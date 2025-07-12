@@ -89,17 +89,14 @@ JsonEscape(str) {
         ; Parse response and extract corrected text
         response := http.ResponseText
        
-        ; Better JSON parsing - look for the last "content" field (assistant's response)
-        contentMatches := []
-        pos := 1
-        while (pos := RegExMatch(response, '"content"\s*:\s*"((?:[^"\\]|\\.)*)"', &match, pos)) {
-            contentMatches.Push(match[1])
-            pos += match.Len
+        ; Optimized JSON parsing - capture the last "content" field (assistant's response)
+        lastPos := 0
+        while (RegExMatch(response, '"content"\s*:\s*"((?:[^"\\]|\\.)*)"', &match, lastPos + 1)) {
+            correctedText := match[1]
+            lastPos := match.Pos
         }
-       
-        if (contentMatches.Length > 0) {
-            ; Get the last content match (should be assistant's response)
-            correctedText := contentMatches[-1]
+        
+        if (lastPos > 0) {
            
             ; Unescape JSON - fix for single backslash sequences
             correctedText := StrReplace(correctedText, "\n", "`n")
