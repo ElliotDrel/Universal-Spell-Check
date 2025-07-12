@@ -1,5 +1,7 @@
 # Ignore the C# application folder
 Universal Spell Checker App/
+# But keep the README file
+!Universal Spell Checker App/README_APP_FOLDER.txt
 
 # Ignore common build artifacts
 bin/
