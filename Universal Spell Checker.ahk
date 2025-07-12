@@ -13,9 +13,11 @@ LogSpellCheck(data) {
     status := data.error ? "ERROR: " . data.error : "SUCCESS"
     inputText := StrReplace(data.original, "`n", "\\n")
     outputText := StrReplace(data.result, "`n", "\\n")
+    rawOutput := StrReplace(data.rawResponse, "`n", "\\n")
+    pastedText := StrReplace(data.pastedText, "`n", "\\n")
     
-    entry := Format("{1} | {2}ms | {3} | Input: {4} | Output: {5}`n", 
-        data.timestamp, duration, status, inputText, outputText)
+    entry := Format("{1} | {2}ms | {3} | Input: {4} | Raw AI: {5} | Output: {6} | Pasted: {7}`n", 
+        data.timestamp, duration, status, inputText, rawOutput, outputText, pastedText)
     
     try {
         FileAppend(entry, logFilePath)
@@ -41,6 +43,8 @@ JsonEscape(str) {
     logData := {
         original: "",
         result: "",
+        rawResponse: "",
+        pastedText: "",
         error: "",
         startTime: startTime,
         pasteTime: 0,
@@ -88,6 +92,7 @@ JsonEscape(str) {
        
         ; Parse response and extract corrected text
         response := http.ResponseText
+        logData.rawResponse := response
        
         ; Optimized JSON parsing - capture the last "content" field (assistant's response)
         lastPos := 0
@@ -112,6 +117,7 @@ JsonEscape(str) {
                 ; Capture paste timing and log success
                 logData.pasteTime := A_TickCount
                 logData.result := correctedText
+                logData.pastedText := correctedText
                 SetTimer(() => LogSpellCheck(logData), -1)
             }
         } else {
