@@ -1,0 +1,17 @@
+# Ignore the C# application folder
+Universal Spell Checker App/
+
+# Ignore common build artifacts
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+
+# Ignore IDE files
+.vs/
+*.user
+*.suo
+
+# Ignore logs
+*.log
