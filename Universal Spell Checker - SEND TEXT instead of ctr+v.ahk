@@ -66,7 +66,10 @@ JsonEscape(str) {
            
             ; Replace with corrected text using keystroke simulation
             if (correctedText != "") {
+                ; Type the corrected text first
                 SendText(correctedText)
+                ; Then place corrected text onto the clipboard for optional Ctrl+V
+                A_Clipboard := correctedText
             }
         } else {
             ToolTip("Error: Could not parse API response")
