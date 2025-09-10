@@ -4,6 +4,24 @@
 enableLogging := true
 logFilePath := A_ScriptDir . "\spellcheck.log"
 
+; Configure per-app paste behavior
+; - Add exe names (e.g., "notepad.exe") to `sendTextApps` to use keystroke typing
+; - Default for all other apps is clipboard + Ctrl+V paste
+sendTextApps := [
+    ; Examples (replace or extend as needed):
+    ; "SomeApp.exe",
+    ; "AnotherApp.exe"
+]
+
+UseSendText() {
+    global sendTextApps
+    for exe in sendTextApps {
+        if WinActive("ahk_exe " exe)
+            return true
+    }
+    return false
+}
+
 ; Logging function
 LogSpellCheck(data) {
     if (!enableLogging) 
@@ -111,8 +129,16 @@ JsonEscape(str) {
            
             ; Replace with corrected text
             if (correctedText != "") {
-                A_Clipboard := correctedText
-                Send("^v")
+                if (UseSendText()) {
+                    ; Type the corrected text directly (replaces current selection)
+                    SendText(correctedText)
+                    ; Optionally mirror to clipboard for user convenience
+                    A_Clipboard := correctedText
+                } else {
+                    ; Default: paste via clipboard
+                    A_Clipboard := correctedText
+                    Send("^v")
+                }
                 
                 ; Capture paste timing and log success
                 logData.pasteTime := A_TickCount
