@@ -94,6 +94,14 @@ LogDetailed(data) {
             entry .= rawResponse . "`n"
             entry .= "`n"
         }
+
+        if (data.HasOwnProp("events") && IsObject(data.events) && data.events.Length) {
+            entry .= "Events:`n"
+            for idx, event in data.events {
+                entry .= "  " . event . "`n"
+            }
+            entry .= "`n"
+        }
         
         entry .= "Pasted Text:`n"
         entry .= pastedText . "`n"
@@ -117,6 +125,13 @@ JsonEscape(str) {
     return str
 }
 
+FinalizeRun(logData) {
+    if (!logData.HasOwnProp("pasteTime") || logData.pasteTime = 0)
+        logData.pasteTime := A_TickCount
+    snapshot := logData.Clone()
+    SetTimer(() => LogDetailed(snapshot), -1)
+}
+
 ^!u::                                  ; hotkey Ctrl+Alt+U
 {
     ; Initialize timing and logging data
@@ -129,45 +144,49 @@ JsonEscape(str) {
         error: "",
         startTime: startTime,
         pasteTime: 0,
-        timestamp: FormatTime(, "yyyy-MM-dd HH:mm:ss")
-    }
-    
-    A_Clipboard := ""                  ; clear clipboard
-    Send("^c")                         ; copy selection
-    if !ClipWait(1) {
-        logData.error := "Clipboard wait timeout"
-        logData.pasteTime := A_TickCount
-        SetTimer(() => LogDetailed(logData), -1)
-        return
+        timestamp: FormatTime(, "yyyy-MM-dd HH:mm:ss"),
+        pasteAttempted: false,
+        events: []
     }
 
-    originalText := A_Clipboard         ; store original text before processing
-    logData.original := originalText
-   
-    ; OpenAI API call
-    apiKey := "REDACTED"
-   
-    ; Create the prompt (same as Python file)
-    prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
-   
-    ; Create JSON payload with proper escaping
-    escapedPrompt := JsonEscape(prompt)
-    jsonPayload := '{"model":"gpt-4.1","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
-   
     try {
-        ; Make HTTP request with timeouts
+        A_Clipboard := ""                  ; clear clipboard
+        Send("^c")                         ; copy selection
+        if !ClipWait(1) {
+            logData.error := "Clipboard wait timeout"
+            logData.pasteTime := A_TickCount
+            logData.events.Push("Clipboard wait timed out")
+            return
+        }
+
+        originalText := A_Clipboard         ; store original text before processing
+        logData.original := originalText
+        logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
+       
+        ; OpenAI API call
+        apiKey := "REDACTED"
+       
+        ; Create the prompt (same as Python file)
+        prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
+       
+        ; Create JSON payload with proper escaping
+        escapedPrompt := JsonEscape(prompt)
+        jsonPayload := '{"model":"gpt-4.1","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
+        logData.events.Push("Payload prepared")
+
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
         http.Open("POST", "https://api.openai.com/v1/chat/completions", false)
         http.SetRequestHeader("Content-Type", "application/json")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
         http.Send(jsonPayload)
+        logData.events.Push("Request sent")
        
         ; Check for successful response
         if (http.Status != 200) {
             logData.error := "API Error: " . http.Status . " - " . http.StatusText
             logData.pasteTime := A_TickCount
-            SetTimer(() => LogDetailed(logData), -1)
+            logData.events.Push("API error encountered: " . http.Status)
             ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(http.ResponseText, 1, 200))
             SetTimer(() => ToolTip(), -5000)
             return
@@ -176,6 +195,7 @@ JsonEscape(str) {
         ; Parse response and extract corrected text
         response := http.ResponseText
         logData.rawResponse := response
+        logData.events.Push("Response received")
        
         ; Optimized JSON parsing - capture the last "content" field (assistant's response)
         lastPos := 0
@@ -196,34 +216,41 @@ JsonEscape(str) {
             if (correctedText != "") {
                 if (UseSendText()) {
                     ; Type the corrected text directly (replaces current selection)
+                    logData.pasteAttempted := true
                     SendText(correctedText)
                     ; Optionally mirror to clipboard for user convenience
                     A_Clipboard := correctedText
+                    logData.events.Push("Text typed via SendText")
                 } else {
                     ; Default: paste via clipboard
                     A_Clipboard := correctedText
+                    logData.pasteAttempted := true
                     Send("^v")
+                    logData.events.Push("Text pasted via clipboard")
                 }
                 
                 ; Capture paste timing and log success
                 logData.pasteTime := A_TickCount
                 logData.result := correctedText
                 logData.pastedText := correctedText
-                SetTimer(() => LogDetailed(logData), -1)
             }
         } else {
             logData.error := "Could not parse API response"
             logData.pasteTime := A_TickCount
-            SetTimer(() => LogDetailed(logData), -1)
+            logData.events.Push("Response parsing failed")
             ToolTip("Error: Could not parse API response")
             SetTimer(() => ToolTip(), -3000)
         }
        
     } catch Error as e {
         logData.error := "Exception: " . e.Message
-        logData.pasteTime := A_TickCount
-        SetTimer(() => LogDetailed(logData), -1)
+        if (!logData.pasteTime)
+            logData.pasteTime := A_TickCount
+        logData.events.Push("Exception thrown: " . e.Message)
         ToolTip("Error: " . e.Message)
         SetTimer(() => ToolTip(), -3000)
+    } finally {
+        FinalizeRun(logData)
     }
-} 
+    return
+}
