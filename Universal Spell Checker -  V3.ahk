@@ -171,7 +171,7 @@ FinalizeRun(logData) {
        
         ; Create JSON payload with proper escaping
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"gpt-4.1","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
+        jsonPayload := '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
         logData.events.Push("Payload prepared")
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
