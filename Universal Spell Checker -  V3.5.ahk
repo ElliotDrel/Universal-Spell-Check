@@ -162,6 +162,25 @@ JsonEscape(str) {
     return str
 }
 
+; Read HTTP response body as UTF-8 text to avoid mojibake on smart quotes, etc.
+GetUtf8Response(http) {
+    stream := ComObject("ADODB.Stream")
+    try {
+        stream.Type := 1                      ; binary mode
+        stream.Open()
+        stream.Write(http.ResponseBody)
+        stream.Position := 0
+        stream.Type := 2                      ; text mode
+        stream.Charset := "utf-8"
+        return stream.ReadText()
+    } finally {
+        try {
+            if (stream.State = 1)
+                stream.Close()
+        }
+    }
+}
+
 FinalizeRun(logData) {
     if (!logData.HasOwnProp("pasteTime") || logData.pasteTime = 0)
         logData.pasteTime := A_TickCount
@@ -214,7 +233,7 @@ FinalizeRun(logData) {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
         http.Open("POST", "https://api.openai.com/v1/chat/completions", false)
-        http.SetRequestHeader("Content-Type", "application/json")
+        http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
         http.Send(jsonPayload)
         logData.events.Push("Request sent")
@@ -224,13 +243,23 @@ FinalizeRun(logData) {
             logData.error := "API Error: " . http.Status . " - " . http.StatusText
             logData.pasteTime := A_TickCount
             logData.events.Push("API error encountered: " . http.Status)
-            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(http.ResponseText, 1, 200))
+            errPreview := ""
+            try {
+                errPreview := SubStr(GetUtf8Response(http), 1, 200)
+            } catch {
+                try {
+                    errPreview := SubStr(http.ResponseText, 1, 200)
+                } catch {
+                    errPreview := ""
+                }
+            }
+            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . errPreview)
             SetTimer(() => ToolTip(), -5000)
             return
         }
        
         ; Parse response and extract corrected text
-        response := http.ResponseText
+        response := GetUtf8Response(http)
         logData.rawResponse := response
         logData.events.Push("Response received")
        
