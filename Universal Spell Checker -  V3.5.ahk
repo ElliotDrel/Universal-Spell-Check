@@ -42,7 +42,7 @@ GetClipboardText() {
         if DllCall("IsClipboardFormatAvailable", "uint", CF_UNICODETEXT) {
             if (hData := DllCall("GetClipboardData", "uint", CF_UNICODETEXT, "ptr")) {
                 if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
-                    text := StrGet(pData, "UTF-16")
+                    text := StrGet(pData, , "UTF-16")
                     DllCall("GlobalUnlock", "ptr", hData)
                     return text
                 }
@@ -52,7 +52,7 @@ GetClipboardText() {
             if (hData := DllCall("GetClipboardData", "uint", CF_TEXT, "ptr")) {
                 if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
                     ; Decode legacy ANSI bytes with Windows-1252 so smart quotes survive UTF-8 locale
-                    text := StrGet(pData, "CP1252")
+                    text := StrGet(pData, , "CP1252")
                     DllCall("GlobalUnlock", "ptr", hData)
                     return text
                 }
@@ -208,7 +208,7 @@ FinalizeRun(logData) {
        
         ; Create JSON payload with proper escaping
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
+        jsonPayload := '{"model":"gpt-4.1","messages":[{"role":"user","content":"' . escapedPrompt . '"}],"temperature":0.3}'
         logData.events.Push("Payload prepared")
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
