@@ -276,11 +276,17 @@ FinalizeRun(logData) {
         
         if (correctedText != "") {
            
-            ; Unescape JSON - fix for single backslash sequences
+            ; Unescape JSON - ensure escaped backslashes are resolved before other sequences
+            backslashPlaceholder := Chr(0x1F)
+            while InStr(correctedText, backslashPlaceholder) {
+                backslashPlaceholder .= Chr(0x1F)
+            }
+            correctedText := StrReplace(correctedText, "\\", backslashPlaceholder)
             correctedText := StrReplace(correctedText, "\n", "`n")
             correctedText := StrReplace(correctedText, "\r", "`r")
             correctedText := StrReplace(correctedText, "\t", "`t")
             correctedText := StrReplace(correctedText, '\"', '"')
+            correctedText := StrReplace(correctedText, backslashPlaceholder, "\")
            
             if (UseSendText()) {
                 ; Type the corrected text directly (replaces current selection)
