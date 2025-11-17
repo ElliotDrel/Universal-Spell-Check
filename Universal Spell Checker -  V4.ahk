@@ -162,6 +162,215 @@ JsonEscape(str) {
     return str
 }
 
+; Minimal JSON parser (enough for the Responses API payloads)
+JsonLoad(json) {
+    parser := {text: json, pos: 1, len: StrLen(json)}
+    value := __JsonParseValue(parser)
+    __JsonSkipWhitespace(parser)
+    if (parser.pos <= parser.len)
+        throw Error("JSON parse error: unexpected data at position " parser.pos)
+    return value
+}
+
+__JsonSkipWhitespace(parser) {
+    while (parser.pos <= parser.len) {
+        char := SubStr(parser.text, parser.pos, 1)
+        if (char != " " && char != "`t" && char != "`n" && char != "`r")
+            break
+        parser.pos += 1
+    }
+}
+
+__JsonPeekChar(parser) {
+    if (parser.pos > parser.len)
+        return ""
+    return SubStr(parser.text, parser.pos, 1)
+}
+
+__JsonConsumeChar(parser) {
+    if (parser.pos > parser.len)
+        throw Error("JSON parse error: unexpected end of input at position " parser.pos)
+    char := SubStr(parser.text, parser.pos, 1)
+    parser.pos += 1
+    return char
+}
+
+__JsonParseValue(parser) {
+    __JsonSkipWhitespace(parser)
+    if (parser.pos > parser.len)
+        throw Error("JSON parse error: incomplete value at position " parser.pos)
+    char := __JsonPeekChar(parser)
+    if (char = "{")
+        return __JsonParseObject(parser)
+    if (char = "[")
+        return __JsonParseArray(parser)
+    if (char = '"')
+        return __JsonParseString(parser)
+    if (char = "-" || (char >= "0" && char <= "9"))
+        return __JsonParseNumber(parser)
+    if (SubStr(parser.text, parser.pos, 4) = "true")
+        return __JsonParseLiteral(parser, "true", true)
+    if (SubStr(parser.text, parser.pos, 5) = "false")
+        return __JsonParseLiteral(parser, "false", false)
+    if (SubStr(parser.text, parser.pos, 4) = "null")
+        return __JsonParseLiteral(parser, "null", "")
+    throw Error("JSON parse error: unexpected character '" . char . "' at position " parser.pos)
+}
+
+__JsonParseLiteral(parser, literal, value) {
+    if (SubStr(parser.text, parser.pos, StrLen(literal)) != literal)
+        throw Error("JSON parse error: invalid literal at position " parser.pos)
+    parser.pos += StrLen(literal)
+    return value
+}
+
+__JsonParseObject(parser) {
+    __JsonConsumeChar(parser) ; skip '{'
+    obj := Map()
+    __JsonSkipWhitespace(parser)
+    if (__JsonPeekChar(parser) = "}") {
+        parser.pos += 1
+        return obj
+    }
+    while (true) {
+        __JsonSkipWhitespace(parser)
+        if (__JsonPeekChar(parser) != '"')
+            throw Error("JSON parse error: expected string key at position " parser.pos)
+        key := __JsonParseString(parser)
+        __JsonSkipWhitespace(parser)
+        if (__JsonConsumeChar(parser) != ":")
+            throw Error("JSON parse error: expected ':' at position " parser.pos)
+        value := __JsonParseValue(parser)
+        obj[key] := value
+        __JsonSkipWhitespace(parser)
+        delimiter := __JsonConsumeChar(parser)
+        if (delimiter = "}")
+            break
+        if (delimiter != ",")
+            throw Error("JSON parse error: expected ',' at position " parser.pos)
+    }
+    return obj
+}
+
+__JsonParseArray(parser) {
+    __JsonConsumeChar(parser) ; skip '['
+    arr := []
+    __JsonSkipWhitespace(parser)
+    if (__JsonPeekChar(parser) = "]") {
+        parser.pos += 1
+        return arr
+    }
+    while (true) {
+        value := __JsonParseValue(parser)
+        arr.Push(value)
+        __JsonSkipWhitespace(parser)
+        delimiter := __JsonConsumeChar(parser)
+        if (delimiter = "]")
+            break
+        if (delimiter != ",")
+            throw Error("JSON parse error: expected ',' at position " parser.pos)
+    }
+    return arr
+}
+
+__JsonParseString(parser) {
+    __JsonConsumeChar(parser) ; skip opening quote
+    result := ""
+    while (parser.pos <= parser.len) {
+        char := __JsonConsumeChar(parser)
+        if (char = '"')
+            return result
+        if (char = "\")
+            result .= __JsonParseEscape(parser)
+        else
+            result .= char
+    }
+    throw Error("JSON parse error: unterminated string literal")
+}
+
+__JsonParseEscape(parser) {
+    esc := __JsonConsumeChar(parser)
+    if (esc = '"' || esc = "\" || esc = "/")
+        return esc
+    if (esc = "b")
+        return Chr(8)
+    if (esc = "f")
+        return Chr(12)
+    if (esc = "n")
+        return "`n"
+    if (esc = "r")
+        return "`r"
+    if (esc = "t")
+        return "`t"
+    if (esc = "u")
+        return __JsonParseUnicodeEscape(parser)
+    throw Error("JSON parse error: invalid escape sequence '\\" . esc . "' at position " parser.pos)
+}
+
+__JsonParseUnicodeEscape(parser) {
+    if (parser.pos + 3 > parser.len)
+        throw Error("JSON parse error: incomplete unicode escape at position " parser.pos)
+    hex := SubStr(parser.text, parser.pos, 4)
+    if !RegExMatch(hex, "^[0-9A-Fa-f]{4}$")
+        throw Error("JSON parse error: invalid unicode escape at position " parser.pos)
+    code := ("0x" . hex) + 0
+    parser.pos += 4
+    if (code >= 0xD800 && code <= 0xDBFF) {
+        if (parser.pos + 5 <= parser.len && SubStr(parser.text, parser.pos, 2) = "\u") {
+            parser.pos += 2
+            hex2 := SubStr(parser.text, parser.pos, 4)
+            if !RegExMatch(hex2, "^[0-9A-Fa-f]{4}$")
+                throw Error("JSON parse error: invalid unicode escape at position " parser.pos)
+            low := ("0x" . hex2) + 0
+            parser.pos += 4
+            if (low < 0xDC00 || low > 0xDFFF)
+                throw Error("JSON parse error: invalid surrogate pair at position " parser.pos)
+            code := 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00)
+        }
+    }
+    return Chr(code)
+}
+
+__JsonParseNumber(parser) {
+    start := parser.pos
+    if (__JsonPeekChar(parser) = "-")
+        parser.pos += 1
+    __JsonParseDigits(parser)
+    hasDecimal := false
+    if (__JsonPeekChar(parser) = ".") {
+        hasDecimal := true
+        parser.pos += 1
+        __JsonParseDigits(parser)
+    }
+    nextChar := __JsonPeekChar(parser)
+    if (nextChar = "e" || nextChar = "E") {
+        hasDecimal := true
+        parser.pos += 1
+        sign := __JsonPeekChar(parser)
+        if (sign = "+" || sign = "-")
+            parser.pos += 1
+        __JsonParseDigits(parser)
+    }
+    numberText := SubStr(parser.text, start, parser.pos - start)
+    ; Use Integer() or Float() for proper AHK v2 conversion
+    if (hasDecimal)
+        return Float(numberText)
+    else
+        return Integer(numberText)
+}
+
+__JsonParseDigits(parser) {
+    start := parser.pos
+    while (parser.pos <= parser.len) {
+        char := __JsonPeekChar(parser)
+        if (char < "0" || char > "9")
+            break
+        parser.pos += 1
+    }
+    if (start = parser.pos)
+        throw Error("JSON parse error: expected digit at position " parser.pos)
+}
+
 ; Read HTTP response body as UTF-8 text to avoid mojibake on smart quotes, etc.
 GetUtf8Response(http) {
     stream := ComObject("ADODB.Stream")
@@ -179,6 +388,62 @@ GetUtf8Response(http) {
                 stream.Close()
         }
     }
+}
+
+; ALTERNATIVE PARSER 1: Regex-based (FASTEST - no object parsing overhead)
+; Extracts text directly from JSON response using regex
+ExtractTextFromResponseRegex(jsonResponse) {
+    ; More flexible pattern - searches for "text" field within "output" array
+    ; Uses PCRE's s flag (dotall) via (?s) to match newlines
+    if RegExMatch(jsonResponse, 's)"output"\s*:\s*\[\s*\{[^}]*"content"\s*:\s*\[\s*\{[^}]*"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', &match) {
+        ; Unescape JSON string (in correct order to avoid double-unescaping)
+        text := match[1]
+
+        ; Handle Unicode escapes FIRST (before unescaping backslashes)
+        while RegExMatch(text, "\\u([0-9A-Fa-f]{4})", &unicodeMatch) {
+            codepoint := Integer("0x" . unicodeMatch[1])
+            text := StrReplace(text, unicodeMatch[0], Chr(codepoint), , , 1)
+        }
+
+        ; Then handle standard JSON escapes
+        text := StrReplace(text, '\"', '"')
+        text := StrReplace(text, "\\n", "`n")
+        text := StrReplace(text, "\\r", "`r")
+        text := StrReplace(text, "\\t", "`t")
+        text := StrReplace(text, "\\/", "/")
+        text := StrReplace(text, "\\\\", "\")  ; Do backslash LAST
+
+        return text
+    }
+    return ""
+}
+
+; ALTERNATIVE PARSER 2: Object-based with dynamic properties (COMPATIBLE)
+; Uses basic Object instead of Map for better AHK v2 compatibility
+ExtractTextFromResponseObject(jsonResponse) {
+    try {
+        ; This uses the existing JsonLoad but expects Object not Map
+        responseObj := JsonLoad(jsonResponse)
+
+        ; Try multiple access patterns for compatibility
+        try {
+            if (responseObj.HasOwnProp("output")) {
+                output := responseObj.output
+                if (IsObject(output) && output.Length > 0) {
+                    chunk := output[1]  ; 1-indexed
+                    if (IsObject(chunk) && chunk.HasOwnProp("content")) {
+                        content := chunk.content
+                        if (IsObject(content) && content.Length > 0) {
+                            piece := content[1]
+                            if (IsObject(piece) && piece.HasOwnProp("text"))
+                                return piece.text
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return ""
 }
 
 FinalizeRun(logData) {
@@ -264,29 +529,78 @@ FinalizeRun(logData) {
         logData.events.Push("Response received")
        
         correctedText := ""
-        if (RegExMatch(response, '"output_text"\s*:\s*\[\s*"((?:[^"\\]|\\.)*)"', &match)) {
-            correctedText := match[1]
-        } else {
-            lastPos := 0
-            while (RegExMatch(response, '"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match, lastPos + 1)) {
-                correctedText := match[1]
-                lastPos := match.Pos
+
+        ; TRY METHOD 1: Regex-based extraction (FASTEST, most reliable)
+        try {
+            logData.events.Push("DEBUG: Trying regex extraction")
+            correctedText := ExtractTextFromResponseRegex(response)
+            if (correctedText != "") {
+                logData.events.Push("DEBUG: Regex extraction SUCCESS, length=" . StrLen(correctedText))
+            } else {
+                logData.events.Push("DEBUG: Regex extraction returned empty")
+            }
+        } catch Error as regexErr {
+            logData.events.Push("DEBUG: Regex extraction failed: " . regexErr.Message)
+        }
+
+        ; TRY METHOD 2: Map-based parsing (if regex failed)
+        if (correctedText = "") {
+            try {
+                logData.events.Push("DEBUG: Trying Map-based parsing")
+                responseObj := JsonLoad(response)
+                logData.events.Push("DEBUG: JsonLoad complete, type=" . Type(responseObj))
+
+                if (responseObj.Has("output")) {
+                    logData.events.Push("DEBUG: Has output property")
+                    outputChunks := responseObj["output"]
+                    logData.events.Push("DEBUG: Got output, type=" . Type(outputChunks))
+
+                    if (IsObject(outputChunks)) {
+                        logData.events.Push("DEBUG: output is object, length=" . outputChunks.Length)
+                        chunkIndex := 0
+                        for , chunk in outputChunks {
+                            chunkIndex++
+                            logData.events.Push("DEBUG: Processing chunk #" . chunkIndex . ", type=" . Type(chunk))
+
+                            if !(IsObject(chunk) && chunk.Has("content"))
+                                continue
+
+                            logData.events.Push("DEBUG: Chunk has content")
+                            contentPieces := chunk["content"]
+                            logData.events.Push("DEBUG: Got content, type=" . Type(contentPieces))
+
+                            if !IsObject(contentPieces)
+                                continue
+
+                            pieceIndex := 0
+                            for , piece in contentPieces {
+                                pieceIndex++
+                                logData.events.Push("DEBUG: Processing piece #" . pieceIndex . ", type=" . Type(piece))
+
+                                if (IsObject(piece) && piece.Has("text")) {
+                                    textValue := piece["text"]
+                                    logData.events.Push("DEBUG: Found text: " . SubStr(textValue, 1, 50))
+                                    correctedText .= textValue
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    logData.events.Push("DEBUG: No output property found")
+                }
+
+                if (correctedText != "") {
+                    logData.events.Push("DEBUG: Map-based parsing SUCCESS, length=" . StrLen(correctedText))
+                } else {
+                    logData.events.Push("DEBUG: Map-based parsing returned empty")
+                }
+            } catch Error as parseErr {
+                logData.events.Push("JSON parse error: " . parseErr.Message . " at line " . parseErr.Line)
+                logData.events.Push("DEBUG: Error.What=" . parseErr.What . ", Error.Extra=" . parseErr.Extra)
             }
         }
         
         if (correctedText != "") {
-           
-            ; Unescape JSON - ensure escaped backslashes are resolved before other sequences
-            backslashPlaceholder := Chr(0x1F)
-            while InStr(correctedText, backslashPlaceholder) {
-                backslashPlaceholder .= Chr(0x1F)
-            }
-            correctedText := StrReplace(correctedText, "\\", backslashPlaceholder)
-            correctedText := StrReplace(correctedText, "\n", "`n")
-            correctedText := StrReplace(correctedText, "\r", "`r")
-            correctedText := StrReplace(correctedText, "\t", "`t")
-            correctedText := StrReplace(correctedText, '\"', '"')
-            correctedText := StrReplace(correctedText, backslashPlaceholder, "\")
            
             if (UseSendText()) {
                 ; Type the corrected text directly (replaces current selection)
