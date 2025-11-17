@@ -37,32 +37,81 @@ GetClipboardText() {
 
     static CF_TEXT := 1
     static CF_UNICODETEXT := 13
+    static CF_HTML := DllCall("RegisterClipboardFormat", "str", "HTML Format", "uint")
+    result := ""
 
     try {
-        if DllCall("IsClipboardFormatAvailable", "uint", CF_UNICODETEXT) {
-            if (hData := DllCall("GetClipboardData", "uint", CF_UNICODETEXT, "ptr")) {
-                if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
-                    text := StrGet(pData, , "UTF-16")
-                    DllCall("GlobalUnlock", "ptr", hData)
-                    return text
+        ; Prefer HTML when available so we can strip formatting noise (empty paragraphs, etc.)
+        if (CF_HTML && DllCall("IsClipboardFormatAvailable", "uint", CF_HTML)) {
+            htmlBlob := __ReadClipboardString(CF_HTML, "UTF-8")
+            if (htmlBlob != "") {
+                fragment := __ExtractHtmlFragment(htmlBlob)
+                if (fragment != "") {
+                    htmlText := __HtmlFragmentToPlainText(fragment)
+                    if (htmlText != "")
+                        result := htmlText
                 }
             }
         }
-        if DllCall("IsClipboardFormatAvailable", "uint", CF_TEXT) {
-            if (hData := DllCall("GetClipboardData", "uint", CF_TEXT, "ptr")) {
-                if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
-                    ; Decode legacy ANSI bytes with Windows-1252 so smart quotes survive UTF-8 locale
-                    text := StrGet(pData, , "CP1252")
-                    DllCall("GlobalUnlock", "ptr", hData)
-                    return text
-                }
-            }
+
+        if (result = "" && DllCall("IsClipboardFormatAvailable", "uint", CF_UNICODETEXT)) {
+            unicodeText := __ReadClipboardString(CF_UNICODETEXT, "UTF-16")
+            if (unicodeText != "")
+                result := unicodeText
+        }
+
+        if (result = "" && DllCall("IsClipboardFormatAvailable", "uint", CF_TEXT)) {
+            ansiText := __ReadClipboardString(CF_TEXT, "CP1252")
+            if (ansiText != "")
+                result := ansiText
         }
     } finally {
         DllCall("CloseClipboard")
     }
 
-    return text
+    return result != "" ? result : text
+}
+
+__ReadClipboardString(format, encoding) {
+    if (hData := DllCall("GetClipboardData", "uint", format, "ptr")) {
+        if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
+            text := StrGet(pData, , encoding)
+            DllCall("GlobalUnlock", "ptr", hData)
+            return text
+        }
+    }
+    return ""
+}
+
+__ExtractHtmlFragment(htmlBlob) {
+    startMarker := "<!--StartFragment-->"
+    endMarker := "<!--EndFragment-->"
+    startIdx := InStr(htmlBlob, startMarker)
+    endIdx := InStr(htmlBlob, endMarker)
+    if (startIdx && endIdx) {
+        startIdx += StrLen(startMarker)
+        return SubStr(htmlBlob, startIdx, endIdx - startIdx)
+    }
+
+    if (RegExMatch(htmlBlob, "StartFragment:(\d+)", &startMatch) && RegExMatch(htmlBlob, "EndFragment:(\d+)", &endMatch)) {
+        startPos := Integer(startMatch[1]) + 1
+        length := Integer(endMatch[1]) - Integer(startMatch[1])
+        return SubStr(htmlBlob, startPos, length)
+    }
+    return ""
+}
+
+__HtmlFragmentToPlainText(fragment) {
+    try {
+        doc := ComObject("HTMLFile")
+        doc.Write(fragment)
+        doc.Close()
+        if (doc.body)
+            return Trim(doc.body.innerText, "`r`n")
+    } catch {
+        ; Fall through to caller so it can try Unicode/plain text representations
+    }
+    return ""
 }
 
 ; Log rotation function
@@ -407,11 +456,11 @@ ExtractTextFromResponseRegex(jsonResponse) {
 
         ; Then handle standard JSON escapes
         text := StrReplace(text, '\"', '"')
-        text := StrReplace(text, "\\n", "`n")
-        text := StrReplace(text, "\\r", "`r")
-        text := StrReplace(text, "\\t", "`t")
-        text := StrReplace(text, "\\/", "/")
-        text := StrReplace(text, "\\\\", "\")  ; Do backslash LAST
+        text := StrReplace(text, "\n", "`n")
+        text := StrReplace(text, "\r", "`r")
+        text := StrReplace(text, "\t", "`t")
+        text := StrReplace(text, "\/", "/")
+        text := StrReplace(text, "\\", "\")  ; Do backslash LAST
 
         return text
     }
