@@ -444,7 +444,8 @@ GetUtf8Response(http) {
 ExtractTextFromResponseRegex(jsonResponse) {
     ; More flexible pattern - searches for "text" field within "output" array
     ; Uses PCRE's s flag (dotall) via (?s) to match newlines
-    if RegExMatch(jsonResponse, 's)"output"\s*:\s*\[\s*\{[^}]*"content"\s*:\s*\[\s*\{[^}]*"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', &match) {
+    ; Capture group pattern (?:[^"\\]|\\.)* correctly handles escaped quotes
+    if RegExMatch(jsonResponse, 's)"output"\s*:\s*\[\s*\{[^}]*"content"\s*:\s*\[\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
         ; Unescape JSON string (in correct order to avoid double-unescaping)
         text := match[1]
 
