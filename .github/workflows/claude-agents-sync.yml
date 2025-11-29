@@ -1,0 +1,22 @@
+name: Verify CLAUDE.md and AGENTS.md match
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check if files match
+        run: |
+          if ! diff -u CLAUDE.md AGENTS.md; then
+            echo "❌ ERROR: CLAUDE.md and AGENTS.md have different content!"
+            echo "These files must be kept in sync for consistent AI agent behavior."
+            echo "Please update both files to match before merging."
+            exit 1
+          fi
+          echo "✓ CLAUDE.md and AGENTS.md are in sync"
