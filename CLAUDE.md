@@ -31,10 +31,11 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 5. Parses response and replaces text via clipboard (Ctrl+V)
 
 ### OpenAI API Integration
-- **Models**: Uses `gpt-4.1` or `gpt-4.1-mini` (both are real, valid OpenAI models)
-- **Temperature**: 0.3 for consistent corrections
+- **Models**: Uses `gpt-5.1` (reasoning model via Responses API)
+- **Temperature**: Not supported (reasoning models use internal adaptive reasoning)
 - **Timeout**: 30 seconds for API response
 - **Prompt**: Optimized for grammar/spelling fixes while preserving formatting
+- **API Endpoint**: `https://api.openai.com/v1/responses` (Responses API)
 
 ### Performance Optimizations
 - Direct WinHTTP COM object for API calls
@@ -129,7 +130,8 @@ When debugging unclear issues, prepare multiple approaches:
 
 ## Important Notes for Claude
 
-- **gpt-4.1** and **gpt-4.1-mini** are legitimate OpenAI models - do not suggest they're invalid
+- **gpt-5.1** is a reasoning model and does NOT support temperature/top_p parameters
+- **Responses API** is the correct endpoint (`/v1/responses`) for GPT-5 series models
 - **SPEED IS PARAMOUNT**: Always prioritize performance - user has emphasized this repeatedly
 - **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes
 - **Simplest wins**: Regex > Object parsing for simple extraction tasks

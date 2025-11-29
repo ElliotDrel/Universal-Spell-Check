@@ -5,6 +5,11 @@ enableLogging := true
 detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
 maxLogSize := 5000000  ; 5MB max per log file
 
+; API configuration
+apiModel := "gpt-5.1"
+apiUrl := "https://api.openai.com/v1/responses"
+reasoningEffort := "none"  ; none = fastest (no reasoning), low/medium/high for more reasoning
+
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
@@ -536,18 +541,18 @@ FinalizeRun(logData) {
        
         ; OpenAI API call
         apiKey := "REDACTED"
-       
+        
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
        
         ; Create JSON payload for Responses API
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"gpt-4.1","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"temperature":0.3}'
-        logData.events.Push("Payload prepared")
+        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"reasoning_effort":"' . reasoningEffort . '"}'
+        logData.events.Push("Payload prepared for " . apiModel . " (reasoning: " . reasoningEffort . ")")
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
-        http.Open("POST", "https://api.openai.com/v1/responses", false)
+        http.Open("POST", apiUrl, false)
         http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
         http.Send(jsonPayload)
