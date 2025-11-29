@@ -32,12 +32,16 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 
 ### OpenAI API Integration
 - **Models**: Uses `gpt-5.1` (reasoning model via Responses API)
-- **Reasoning Effort**: Set to `"none"` for maximum speed (no reasoning needed for spell check)
-- **Verbosity**: Default `"low"` (GPT-5.1's default - concise output)
-- **Temperature**: Not supported (reasoning models use internal adaptive reasoning)
+- **Endpoint**: `https://api.openai.com/v1/responses`
+- **Payload fields (must match docs)**:
+  - `model`: `gpt-5.1`
+  - `input`: array with `{role:"user", content:[{type:"input_text", text:"..."}]}`
+  - `store`: `true`
+  - `text`: `{"verbosity":"low"}`
+  - `reasoning`: `{"effort":"none","summary":"auto"}` (do not use `reasoning_effort`)
+- **Unsupported for reasoning models**: temperature, top_p, presence_penalty, frequency_penalty, logit_bias, logprobs
 - **Timeout**: 30 seconds for API response
 - **Prompt**: Optimized for grammar/spelling fixes while preserving formatting
-- **API Endpoint**: `https://api.openai.com/v1/responses` (Responses API)
 
 ### Performance Optimizations
 - Direct WinHTTP COM object for API calls
@@ -48,6 +52,7 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 - **Map-based JSON parser** (fallback with debug logging)
   - Only used if regex extraction fails
   - Uses Integer()/Float() for AHK v2 compatibility
+- Log API error bodies on non-200 responses for quick root-cause checks
 - No file I/O or configuration overhead
 - Single clipboard operation for text replacement
 - Hardcoded API key to avoid configuration delays
@@ -58,12 +63,12 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 **NEVER declare work complete without verifying ALL aspects, not just structure.**
 
 When verifying API integrations or model changes:
-1. ✓ Model name/identifier correct?
-2. ✓ Endpoint URL correct?
-3. ✓ Request structure correct?
-4. ✓ **ALL parameters supported by this specific model?** (Critical - often missed!)
-5. ✓ Response format compatible?
-6. ✓ Error handling appropriate?
+1. Model name/identifier correct?
+2. Endpoint URL correct?
+3. Request structure correct and matches docs?
+4. **ALL parameters supported by this specific model/type?** (Critical - often missed!)
+5. Response format compatible?
+6. Error handling appropriate (capture raw error body for 4xx/5xx)?
 
 **Real Example**: When migrating to GPT-5.1, initial verification checked model name and endpoint but MISSED that reasoning models don't support the `temperature` parameter. This would have caused API errors. Always verify parameter compatibility, especially when switching model TYPES (not just versions).
 
@@ -77,7 +82,7 @@ When facing bugs:
 2. **SECOND**: Analyze debug output to understand root cause
 3. **THIRD**: Implement targeted fix based on data, not assumptions
 
-**Real Example**: Spent 3 fix attempts on object model issues (Object vs Map, bracket notation, etc.) when actual problems were:
+**Real Example**: Spent multiple attempts on object model issues when actual problems were:
 - Regex pattern too strict (revealed by debug log: "Regex extraction returned empty")
 - Number parsing syntax error (revealed by debug log: "Expected a Number but got a String at line 359")
 
@@ -96,11 +101,9 @@ When user emphasizes speed/performance:
 
 ### 4. AutoHotkey v2 Compatibility Gotchas
 
-**CRITICAL**: AHK v2 has breaking changes from v1. Common issues:
-
 **Number Conversion:**
-- ❌ WRONG: `return numberText + 0` (throws "Expected a Number but got a String")
-- ✅ RIGHT: `return Integer(numberText)` or `return Float(numberText)`
+- WRONG: `return numberText + 0` (throws "Expected a Number but got a String")
+- RIGHT: `return Integer(numberText)` or `return Float(numberText)`
 
 **Object Types:**
 - `obj := {}` creates basic Object
@@ -166,16 +169,15 @@ When debugging unclear issues, prepare multiple approaches:
 4. Check response structure differences
 5. Test with sample request before declaring complete
 
-**Why This Matters**: Reasoning models will return API errors if you send unsupported parameters like temperature. Always verify parameter compatibility when switching model TYPES, not just versions.
+**Why This Matters**: Reasoning models will return API errors if you send unsupported parameters like temperature or `reasoning_effort` (the correct shape is `reasoning: { effort: ... }`). Always verify parameter compatibility when switching model TYPES, not just versions.
 
 ## Important Notes for Claude
 
 - **VERIFY EVERYTHING**: Don't declare work complete without checking ALL parameters, not just structure
 - **Model type awareness**: Standard GPT vs Reasoning models have different parameter support - ALWAYS CHECK
-- **gpt-5.1** is a reasoning model and does NOT support temperature/top_p parameters
-- **Responses API** is the correct endpoint (`/v1/responses`) for GPT-5 series models
+- **gpt-5.1** is a reasoning model and uses the Responses API; include `store`, `text.verbosity`, and `reasoning` fields as documented
 - **SPEED IS PARAMOUNT**: Always prioritize performance - user has emphasized this repeatedly
-- **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes
+- **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes (include raw error body on failures)
 - **Simplest wins**: Regex > Object parsing for simple extraction tasks
 - **Version awareness**: AHK v2 syntax differs from v1; use Integer()/Float() for number conversion
 - **Official docs only**: When user emphasizes official documentation, be strategic in searches when direct access fails
