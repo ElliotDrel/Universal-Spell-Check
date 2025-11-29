@@ -8,7 +8,9 @@ maxLogSize := 5000000  ; 5MB max per log file
 ; API configuration
 apiModel := "gpt-5.1"
 apiUrl := "https://api.openai.com/v1/responses"
-reasoningEffort := "none"  ; none = fastest (no reasoning), low/medium/high for more reasoning
+reasoningEffort := "none"   ; Responses API: none/low/medium/high
+reasoningSummary := "auto"  ; let model decide summary behavior
+Verbosity := "low"      ; concise output per Responses API text config
 
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
@@ -545,10 +547,10 @@ FinalizeRun(logData) {
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
        
-        ; Create JSON payload for Responses API
+        ; Create JSON payload for Responses API (store + text verbosity + reasoning)
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"reasoning_effort":"' . reasoningEffort . '"}'
-        logData.events.Push("Payload prepared for " . apiModel . " (reasoning: " . reasoningEffort . ")")
+        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
+        logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", reasoning: " . reasoningEffort . "/" . reasoningSummary . ")")
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
@@ -563,17 +565,24 @@ FinalizeRun(logData) {
             logData.error := "API Error: " . http.Status . " - " . http.StatusText
             logData.pasteTime := A_TickCount
             logData.events.Push("API error encountered: " . http.Status)
+
             errPreview := ""
             try {
-                errPreview := SubStr(GetUtf8Response(http), 1, 200)
+                errPreview := GetUtf8Response(http)
             } catch {
                 try {
-                    errPreview := SubStr(http.ResponseText, 1, 200)
+                    errPreview := http.ResponseText
                 } catch {
                     errPreview := ""
                 }
             }
-            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . errPreview)
+
+            if (errPreview != "") {
+                logData.rawResponse := SubStr(errPreview, 1, 1000)
+                logData.events.Push("API error body captured (" . StrLen(logData.rawResponse) . " chars)")
+            }
+
+            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(errPreview, 1, 200))
             SetTimer(() => ToolTip(), -5000)
             return
         }
