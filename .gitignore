@@ -12,3 +12,6 @@ obj/
 
 # Ignore logs
 *.log
+
+# Ignore claude code settings
+.claude/settings.local.json
