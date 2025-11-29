@@ -32,6 +32,8 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 
 ### OpenAI API Integration
 - **Models**: Uses `gpt-5.1` (reasoning model via Responses API)
+- **Reasoning Effort**: Set to `"none"` for maximum speed (no reasoning needed for spell check)
+- **Verbosity**: Default `"low"` (GPT-5.1's default - concise output)
 - **Temperature**: Not supported (reasoning models use internal adaptive reasoning)
 - **Timeout**: 30 seconds for API response
 - **Prompt**: Optimized for grammar/spelling fixes while preserving formatting
@@ -52,7 +54,22 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 
 ## Critical Debugging Principles (MUST FOLLOW)
 
-### 1. Debug First, Fix Second
+### 1. Complete Verification Before Declaring Success
+**NEVER declare work complete without verifying ALL aspects, not just structure.**
+
+When verifying API integrations or model changes:
+1. ✓ Model name/identifier correct?
+2. ✓ Endpoint URL correct?
+3. ✓ Request structure correct?
+4. ✓ **ALL parameters supported by this specific model?** (Critical - often missed!)
+5. ✓ Response format compatible?
+6. ✓ Error handling appropriate?
+
+**Real Example**: When migrating to GPT-5.1, initial verification checked model name and endpoint but MISSED that reasoning models don't support the `temperature` parameter. This would have caused API errors. Always verify parameter compatibility, especially when switching model TYPES (not just versions).
+
+**Key Learning**: Standard GPT models vs Reasoning models (GPT-5/o1/o3) have fundamentally different parameter support. Model TYPE matters, not just model name.
+
+### 2. Debug First, Fix Second
 **NEVER attempt fixes without data when root cause is unclear.**
 
 When facing bugs:
@@ -66,7 +83,7 @@ When facing bugs:
 
 Debug logging would have revealed both issues immediately. Always add logging FIRST.
 
-### 2. Simplest Solution First (Performance Priority)
+### 3. Simplest Solution First (Performance Priority)
 When user emphasizes speed/performance:
 1. Consider **regex-based parsing** before object model parsing
 2. Regex is ~10x faster: no object allocation, no recursive parsing, no type checking
@@ -77,7 +94,7 @@ When user emphasizes speed/performance:
 - Simpler: ~25 lines vs ~200 lines of JSON parser
 - More reliable: no object model version dependencies
 
-### 3. AutoHotkey v2 Compatibility Gotchas
+### 4. AutoHotkey v2 Compatibility Gotchas
 
 **CRITICAL**: AHK v2 has breaking changes from v1. Common issues:
 
@@ -100,7 +117,7 @@ When user emphasizes speed/performance:
 - Map: `map.Has(key)`
 - Array: `arr.Length` property
 
-### 4. Regex vs JSON Parsing Decision Tree
+### 5. Regex vs JSON Parsing Decision Tree
 
 **Use Regex When:**
 - Performance is critical
@@ -116,7 +133,7 @@ When user emphasizes speed/performance:
 
 **This project**: Regex is correct choice (only need one text field, speed critical)
 
-### 5. Multiple Solutions Strategy
+### 6. Multiple Solutions Strategy
 
 When debugging unclear issues, prepare multiple approaches:
 1. Primary solution (fastest/simplest)
@@ -128,14 +145,40 @@ When debugging unclear issues, prepare multiple approaches:
 - Fallback: Map-based parsing with full debug logs
 - Both approaches ensure we get data about what works/fails
 
+## OpenAI Model Type Differences (CRITICAL)
+
+### Standard GPT Models (gpt-4, gpt-4-turbo, etc.)
+- Support: temperature, top_p, presence_penalty, frequency_penalty, max_tokens
+- Use Chat Completions API: `/v1/chat/completions`
+- Endpoint: `messages` array with role/content
+
+### Reasoning Models (gpt-5.1, gpt-5, o1, o3 series)
+- **DO NOT support**: temperature, top_p, presence_penalty, frequency_penalty, logprobs, logit_bias
+- **Only default values** or model-managed reasoning parameters
+- Use Responses API: `/v1/responses`
+- Endpoint: `input` array with role/content/type structure
+- Use internal adaptive reasoning instead of temperature control
+
+**Migration Checklist** (when changing models):
+1. Verify model name/identifier
+2. Verify correct API endpoint for that model family
+3. **Verify ALL request parameters are supported** (don't assume!)
+4. Check response structure differences
+5. Test with sample request before declaring complete
+
+**Why This Matters**: Reasoning models will return API errors if you send unsupported parameters like temperature. Always verify parameter compatibility when switching model TYPES, not just versions.
+
 ## Important Notes for Claude
 
+- **VERIFY EVERYTHING**: Don't declare work complete without checking ALL parameters, not just structure
+- **Model type awareness**: Standard GPT vs Reasoning models have different parameter support - ALWAYS CHECK
 - **gpt-5.1** is a reasoning model and does NOT support temperature/top_p parameters
 - **Responses API** is the correct endpoint (`/v1/responses`) for GPT-5 series models
 - **SPEED IS PARAMOUNT**: Always prioritize performance - user has emphasized this repeatedly
 - **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes
 - **Simplest wins**: Regex > Object parsing for simple extraction tasks
 - **Version awareness**: AHK v2 syntax differs from v1; use Integer()/Float() for number conversion
+- **Official docs only**: When user emphasizes official documentation, be strategic in searches when direct access fails
 - The script is intentionally minimal - but temporary debug logging is acceptable for troubleshooting
 - Focus on the .ahk file, not the abandoned C# application in the App folder
 
