@@ -3,7 +3,7 @@
 ; Logging configuration
 enableLogging := true
 detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
-maxLogSize := 5000000  ; 5MB max per log file
+maxLogSize := 1000000  ; 5MB max per log file
 
 ; API configuration
 apiModel := "gpt-5.1"
