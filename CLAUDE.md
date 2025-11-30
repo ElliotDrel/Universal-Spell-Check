@@ -31,14 +31,16 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 5. Parses response and replaces text via clipboard (Ctrl+V)
 
 ### OpenAI API Integration
-- **Models**: Uses `gpt-5.1` (reasoning model via Responses API)
+- **Models**: Uses reasoning models via Responses API (`gpt-5.1` and `gpt-5-mini`)
 - **Endpoint**: `https://api.openai.com/v1/responses`
 - **Payload fields (must match docs)**:
-  - `model`: `gpt-5.1`
+  - `model`: e.g., `gpt-5.1` or `gpt-5-mini`
   - `input`: array with `{role:"user", content:[{type:"input_text", text:"..."}]}`
   - `store`: `true`
   - `text`: `{"verbosity":"low"}`
-  - `reasoning`: `{"effort":"none","summary":"auto"}` (do not use `reasoning_effort`)
+  - `reasoning`: 
+    - For `gpt-5.1`: `{"effort":"none","summary":"auto"}`
+    - For `gpt-5-mini`: `{"effort":"minimal","summary":"auto"}` (allowed for this model)
 - **Unsupported for reasoning models**: temperature, top_p, presence_penalty, frequency_penalty, logit_bias, logprobs
 - **Timeout**: 30 seconds for API response
 - **Prompt**: Optimized for grammar/spelling fixes while preserving formatting
@@ -155,7 +157,7 @@ When debugging unclear issues, prepare multiple approaches:
 - Use Chat Completions API: `/v1/chat/completions`
 - Endpoint: `messages` array with role/content
 
-### Reasoning Models (gpt-5.1, gpt-5, o1, o3 series)
+### Reasoning Models (gpt-5.1, gpt-5-mini, gpt-5, o1, o3 series)
 - **DO NOT support**: temperature, top_p, presence_penalty, frequency_penalty, logprobs, logit_bias
 - **Only default values** or model-managed reasoning parameters
 - Use Responses API: `/v1/responses`
@@ -169,13 +171,14 @@ When debugging unclear issues, prepare multiple approaches:
 4. Check response structure differences
 5. Test with sample request before declaring complete
 
-**Why This Matters**: Reasoning models will return API errors if you send unsupported parameters like temperature or `reasoning_effort` (the correct shape is `reasoning: { effort: ... }`). Always verify parameter compatibility when switching model TYPES, not just versions.
+**Why This Matters**: Reasoning models will return API errors if you send unsupported parameters like temperature or `reasoning_effort` (the correct shape is `reasoning: { effort: ... }`). Always verify parameter compatibility when switching model TYPES, not just versions; note `gpt-5-mini` uniquely allows `effort:"minimal"`.
 
 ## Important Notes for Claude
 
 - **VERIFY EVERYTHING**: Don't declare work complete without checking ALL parameters, not just structure
 - **Model type awareness**: Standard GPT vs Reasoning models have different parameter support - ALWAYS CHECK
 - **gpt-5.1** is a reasoning model and uses the Responses API; include `store`, `text.verbosity`, and `reasoning` fields as documented
+- **gpt-5-mini** also uses the Responses API and permits `reasoning.effort:"minimal"`; do not auto-change it to none/low/medium/high
 - **SPEED IS PARAMOUNT**: Always prioritize performance - user has emphasized this repeatedly
 - **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes (include raw error body on failures)
 - **Simplest wins**: Regex > Object parsing for simple extraction tasks

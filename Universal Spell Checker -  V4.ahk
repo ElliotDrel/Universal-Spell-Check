@@ -6,11 +6,11 @@ detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
 maxLogSize := 1000000  ; 5MB max per log file
 
 ; API configuration
-apiModel := "gpt-5.1"
-apiUrl := "https://api.openai.com/v1/responses"
-reasoningEffort := "none"   ; Responses API: none/low/medium/high
+apiModel := "gpt-5-mini"
+reasoningEffort := "minimal"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
 reasoningSummary := "auto"  ; let model decide summary behavior
 Verbosity := "low"      ; concise output per Responses API text config
+apiUrl := "https://api.openai.com/v1/responses"
 
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
@@ -449,10 +449,8 @@ GetUtf8Response(http) {
 ; ALTERNATIVE PARSER 1: Regex-based (FASTEST - no object parsing overhead)
 ; Extracts text directly from JSON response using regex
 ExtractTextFromResponseRegex(jsonResponse) {
-    ; More flexible pattern - searches for "text" field within "output" array
-    ; Uses PCRE's s flag (dotall) via (?s) to match newlines
-    ; Capture group pattern (?:[^"\\]|\\.)* correctly handles escaped quotes
-    if RegExMatch(jsonResponse, 's)"output"\s*:\s*\[\s*\{[^}]*"content"\s*:\s*\[\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
+    ; Match any output_text block anywhere in the output array
+    if RegExMatch(jsonResponse, 's)"type"\s*:\s*"output_text"[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
         ; Unescape JSON string (in correct order to avoid double-unescaping)
         text := match[1]
 
