@@ -155,7 +155,34 @@ LogDetailed(data) {
         duration := data.pasteTime - data.startTime
         status := data.error ? "ERROR: " . data.error : "SUCCESS"
         errorMarker := data.error ? "[ERROR] " : ""
-        
+
+        ; Build timing breakdown (all calculations happen async - zero impact on hotkey)
+        timingBreakdown := ""
+        if (data.HasOwnProp("timings") && IsObject(data.timings)) {
+            t := data.timings
+            timingBreakdown .= "Timing Breakdown:`n"
+
+            if (t.clipboardCaptured > 0)
+                timingBreakdown .= "  Clipboard capture: " . (t.clipboardCaptured - data.startTime) . "ms`n"
+
+            if (t.payloadPrepared > 0)
+                timingBreakdown .= "  Payload preparation: " . (t.payloadPrepared - t.clipboardCaptured) . "ms`n"
+
+            if (t.requestSent > 0)
+                timingBreakdown .= "  Request setup: " . (t.requestSent - t.payloadPrepared) . "ms`n"
+
+            if (t.responseReceived > 0)
+                timingBreakdown .= "  API round-trip: " . (t.responseReceived - t.requestSent) . "ms`n"
+
+            if (t.textParsed > 0)
+                timingBreakdown .= "  Response parsing: " . (t.textParsed - t.responseReceived) . "ms`n"
+
+            if (t.textPasted > 0)
+                timingBreakdown .= "  Text pasting: " . (t.textPasted - t.textParsed) . "ms`n"
+
+            timingBreakdown .= "`n"
+        }
+
         ; Indent text content for readability
         inputText := "  " . StrReplace(data.original, "`n", "`n  ")
         outputText := "  " . StrReplace(data.result, "`n", "`n  ")
@@ -175,6 +202,7 @@ LogDetailed(data) {
         entry .= "Status: " . status . "`n"
         entry .= "Duration: " . duration . "ms`n"
         entry .= "`n"
+        entry .= timingBreakdown
         entry .= "Input Text:`n"
         entry .= inputText . "`n"
         entry .= "`n"
@@ -522,7 +550,15 @@ FinalizeRun(logData) {
         pasteTime: 0,
         timestamp: FormatTime(, "yyyy-MM-dd HH:mm:ss"),
         pasteAttempted: false,
-        events: []
+        events: [],
+        timings: {
+            clipboardCaptured: 0,
+            payloadPrepared: 0,
+            requestSent: 0,
+            responseReceived: 0,
+            textParsed: 0,
+            textPasted: 0
+        }
     }
 
     try {
@@ -538,7 +574,8 @@ FinalizeRun(logData) {
         originalText := GetClipboardText()  ; store original text before processing
         logData.original := originalText
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
-       
+        logData.timings.clipboardCaptured := A_TickCount
+
         ; OpenAI API call
         apiKey := "REDACTED"
         
@@ -549,12 +586,14 @@ FinalizeRun(logData) {
         escapedPrompt := JsonEscape(prompt)
         jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
         logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", reasoning: " . reasoningEffort . "/" . reasoningSummary . ")")
+        logData.timings.payloadPrepared := A_TickCount
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
         http.Open("POST", apiUrl, false)
         http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
+        logData.timings.requestSent := A_TickCount
         http.Send(jsonPayload)
         logData.events.Push("Request sent")
        
@@ -589,7 +628,8 @@ FinalizeRun(logData) {
         response := GetUtf8Response(http)
         logData.rawResponse := response
         logData.events.Push("Response received")
-       
+        logData.timings.responseReceived := A_TickCount
+
         correctedText := ""
 
         ; TRY METHOD 1: Regex-based extraction (FASTEST, most reliable)
@@ -598,6 +638,7 @@ FinalizeRun(logData) {
             correctedText := ExtractTextFromResponseRegex(response)
             if (correctedText != "") {
                 logData.events.Push("DEBUG: Regex extraction SUCCESS, length=" . StrLen(correctedText))
+                logData.timings.textParsed := A_TickCount
             } else {
                 logData.events.Push("DEBUG: Regex extraction returned empty")
             }
@@ -653,6 +694,7 @@ FinalizeRun(logData) {
 
                 if (correctedText != "") {
                     logData.events.Push("DEBUG: Map-based parsing SUCCESS, length=" . StrLen(correctedText))
+                    logData.timings.textParsed := A_TickCount
                 } else {
                     logData.events.Push("DEBUG: Map-based parsing returned empty")
                 }
@@ -666,21 +708,24 @@ FinalizeRun(logData) {
            
             if (UseSendText()) {
                 ; Type the corrected text directly (replaces current selection)
+                logData.events.Push("INSERTION METHOD: SendText (direct typing)")
                 logData.pasteAttempted := true
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
                 A_Clipboard := correctedText
-                logData.events.Push("Text typed via SendText")
+                logData.events.Push("Text typed via SendText - COMPLETE")
             } else {
                 ; Default: paste via clipboard
+                logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
                 logData.pasteAttempted := true
                 Send("^v")
-                logData.events.Push("Text pasted via clipboard")
+                logData.events.Push("Text pasted via clipboard - COMPLETE")
             }
             
             ; Capture paste timing and log success
             logData.pasteTime := A_TickCount
+            logData.timings.textPasted := A_TickCount
             logData.result := correctedText
             logData.pastedText := correctedText
         } else {
