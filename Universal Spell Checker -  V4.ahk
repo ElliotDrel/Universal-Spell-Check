@@ -6,8 +6,8 @@ detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
 maxLogSize := 1000000  ; 5MB max per log file
 
 ; API configuration
-apiModel := "gpt-5-mini"
-reasoningEffort := "minimal"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
+apiModel := "gpt-5.1"
+reasoningEffort := "none"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
 reasoningSummary := "auto"  ; let model decide summary behavior
 Verbosity := "low"      ; concise output per Responses API text config
 apiUrl := "https://api.openai.com/v1/responses"
