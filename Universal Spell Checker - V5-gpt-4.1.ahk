@@ -3,7 +3,19 @@
 ; Logging configuration
 enableLogging := true
 detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
-maxLogSize := 5000000  ; 5MB max per log file
+maxLogSize := 1000000  ; 5MB max per log file
+
+; API configuration
+apiModel := "gpt-4.1"   ; standard GPT model (no reasoning parameters supported)
+; OLD VERBOSITY VALUE (commented out - gpt-4.1 only supports "medium", not "low"):
+; Verbosity := "low"      ; concise output per Responses API text config
+Verbosity := "medium"   ; gpt-4.1 only supports "medium" verbosity (not "low")
+Temperature := 0.3       ; temperature for response randomness (0.0-2.0)
+apiUrl := "https://api.openai.com/v1/responses"
+
+; OLD REASONING CONFIGURATION (commented out for gpt-4.1 - no reasoning support)
+; reasoningEffort := "none"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
+; reasoningSummary := "auto"  ; let model decide summary behavior
 
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
@@ -148,7 +160,34 @@ LogDetailed(data) {
         duration := data.pasteTime - data.startTime
         status := data.error ? "ERROR: " . data.error : "SUCCESS"
         errorMarker := data.error ? "[ERROR] " : ""
-        
+
+        ; Build timing breakdown (all calculations happen async - zero impact on hotkey)
+        timingBreakdown := ""
+        if (data.HasOwnProp("timings") && IsObject(data.timings)) {
+            t := data.timings
+            timingBreakdown .= "Timing Breakdown:`n"
+
+            if (t.clipboardCaptured > 0)
+                timingBreakdown .= "  Clipboard capture: " . (t.clipboardCaptured - data.startTime) . "ms`n"
+
+            if (t.payloadPrepared > 0)
+                timingBreakdown .= "  Payload preparation: " . (t.payloadPrepared - t.clipboardCaptured) . "ms`n"
+
+            if (t.requestSent > 0)
+                timingBreakdown .= "  Request setup: " . (t.requestSent - t.payloadPrepared) . "ms`n"
+
+            if (t.responseReceived > 0)
+                timingBreakdown .= "  API round-trip: " . (t.responseReceived - t.requestSent) . "ms`n"
+
+            if (t.textParsed > 0)
+                timingBreakdown .= "  Response parsing: " . (t.textParsed - t.responseReceived) . "ms`n"
+
+            if (t.textPasted > 0)
+                timingBreakdown .= "  Text pasting: " . (t.textPasted - t.textParsed) . "ms`n"
+
+            timingBreakdown .= "`n"
+        }
+
         ; Indent text content for readability
         inputText := "  " . StrReplace(data.original, "`n", "`n  ")
         outputText := "  " . StrReplace(data.result, "`n", "`n  ")
@@ -168,6 +207,7 @@ LogDetailed(data) {
         entry .= "Status: " . status . "`n"
         entry .= "Duration: " . duration . "ms`n"
         entry .= "`n"
+        entry .= timingBreakdown
         entry .= "Input Text:`n"
         entry .= inputText . "`n"
         entry .= "`n"
@@ -442,10 +482,8 @@ GetUtf8Response(http) {
 ; ALTERNATIVE PARSER 1: Regex-based (FASTEST - no object parsing overhead)
 ; Extracts text directly from JSON response using regex
 ExtractTextFromResponseRegex(jsonResponse) {
-    ; More flexible pattern - searches for "text" field within "output" array
-    ; Uses PCRE's s flag (dotall) via (?s) to match newlines
-    ; Capture group pattern (?:[^"\\]|\\.)* correctly handles escaped quotes
-    if RegExMatch(jsonResponse, 's)"output"\s*:\s*\[\s*\{[^}]*"content"\s*:\s*\[\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
+    ; Match any output_text block anywhere in the output array
+    if RegExMatch(jsonResponse, 's)"type"\s*:\s*"output_text"[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
         ; Unescape JSON string (in correct order to avoid double-unescaping)
         text := match[1]
 
@@ -517,7 +555,15 @@ FinalizeRun(logData) {
         pasteTime: 0,
         timestamp: FormatTime(, "yyyy-MM-dd HH:mm:ss"),
         pasteAttempted: false,
-        events: []
+        events: [],
+        timings: {
+            clipboardCaptured: 0,
+            payloadPrepared: 0,
+            requestSent: 0,
+            responseReceived: 0,
+            textParsed: 0,
+            textPasted: 0
+        }
     }
 
     try {
@@ -533,23 +579,28 @@ FinalizeRun(logData) {
         originalText := GetClipboardText()  ; store original text before processing
         logData.original := originalText
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
-       
+        logData.timings.clipboardCaptured := A_TickCount
+
         ; OpenAI API call
         apiKey := "REDACTED"
-       
+        
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
        
-        ; Create JSON payload for Responses API
+        ; Create JSON payload for Responses API (store + text verbosity + temperature)
+        ; OLD PAYLOAD WITH REASONING (commented out for gpt-4.1):
+        ; jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"gpt-4.1","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"temperature":0.3}'
-        logData.events.Push("Payload prepared")
+        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"temperature":' . Temperature . '}'
+        logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
+        logData.timings.payloadPrepared := A_TickCount
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
-        http.Open("POST", "https://api.openai.com/v1/responses", false)
+        http.Open("POST", apiUrl, false)
         http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
+        logData.timings.requestSent := A_TickCount
         http.Send(jsonPayload)
         logData.events.Push("Request sent")
        
@@ -558,17 +609,24 @@ FinalizeRun(logData) {
             logData.error := "API Error: " . http.Status . " - " . http.StatusText
             logData.pasteTime := A_TickCount
             logData.events.Push("API error encountered: " . http.Status)
+
             errPreview := ""
             try {
-                errPreview := SubStr(GetUtf8Response(http), 1, 200)
+                errPreview := GetUtf8Response(http)
             } catch {
                 try {
-                    errPreview := SubStr(http.ResponseText, 1, 200)
+                    errPreview := http.ResponseText
                 } catch {
                     errPreview := ""
                 }
             }
-            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . errPreview)
+
+            if (errPreview != "") {
+                logData.rawResponse := SubStr(errPreview, 1, 1000)
+                logData.events.Push("API error body captured (" . StrLen(logData.rawResponse) . " chars)")
+            }
+
+            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(errPreview, 1, 200))
             SetTimer(() => ToolTip(), -5000)
             return
         }
@@ -577,7 +635,8 @@ FinalizeRun(logData) {
         response := GetUtf8Response(http)
         logData.rawResponse := response
         logData.events.Push("Response received")
-       
+        logData.timings.responseReceived := A_TickCount
+
         correctedText := ""
 
         ; TRY METHOD 1: Regex-based extraction (FASTEST, most reliable)
@@ -586,6 +645,7 @@ FinalizeRun(logData) {
             correctedText := ExtractTextFromResponseRegex(response)
             if (correctedText != "") {
                 logData.events.Push("DEBUG: Regex extraction SUCCESS, length=" . StrLen(correctedText))
+                logData.timings.textParsed := A_TickCount
             } else {
                 logData.events.Push("DEBUG: Regex extraction returned empty")
             }
@@ -641,6 +701,7 @@ FinalizeRun(logData) {
 
                 if (correctedText != "") {
                     logData.events.Push("DEBUG: Map-based parsing SUCCESS, length=" . StrLen(correctedText))
+                    logData.timings.textParsed := A_TickCount
                 } else {
                     logData.events.Push("DEBUG: Map-based parsing returned empty")
                 }
@@ -654,21 +715,24 @@ FinalizeRun(logData) {
            
             if (UseSendText()) {
                 ; Type the corrected text directly (replaces current selection)
+                logData.events.Push("INSERTION METHOD: SendText (direct typing)")
                 logData.pasteAttempted := true
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
                 A_Clipboard := correctedText
-                logData.events.Push("Text typed via SendText")
+                logData.events.Push("Text typed via SendText - COMPLETE")
             } else {
                 ; Default: paste via clipboard
+                logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
                 logData.pasteAttempted := true
                 Send("^v")
-                logData.events.Push("Text pasted via clipboard")
+                logData.events.Push("Text pasted via clipboard - COMPLETE")
             }
             
             ; Capture paste timing and log success
             logData.pasteTime := A_TickCount
+            logData.timings.textPasted := A_TickCount
             logData.result := correctedText
             logData.pastedText := correctedText
         } else {
