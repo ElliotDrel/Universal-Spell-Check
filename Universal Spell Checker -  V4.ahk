@@ -6,11 +6,16 @@ detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
 maxLogSize := 1000000  ; 5MB max per log file
 
 ; API configuration
-apiModel := "gpt-5.1"
-reasoningEffort := "none"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
-reasoningSummary := "auto"  ; let model decide summary behavior
-Verbosity := "low"      ; concise output per Responses API text config
+apiModel := "gpt-4.1"   ; standard GPT model (no reasoning parameters supported)
+; OLD VERBOSITY VALUE (commented out - gpt-4.1 only supports "medium", not "low"):
+; Verbosity := "low"      ; concise output per Responses API text config
+Verbosity := "medium"   ; gpt-4.1 only supports "medium" verbosity (not "low")
+Temperature := 0.3       ; temperature for response randomness (0.0-2.0)
 apiUrl := "https://api.openai.com/v1/responses"
+
+; OLD REASONING CONFIGURATION (commented out for gpt-4.1 - no reasoning support)
+; reasoningEffort := "none"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
+; reasoningSummary := "auto"  ; let model decide summary behavior
 
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
@@ -582,10 +587,12 @@ FinalizeRun(logData) {
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
        
-        ; Create JSON payload for Responses API (store + text verbosity + reasoning)
+        ; Create JSON payload for Responses API (store + text verbosity + temperature)
+        ; OLD PAYLOAD WITH REASONING (commented out for gpt-4.1):
+        ; jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
-        logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", reasoning: " . reasoningEffort . "/" . reasoningSummary . ")")
+        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"temperature":' . Temperature . '}'
+        logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
         logData.timings.payloadPrepared := A_TickCount
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
