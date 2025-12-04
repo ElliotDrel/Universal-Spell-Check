@@ -8,20 +8,33 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 
 ## Primary Implementation
 
-**Universal Spell Checker.ahk**: The main AutoHotkey v2.0 script optimized for performance
-- Single file containing all functionality
-- Direct OpenAI API integration
+The project uses a versioned file structure with model-specific variants:
+
+### Active Files (V5 - Current)
+- **Universal Spell Checker - V5.ahk**: Latest version with all improvements (gpt-4.1 default)
+- **Universal Spell Checker - V5-gpt-4.1.ahk**: Standard GPT model with `temperature` parameter
+- **Universal Spell Checker - V5-gpt-5.1.ahk**: Reasoning model with `reasoning.effort:"none"`
+- **Universal Spell Checker - V5-gpt-5-mini.ahk**: Reasoning model with `reasoning.effort:"minimal"`
+
+### Stable Baseline (V4)
+- **Universal Spell Checker - V4.ahk**: Stable version from before model experimentation (commit dc2c82b)
+
+### Common Features (All Versions)
+- AutoHotkey v2.0 scripts optimized for performance
+- Direct OpenAI API integration via Responses API
 - Instant text replacement via clipboard
 - Global hotkey: Ctrl+Alt+U
-- Minimal error handling to preserve speed
+- Enhanced logging with timing breakdown
+- Dual JSON parsing (regex primary, Map fallback)
 
 ## Architecture & Performance
 
 ### Core Design Principles
 - **Speed First**: Every operation optimized for minimal latency
-- **Simplicity**: Single .ahk file with no external dependencies
+- **Simplicity**: Self-contained .ahk files with no external dependencies
 - **Seamless**: Direct clipboard manipulation for instant text replacement
 - **Minimal**: Only essential functionality to avoid performance overhead
+- **Model Flexibility**: Separate files for each model allow easy switching
 
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
@@ -31,19 +44,33 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 5. Parses response and replaces text via clipboard (Ctrl+V)
 
 ### OpenAI API Integration
-- **Models**: Uses reasoning models via Responses API (`gpt-5.1` and `gpt-5-mini`)
-- **Endpoint**: `https://api.openai.com/v1/responses`
-- **Payload fields (must match docs)**:
-  - `model`: e.g., `gpt-5.1` or `gpt-5-mini`
-  - `input`: array with `{role:"user", content:[{type:"input_text", text:"..."}]}`
-  - `store`: `true`
-  - `text`: `{"verbosity":"low"}`
-  - `reasoning`: 
-    - For `gpt-5.1`: `{"effort":"none","summary":"auto"}`
-    - For `gpt-5-mini`: `{"effort":"minimal","summary":"auto"}` (allowed for this model)
-- **Unsupported for reasoning models**: temperature, top_p, presence_penalty, frequency_penalty, logit_bias, logprobs
+- **Endpoint**: `https://api.openai.com/v1/responses` (all models use Responses API)
 - **Timeout**: 30 seconds for API response
 - **Prompt**: Optimized for grammar/spelling fixes while preserving formatting
+
+#### Model-Specific Configurations
+
+**gpt-4.1 (Standard Model)**:
+- Uses `temperature` parameter (e.g., `0.3`)
+- Uses `verbosity: "medium"` (does NOT support "low")
+- Does NOT support `reasoning` block
+- Payload: `{"model":"gpt-4.1", "input":[...], "store":true, "text":{"verbosity":"medium"}, "temperature":0.3}`
+
+**gpt-5.1 (Reasoning Model)**:
+- Uses `reasoning` block with `effort: "none"` (fastest)
+- Uses `verbosity: "low"`
+- Does NOT support `temperature`
+- Payload: `{"model":"gpt-5.1", "input":[...], "store":true, "text":{"verbosity":"low"}, "reasoning":{"effort":"none","summary":"auto"}}`
+
+**gpt-5-mini (Reasoning Model)**:
+- Uses `reasoning` block with `effort: "minimal"` (unique to this model)
+- Uses `verbosity: "low"`
+- Does NOT support `temperature`
+- Payload: `{"model":"gpt-5-mini", "input":[...], "store":true, "text":{"verbosity":"low"}, "reasoning":{"effort":"minimal","summary":"auto"}}`
+
+#### Common Payload Structure
+- `input`: array with `{role:"user", content:[{type:"input_text", text:"..."}]}`
+- `store`: `true` (required for all models)
 
 ### Performance Optimizations
 - Direct WinHTTP COM object for API calls
@@ -175,22 +202,40 @@ When debugging unclear issues, prepare multiple approaches:
 
 ## Important Notes for Claude
 
+### Proactive Behavior (CRITICAL)
+- **PROACTIVELY VERIFY CODE**: After making changes, ALWAYS review code for bugs without waiting for user to ask
+- **PROACTIVELY UPDATE DOCUMENTATION**: When file structure or configurations change, update CLAUDE.md immediately
+- **ASK CLARIFYING QUESTIONS FIRST**: When tasks have ambiguity (which version? which approach?), ask BEFORE doing work
+
+### Model Configuration Rules
+- **gpt-4.1** is a STANDARD model: uses `temperature`, `verbosity:"medium"`, NO reasoning block
+- **gpt-5.1** is a REASONING model: uses `reasoning.effort:"none"`, `verbosity:"low"`, NO temperature
+- **gpt-5-mini** is a REASONING model: uses `reasoning.effort:"minimal"` (unique), `verbosity:"low"`, NO temperature
+- **NEVER mix parameters**: temperature and reasoning are mutually exclusive based on model type
+
+### File Structure Awareness
+- Project uses versioned files: V4 (stable baseline), V5 (current with variants)
+- Model-specific variants exist: V5-gpt-4.1, V5-gpt-5.1, V5-gpt-5-mini
+- When modifying code, ensure ALL relevant variant files are updated consistently
+- V4 is preserved as stable baseline - do not modify unless explicitly requested
+
+### Verification Standards
 - **VERIFY EVERYTHING**: Don't declare work complete without checking ALL parameters, not just structure
 - **Model type awareness**: Standard GPT vs Reasoning models have different parameter support - ALWAYS CHECK
-- **gpt-5.1** is a reasoning model and uses the Responses API; include `store`, `text.verbosity`, and `reasoning` fields as documented
-- **gpt-5-mini** also uses the Responses API and permits `reasoning.effort:"minimal"`; do not auto-change it to none/low/medium/high
 - **SPEED IS PARAMOUNT**: Always prioritize performance - user has emphasized this repeatedly
 - **Debug first**: If you can't test the code yourself, add comprehensive logging before attempting fixes (include raw error body on failures)
 - **Simplest wins**: Regex > Object parsing for simple extraction tasks
 - **Version awareness**: AHK v2 syntax differs from v1; use Integer()/Float() for number conversion
 - **Official docs only**: When user emphasizes official documentation, be strategic in searches when direct access fails
-- The script is intentionally minimal - but temporary debug logging is acceptable for troubleshooting
-- Focus on the .ahk file, not the abandoned C# application in the App folder
+- The scripts are intentionally minimal - but temporary debug logging is acceptable for troubleshooting
+- Focus on the .ahk files, not the abandoned C# application in the App folder
 
 ## Legacy Components (Deprecated)
 
 - **Universal Spell Checker App/**: Abandoned C# .NET implementation
-- **Universal Spell Check - OG.ahk**: Original slower version
+- **Universal Spell Check - V1 - OG.ahk**: Original slower version
+- **Universal Spell Checker - V2.ahk**: Early iteration
+- **Universal Spell Checker - V3.ahk / V3.5.ahk**: Intermediate versions
 - **spellcheck.js / spellcheck-old.js**: Old JavaScript approach
 
-These exist for reference but are not actively developed. The focus is entirely on the streamlined `Universal Spell Checker.ahk` script.
+These exist for reference but are not actively developed. The focus is on V5 variants for active use and V4 as stable baseline.
