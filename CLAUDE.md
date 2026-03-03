@@ -11,37 +11,43 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 The project uses a versioned file structure with model-specific variants:
 
 ### Active Files (V5 - Current)
-- **Universal Spell Checker - V5.ahk**: Latest version with all improvements (gpt-4.1 default)
-- **Universal Spell Checker - V5-gpt-4.1.ahk**: Standard GPT model with `temperature` parameter
+- **Universal Spell Checker - V5-gpt-4.1.ahk**: Primary/default — standard GPT model with `temperature` parameter
 - **Universal Spell Checker - V5-gpt-5.1.ahk**: Reasoning model with `reasoning.effort:"none"`
 - **Universal Spell Checker - V5-gpt-5-mini.ahk**: Reasoning model with `reasoning.effort:"minimal"`
+- **replacements.json**: Post-processing replacement pairs — format: `{ "canonical": ["variant1", "variant2", ...] }`
 
-### Stable Baseline (V4)
-- **Universal Spell Checker - V4.ahk**: Stable version from before model experimentation (commit dc2c82b)
+### Legacy / Simple Variant
+- **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing — kept for reference/fallback
 
-### Common Features (All Versions)
+### Common Features (All V5 Variants)
 - AutoHotkey v2.0 scripts optimized for performance
 - Direct OpenAI API integration via Responses API
-- Instant text replacement via clipboard
+- Instant text replacement via clipboard (or `SendText()` per app)
 - Global hotkey: Ctrl+Alt+U
-- Enhanced logging with timing breakdown
+- Enhanced logging with full timing breakdown
 - Dual JSON parsing (regex primary, Map fallback)
+- Post-processing replacements via `replacements.json`
+- Enhanced clipboard reading (HTML → Unicode → ANSI fallback chain)
+- Per-app paste behavior configurable via `sendTextApps` list
 
 ## Architecture & Performance
 
 ### Core Design Principles
 - **Speed First**: Every operation optimized for minimal latency
-- **Simplicity**: Self-contained .ahk files with no external dependencies
+- **Simplicity**: Self-contained .ahk files with minimal external dependencies (`replacements.json` only)
 - **Seamless**: Direct clipboard manipulation for instant text replacement
 - **Minimal**: Only essential functionality to avoid performance overhead
 - **Model Flexibility**: Separate files for each model allow easy switching
 
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
-2. Script clears clipboard and copies selection (Ctrl+C)
-3. Waits max 1 second for clipboard content
-4. Sends text directly to OpenAI API
-5. Parses response and replaces text via clipboard (Ctrl+V)
+2. `LoadReplacements()` reloads `replacements.json` (catches live edits)
+3. Script clears clipboard and copies selection (Ctrl+C)
+4. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
+5. Sends text directly to OpenAI API
+6. Parses response (regex primary → Map-based fallback)
+7. `ApplyReplacements()` fixes known brand/term casing in AI output
+8. Replaces selected text via clipboard paste (Ctrl+V) or `SendText()` depending on active app
 
 ### OpenAI API Integration
 - **Endpoint**: `https://api.openai.com/v1/responses` (all models use Responses API)
@@ -78,13 +84,39 @@ The project uses a versioned file structure with model-specific variants:
   - Single RegEx match extracts corrected text directly
   - ~10x faster than full JSON object parsing
   - No object allocation or recursive traversal overhead
-- **Map-based JSON parser** (fallback with debug logging)
+- **Map-based JSON parser** (`JsonLoad` — full recursive parser, fallback with debug logging)
   - Only used if regex extraction fails
-  - Uses Integer()/Float() for AHK v2 compatibility
+  - Uses `Integer()`/`Float()` for AHK v2 compatibility
+- **Post-processing replacements** (`replacements.json`)
+  - Reloaded fresh on every invocation so edits take effect without restart
+  - Sorted longest-variant-first to prevent shorter substrings interfering
+  - Runs in microseconds; logged with count and list of applied replacements
+- **Enhanced clipboard reading** (`GetClipboardText()`)
+  - Prefers HTML clipboard format (strips empty paragraphs / formatting noise)
+  - Falls back to Unicode (CF_UNICODETEXT), then ANSI (CF_TEXT)
+- **UTF-8 response reading** (`GetUtf8Response()` via ADODB.Stream)
+  - Prevents mojibake on smart quotes and other non-ASCII characters
+- **Per-app paste method** (`sendTextApps` / `UseSendText()`)
+  - Default: clipboard + Ctrl+V (all apps)
+  - Override: `SendText()` direct typing for apps listed in `sendTextApps`
 - Log API error bodies on non-200 responses for quick root-cause checks
-- No file I/O or configuration overhead
 - Single clipboard operation for text replacement
 - Hardcoded API key to avoid configuration delays
+
+### Post-Processing Replacements System
+
+`replacements.json` maps canonical forms to their common AI-output variants:
+
+```json
+{
+  "GitHub": ["Git Hub", "git hub", "GitHUB", "GITHUB", "Github", "github"],
+  "OpenAI": ["Open AI", "Open Ai", "open ai", "openai"]
+}
+```
+
+- **`LoadReplacements()`**: Parses the JSON, flattens to `[variant, canonical]` pairs, sorts by variant length descending
+- **`ApplyReplacements(text, &applied)`**: Runs each pair through `StrReplace()`; returns modified text and populates `applied` array for logging
+- **Timing**: Captured in `timings.replacementsApplied`; logged in `spellcheck-detailed.log` under "Post-processing"
 
 ## Critical Debugging Principles (MUST FOLLOW)
 
@@ -214,10 +246,10 @@ When debugging unclear issues, prepare multiple approaches:
 - **NEVER mix parameters**: temperature and reasoning are mutually exclusive based on model type
 
 ### File Structure Awareness
-- Project uses versioned files: V4 (stable baseline), V5 (current with variants)
-- Model-specific variants exist: V5-gpt-4.1, V5-gpt-5.1, V5-gpt-5-mini
-- When modifying code, ensure ALL relevant variant files are updated consistently
-- V4 is preserved as stable baseline - do not modify unless explicitly requested
+- Active scripts: `V5-gpt-4.1.ahk` (primary), `V5-gpt-5.1.ahk`, `V5-gpt-5-mini.ahk`
+- `replacements.json` lives alongside the scripts; edit it freely — scripts reload it on every run
+- When modifying core logic, ensure ALL three V5 variant files are updated consistently
+- `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` is a minimal legacy variant — do not use it as a template for new features
 
 ### Verification Standards
 - **VERIFY EVERYTHING**: Don't declare work complete without checking ALL parameters, not just structure
@@ -237,5 +269,6 @@ When debugging unclear issues, prepare multiple approaches:
 - **Universal Spell Checker - V2.ahk**: Early iteration
 - **Universal Spell Checker - V3.ahk / V3.5.ahk**: Intermediate versions
 - **spellcheck.js / spellcheck-old.js**: Old JavaScript approach
+- **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal variant without logging/replacements (kept for reference)
 
-These exist for reference but are not actively developed. The focus is on V5 variants for active use and V4 as stable baseline.
+These exist for reference but are not actively developed. The focus is on the three V5 model-specific variants.
