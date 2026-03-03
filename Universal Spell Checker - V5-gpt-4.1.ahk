@@ -128,7 +128,7 @@ ApplyReplacements(text, &applied) {
             replaceCount := 0
             text := StrReplace(text, pair[1], pair[2], true, &replaceCount)
             if (replaceCount > 0)
-                applied.Push(pair[1] . "->" . pair[2])
+                applied.Push(pair[1] . " -> " . pair[2])
         }
     }
     return text
