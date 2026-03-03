@@ -11,7 +11,7 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 The project uses a single active V5 script with a top-level model selector.
 
 ### Active Files (V5 - Current)
-- **Universal Spell Checker - V5-gpt-4.1.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
+- **Universal Spell Checker - V5.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
 
 ### Legacy / Simple Variant
@@ -244,7 +244,7 @@ When debugging unclear issues, prepare multiple approaches:
 - **NEVER mix parameters**: temperature and reasoning are mutually exclusive based on model type
 
 ### File Structure Awareness
-- Active script: `V5-gpt-4.1.ahk` (primary, with `modelModule` selector)
+- Active script: `V5.ahk` (primary, with `modelModule` selector)
 - `replacements.json` lives alongside the script; edit it freely - script reloads it on every run
 - When modifying core logic, ensure all model branches inside the single V5 script remain consistent
 - `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` is a minimal legacy variant - do not use it as a template for new features
