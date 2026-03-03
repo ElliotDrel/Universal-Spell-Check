@@ -3,7 +3,7 @@
 ; Logging configuration
 enableLogging := true
 detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
-maxLogSize := 1000000  ; 5MB max per log file
+maxLogSize := 1000000  ; 1MB max per log file
 
 ; Post-processing replacements
 replacementsPath := A_ScriptDir . "\replacements.json"
@@ -52,13 +52,16 @@ LoadReplacements() {
 
     try {
         pairs := []
-        obj := JsonLoad(FileRead(replacementsPath, "UTF-8"))
+        rawJson := FileRead(replacementsPath, "UTF-8")
+        if (SubStr(rawJson, 1, 1) = Chr(0xFEFF))
+            rawJson := SubStr(rawJson, 2)
+        obj := JsonLoad(rawJson)
 
         for canonical, variants in obj {
             if !IsObject(variants)
                 continue
             for , variant in variants {
-                if (variant != "" && variant != canonical)
+                if (variant != "" && StrCompare(variant, canonical, true) != 0)
                     pairs.Push([variant, canonical])
             }
         }
@@ -78,19 +81,21 @@ LoadReplacements() {
 
 
     } catch {
-        ; Silently fail — replacements are optional
+        ; Silently fail - replacements are optional
     }
 }
 
 ; Apply post-processing replacements to AI output. Runs in microseconds.
-; &applied receives a list of "variant→canonical" strings for every replacement that fired.
+; &applied receives a list of "variant->canonical" strings for every replacement that fired.
 ApplyReplacements(text, &applied) {
     global postReplacements
     applied := []
     for pair in postReplacements {
-        if InStr(text, pair[1]) {
-            text := StrReplace(text, pair[1], pair[2])
-            applied.Push(pair[1] . "→" . pair[2])
+        if InStr(text, pair[1], true) {
+            replaceCount := 0
+            text := StrReplace(text, pair[1], pair[2], true, &replaceCount)
+            if (replaceCount > 0)
+                applied.Push(pair[1] . "->" . pair[2])
         }
     }
     return text

@@ -114,8 +114,8 @@ The project uses a versioned file structure with model-specific variants:
 }
 ```
 
-- **`LoadReplacements()`**: Parses the JSON, flattens to `[variant, canonical]` pairs, sorts by variant length descending
-- **`ApplyReplacements(text, &applied)`**: Runs each pair through `StrReplace()`; returns modified text and populates `applied` array for logging
+- **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
+- **`ApplyReplacements(text, &applied)`**: Runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching; only logs entries when at least one replacement occurred
 - **Timing**: Captured in `timings.replacementsApplied`; logged in `spellcheck-detailed.log` under "Post-processing"
 
 ## Critical Debugging Principles (MUST FOLLOW)
