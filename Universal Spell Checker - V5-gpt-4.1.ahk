@@ -10,22 +10,49 @@ replacementsPath := A_ScriptDir . "\replacements.json"
 postReplacements := []    ; Array of [variant, canonical] pairs, sorted longest-first
 
 ; API configuration
-apiModel := "gpt-4.1"   ; standard GPT model (no reasoning parameters supported)
-; OLD VERBOSITY VALUE (commented out - gpt-4.1 only supports "medium", not "low"):
-; Verbosity := "low"      ; concise output per Responses API text config
-Verbosity := "medium"   ; gpt-4.1 only supports "medium" verbosity (not "low")
-Temperature := 0.3       ; temperature for response randomness (0.0-2.0)
-apiUrl := "https://api.openai.com/v1/responses"
+; Select the model module here (single source of truth):
+; - "gpt-4.1"    -> standard model, uses temperature, verbosity "medium"
+; - "gpt-5.1"    -> reasoning model, uses reasoning.effort "none", verbosity "low"
+; - "gpt-5-mini" -> reasoning model, uses reasoning.effort "minimal", verbosity "low"
+; The script applies the correct payload shape automatically.
+modelModule := "gpt-4.1"
 
-; OLD REASONING CONFIGURATION (commented out for gpt-4.1 - no reasoning support)
-; reasoningEffort := "none"   ; GPT-5 mini uses minimal/low/medium/high and GPT-5.1 uses none/low/medium/high
-; reasoningSummary := "auto"  ; let model decide summary behavior
+; Defaults (overridden by switch below)
+apiModel := modelModule
+apiUsesReasoning := false
+Verbosity := "medium"
+Temperature := 0.3
+reasoningEffort := "none"
+reasoningSummary := "auto"
+
+switch modelModule {
+    case "gpt-4.1":
+        apiUsesReasoning := false
+        Verbosity := "medium"
+        Temperature := 0.3
+        reasoningEffort := "none"
+        reasoningSummary := "auto"
+    case "gpt-5.1":
+        apiUsesReasoning := true
+        Verbosity := "low"
+        reasoningEffort := "none"
+        reasoningSummary := "auto"
+    case "gpt-5-mini":
+        apiUsesReasoning := true
+        Verbosity := "low"
+        reasoningEffort := "minimal"
+        reasoningSummary := "auto"
+    default:
+        MsgBox("Invalid modelModule: " . modelModule . "`nUse one of: gpt-4.1, gpt-5.1, gpt-5-mini")
+        ExitApp
+}
+
+apiUrl := "https://api.openai.com/v1/responses"
 
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
 }
-
 
 ; Configure per-app paste behavior
 ; - Add exe names (e.g., "notepad.exe") to `sendTextApps` to use keystroke typing
@@ -106,7 +133,6 @@ ApplyReplacements(text, &applied) {
     }
     return text
 }
-
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
 GetClipboardText() {
@@ -676,12 +702,16 @@ FinalizeRun(logData) {
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
        
-        ; Create JSON payload for Responses API (store + text verbosity + temperature)
-        ; OLD PAYLOAD WITH REASONING (commented out for gpt-4.1):
-        ; jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
+        ; Create JSON payload for Responses API (store + text verbosity + model-specific controls)
         escapedPrompt := JsonEscape(prompt)
-        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"},"temperature":' . Temperature . '}'
-        logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
+        jsonPayload := '{"model":"' . apiModel . '","input":[{"role":"user","content":[{"type":"input_text","text":"' . escapedPrompt . '"}]}],"store":true,"text":{"verbosity":"' . Verbosity . '"}'
+        if (apiUsesReasoning) {
+            jsonPayload .= ',"reasoning":{"effort":"' . reasoningEffort . '","summary":"' . reasoningSummary . '"}}'
+            logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", reasoning: " . reasoningEffort . "/" . reasoningSummary . ")")
+        } else {
+            jsonPayload .= ',"temperature":' . Temperature . '}'
+            logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
+        }
         logData.timings.payloadPrepared := A_TickCount
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
