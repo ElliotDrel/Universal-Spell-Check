@@ -26,8 +26,6 @@ if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
 }
 
-; Load post-processing replacements at startup
-LoadReplacements()
 
 ; Configure per-app paste behavior
 ; - Add exe names (e.g., "notepad.exe") to `sendTextApps` to use keystroke typing
@@ -84,15 +82,7 @@ LoadReplacements() {
         }
         postReplacements := pairs
 
-        ; Log what was loaded
-        if (pairs.Length > 0) {
-            msg := pairs.Length . " replacement(s) loaded from replacements.json`n"
-            for pair in pairs
-                msg .= "  `"" . pair[1] . "`"  →  `"" . pair[2] . "`"`n"
-            LogStartup(msg)
-        } else {
-            LogStartup("replacements.json loaded — no entries found")
-        }
+
     } catch {
         ; Silently fail — replacements are optional
     }
@@ -112,24 +102,6 @@ ApplyReplacements(text, &applied) {
     return text
 }
 
-; Write a one-time startup entry to the log (dictionary load, etc.)
-LogStartup(message) {
-    global enableLogging, detailedLogPath, maxLogSize
-    if (!enableLogging)
-        return
-    try {
-        RotateLogIfNeeded(detailedLogPath, maxLogSize)
-        timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-        entry := "================================================================================`n"
-        entry .= "STARTUP: " . timestamp . "`n"
-        entry .= "================================================================================`n"
-        entry .= message . "`n"
-        entry .= "================================================================================`n`n"
-        FileAppend(entry, detailedLogPath)
-    } catch {
-        ; Silently fail
-    }
-}
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
 GetClipboardText() {
@@ -678,6 +650,7 @@ FinalizeRun(logData) {
     }
 
     try {
+        LoadReplacements()                 ; reload replacements.json on every run
         A_Clipboard := ""                  ; clear clipboard
         Send("^c")                         ; copy selection
         if !ClipWait(1) {
