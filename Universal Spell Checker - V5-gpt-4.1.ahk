@@ -5,6 +5,10 @@ enableLogging := true
 detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
 maxLogSize := 1000000  ; 5MB max per log file
 
+; Post-processing replacements
+replacementsPath := A_ScriptDir . "\replacements.json"
+postReplacements := []    ; Array of [variant, canonical] pairs, sorted longest-first
+
 ; API configuration
 apiModel := "gpt-4.1"   ; standard GPT model (no reasoning parameters supported)
 ; OLD VERBOSITY VALUE (commented out - gpt-4.1 only supports "medium", not "low"):
@@ -22,6 +26,9 @@ if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
 }
 
+; Load post-processing replacements at startup
+LoadReplacements()
+
 ; Configure per-app paste behavior
 ; - Add exe names (e.g., "notepad.exe") to `sendTextApps` to use keystroke typing
 ; - Default for all other apps is clipboard + Ctrl+V paste
@@ -38,6 +45,55 @@ UseSendText() {
             return true
     }
     return false
+}
+
+; Load post-processing replacements from replacements.json.
+; JSON format: { "canonical": ["variant1", "variant2", ...], ... }
+; Builds a flat list of [variant, canonical] sorted longest-first so longer
+; phrases are replaced before any shorter substring could interfere.
+LoadReplacements() {
+    global replacementsPath, postReplacements
+    postReplacements := []
+
+    if (!FileExist(replacementsPath))
+        return
+
+    try {
+        pairs := []
+        obj := JsonLoad(FileRead(replacementsPath, "UTF-8"))
+
+        for canonical, variants in obj {
+            if !IsObject(variants)
+                continue
+            for , variant in variants {
+                if (variant != "" && variant != canonical)
+                    pairs.Push([variant, canonical])
+            }
+        }
+
+        ; Insertion sort by variant length descending (list is typically tiny)
+        n := pairs.Length
+        loop n - 1 {
+            i := A_Index + 1
+            while (i > 1 && StrLen(pairs[i][1]) > StrLen(pairs[i - 1][1])) {
+                temp := pairs[i]
+                pairs[i] := pairs[i - 1]
+                pairs[i - 1] := temp
+                i--
+            }
+        }
+        postReplacements := pairs
+    } catch {
+        ; Silently fail — replacements are optional
+    }
+}
+
+; Apply post-processing replacements to AI output. Runs in microseconds.
+ApplyReplacements(text) {
+    global postReplacements
+    for pair in postReplacements
+        text := StrReplace(text, pair[1], pair[2])
+    return text
 }
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
@@ -711,8 +767,12 @@ FinalizeRun(logData) {
             }
         }
         
+        ; Apply post-processing replacements (instant string pass)
+        if (correctedText != "")
+            correctedText := ApplyReplacements(correctedText)
+
         if (correctedText != "") {
-           
+
             if (UseSendText()) {
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
