@@ -83,17 +83,52 @@ LoadReplacements() {
             }
         }
         postReplacements := pairs
+
+        ; Log what was loaded
+        if (pairs.Length > 0) {
+            msg := pairs.Length . " replacement(s) loaded from replacements.json`n"
+            for pair in pairs
+                msg .= "  `"" . pair[1] . "`"  →  `"" . pair[2] . "`"`n"
+            LogStartup(msg)
+        } else {
+            LogStartup("replacements.json loaded — no entries found")
+        }
     } catch {
         ; Silently fail — replacements are optional
     }
 }
 
 ; Apply post-processing replacements to AI output. Runs in microseconds.
-ApplyReplacements(text) {
+; &applied receives a list of "variant→canonical" strings for every replacement that fired.
+ApplyReplacements(text, &applied) {
     global postReplacements
-    for pair in postReplacements
-        text := StrReplace(text, pair[1], pair[2])
+    applied := []
+    for pair in postReplacements {
+        if InStr(text, pair[1]) {
+            text := StrReplace(text, pair[1], pair[2])
+            applied.Push(pair[1] . "→" . pair[2])
+        }
+    }
     return text
+}
+
+; Write a one-time startup entry to the log (dictionary load, etc.)
+LogStartup(message) {
+    global enableLogging, detailedLogPath, maxLogSize
+    if (!enableLogging)
+        return
+    try {
+        RotateLogIfNeeded(detailedLogPath, maxLogSize)
+        timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
+        entry := "================================================================================`n"
+        entry .= "STARTUP: " . timestamp . "`n"
+        entry .= "================================================================================`n"
+        entry .= message . "`n"
+        entry .= "================================================================================`n`n"
+        FileAppend(entry, detailedLogPath)
+    } catch {
+        ; Silently fail
+    }
 }
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
@@ -238,16 +273,21 @@ LogDetailed(data) {
             if (t.textParsed > 0)
                 timingBreakdown .= "  Response parsing: " . (t.textParsed - t.responseReceived) . "ms`n"
 
-            if (t.textPasted > 0)
-                timingBreakdown .= "  Text pasting: " . (t.textPasted - t.textParsed) . "ms`n"
+            if (t.replacementsApplied > 0)
+                timingBreakdown .= "  Post-processing: " . (t.replacementsApplied - t.textParsed) . "ms`n"
+
+            if (t.textPasted > 0) {
+                prevTime := t.replacementsApplied > 0 ? t.replacementsApplied : t.textParsed
+                timingBreakdown .= "  Text pasting: " . (t.textPasted - prevTime) . "ms`n"
+            }
 
             timingBreakdown .= "`n"
         }
 
         ; Indent text content for readability
-        inputText := "  " . StrReplace(data.original, "`n", "`n  ")
-        outputText := "  " . StrReplace(data.result, "`n", "`n  ")
-        pastedText := "  " . StrReplace(data.pastedText, "`n", "`n  ")
+        inputText     := "  " . StrReplace(data.original,     "`n", "`n  ")
+        rawAiText     := "  " . StrReplace(data.rawAiOutput,  "`n", "`n  ")
+        pastedText    := "  " . StrReplace(data.pastedText,   "`n", "`n  ")
         
         ; Format API response with indentation
         rawResponse := data.rawResponse
@@ -267,10 +307,25 @@ LogDetailed(data) {
         entry .= "Input Text:`n"
         entry .= inputText . "`n"
         entry .= "`n"
-        entry .= "Output Text:`n"
-        entry .= outputText . "`n"
+        entry .= "AI Output (before post-processing):`n"
+        entry .= rawAiText . "`n"
         entry .= "`n"
-        
+
+        if (data.HasOwnProp("replacementsApplied") && IsObject(data.replacementsApplied)) {
+            if (data.replacementsApplied.Length > 0) {
+                entry .= "Post-processing (" . data.replacementsApplied.Length . " replacement(s) applied):`n"
+                for , rep in data.replacementsApplied
+                    entry .= "  " . rep . "`n"
+            } else {
+                entry .= "Post-processing: no replacements matched`n"
+            }
+            entry .= "`n"
+        }
+
+        entry .= "Pasted Text:`n"
+        entry .= pastedText . "`n"
+        entry .= "`n"
+
         if (rawResponse != "") {
             entry .= "API Response:`n"
             entry .= rawResponse . "`n"
@@ -284,10 +339,7 @@ LogDetailed(data) {
             }
             entry .= "`n"
         }
-        
-        entry .= "Pasted Text:`n"
-        entry .= pastedText . "`n"
-        entry .= "`n"
+
         entry .= "================================================================================`n"
         entry .= "`n"
         
@@ -603,9 +655,11 @@ FinalizeRun(logData) {
     startTime := A_TickCount
     logData := {
         original: "",
+        rawAiOutput: "",
         result: "",
         rawResponse: "",
         pastedText: "",
+        replacementsApplied: [],
         error: "",
         startTime: startTime,
         pasteTime: 0,
@@ -618,6 +672,7 @@ FinalizeRun(logData) {
             requestSent: 0,
             responseReceived: 0,
             textParsed: 0,
+            replacementsApplied: 0,
             textPasted: 0
         }
     }
@@ -768,8 +823,17 @@ FinalizeRun(logData) {
         }
         
         ; Apply post-processing replacements (instant string pass)
-        if (correctedText != "")
-            correctedText := ApplyReplacements(correctedText)
+        if (correctedText != "") {
+            logData.rawAiOutput := correctedText
+            applied := []
+            correctedText := ApplyReplacements(correctedText, &applied)
+            logData.replacementsApplied := applied
+            logData.timings.replacementsApplied := A_TickCount
+            if (applied.Length > 0)
+                logData.events.Push("Post-processing: " . applied.Length . " replacement(s) applied: " . applied[1] . (applied.Length > 1 ? " (+" . (applied.Length - 1) . " more)" : ""))
+            else
+                logData.events.Push("Post-processing: no replacements matched")
+        }
 
         if (correctedText != "") {
 
