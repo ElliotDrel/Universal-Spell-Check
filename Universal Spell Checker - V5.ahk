@@ -49,6 +49,10 @@ switch modelModule {
 
 apiUrl := "https://api.openai.com/v1/responses"
 
+; Prompt text (single source of truth).
+; Reused for request construction and prompt-leak safeguard detection.
+promptInstructionText := "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text."
+
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
@@ -132,6 +136,43 @@ ApplyReplacements(text, &applied) {
         }
     }
     return text
+}
+
+; Remove leaked prompt text if model accidentally echoes the instruction block.
+; Simple rule: if output contains the instruction prompt, remove it.
+StripPromptLeak(text, promptText, &details) {
+    details := {
+        triggered: false,
+        occurrences: 0,
+        textInputRemoved: false,
+        removedChars: 0,
+        beforeLength: StrLen(text),
+        afterLength: StrLen(text)
+    }
+
+    if (promptText = "")
+        return text
+
+    leakedPromptLine := "instructions: " . promptText
+    if !InStr(text, leakedPromptLine, true)
+        return text
+
+    replaced := 0
+    textAfter := StrReplace(text, leakedPromptLine, "", true, &replaced)
+    textAfter := LTrim(textAfter, " `t`r`n")
+
+    textInputLabel := "text input:"
+    if (InStr(textAfter, textInputLabel, true) = 1) {
+        textAfter := SubStr(textAfter, StrLen(textInputLabel) + 1)
+        textAfter := LTrim(textAfter, " `t`r`n")
+        details.textInputRemoved := true
+    }
+
+    details.triggered := true
+    details.occurrences := replaced
+    details.afterLength := StrLen(textAfter)
+    details.removedChars := details.beforeLength - details.afterLength
+    return textAfter
 }
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
@@ -277,10 +318,18 @@ LogDetailed(data) {
                 timingBreakdown .= "  Response parsing: " . (t.textParsed - t.responseReceived) . "ms`n"
 
             if (t.replacementsApplied > 0)
-                timingBreakdown .= "  Post-processing: " . (t.replacementsApplied - t.textParsed) . "ms`n"
+                timingBreakdown .= "  Post-processing replacements: " . (t.replacementsApplied - t.textParsed) . "ms`n"
+
+            if (t.promptGuardApplied > 0)
+                timingBreakdown .= "  Prompt-leak safeguard: " . (t.promptGuardApplied - t.replacementsApplied) . "ms`n"
 
             if (t.textPasted > 0) {
-                prevTime := t.replacementsApplied > 0 ? t.replacementsApplied : t.textParsed
+                if (t.promptGuardApplied > 0)
+                    prevTime := t.promptGuardApplied
+                else if (t.replacementsApplied > 0)
+                    prevTime := t.replacementsApplied
+                else
+                    prevTime := t.textParsed
                 timingBreakdown .= "  Text pasting: " . (t.textPasted - prevTime) . "ms`n"
             }
 
@@ -321,6 +370,20 @@ LogDetailed(data) {
                     entry .= "  " . rep . "`n"
             } else {
                 entry .= "Post-processing: no replacements matched`n"
+            }
+            entry .= "`n"
+        }
+
+        if (data.HasOwnProp("promptLeakGuard") && IsObject(data.promptLeakGuard)) {
+            guard := data.promptLeakGuard
+            if (guard.HasOwnProp("triggered") && guard.triggered) {
+                entry .= "Prompt-leak safeguard: TRIGGERED`n"
+                entry .= "  Occurrences removed: " . guard.occurrences . "`n"
+                entry .= "  Removed 'text input:' label: " . (guard.textInputRemoved ? "yes" : "no") . "`n"
+                entry .= "  Removed chars: " . guard.removedChars . "`n"
+                entry .= "  Length: " . guard.beforeLength . " -> " . guard.afterLength . "`n"
+            } else {
+                entry .= "Prompt-leak safeguard: no leak pattern matched`n"
             }
             entry .= "`n"
         }
@@ -663,6 +726,14 @@ FinalizeRun(logData) {
         rawResponse: "",
         pastedText: "",
         replacementsApplied: [],
+        promptLeakGuard: {
+            triggered: false,
+            occurrences: 0,
+            textInputRemoved: false,
+            removedChars: 0,
+            beforeLength: 0,
+            afterLength: 0
+        },
         error: "",
         startTime: startTime,
         pasteTime: 0,
@@ -676,6 +747,7 @@ FinalizeRun(logData) {
             responseReceived: 0,
             textParsed: 0,
             replacementsApplied: 0,
+            promptGuardApplied: 0,
             textPasted: 0
         }
     }
@@ -699,8 +771,8 @@ FinalizeRun(logData) {
         ; OpenAI API call
         apiKey := "REDACTED"
         
-        ; Create the prompt (same as Python file)
-        prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
+        ; Create the prompt from shared instruction text
+        prompt := "instructions: " . promptInstructionText . "`ntext input: " . originalText
        
         ; Create JSON payload for Responses API (store + text verbosity + model-specific controls)
         escapedPrompt := JsonEscape(prompt)
@@ -830,7 +902,7 @@ FinalizeRun(logData) {
             }
         }
         
-        ; Apply post-processing replacements (instant string pass)
+        ; Apply post-processing replacements + safeguard cleanup (instant string passes)
         if (correctedText != "") {
             logData.rawAiOutput := correctedText
             applied := []
@@ -841,6 +913,22 @@ FinalizeRun(logData) {
                 logData.events.Push("Post-processing: " . applied.Length . " replacement(s) applied: " . applied[1] . (applied.Length > 1 ? " (+" . (applied.Length - 1) . " more)" : ""))
             else
                 logData.events.Push("Post-processing: no replacements matched")
+
+            guardDetails := {}
+            guardInput := correctedText
+            correctedText := StripPromptLeak(correctedText, promptInstructionText, &guardDetails)
+            logData.promptLeakGuard := guardDetails
+            logData.timings.promptGuardApplied := A_TickCount
+
+            if (guardDetails.triggered) {
+                beforePreview := StrReplace(StrReplace(SubStr(guardInput, 1, 120), "`r", " "), "`n", " ")
+                afterPreview := StrReplace(StrReplace(SubStr(correctedText, 1, 120), "`r", " "), "`n", " ")
+                logData.events.Push("Prompt-leak safeguard TRIGGERED (removed " . guardDetails.occurrences . " occurrence(s), text input label removed: " . (guardDetails.textInputRemoved ? "yes" : "no") . ", " . guardDetails.removedChars . " chars, " . guardDetails.beforeLength . " -> " . guardDetails.afterLength . ")")
+                logData.events.Push("Prompt-leak safeguard before: " . beforePreview)
+                logData.events.Push("Prompt-leak safeguard after: " . afterPreview)
+            } else {
+                logData.events.Push("Prompt-leak safeguard: no leak pattern matched")
+            }
         }
 
         if (correctedText != "") {

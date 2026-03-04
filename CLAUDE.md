@@ -25,6 +25,7 @@ The project uses a single active V5 script with a top-level model selector.
 - Enhanced logging with full timing breakdown
 - Dual JSON parsing (regex primary, Map fallback)
 - Post-processing replacements via `replacements.json`
+- Prompt-leak safeguard to strip echoed instruction headers when they appear in model output
 - Enhanced clipboard reading (HTML -> Unicode -> ANSI fallback chain)
 - Per-app paste behavior configurable via `sendTextApps` list
 
@@ -45,7 +46,8 @@ The project uses a single active V5 script with a top-level model selector.
 5. Sends text directly to OpenAI API
 6. Parses response (regex primary -> Map-based fallback)
 7. `ApplyReplacements()` fixes known brand/term casing in AI output
-8. Replaces selected text via clipboard paste (Ctrl+V) or `SendText()` depending on active app
+8. `StripPromptLeak()` removes accidental echoed instruction blocks (simple string check against `promptInstructionText`)
+9. Replaces selected text via clipboard paste (Ctrl+V) or `SendText()` depending on active app
 
 ### OpenAI API Integration
 - **Endpoint**: `https://api.openai.com/v1/responses` (all models use Responses API)
@@ -89,6 +91,12 @@ The project uses a single active V5 script with a top-level model selector.
   - Reloaded fresh on every invocation so edits take effect without restart
   - Sorted longest-variant-first to prevent shorter substrings interfering
   - Runs in microseconds; logged with count and list of applied replacements
+- **Prompt-leak safeguard** (`StripPromptLeak`)
+  - Hardcoded detection for leaked `instructions: ... text input:` prefix echoed by the model
+  - Uses a simple string check: if output contains the instruction prompt, remove it
+  - Reuses the same `promptInstructionText` variable used to build the request prompt
+  - Also removes a leading `text input:` label after stripping the leaked instruction block
+  - Logs trigger status and before/after lengths via `promptLeakGuard` + `timings.promptGuardApplied`
 - **Enhanced clipboard reading** (`GetClipboardText()`)
   - Prefers HTML clipboard format (strips empty paragraphs / formatting noise)
   - Falls back to Unicode (CF_UNICODETEXT), then ANSI (CF_TEXT)
@@ -114,7 +122,8 @@ The project uses a single active V5 script with a top-level model selector.
 
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
 - **`ApplyReplacements(text, &applied)`**: Runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching; only logs entries when at least one replacement occurred
-- **Timing**: Captured in `timings.replacementsApplied`; logged in `spellcheck-detailed.log` under "Post-processing"
+- **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
+- **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged in `spellcheck-detailed.log` under post-processing sections
 
 ## Critical Debugging Principles (MUST FOLLOW)
 
