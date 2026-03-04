@@ -219,6 +219,51 @@ GetClipboardText() {
     return result != "" ? result : text
 }
 
+; Mark current clipboard content for Windows clipboard-history/cloud behavior.
+; `canIncludeInHistory := false` makes transient data (like source Ctrl+C text) less likely to appear in Win+V history.
+SetClipboardHistoryPolicy(canIncludeInHistory := true, canUploadToCloud := true) {
+    static CF_CAN_INCLUDE := DllCall("RegisterClipboardFormat", "str", "CanIncludeInClipboardHistory", "uint")
+    static CF_CAN_UPLOAD := DllCall("RegisterClipboardFormat", "str", "CanUploadToCloudClipboard", "uint")
+
+    if !DllCall("OpenClipboard", "ptr", 0)
+        return false
+
+    anySet := false
+    try {
+        if (CF_CAN_INCLUDE)
+            anySet := __SetClipboardDwordFormat(CF_CAN_INCLUDE, canIncludeInHistory ? 1 : 0) || anySet
+        if (CF_CAN_UPLOAD)
+            anySet := __SetClipboardDwordFormat(CF_CAN_UPLOAD, canUploadToCloud ? 1 : 0) || anySet
+    } finally {
+        DllCall("CloseClipboard")
+    }
+    return anySet
+}
+
+__SetClipboardDwordFormat(formatId, value) {
+    static GMEM_MOVEABLE := 0x2
+    static GMEM_ZEROINIT := 0x40
+
+    hMem := DllCall("GlobalAlloc", "uint", GMEM_MOVEABLE | GMEM_ZEROINIT, "uptr", 4, "ptr")
+    if !hMem
+        return false
+
+    pMem := DllCall("GlobalLock", "ptr", hMem, "ptr")
+    if !pMem {
+        DllCall("GlobalFree", "ptr", hMem)
+        return false
+    }
+
+    NumPut("uint", value, pMem, 0)
+    DllCall("GlobalUnlock", "ptr", hMem)
+
+    if !DllCall("SetClipboardData", "uint", formatId, "ptr", hMem, "ptr") {
+        DllCall("GlobalFree", "ptr", hMem)
+        return false
+    }
+    return true
+}
+
 __ReadClipboardString(format, encoding) {
     if (hData := DllCall("GetClipboardData", "uint", format, "ptr")) {
         if (pData := DllCall("GlobalLock", "ptr", hData, "ptr")) {
@@ -762,6 +807,11 @@ FinalizeRun(logData) {
             logData.events.Push("Clipboard wait timed out")
             return
         }
+
+        if (SetClipboardHistoryPolicy(false, false))
+            logData.events.Push("Clipboard source marked as transient (history/cloud excluded)")
+        else
+            logData.events.Push("Clipboard source history-policy tag unavailable")
 
         originalText := GetClipboardText()  ; store original text before processing
         logData.original := originalText
