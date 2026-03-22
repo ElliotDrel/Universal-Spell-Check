@@ -125,9 +125,10 @@ LoadReplacements() {
 ; Apply post-processing replacements to AI output. Runs in microseconds.
 ; &applied receives a list of "variant->canonical" strings for every replacement that fired.
 ; URLs are protected: extracted before replacements, restored after.
-ApplyReplacements(text, &applied) {
+ApplyReplacements(text, &applied, &urlCount) {
     global postReplacements
     applied := []
+    urlCount := 0
 
     ; Extract URLs into placeholders so replacements don't break them
     urls := []
@@ -138,6 +139,8 @@ ApplyReplacements(text, &applied) {
         text := SubStr(text, 1, pos - 1) . placeholder . SubStr(text, pos + StrLen(m[0]))
         pos += StrLen(placeholder)
     }
+
+    urlCount := urls.Length
 
     ; Run replacements on placeholder-protected text
     for pair in postReplacements {
@@ -430,12 +433,13 @@ LogDetailed(data) {
         entry .= "`n"
 
         if (data.HasOwnProp("replacementsApplied") && IsObject(data.replacementsApplied)) {
+            urlNote := (data.HasOwnProp("urlsProtected") && data.urlsProtected > 0) ? " (" . data.urlsProtected . " URL(s) protected)" : ""
             if (data.replacementsApplied.Length > 0) {
-                entry .= "Post-processing (" . data.replacementsApplied.Length . " replacement(s) applied):`n"
+                entry .= "Post-processing (" . data.replacementsApplied.Length . " replacement(s) applied)" . urlNote . ":`n"
                 for , rep in data.replacementsApplied
                     entry .= "  " . rep . "`n"
             } else {
-                entry .= "Post-processing: no replacements matched`n"
+                entry .= "Post-processing: no replacements matched" . urlNote . "`n"
             }
             entry .= "`n"
         }
@@ -977,13 +981,15 @@ FinalizeRun(logData) {
         if (correctedText != "") {
             logData.rawAiOutput := correctedText
             applied := []
-            correctedText := ApplyReplacements(correctedText, &applied)
+            urlCount := 0
+            correctedText := ApplyReplacements(correctedText, &applied, &urlCount)
             logData.replacementsApplied := applied
+            logData.urlsProtected := urlCount
             logData.timings.replacementsApplied := A_TickCount
             if (applied.Length > 0)
-                logData.events.Push("Post-processing: " . applied.Length . " replacement(s) applied: " . applied[1] . (applied.Length > 1 ? " (+" . (applied.Length - 1) . " more)" : ""))
+                logData.events.Push("Post-processing: " . applied.Length . " replacement(s) applied: " . applied[1] . (applied.Length > 1 ? " (+" . (applied.Length - 1) . " more)" : "") . (urlCount > 0 ? " (" . urlCount . " URL(s) protected)" : ""))
             else
-                logData.events.Push("Post-processing: no replacements matched")
+                logData.events.Push("Post-processing: no replacements matched" . (urlCount > 0 ? " (" . urlCount . " URL(s) protected)" : ""))
 
             guardDetails := {}
             guardInput := correctedText
