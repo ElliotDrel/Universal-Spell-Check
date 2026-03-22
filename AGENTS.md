@@ -90,6 +90,7 @@ The project uses a single active V5 script with a top-level model selector.
 - **Post-processing replacements** (`replacements.json`)
   - Reloaded fresh on every invocation so edits take effect without restart
   - Sorted longest-variant-first to prevent shorter substrings interfering
+  - **URL protection**: URLs (`https?://\S+`) are extracted into placeholders before replacements run, then restored after — prevents replacements from breaking links
   - Runs in microseconds; logged with count and list of applied replacements
 - **Prompt-leak safeguard** (`StripPromptLeak`)
   - Hardcoded detection for leaked `instructions: ... text input:` prefix echoed by the model
@@ -121,7 +122,7 @@ The project uses a single active V5 script with a top-level model selector.
 ```
 
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
-- **`ApplyReplacements(text, &applied)`**: Runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching; only logs entries when at least one replacement occurred
+- **`ApplyReplacements(text, &applied)`**: Extracts URLs into `__URL_N__` placeholders first, then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; only logs entries when at least one replacement occurred
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
 - **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged in `spellcheck-detailed.log` under post-processing sections
 
