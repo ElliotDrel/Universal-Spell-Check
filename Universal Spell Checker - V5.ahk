@@ -124,9 +124,22 @@ LoadReplacements() {
 
 ; Apply post-processing replacements to AI output. Runs in microseconds.
 ; &applied receives a list of "variant->canonical" strings for every replacement that fired.
+; URLs are protected: extracted before replacements, restored after.
 ApplyReplacements(text, &applied) {
     global postReplacements
     applied := []
+
+    ; Extract URLs into placeholders so replacements don't break them
+    urls := []
+    pos := 1
+    while (pos := RegExMatch(text, "https?://\S+", &m, pos)) {
+        urls.Push(m[0])
+        placeholder := "__URL_" . urls.Length . "__"
+        text := SubStr(text, 1, pos - 1) . placeholder . SubStr(text, pos + StrLen(m[0]))
+        pos += StrLen(placeholder)
+    }
+
+    ; Run replacements on placeholder-protected text
     for pair in postReplacements {
         if InStr(text, pair[1], true) {
             replaceCount := 0
@@ -135,6 +148,14 @@ ApplyReplacements(text, &applied) {
                 applied.Push(pair[1] . " -> " . pair[2])
         }
     }
+
+    ; Restore original URLs
+    i := urls.Length
+    while (i >= 1) {
+        text := StrReplace(text, "__URL_" . i . "__", urls[i])
+        i--
+    }
+
     return text
 }
 
