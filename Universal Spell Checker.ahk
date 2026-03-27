@@ -324,7 +324,7 @@ __HtmlFragmentToPlainText(fragment) {
         doc.Write(fragment)
         doc.Close()
         if (doc.body)
-            return Trim(doc.body.innerText, "`r`n")
+            return doc.body.innerText
     } catch {
         ; Fall through to caller so it can try Unicode/plain text representations
     }
