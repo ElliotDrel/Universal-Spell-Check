@@ -65,113 +65,277 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spell Check Log Viewer</title>
+<title>Spell Check &mdash; Log Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Barlow:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d1117; --surface: #161b22; --border: #30363d;
-    --text: #e6edf3; --text-dim: #8b949e; --accent: #58a6ff;
-    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --bg: #0b0c10; --surface: #14161e; --surface-hover: #1a1d27;
+    --border: #252838; --border-light: #353950;
+    --text: #e4dfd6; --text-mid: #aea89e; --text-dim: #6e6960;
+    --accent: #c9a84c; --accent-bright: #e0bf5e;
+    --accent-subtle: rgba(201,168,76,0.08);
+    --success: #5ea671; --error: #d45454;
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Barlow', 'Segoe UI', sans-serif;
+    --font-mono: 'Fira Code', Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-         background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
-  h1 { font-size: 1.4em; margin-bottom: 16px; }
-  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border);
-               border-radius: 8px; padding: 12px 16px; min-width: 140px; }
-  .stat-card .label { font-size: 0.75em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-card .value { font-size: 1.5em; font-weight: 600; }
-  .stat-card .value.green { color: var(--green); }
-  .stat-card .value.red { color: var(--red); }
+  body {
+    font-family: var(--font-body); background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 15% -5%, rgba(201,168,76,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 105%, rgba(94,166,113,0.025) 0%, transparent 50%);
+    color: var(--text); line-height: 1.5; min-height: 100vh;
+  }
+  .container { max-width: 1440px; margin: 0 auto; padding: 32px 40px; }
 
-  .controls { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-  .controls input, .controls select { background: var(--surface); color: var(--text);
-    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.9em; }
-  .controls input { flex: 1; min-width: 200px; }
-  .controls select { min-width: 120px; }
-  .controls label { font-size: 0.85em; color: var(--text-dim); }
+  /* --- Header --- */
+  .header { text-align: center; margin-bottom: 40px; }
+  .header-rule { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .header-rule::before, .header-rule::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent) 40%, var(--accent) 60%, transparent);
+    opacity: 0.5;
+  }
+  .diamond {
+    width: 7px; height: 7px; background: var(--accent);
+    transform: rotate(45deg); flex-shrink: 0;
+    animation: diamondIn 0.6s ease-out 0.15s both;
+  }
+  @keyframes diamondIn {
+    from { opacity: 0; transform: rotate(45deg) scale(0); }
+    to { opacity: 1; transform: rotate(45deg) scale(1); }
+  }
+  h1 {
+    font-family: var(--font-display); font-size: 2.6em; font-weight: 700;
+    letter-spacing: 0.015em; animation: fadeUp 0.5s ease 0.1s both;
+  }
+  h1 .sep { color: var(--accent); margin: 0 4px; }
+  .header-sub {
+    font-size: 0.82em; color: var(--text-dim); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-top: 8px;
+    animation: fadeUp 0.5s ease 0.2s both;
+  }
 
+  /* --- Stats --- */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 14px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 2px solid var(--accent); border-radius: 2px 2px 8px 8px;
+    padding: 18px 14px 14px; text-align: center;
+    transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    animation: fadeUp 0.5s ease both;
+  }
+  .stat-card:hover {
+    border-top-color: var(--accent-bright); transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .stat-card:nth-child(1){animation-delay:.3s}
+  .stat-card:nth-child(2){animation-delay:.35s}
+  .stat-card:nth-child(3){animation-delay:.4s}
+  .stat-card:nth-child(4){animation-delay:.45s}
+  .stat-card:nth-child(5){animation-delay:.5s}
+  .stat-card:nth-child(6){animation-delay:.55s}
+  .stat-card:nth-child(7){animation-delay:.6s}
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stat-value {
+    font-family: var(--font-mono); font-size: 1.75em; font-weight: 500; line-height: 1.2;
+  }
+  .stat-value.green { color: var(--success); }
+  .stat-value.red { color: var(--error); }
+  .stat-value small { font-size: 0.48em; color: var(--text-dim); font-weight: 400; margin-left: 1px; }
+  .stat-label {
+    font-size: 0.68em; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--text-dim); margin-top: 6px;
+  }
+
+  /* --- Controls --- */
+  .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+  .controls input, .controls select {
+    font-family: var(--font-body); background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-size: 0.88em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .controls input:focus, .controls select:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
+  .controls input[type="text"] {
+    flex: 1; min-width: 220px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236e6960' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 12px center; padding-left: 34px;
+  }
+  .controls select {
+    min-width: 130px; cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236e6960'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+  }
+  .controls label {
+    font-size: 0.85em; color: var(--text-mid); cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .controls label input[type="checkbox"] { accent-color: var(--accent); }
+
+  /* --- Table --- */
+  .table-wrap {
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
   table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
-  thead th { background: var(--surface); position: sticky; top: 0; padding: 8px 10px;
-             text-align: left; border-bottom: 2px solid var(--border); cursor: pointer;
-             user-select: none; white-space: nowrap; }
+  thead th {
+    font-family: var(--font-body); font-weight: 600; font-size: 0.7em;
+    text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim);
+    background: var(--surface); padding: 12px 14px; text-align: left;
+    border-bottom: 1px solid var(--border); cursor: pointer;
+    user-select: none; white-space: nowrap; position: sticky; top: 0; z-index: 10;
+    transition: color 0.2s;
+  }
   thead th:hover { color: var(--accent); }
-  thead th .arrow { margin-left: 4px; font-size: 0.7em; }
-  tbody tr { border-bottom: 1px solid var(--border); }
-  tbody tr:hover { background: rgba(88, 166, 255, 0.05); }
-  td { padding: 6px 10px; vertical-align: top; max-width: 300px; overflow: hidden;
-       text-overflow: ellipsis; white-space: nowrap; }
+  thead th .arrow { margin-left: 4px; font-size: 0.85em; color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:not(.detail-row):hover { background: var(--accent-subtle); }
+  tbody tr:not(.detail-row):hover td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  td {
+    padding: 10px 14px; vertical-align: middle; font-family: var(--font-mono);
+    font-size: 0.92em; max-width: 300px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
   td.wrap { white-space: normal; word-break: break-word; }
+  .col-ts { color: var(--text-mid); font-size: 0.88em; }
+  .status-ok { color: var(--success); font-weight: 600; }
+  .status-err { color: var(--error); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .dot-yes { background: var(--success); box-shadow: 0 0 8px rgba(94,166,113,0.4); }
+  .dot-no { background: var(--border-light); }
 
-  .status-ok { color: var(--green); font-weight: 600; }
-  .status-err { color: var(--red); font-weight: 600; }
-  .changed-yes { color: var(--green); }
-  .changed-no { color: var(--text-dim); }
+  /* --- Expand button --- */
+  .expand-btn {
+    font-family: var(--font-body); background: transparent; border: 1px solid var(--border);
+    color: var(--accent); border-radius: 4px; padding: 4px 12px; cursor: pointer;
+    font-size: 0.75em; font-weight: 500; letter-spacing: 0.06em;
+    text-transform: uppercase; transition: all 0.2s;
+  }
+  .expand-btn:hover { background: var(--accent-subtle); border-color: var(--accent); }
 
-  .expand-btn { background: none; border: 1px solid var(--border); color: var(--accent);
-                border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.8em; }
-  .expand-btn:hover { background: rgba(88, 166, 255, 0.1); }
+  /* --- Detail panel --- */
+  .detail-row td { padding: 0 !important; border-bottom: none; }
+  .detail-content {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.4s ease-out, padding 0.3s ease-out;
+    background: var(--surface); padding: 0 20px;
+    border-top: 1px solid transparent;
+  }
+  .detail-content.open {
+    max-height: 4000px; padding: 24px 20px;
+    border-top-color: var(--accent);
+    transition: max-height 0.6s ease-in, padding 0.3s ease-in;
+  }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section h4 {
+    font-family: var(--font-display); font-size: 1.05em; font-weight: 600;
+    color: var(--accent); margin-bottom: 8px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-section pre {
+    font-family: var(--font-mono); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    font-size: 0.82em; max-height: 300px; overflow-y: auto;
+    line-height: 1.65; color: var(--text-mid);
+  }
+  .detail-section .kv {
+    display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; font-size: 0.88em;
+  }
+  .detail-section .kv .k { color: var(--text-dim); font-weight: 500; }
+  .detail-section .kv .v { font-family: var(--font-mono); color: var(--text); }
 
-  .detail-row td { padding: 0; }
-  .detail-content { background: var(--surface); padding: 16px; display: none; }
-  .detail-content.open { display: block; }
-  .detail-section { margin-bottom: 14px; }
-  .detail-section h4 { font-size: 0.85em; color: var(--accent); margin-bottom: 4px; }
-  .detail-section pre { background: #0d1117; border: 1px solid var(--border);
-    border-radius: 4px; padding: 10px; overflow-x: auto; white-space: pre-wrap;
-    word-break: break-word; font-size: 0.82em; max-height: 300px; overflow-y: auto; }
-  .detail-section .kv { display: grid; grid-template-columns: 160px 1fr; gap: 2px 12px; font-size: 0.85em; }
-  .detail-section .kv .k { color: var(--text-dim); }
+  /* --- Timing bar --- */
+  .timing-bar {
+    display: flex; height: 22px; border-radius: 4px; overflow: hidden;
+    margin: 8px 0 12px; background: var(--bg); border: 1px solid var(--border);
+  }
+  .timing-bar > div {
+    height: 100%; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 0.62em; font-weight: 500;
+    color: #fff; min-width: 2px; transition: filter 0.2s; cursor: default;
+  }
+  .timing-bar > div:hover { filter: brightness(1.2); }
+  .tb-clip { background: #3d5a80; } .tb-payload { background: #4a7fb5; }
+  .tb-req { background: #5b9bd5; } .tb-api { background: #c9a84c; }
+  .tb-parse { background: #5ea671; } .tb-replace { background: #4a8c5e; }
+  .tb-guard { background: #6e6960; } .tb-paste { background: #504a42; }
 
-  .timing-bar { display: flex; height: 20px; border-radius: 4px; overflow: hidden; margin: 4px 0; }
-  .timing-bar > div { height: 100%; display: flex; align-items: center; justify-content: center;
-    font-size: 0.7em; color: #fff; min-width: 2px; }
-  .tb-clip { background: #1f6feb; } .tb-payload { background: #388bfd; }
-  .tb-req { background: #58a6ff; } .tb-api { background: #d29922; }
-  .tb-parse { background: #3fb950; } .tb-replace { background: #2ea043; }
-  .tb-guard { background: #8b949e; } .tb-paste { background: #6e7681; }
+  /* --- Footer --- */
+  footer {
+    margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border);
+    text-align: center; font-size: 0.78em; color: var(--text-dim); letter-spacing: 0.04em;
+  }
 
-  .count-badge { display: inline-block; background: var(--border); border-radius: 10px;
-    padding: 0 6px; font-size: 0.75em; margin-left: 4px; }
-  footer { margin-top: 24px; text-align: center; font-size: 0.8em; color: var(--text-dim); }
+  /* --- Scrollbar --- */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
 
   @media (max-width: 900px) {
-    td { font-size: 0.78em; padding: 4px 6px; }
+    .container { padding: 20px 16px; }
+    h1 { font-size: 1.8em; }
+    td { font-size: 0.78em; padding: 6px 8px; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .detail-section .kv { grid-template-columns: 120px 1fr; }
   }
 </style>
 </head>
 <body>
-<h1>Spell Check Log Viewer</h1>
+<div class="container">
 
-<div class="stats" id="stats"></div>
+  <header class="header">
+    <div class="header-rule"><div class="diamond"></div></div>
+    <h1>Spell Check <span class="sep">&middot;</span> Log Viewer</h1>
+    <div class="header-sub" id="headerSub"></div>
+  </header>
 
-<div class="controls">
-  <input type="text" id="search" placeholder="Search text, app, error...">
-  <select id="filterStatus"><option value="">All Status</option><option value="SUCCESS">Success</option><option value="ERROR">Error</option></select>
-  <select id="filterModel"></select>
-  <select id="filterApp"></select>
-  <label><input type="checkbox" id="changedOnly"> Changed only</label>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search text, app, error&hellip;">
+    <select id="filterStatus"><option value="">All Status</option><option value="SUCCESS">Success</option><option value="ERROR">Error</option></select>
+    <select id="filterModel"></select>
+    <select id="filterApp"></select>
+    <label><input type="checkbox" id="changedOnly"> Changed only</label>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="timestamp">Time <span class="arrow"></span></th>
+          <th data-col="status">Status <span class="arrow"></span></th>
+          <th data-col="duration_ms">Duration <span class="arrow"></span></th>
+          <th data-col="model">Model <span class="arrow"></span></th>
+          <th data-col="active_app">App <span class="arrow"></span></th>
+          <th data-col="input_chars">In <span class="arrow"></span></th>
+          <th data-col="output_chars">Out <span class="arrow"></span></th>
+          <th data-col="text_changed">Changed <span class="arrow"></span></th>
+          <th data-col="tokens.total">Tokens <span class="arrow"></span></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <footer id="footer"></footer>
 </div>
-
-<table>
-  <thead>
-    <tr>
-      <th data-col="timestamp">Timestamp <span class="arrow"></span></th>
-      <th data-col="status">Status <span class="arrow"></span></th>
-      <th data-col="duration_ms">Duration <span class="arrow"></span></th>
-      <th data-col="model">Model <span class="arrow"></span></th>
-      <th data-col="active_app">App <span class="arrow"></span></th>
-      <th data-col="input_chars">In <span class="arrow"></span></th>
-      <th data-col="output_chars">Out <span class="arrow"></span></th>
-      <th data-col="text_changed">Changed <span class="arrow"></span></th>
-      <th data-col="tokens.total">Tokens <span class="arrow"></span></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody id="tbody"></tbody>
-</table>
-
-<footer id="footer"></footer>
 
 <script type="application/json" id="log-data">%%DATA%%</script>
 <script type="application/json" id="log-stats">%%STATS%%</script>
@@ -179,34 +343,35 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 const DATA = JSON.parse(document.getElementById('log-data').textContent);
 const STATS = JSON.parse(document.getElementById('log-stats').textContent);
 
-// --- Render stats ---
+// --- Stats ---
 (function() {
-  const s = STATS;
-  const el = document.getElementById('stats');
-  if (s.total === 0) { el.innerHTML = '<div class="stat-card"><div class="label">Entries</div><div class="value">0</div></div>'; return; }
+  const s = STATS, el = document.getElementById('stats'), sub = document.getElementById('headerSub');
+  if (s.total === 0) {
+    el.innerHTML = '<div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Entries</div></div>';
+    sub.textContent = 'No entries recorded';
+    return;
+  }
+  sub.textContent = s.total + ' spell-check runs recorded';
   el.innerHTML = `
-    <div class="stat-card"><div class="label">Total Runs</div><div class="value">${s.total}</div></div>
-    <div class="stat-card"><div class="label">Success Rate</div><div class="value green">${s.success_rate}%</div></div>
-    <div class="stat-card"><div class="label">Errors</div><div class="value ${s.errors?'red':''}">${s.errors}</div></div>
-    <div class="stat-card"><div class="label">Avg Duration</div><div class="value">${s.avg_duration}ms</div></div>
-    <div class="stat-card"><div class="label">Avg API Time</div><div class="value">${s.avg_api_time}ms</div></div>
-    <div class="stat-card"><div class="label">Total Tokens</div><div class="value">${s.total_tokens.toLocaleString()}</div></div>
-    <div class="stat-card"><div class="label">Text Changed</div><div class="value">${s.text_changed_pct}%</div></div>
-  `;
+    <div class="stat-card"><div class="stat-value">${s.total}</div><div class="stat-label">Total Runs</div></div>
+    <div class="stat-card"><div class="stat-value green">${s.success_rate}<small>%</small></div><div class="stat-label">Success Rate</div></div>
+    <div class="stat-card"><div class="stat-value ${s.errors?'red':''}">${s.errors}</div><div class="stat-label">Errors</div></div>
+    <div class="stat-card"><div class="stat-value">${s.avg_duration}<small>ms</small></div><div class="stat-label">Avg Duration</div></div>
+    <div class="stat-card"><div class="stat-value">${s.avg_api_time}<small>ms</small></div><div class="stat-label">Avg API Time</div></div>
+    <div class="stat-card"><div class="stat-value">${s.total_tokens.toLocaleString()}</div><div class="stat-label">Total Tokens</div></div>
+    <div class="stat-card"><div class="stat-value">${s.text_changed_pct}<small>%</small></div><div class="stat-label">Text Changed</div></div>`;
 })();
 
-// --- Populate filters ---
+// --- Filters ---
 (function() {
   const models = [...new Set(DATA.map(e => e.model || ''))].filter(Boolean).sort();
   const apps = [...new Set(DATA.map(e => e.active_exe || ''))].filter(Boolean).sort();
-  const mSel = document.getElementById('filterModel');
-  mSel.innerHTML = '<option value="">All Models</option>' + models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
-  const aSel = document.getElementById('filterApp');
-  aSel.innerHTML = '<option value="">All Apps</option>' + apps.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  document.getElementById('filterModel').innerHTML = '<option value="">All Models</option>' + models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  document.getElementById('filterApp').innerHTML = '<option value="">All Apps</option>' + apps.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
 })();
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '...' : (s || ''); }
+function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '\u2026' : (s || ''); }
 function nested(obj, path) { return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : 0, obj); }
 
 let sortCol = 'timestamp', sortDir = -1;
@@ -222,10 +387,7 @@ function getFiltered() {
     if (model && e.model !== model) return false;
     if (app && e.active_exe !== app) return false;
     if (changed && !e.text_changed) return false;
-    if (search) {
-      const blob = JSON.stringify(e).toLowerCase();
-      if (!blob.includes(search)) return false;
-    }
+    if (search) { if (!JSON.stringify(e).toLowerCase().includes(search)) return false; }
     return true;
   }).sort((a, b) => {
     let va = nested(a, sortCol), vb = nested(b, sortCol);
@@ -237,14 +399,10 @@ function getFiltered() {
 function renderTimingBar(t, total) {
   if (!t || total <= 0) return '';
   const parts = [
-    ['tb-clip', t.clipboard_ms, 'Clip'],
-    ['tb-payload', t.payload_ms, 'Prep'],
-    ['tb-req', t.request_ms, 'Req'],
-    ['tb-api', t.api_ms, 'API'],
-    ['tb-parse', t.parse_ms, 'Parse'],
-    ['tb-replace', t.replacements_ms, 'Repl'],
-    ['tb-guard', t.prompt_guard_ms, 'Guard'],
-    ['tb-paste', t.paste_ms, 'Paste'],
+    ['tb-clip', t.clipboard_ms, 'Clipboard'], ['tb-payload', t.payload_ms, 'Payload'],
+    ['tb-req', t.request_ms, 'Request'], ['tb-api', t.api_ms, 'API'],
+    ['tb-parse', t.parse_ms, 'Parse'], ['tb-replace', t.replacements_ms, 'Replacements'],
+    ['tb-guard', t.prompt_guard_ms, 'Guard'], ['tb-paste', t.paste_ms, 'Paste'],
   ];
   return '<div class="timing-bar">' + parts.map(([cls, ms, label]) => {
     const pct = Math.max((ms / total) * 100, 0);
@@ -264,38 +422,40 @@ function renderDetail(e, idx) {
   try { rawResp = e.raw_response ? JSON.stringify(JSON.parse(e.raw_response), null, 2) : ''; } catch { rawResp = e.raw_response || ''; }
 
   return `<div class="detail-content" id="detail-${idx}">
-    <div class="detail-section"><h4>Timing Breakdown</h4>${renderTimingBar(t, e.duration_ms)}
-      <div class="kv">
-        <span class="k">Clipboard</span><span>${t.clipboard_ms || 0}ms</span>
-        <span class="k">Payload prep</span><span>${t.payload_ms || 0}ms</span>
-        <span class="k">Request setup</span><span>${t.request_ms || 0}ms</span>
-        <span class="k">API round-trip</span><span>${t.api_ms || 0}ms</span>
-        <span class="k">Response parse</span><span>${t.parse_ms || 0}ms</span>
-        <span class="k">Replacements</span><span>${t.replacements_ms || 0}ms</span>
-        <span class="k">Prompt guard</span><span>${t.prompt_guard_ms || 0}ms</span>
-        <span class="k">Paste</span><span>${t.paste_ms || 0}ms</span>
+    <div class="detail-grid">
+      <div class="detail-section"><h4>Timing Breakdown</h4>${renderTimingBar(t, e.duration_ms)}
+        <div class="kv">
+          <span class="k">Clipboard</span><span class="v">${t.clipboard_ms || 0}ms</span>
+          <span class="k">Payload prep</span><span class="v">${t.payload_ms || 0}ms</span>
+          <span class="k">Request setup</span><span class="v">${t.request_ms || 0}ms</span>
+          <span class="k">API round-trip</span><span class="v">${t.api_ms || 0}ms</span>
+          <span class="k">Response parse</span><span class="v">${t.parse_ms || 0}ms</span>
+          <span class="k">Replacements</span><span class="v">${t.replacements_ms || 0}ms</span>
+          <span class="k">Prompt guard</span><span class="v">${t.prompt_guard_ms || 0}ms</span>
+          <span class="k">Paste</span><span class="v">${t.paste_ms || 0}ms</span>
+        </div>
       </div>
-    </div>
-    <div class="detail-section"><h4>Tokens</h4>
-      <div class="kv">
-        <span class="k">Input</span><span>${tok.input || 0}</span>
-        <span class="k">Output</span><span>${tok.output || 0}</span>
-        <span class="k">Total</span><span>${tok.total || 0}</span>
-        <span class="k">Cached</span><span>${tok.cached || 0}</span>
-        <span class="k">Reasoning</span><span>${tok.reasoning || 0}</span>
+      <div class="detail-section"><h4>Tokens</h4>
+        <div class="kv">
+          <span class="k">Input</span><span class="v">${tok.input || 0}</span>
+          <span class="k">Output</span><span class="v">${tok.output || 0}</span>
+          <span class="k">Total</span><span class="v">${tok.total || 0}</span>
+          <span class="k">Cached</span><span class="v">${tok.cached || 0}</span>
+          <span class="k">Reasoning</span><span class="v">${tok.reasoning || 0}</span>
+        </div>
       </div>
     </div>
     <div class="detail-section"><h4>Input Text</h4><pre>${esc(e.input_text || '')}</pre></div>
     <div class="detail-section"><h4>AI Output (before post-processing)</h4><pre>${esc(e.raw_ai_output || '')}</pre></div>
     <div class="detail-section"><h4>Final Output</h4><pre>${esc(e.output_text || '')}</pre></div>
     ${rep.count > 0 ? `<div class="detail-section"><h4>Replacements (${rep.count})</h4><pre>${esc((rep.applied || []).join('\n'))}</pre></div>` : ''}
-    ${rep.urls_protected > 0 ? `<div class="detail-section"><h4>URLs Protected</h4><span>${rep.urls_protected}</span></div>` : ''}
+    ${rep.urls_protected > 0 ? `<div class="detail-section"><h4>URLs Protected</h4><span class="v">${rep.urls_protected}</span></div>` : ''}
     ${pl.triggered ? `<div class="detail-section"><h4>Prompt Leak Guard</h4>
       <div class="kv">
-        <span class="k">Occurrences</span><span>${pl.occurrences}</span>
-        <span class="k">Text input removed</span><span>${pl.text_input_removed}</span>
-        <span class="k">Chars removed</span><span>${pl.removed_chars}</span>
-        <span class="k">Length</span><span>${pl.before_length} → ${pl.after_length}</span>
+        <span class="k">Occurrences</span><span class="v">${pl.occurrences}</span>
+        <span class="k">Text input removed</span><span class="v">${pl.text_input_removed}</span>
+        <span class="k">Chars removed</span><span class="v">${pl.removed_chars}</span>
+        <span class="k">Length</span><span class="v">${pl.before_length} \u2192 ${pl.after_length}</span>
       </div></div>` : ''}
     <div class="detail-section"><h4>Events</h4><pre>${esc((e.events || []).join('\n'))}</pre></div>
     ${e.error ? `<div class="detail-section"><h4>Error</h4><pre>${esc(e.error)}</pre></div>` : ''}
@@ -303,10 +463,10 @@ function renderDetail(e, idx) {
     ${rawResp ? `<div class="detail-section"><h4>Raw API Response</h4><pre>${esc(rawResp)}</pre></div>` : ''}
     <div class="detail-section">
       <div class="kv">
-        <span class="k">Model version</span><span>${esc(e.model_version || '')}</span>
-        <span class="k">Active app</span><span>${esc(e.active_app || '')}</span>
-        <span class="k">Active exe</span><span>${esc(e.active_exe || '')}</span>
-        <span class="k">Paste method</span><span>${esc(e.paste_method || '')}</span>
+        <span class="k">Model version</span><span class="v">${esc(e.model_version || '')}</span>
+        <span class="k">Active app</span><span class="v">${esc(e.active_app || '')}</span>
+        <span class="k">Active exe</span><span class="v">${esc(e.active_exe || '')}</span>
+        <span class="k">Paste method</span><span class="v">${esc(e.paste_method || '')}</span>
       </div>
     </div>
   </div>`;
@@ -314,39 +474,32 @@ function renderDetail(e, idx) {
 
 function render() {
   const filtered = getFiltered();
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = filtered.map((e, i) => `
+  document.getElementById('tbody').innerHTML = filtered.map((e, i) => `
     <tr>
-      <td>${esc(e.timestamp || '')}</td>
+      <td class="col-ts">${esc(e.timestamp || '')}</td>
       <td class="${e.status === 'SUCCESS' ? 'status-ok' : 'status-err'}">${esc(e.status || '')}</td>
       <td>${e.duration_ms || 0}ms</td>
       <td>${esc(e.model || '')}</td>
       <td title="${esc(e.active_app || '')}">${esc(trunc(e.active_exe || '', 20))}</td>
       <td>${e.input_chars || 0}</td>
       <td>${e.output_chars || 0}</td>
-      <td class="${e.text_changed ? 'changed-yes' : 'changed-no'}">${e.text_changed ? 'Yes' : 'No'}</td>
+      <td><span class="dot ${e.text_changed ? 'dot-yes' : 'dot-no'}"></span></td>
       <td>${(e.tokens || {}).total || 0}</td>
       <td><button class="expand-btn" onclick="toggle(${i})">Details</button></td>
     </tr>
     <tr class="detail-row"><td colspan="10">${renderDetail(e, i)}</td></tr>
   `).join('');
   document.getElementById('footer').textContent = `Showing ${filtered.length} of ${DATA.length} entries`;
-
-  // Update sort arrows
   document.querySelectorAll('thead th').forEach(th => {
     const arrow = th.querySelector('.arrow');
     if (!arrow) return;
-    if (th.dataset.col === sortCol) arrow.textContent = sortDir === 1 ? '▲' : '▼';
+    if (th.dataset.col === sortCol) arrow.textContent = sortDir === 1 ? '\u25B2' : '\u25BC';
     else arrow.textContent = '';
   });
 }
 
-function toggle(idx) {
-  const el = document.getElementById('detail-' + idx);
-  if (el) el.classList.toggle('open');
-}
+function toggle(idx) { const el = document.getElementById('detail-' + idx); if (el) el.classList.toggle('open'); }
 
-// Sort on header click
 document.querySelectorAll('thead th[data-col]').forEach(th => {
   th.addEventListener('click', () => {
     const col = th.dataset.col;
@@ -356,7 +509,6 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
   });
 });
 
-// Filter events
 ['search', 'filterStatus', 'filterModel', 'filterApp', 'changedOnly'].forEach(id => {
   document.getElementById(id).addEventListener(id === 'changedOnly' ? 'change' : 'input', render);
 });
