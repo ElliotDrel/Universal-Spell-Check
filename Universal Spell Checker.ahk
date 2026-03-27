@@ -132,13 +132,11 @@ ApplyReplacements(text, &applied, &urlCount) {
     urlCount := 0
 
     ; Extract URLs into placeholders so replacements don't break them
-    ; Use A_TickCount prefix so placeholders can't collide with real text
     urls := []
-    urlTag := "__URL_" . A_TickCount . "_"
     pos := 1
     while (pos := RegExMatch(text, "https?://\S+", &m, pos)) {
         urls.Push(m[0])
-        placeholder := urlTag . urls.Length . "__"
+        placeholder := "__URL_" . urls.Length . "__"
         text := SubStr(text, 1, pos - 1) . placeholder . SubStr(text, pos + StrLen(m[0]))
         pos += StrLen(placeholder)
     }
@@ -158,7 +156,7 @@ ApplyReplacements(text, &applied, &urlCount) {
     ; Restore original URLs
     i := urls.Length
     while (i >= 1) {
-        text := StrReplace(text, urlTag . i . "__", urls[i])
+        text := StrReplace(text, "__URL_" . i . "__", urls[i])
         i--
     }
 
