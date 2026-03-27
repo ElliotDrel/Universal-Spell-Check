@@ -125,11 +125,11 @@ The project uses a single active script with a top-level model selector.
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
 - **`ApplyReplacements(text, &applied, &urlCount)`**: Extracts `http(s)://` URLs into `__URL_N__` placeholders first (scheme-less links not covered), then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; reports URL count and replacement list for logging
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
-- **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in `spellcheck.jsonl`
+- **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in the weekly `spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl` files
 
 ### Logging System (JSONL)
-- **Format**: JSON Lines — one JSON object per line in `logs/spellcheck.jsonl`
-- **Rotation**: At 1MB, archived with timestamp suffix (same as before)
+- **Format**: JSON Lines — one JSON object per line in weekly files like `logs/spellcheck-2026-03-23-to-2026-03-29.jsonl`
+- **Rotation**: New entries write to the current week's file (Monday-based week start). If appending the next line would push that file past 5 MiB, the script spills into `-2`, `-3`, etc. files for that same week instead of renaming old logs
 - **Fields per entry**: timestamp, status, error, duration_ms, model, model_version, active_app, active_exe, paste_method, text_changed, input_text, input_chars, output_text, output_chars, raw_ai_output, tokens (input/output/total/cached/reasoning), timings (clipboard/payload/request/api/parse/replacements/prompt_guard/paste in ms), replacements (count/applied/urls_protected), prompt_leak (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), events array, raw_response
 - **Viewer**: Run `python generate_log_viewer.py` to generate `logs/viewer.html` (add `--open` to auto-launch in browser). The HTML has summary stats, sortable/filterable table, expandable row details, timing breakdown bars, and search
 
@@ -287,3 +287,308 @@ When debugging unclear issues, prepare multiple approaches:
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback
 
 These exist for reference but are not actively developed. The focus is on `Universal Spell Checker.ahk`.
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Universal Spell Checker**
+
+A minimalist AutoHotkey script that provides instant AI-powered spell checking across all Windows applications. Select text, press Ctrl+Alt+U, and the corrected text replaces the selection in-place. Built for maximum speed and seamless operation with zero UI overhead.
+
+**Core Value:** Spell checking must feel instant and invisible — select, hotkey, done. Speed is the product.
+
+### Constraints
+
+- **Platform**: Windows only — relies on AHK v2, WinHTTP COM, Windows clipboard API
+- **Runtime**: AutoHotkey v2.0 interpreter must be installed
+- **API**: OpenAI API key required with Responses API access
+- **Performance**: Every operation must be optimized for minimal latency — speed is the core value
+- **Simplicity**: Self-contained .ahk files with minimal external dependencies
+- **No build step**: Scripts run directly, no compilation or bundling
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages
+- AutoHotkey v2.0 - Main implementation language for spell-checking automation
+- Python 3.x - Log viewer HTML generation tool
+## Runtime
+- Windows (script runs as AutoHotkey v2.0 interpreter)
+- Python 3.x runtime for log viewer tool
+- Python pip (implicit) - Python standard library only, no external dependencies
+## Frameworks
+- AutoHotkey v2.0 - Hotkey scripting framework with COM integration
+- Custom JSON Lines (JSONL) logging system - Structured log format stored in `logs/spellcheck.jsonl`
+- Python built-in libraries (json, glob, pathlib, html, os, sys) for log viewer generation
+- Python built-in web templating (no external template library) - `generate_log_viewer.py` generates static HTML
+## Key Dependencies
+- Windows COM Objects - ADODB.Stream (UTF-8 response reading), HTMLFile (HTML to plaintext conversion), WinHttp.WinHttpRequest.5.1 (HTTP requests)
+- OpenAI API client - Direct HTTP/1.1 via WinHttp.WinHttpRequest (no SDK)
+- Clipboard API - Windows native clipboard format handling (CF_HTML, CF_UNICODETEXT, CF_TEXT)
+- Process/Window API - WinGetTitle, WinGetProcessName for active application tracking
+## Configuration
+- API Key: Hardcoded in script (`.ahk` file line 877) - "sk-proj-..." format
+- Model selection: Top-level `modelModule` variable (line 18) - supports "gpt-4.1", "gpt-5.1", "gpt-5-mini"
+- Per-app paste behavior: `sendTextApps` array (line 64) configurable for keystroke typing override
+- No build process - AutoHotkey scripts run directly
+- Python viewer: Run `python generate_log_viewer.py` to generate `logs/viewer.html`
+- Log format: JSONL (UTF-8, BOM-aware reading)
+## Platform Requirements
+- Windows 11 Pro (tested) - works on Windows 8+
+- AutoHotkey v2.0+ (interpreter installed)
+- Python 3.x for log viewer generation
+- Windows 8+ (script uses WinHTTP which available on all modern Windows)
+- OpenAI API key with access to Responses API
+- Network connectivity for API calls to `https://api.openai.com/v1/responses`
+## Special Notes
+- Direct HTTP via Windows native COM (no SDK dependency)
+- Responses API endpoint (not Chat Completions)
+- Request timeout: 30 seconds
+- gpt-4.1 (standard, uses temperature parameter)
+- gpt-5.1 (reasoning, uses reasoning.effort="none")
+- gpt-5-mini (reasoning, uses reasoning.effort="minimal")
+- Max single log file: 1MB before rotation
+- Archive format: `spellcheck-YYYY-MM-dd-HHmmss.jsonl`
+- Fields: 30+ metrics including timings breakdown, token counts, clipboard formats, active app tracking
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Naming Patterns
+- PascalCase with spaces: `Universal Spell Checker.ahk` (active script)
+- Variant scripts with dashes: `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` (legacy)
+- Configuration files lowercase with underscores: `replacements.json`, `generate_log_viewer.py`
+- Log output in lowercase: `spellcheck.jsonl` (JSONL format)
+- camelCase for all functions: `GetClipboardText()`, `ApplyReplacements()`, `LogDetailed()`, `RotateLogIfNeeded()`
+- Private/internal functions prefixed with double underscore: `__ReadClipboardString()`, `__ExtractHtmlFragment()`, `__JsonParseValue()`, `__JsonParseNumber()`
+- Helper functions grouped logically near their public wrappers
+- Single-purpose functions with clear responsibilities (e.g., `GetUtf8Response()` handles only UTF-8 stream conversion)
+- camelCase for local/global variables: `originalText`, `correctedText`, `logData`, `apiKey`, `apiUrl`
+- Constants in uppercase with camelCase fallback: `enableLogging`, `maxLogSize`, `replacementsPath` (per-module constants defined at top)
+- Descriptive names over abbreviations: `originalText` not `origText`, `urlCount` not `cnt`
+- Object properties use camelCase: `logData.original`, `logData.pasteTime`, `logData.timings.clipboardCaptured`
+- Array properties descriptive: `postReplacements`, `applied`, `events`
+- Timing objects nested: `timings.clipboardCaptured`, `timings.requestSent` (millisecond timestamps)
+- Implicit typing (AutoHotkey v2)
+- Boolean flags explicit: `apiUsesReasoning`, `textChanged`, `pasteAttempted`
+- JSON object keys use snake_case in output (for logging/API): `input_text`, `output_text`, `text_changed`, `model_version`
+## Code Style
+- No automatic formatter configured (raw AHK file)
+- Indentation: 4 spaces (visible in function bodies and control structures)
+- Line length: no hard limit enforced, but kept reasonable (~100 chars typical)
+- Opening braces on same line: `function {` pattern
+- Spacing: consistent single space around operators and after commas
+- No linter configured for AutoHotkey code
+- Code review focuses on:
+- PEP 8 style with 4-space indentation
+- Type hints not used (older Python compatibility)
+- Docstrings for public functions: `"""..."""` format
+- Imports: stdlib only (json, glob, os, sys, html, pathlib)
+- Line length: ~80-100 chars
+## Import Organization
+- No explicit imports (AutoHotkey v2 has built-in functions)
+- Library-style functions: all defined in single script for performance
+- No external .ahk includes (intentionally self-contained)
+- `replacements.json`: JSON key-value map (canonical → [variants])
+- No path aliases or special resolution mechanisms
+## Error Handling
+- Try-catch wrapping fallible operations: `try { ... } catch Error as e { ... }`
+- Silent failures for optional operations (replacements, logging, clipboard history policy)
+- Error capture in `logData.error` for API failures
+- User-facing tooltips for critical failures: `ToolTip("API Error: " . status)`
+- Detailed event logging for all error paths: `logData.events.Push("Exception thrown: " . message)`
+- Comprehensive try-finally for resource cleanup (HTTP object, COM objects, clipboard operations)
+- Clipboard operations: `try { ... } finally { DllCall("CloseClipboard") }`
+- HTTP timeouts: 5s connection, 5s response, 30s total (defensive)
+- JSON parse errors: caught separately, logged with position info
+- Regex extraction: method 1 (fast), fallback to method 2 (compatible) with full debug logging
+- Critical vs optional errors:
+## Logging
+- Structured logging: one JSON object per line in `logs/spellcheck.jsonl`
+- Timestamp format: `"yyyy-MM-dd HH:mm:ss"` (human-readable, not Unix time)
+- Event log: `logData.events` array captures sequence of operations and debug info
+- Timing instrumentation: delta-millisecond values (`clipboard_ms`, `api_ms`, `parse_ms`, etc.)
+- Token tracking: `tokens.input`, `tokens.output`, `tokens.total`, `tokens.cached`, `tokens.reasoning`
+- Replacements tracking: count + list of applied variants
+- Prompt-leak guard: triggered flag + occurrence count + character delta
+- Raw capture: `raw_request` (JSON payload sent) and `raw_response` (full API response) for debugging
+- Log rotation: automatic at 1MB with timestamp suffix (e.g., `spellcheck-2026-03-27-123456.jsonl`)
+- On hotkey press (`Ctrl+Alt+U`): initialize `logData`
+- After clipboard read: `clipboard_captured` timing
+- After payload construction: `payload_prepared` timing
+- After HTTP send: `request_sent` timing
+- After HTTP receive: `response_received` timing, token counts extracted
+- After parse: `text_parsed` timing, debug events for both regex and Map parsing
+- After replacements: `replacements_applied` timing, count/list of changes
+- After prompt-leak guard: `prompt_guard_applied` timing, trigger details
+- After text insertion (paste or SendText): `text_pasted` timing, final state
+- On any error: error message + relevant context captured
+## Comments
+- Complex algorithms (e.g., HTML fragment extraction, surrogate pair handling in JSON parsing)
+- Non-obvious performance decisions (e.g., "regex extraction ~10x faster than JSON parsing")
+- Workarounds and known limitations (e.g., URL extraction placeholders)
+- Critical state transitions (e.g., "Create the prompt from shared instruction text")
+- Per-app behavior (e.g., `sendTextApps` configuration comment)
+- Not used (AutoHotkey doesn't have built-in TSDoc support)
+- Function documentation via inline comments above definition
+- Parameter documentation in comment block before function
+## Function Design
+- Most functions 10-50 lines (focused)
+- Larger functions (100+ lines) reserved for parsing, logging, hotkey handler
+- Hotkey handler at ~300 lines combines multiple stages (acceptable for main flow)
+- Functions use `&paramName` for output parameters (AutoHotkey v2 pass-by-reference)
+- Examples: `ApplyReplacements(text, &applied, &urlCount)`, `StripPromptLeak(text, promptText, &details)`
+- Global state only for module config: `modelModule`, `apiKey`, `enableLogging`
+- Strings for text extraction/transformation
+- Objects/Maps for structured data (parsed JSON, timing info)
+- Booleans for flags and checks
+- Implicit return on error conditions (e.g., `return ""` when clipboard unavailable)
+- Parsing: `__JsonParseValue()`, `__JsonParseObject()`, `__JsonParseString()`
+- Extraction: `__ExtractHtmlFragment()`, `__ReadClipboardString()`
+- Escape/unescape: `JsonEscape()` (public for logging), escape sequences handled inside parsers
+- Utility: `__SetClipboardDwordFormat()`, `__JsonSkipWhitespace()`
+## Module Design
+- No explicit module exports (single-file design)
+- Public API: hotkey handler `^!u::`, callable functions for testing
+- Not used (self-contained script)
+- `#Requires AutoHotkey v2.0`: version constraint at file top
+- Directory creation: `DirCreate(A_ScriptDir . "\logs")` in global scope
+- Model selector: `modelModule := "gpt-4.1"` (single source of truth)
+- No global state initialization needed beyond config
+- Constants: `SCRIPT_DIR`, `LOGS_DIR`, `OUTPUT_FILE`
+- Functions: `load_entries()`, `compute_stats()`, main `main()` with `if __name__ == "__main__"`
+- HTML template: inline multiline string `HTML_TEMPLATE`
+## Performance Conventions
+- Regex extraction preferred over JSON parsing for response text (single pattern match vs recursive traversal)
+- Microsecond-level timing on replacements: `StrReplace(..., true)` with case-sensitive flag
+- URL extraction uses placeholders to avoid regex re-running on protected URLs
+- Post-replacement JSON rebuilding avoided (direct string append for logging)
+- Every major operation timestamped: `A_TickCount` milliseconds
+- Delta calculations post-operation: `tClip := (clipboardCaptured > 0) ? (clipboardCaptured - startTime) : 0`
+- Timing deltas logged as integer milliseconds, no floating-point precision
+- Primary: regex extraction (fast, stateless)
+- Secondary: Map-based JSON parsing (correct, verbose logging on failure)
+- Both paths instrumented for debugging
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## Pattern Overview
+- Monolithic script (`Universal Spell Checker.ahk`) with clear functional layers
+- No external code dependencies (self-contained, except `replacements.json` config)
+- Event-driven hotkey activation (Ctrl+Alt+U) triggering a linear processing pipeline
+- Synchronized API calls with timeout protection
+- Emphasis on performance through regex extraction and microsecond-level timing instrumentation
+## Layers
+- Purpose: Store static settings applied at runtime
+- Location: `Universal Spell Checker.ahk` lines 1-76
+- Contains: Model selector, API URL, prompt text, logging settings, app-specific paste behavior
+- Depends on: Nothing
+- Used by: All other layers
+- Purpose: Robust text capture and paste operations with multiple fallbacks
+- Location: `Universal Spell Checker.ahk` lines 202-265
+- Contains: HTML format parsing, Unicode/ANSI fallback, clipboard history policy
+- Functions: `GetClipboardText()`, `__ExtractHtmlFragment()`, `__HtmlFragmentToPlainText()`, `__ReadClipboardString()`, `SetClipboardHistoryPolicy()`, `__SetClipboardDwordFormat()`
+- Depends on: Windows DLL clipboard API, COM HTMLFile object
+- Used by: Main hotkey handler
+- Purpose: Construct model-specific OpenAI Responses API JSON payloads
+- Location: `Universal Spell Checker.ahk` lines 880-893
+- Contains: Dynamic payload construction based on model type (gpt-4.1, gpt-5.1, gpt-5-mini)
+- Depends on: Model configuration (Temperature, Verbosity, reasoningEffort), JSON escaping
+- Used by: Main hotkey handler
+- Purpose: Execute HTTP POST to OpenAI Responses API with error handling
+- Location: `Universal Spell Checker.ahk` lines 895-929
+- Contains: WinHttp COM object setup, request header injection, timeout configuration, error capture
+- Depends on: WinHttp.WinHttpRequest.5.1 COM object
+- Used by: Main hotkey handler
+- Purpose: Extract corrected text from API JSON response (two competing implementations)
+- Location: `Universal Spell Checker.ahk` lines 738-791
+- Contains:
+- Depends on: `GetUtf8Response()` for proper UTF-8 decoding
+- Used by: Main hotkey handler
+- Purpose: Apply brand/term casing corrections and safety cleanups
+- Location: `Universal Spell Checker.ahk` lines 79-200
+- Contains:
+- Depends on: `replacements.json` file, JSON parsing
+- Used by: Main hotkey handler
+- Purpose: Deliver corrected text back to application
+- Location: `Universal Spell Checker.ahk` lines 1059-1076
+- Contains: Clipboard-based paste (default) vs `SendText()` (app-specific)
+- Depends on: Per-app configuration (`sendTextApps`), clipboard API
+- Used by: Main hotkey handler
+- Purpose: Structured JSONL recording of every spell-check operation with comprehensive timing/event tracking
+- Location: `Universal Spell Checker.ahk` lines 333-483
+- Contains:
+- Depends on: File I/O, timing counters
+- Used by: Main hotkey handler
+- Purpose: JSON handling, string escaping, timing helpers
+- Location: `Universal Spell Checker.ahk` lines 486-717
+- Contains: `JsonEscape()`, `JsonLoad()` (full recursive parser), `GetUtf8Response()`, number parsing
+- Depends on: ADODB.Stream COM object for UTF-8 decoding
+- Used by: All layers
+## Data Flow
+- **logData object**: Single mutable state object passed through entire pipeline, accumulated with events/timings
+- **Global variables**: Model config (`modelModule`, `apiModel`, `Verbosity`, etc.), paths, flags
+- **No shared state between invocations**: Each Ctrl+Alt+U press creates fresh logData object
+## Key Abstractions
+- Purpose: Single source of truth for model selection and parameter mapping
+- Location: `Universal Spell Checker.ahk` lines 18-48
+- Pattern: Switch statement mapping model name → parameter values
+- Ensures model type compatibility (e.g., reasoning models exclude temperature)
+- Purpose: Fast path (regex) + safe fallback (full JSON parsing)
+- Primary: `ExtractTextFromResponseRegex()` — no object allocation, ~10x faster
+- Fallback: `JsonLoad()` + object traversal — full compatibility, comprehensive debug logging
+- Purpose: Prevent substring interference during replacements
+- Pattern: Load from JSON, sort longest-first, apply in order
+- Example: Replace "Build Purdue" before "Build" to avoid partial matches
+- Purpose: Handle apps that don't work well with clipboard paste
+- Pattern: Check `sendTextApps` list, choose `SendText()` or `Ctrl+V` accordingly
+## Entry Points
+- Location: `Universal Spell Checker.ahk` line 800 (`^!u::`)
+- Triggers: User presses Ctrl+Alt+U with text selected
+- Responsibilities: Orchestrates entire spell-check pipeline, error handling, logging
+- `generate_log_viewer.py`: Reads JSONL logs, generates HTML viewer
+- Command: `python generate_log_viewer.py [--no-open]`
+## Error Handling
+## Cross-Cutting Concerns
+- Approach: Structured JSONL (one object per line) with millisecond-level timing breakdown
+- Timing fields: clipboardCaptured, payloadPrepared, requestSent, responseReceived, textParsed, replacementsApplied, promptGuardApplied, textPasted
+- Delta timing: Each stage computed from previous checkpoint, logged as elapsed ms
+- Rotation: 1MB per file, archived with timestamp
+- Async logging: SetTimer ensures timestamps reflect actual completion, not logging time
+- Model name validation: Switch statement rejects invalid `modelModule` values
+- Prompt text: Single hardcoded `promptInstructionText` used for both request and leak detection
+- Token count extraction: Regex patterns with Integer() conversion for AHK v2 compatibility
+- Regex-based JSON extraction: Avoids object allocation overhead
+- Sorted replacement pairs: Longest-first prevents substring interference
+- Clipboard format preference: HTML reduces formatting noise
+- URL protection: Extract/restore around replacements rather than conditional logic during replacements
+- Per-run `replacements.json` reload: Allows live edits without script restart
+- API key hardcoded (intentional design choice for fast startup, offline-first)
+- Clipboard history exclusion: Mark source text as transient
+- Prompt leak detection: Safeguard against instruction echo in output
+- HTML escaping in log viewer: Prevents script injection in viewer UI
+<!-- GSD:architecture-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd:debug` for investigation and bug fixing
+- `/gsd:execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

@@ -1,7 +1,7 @@
 # Requirements: Universal Spell Checker
 
 **Defined:** 2026-03-27
-**Core Value:** Spell checking must feel instant and invisible — select, hotkey, done. Speed is the product.
+**Core Value:** Spell checking must feel instant and invisible -- select, hotkey, done. Speed is the product.
 
 ## v1 Requirements
 
@@ -10,8 +10,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Reliability
 
 - [ ] **REL-01**: Script saves and restores user's clipboard content after each invocation (ClipboardAll)
-- [ ] **REL-02**: Paste race condition eliminated — ClipWait or Sleep between clipboard set and Ctrl+V
-- [ ] **REL-03**: Modifier key sticking prevented — KeyWait at handler start, Send("{Ctrl Up}") in finally block
+- [ ] **REL-02**: Paste race condition eliminated -- ClipWait or Sleep between clipboard set and Ctrl+V
+- [ ] **REL-03**: Modifier key sticking prevented -- KeyWait at handler start, Send("{Ctrl Up}") in finally block
 - [ ] **REL-04**: Transient API failures retried automatically with exponential backoff (max 2 retries)
 - [ ] **REL-05**: API errors classified and shown to user as readable messages (network / auth / rate limit / server)
 
@@ -49,7 +49,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Log Viewer
 
-- [ ] **LOG-01**: Log viewer staleness detection — show popup when HTML data is outdated with generation timestamp
+- [ ] **LOG-01**: Log viewer staleness detection -- show popup when HTML data is outdated with generation timestamp
 - [ ] **LOG-02**: One-click re-run capability to regenerate viewer from the HTML page itself
 
 ## v2 Requirements
@@ -82,7 +82,7 @@ Deferred to future milestone. Tracked but not in current roadmap.
 |---------|--------|
 | Multi-user / OAuth | Personal tool, single user |
 | Mobile app | Windows-only scope |
-| Real-time checking (as-you-type) | Violates core "speed is the product" philosophy — adds latency to typing |
+| Real-time checking (as-you-type) | Violates core "speed is the product" philosophy -- adds latency to typing |
 | GUI settings window | Over-engineering for a hotkey tool |
 | SSE streaming | Not viable with WinHTTP COM object; no benefit for paste-back workflow |
 
@@ -92,33 +92,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REL-01 | — | Pending |
-| REL-02 | — | Pending |
-| REL-03 | — | Pending |
-| REL-04 | — | Pending |
-| REL-05 | — | Pending |
-| PERF-01 | — | Pending |
-| PERF-02 | — | Pending |
-| PERF-03 | — | Pending |
-| PERF-04 | — | Pending |
-| PERF-05 | — | Pending |
-| UX-01 | — | Pending |
-| UX-02 | — | Pending |
-| UX-03 | — | Pending |
-| UX-04 | — | Pending |
-| SEC-01 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| REPL-01 | — | Pending |
-| AI-01 | — | Pending |
-| LOG-01 | — | Pending |
-| LOG-02 | — | Pending |
+| REL-01 | Phase 1 | Pending |
+| REL-02 | Phase 1 | Pending |
+| REL-03 | Phase 1 | Pending |
+| REL-04 | Phase 2 | Pending |
+| REL-05 | Phase 2 | Pending |
+| PERF-01 | Phase 3 | Pending |
+| PERF-02 | Phase 2 | Pending |
+| PERF-03 | Phase 3 | Pending |
+| PERF-04 | Phase 5 | Pending |
+| PERF-05 | Phase 3 | Pending |
+| UX-01 | Phase 1 | Pending |
+| UX-02 | Phase 1 | Pending |
+| UX-03 | Phase 1 | Pending |
+| UX-04 | Phase 1 | Pending |
+| SEC-01 | Phase 1 | Pending |
+| QUAL-01 | Phase 1 | Pending |
+| QUAL-02 | Phase 4 | Pending |
+| REPL-01 | Phase 4 | Pending |
+| AI-01 | Phase 4 | Pending |
+| LOG-01 | Phase 4 | Pending |
+| LOG-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-03-27 after initial definition*
+*Last updated: 2026-03-27 after roadmap creation*
