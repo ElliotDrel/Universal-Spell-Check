@@ -13,6 +13,7 @@ The project uses a single active V5 script with a top-level model selector.
 ### Active Files (V5 - Current)
 - **Universal Spell Checker - V5.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
+- **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` — run `python generate_log_viewer.py --open` to view
 
 ### Legacy / Simple Variant
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback
@@ -22,7 +23,7 @@ The project uses a single active V5 script with a top-level model selector.
 - Direct OpenAI API integration via Responses API
 - Instant text replacement via clipboard (or `SendText()` per app)
 - Global hotkey: Ctrl+Alt+U
-- Enhanced logging with full timing breakdown
+- Structured JSONL logging with full timing breakdown, token counts, active app tracking
 - Dual JSON parsing (regex primary, Map fallback)
 - Post-processing replacements via `replacements.json`
 - Prompt-leak safeguard to strip echoed instruction headers when they appear in model output
@@ -124,7 +125,13 @@ The project uses a single active V5 script with a top-level model selector.
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
 - **`ApplyReplacements(text, &applied, &urlCount)`**: Extracts `http(s)://` URLs into `__URL_N__` placeholders first (scheme-less links not covered), then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; reports URL count and replacement list for logging
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
-- **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged in `spellcheck-detailed.log` under post-processing sections
+- **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in `spellcheck.jsonl`
+
+### Logging System (JSONL)
+- **Format**: JSON Lines — one JSON object per line in `logs/spellcheck.jsonl`
+- **Rotation**: At 1MB, archived with timestamp suffix (same as before)
+- **Fields per entry**: timestamp, status, error, duration_ms, model, model_version, active_app, active_exe, paste_method, text_changed, input_text, input_chars, output_text, output_chars, raw_ai_output, tokens (input/output/total/cached/reasoning), timings (clipboard/payload/request/api/parse/replacements/prompt_guard/paste in ms), replacements (count/applied/urls_protected), prompt_leak (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), events array, raw_response
+- **Viewer**: Run `python generate_log_viewer.py` to generate `logs/viewer.html` (add `--open` to auto-launch in browser). The HTML has summary stats, sortable/filterable table, expandable row details, timing breakdown bars, and search
 
 ## Critical Debugging Principles (MUST FOLLOW)
 

@@ -2,7 +2,7 @@
 
 ; Logging configuration
 enableLogging := true
-detailedLogPath := A_ScriptDir . "\logs\spellcheck-detailed.log"
+detailedLogPath := A_ScriptDir . "\logs\spellcheck.jsonl"
 maxLogSize := 1000000  ; 1MB max per log file
 
 ; Post-processing replacements
@@ -350,136 +350,133 @@ RotateLogIfNeeded(logPath, maxSize) {
     }
 }
 
-; Detailed logging function
+; Build a JSON array of strings from an AHK array
+BuildJsonStringArray(arr) {
+    result := "["
+    first := true
+    for , item in arr {
+        if (!first)
+            result .= ","
+        first := false
+        result .= '"' . JsonEscape(String(item)) . '"'
+    }
+    result .= "]"
+    return result
+}
+
+; Detailed logging function — writes one JSON object per line (JSONL format)
 LogDetailed(data) {
     global enableLogging, detailedLogPath, maxLogSize
-    
+
     if (!enableLogging)
         return
-    
+
     try {
         ; Rotate log if needed
         RotateLogIfNeeded(detailedLogPath, maxLogSize)
-        
+
         duration := data.pasteTime - data.startTime
-        status := data.error ? "ERROR: " . data.error : "SUCCESS"
-        errorMarker := data.error ? "[ERROR] " : ""
+        status := data.error ? "ERROR" : "SUCCESS"
 
-        ; Build timing breakdown (all calculations happen async - zero impact on hotkey)
-        timingBreakdown := ""
-        if (data.HasOwnProp("timings") && IsObject(data.timings)) {
-            t := data.timings
-            timingBreakdown .= "Timing Breakdown:`n"
-
-            if (t.clipboardCaptured > 0)
-                timingBreakdown .= "  Clipboard capture: " . (t.clipboardCaptured - data.startTime) . "ms`n"
-
-            if (t.payloadPrepared > 0)
-                timingBreakdown .= "  Payload preparation: " . (t.payloadPrepared - t.clipboardCaptured) . "ms`n"
-
-            if (t.requestSent > 0)
-                timingBreakdown .= "  Request setup: " . (t.requestSent - t.payloadPrepared) . "ms`n"
-
-            if (t.responseReceived > 0)
-                timingBreakdown .= "  API round-trip: " . (t.responseReceived - t.requestSent) . "ms`n"
-
-            if (t.textParsed > 0)
-                timingBreakdown .= "  Response parsing: " . (t.textParsed - t.responseReceived) . "ms`n"
-
-            if (t.replacementsApplied > 0)
-                timingBreakdown .= "  Post-processing replacements: " . (t.replacementsApplied - t.textParsed) . "ms`n"
-
+        ; Compute timing deltas (ms)
+        t := data.timings
+        tClip := (t.clipboardCaptured > 0) ? (t.clipboardCaptured - data.startTime) : 0
+        tPayload := (t.payloadPrepared > 0 && t.clipboardCaptured > 0) ? (t.payloadPrepared - t.clipboardCaptured) : 0
+        tReq := (t.requestSent > 0 && t.payloadPrepared > 0) ? (t.requestSent - t.payloadPrepared) : 0
+        tApi := (t.responseReceived > 0 && t.requestSent > 0) ? (t.responseReceived - t.requestSent) : 0
+        tParse := (t.textParsed > 0 && t.responseReceived > 0) ? (t.textParsed - t.responseReceived) : 0
+        tReplace := (t.replacementsApplied > 0 && t.textParsed > 0) ? (t.replacementsApplied - t.textParsed) : 0
+        tGuard := (t.promptGuardApplied > 0 && t.replacementsApplied > 0) ? (t.promptGuardApplied - t.replacementsApplied) : 0
+        if (t.textPasted > 0) {
             if (t.promptGuardApplied > 0)
-                timingBreakdown .= "  Prompt-leak safeguard: " . (t.promptGuardApplied - t.replacementsApplied) . "ms`n"
-
-            if (t.textPasted > 0) {
-                if (t.promptGuardApplied > 0)
-                    prevTime := t.promptGuardApplied
-                else if (t.replacementsApplied > 0)
-                    prevTime := t.replacementsApplied
-                else
-                    prevTime := t.textParsed
-                timingBreakdown .= "  Text pasting: " . (t.textPasted - prevTime) . "ms`n"
-            }
-
-            timingBreakdown .= "`n"
+                prevT := t.promptGuardApplied
+            else if (t.replacementsApplied > 0)
+                prevT := t.replacementsApplied
+            else
+                prevT := t.textParsed
+            tPaste := t.textPasted - prevT
+        } else {
+            tPaste := 0
         }
 
-        ; Indent text content for readability
-        inputText     := "  " . StrReplace(data.original,     "`n", "`n  ")
-        rawAiText     := "  " . StrReplace(data.rawAiOutput,  "`n", "`n  ")
-        pastedText    := "  " . StrReplace(data.pastedText,   "`n", "`n  ")
-        
-        ; Format API response with indentation
-        rawResponse := data.rawResponse
-        if (rawResponse != "") {
-            rawResponse := "  " . StrReplace(rawResponse, "`n", "`n  ")
-        }
-        
-        ; Build detailed log entry
-        entry := ""
-        entry .= "================================================================================`n"
-        entry .= errorMarker . "RUN: " . data.timestamp . "`n"
-        entry .= "================================================================================`n"
-        entry .= "Status: " . status . "`n"
-        entry .= "Duration: " . duration . "ms`n"
-        entry .= "`n"
-        entry .= timingBreakdown
-        entry .= "Input Text:`n"
-        entry .= inputText . "`n"
-        entry .= "`n"
-        entry .= "AI Output (before post-processing):`n"
-        entry .= rawAiText . "`n"
-        entry .= "`n"
-
+        ; Replacements array
+        repArr := "[]"
+        repCount := 0
         if (data.HasOwnProp("replacementsApplied") && IsObject(data.replacementsApplied)) {
-            urlNote := (data.HasOwnProp("urlsProtected") && data.urlsProtected > 0) ? " (" . data.urlsProtected . " URL(s) protected)" : ""
-            if (data.replacementsApplied.Length > 0) {
-                entry .= "Post-processing (" . data.replacementsApplied.Length . " replacement(s) applied)" . urlNote . ":`n"
-                for , rep in data.replacementsApplied
-                    entry .= "  " . rep . "`n"
-            } else {
-                entry .= "Post-processing: no replacements matched" . urlNote . "`n"
-            }
-            entry .= "`n"
+            repArr := BuildJsonStringArray(data.replacementsApplied)
+            repCount := data.replacementsApplied.Length
         }
 
+        ; Events array
+        evtArr := "[]"
+        if (data.HasOwnProp("events") && IsObject(data.events))
+            evtArr := BuildJsonStringArray(data.events)
+
+        ; URLs protected
+        urlsProt := (data.HasOwnProp("urlsProtected")) ? data.urlsProtected : 0
+
+        ; Prompt leak guard fields
+        plTriggered := "false"
+        plOcc := 0
+        plTextRemoved := "false"
+        plRmChars := 0
+        plBefore := 0
+        plAfter := 0
         if (data.HasOwnProp("promptLeakGuard") && IsObject(data.promptLeakGuard)) {
-            guard := data.promptLeakGuard
-            if (guard.HasOwnProp("triggered") && guard.triggered) {
-                entry .= "Prompt-leak safeguard: TRIGGERED`n"
-                entry .= "  Occurrences removed: " . guard.occurrences . "`n"
-                entry .= "  Removed 'text input:' label: " . (guard.textInputRemoved ? "yes" : "no") . "`n"
-                entry .= "  Removed chars: " . guard.removedChars . "`n"
-                entry .= "  Length: " . guard.beforeLength . " -> " . guard.afterLength . "`n"
-            } else {
-                entry .= "Prompt-leak safeguard: no leak pattern matched`n"
-            }
-            entry .= "`n"
+            g := data.promptLeakGuard
+            if (g.HasOwnProp("triggered") && g.triggered)
+                plTriggered := "true"
+            if (g.HasOwnProp("occurrences"))
+                plOcc := g.occurrences
+            if (g.HasOwnProp("textInputRemoved") && g.textInputRemoved)
+                plTextRemoved := "true"
+            if (g.HasOwnProp("removedChars"))
+                plRmChars := g.removedChars
+            if (g.HasOwnProp("beforeLength"))
+                plBefore := g.beforeLength
+            if (g.HasOwnProp("afterLength"))
+                plAfter := g.afterLength
         }
 
-        entry .= "Pasted Text:`n"
-        entry .= pastedText . "`n"
-        entry .= "`n"
+        ; New fields with safe defaults
+        model := data.HasOwnProp("model") ? data.model : ""
+        activeApp := data.HasOwnProp("activeApp") ? data.activeApp : ""
+        activeExe := data.HasOwnProp("activeExe") ? data.activeExe : ""
+        pasteMethod := data.HasOwnProp("pasteMethod") ? data.pasteMethod : ""
+        textChanged := (data.HasOwnProp("textChanged") && data.textChanged) ? "true" : "false"
+        modelVer := data.HasOwnProp("modelVersion") ? data.modelVersion : ""
+        tokIn := data.HasOwnProp("tokenInput") ? data.tokenInput : 0
+        tokOut := data.HasOwnProp("tokenOutput") ? data.tokenOutput : 0
+        tokTotal := data.HasOwnProp("tokenTotal") ? data.tokenTotal : 0
+        tokCached := data.HasOwnProp("tokenCached") ? data.tokenCached : 0
+        tokReason := data.HasOwnProp("tokenReasoning") ? data.tokenReasoning : 0
 
-        if (rawResponse != "") {
-            entry .= "API Response:`n"
-            entry .= rawResponse . "`n"
-            entry .= "`n"
-        }
+        ; Build single-line JSON object
+        j := "{"
+        j .= '"timestamp":"' . JsonEscape(data.timestamp) . '"'
+        j .= ',"status":"' . JsonEscape(status) . '"'
+        j .= ',"error":"' . JsonEscape(data.error) . '"'
+        j .= ',"duration_ms":' . duration
+        j .= ',"model":"' . JsonEscape(model) . '"'
+        j .= ',"model_version":"' . JsonEscape(modelVer) . '"'
+        j .= ',"active_app":"' . JsonEscape(activeApp) . '"'
+        j .= ',"active_exe":"' . JsonEscape(activeExe) . '"'
+        j .= ',"paste_method":"' . JsonEscape(pasteMethod) . '"'
+        j .= ',"text_changed":' . textChanged
+        j .= ',"input_text":"' . JsonEscape(data.original) . '"'
+        j .= ',"input_chars":' . StrLen(data.original)
+        j .= ',"output_text":"' . JsonEscape(data.pastedText) . '"'
+        j .= ',"output_chars":' . StrLen(data.pastedText)
+        j .= ',"raw_ai_output":"' . JsonEscape(data.rawAiOutput) . '"'
+        j .= ',"tokens":{"input":' . tokIn . ',"output":' . tokOut . ',"total":' . tokTotal . ',"cached":' . tokCached . ',"reasoning":' . tokReason . '}'
+        j .= ',"timings":{"clipboard_ms":' . tClip . ',"payload_ms":' . tPayload . ',"request_ms":' . tReq . ',"api_ms":' . tApi . ',"parse_ms":' . tParse . ',"replacements_ms":' . tReplace . ',"prompt_guard_ms":' . tGuard . ',"paste_ms":' . tPaste . '}'
+        j .= ',"replacements":{"count":' . repCount . ',"applied":' . repArr . ',"urls_protected":' . urlsProt . '}'
+        j .= ',"prompt_leak":{"triggered":' . plTriggered . ',"occurrences":' . plOcc . ',"text_input_removed":' . plTextRemoved . ',"removed_chars":' . plRmChars . ',"before_length":' . plBefore . ',"after_length":' . plAfter . '}'
+        j .= ',"events":' . evtArr
+        j .= ',"raw_response":"' . JsonEscape(data.rawResponse) . '"'
+        j .= "}`n"
 
-        if (data.HasOwnProp("events") && IsObject(data.events) && data.events.Length) {
-            entry .= "Events:`n"
-            for idx, event in data.events {
-                entry .= "  " . event . "`n"
-            }
-            entry .= "`n"
-        }
-
-        entry .= "================================================================================`n"
-        entry .= "`n"
-        
-        FileAppend(entry, detailedLogPath)
+        FileAppend(j, detailedLogPath)
     } catch {
         ; Silently fail if logging doesn't work - never break core functionality
     }
@@ -819,8 +816,25 @@ FinalizeRun(logData) {
             replacementsApplied: 0,
             promptGuardApplied: 0,
             textPasted: 0
-        }
+        },
+        model: apiModel,
+        activeApp: "",
+        activeExe: "",
+        pasteMethod: "",
+        modelVersion: "",
+        textChanged: false,
+        tokenInput: 0,
+        tokenOutput: 0,
+        tokenTotal: 0,
+        tokenCached: 0,
+        tokenReasoning: 0
     }
+
+    ; Capture active window before any clipboard operations
+    logData.activeApp := WinGetTitle("A")
+    try logData.activeExe := WinGetProcessName("A")
+    catch
+        logData.activeExe := "unknown"
 
     try {
         LoadReplacements()                 ; reload replacements.json on every run
@@ -902,6 +916,20 @@ FinalizeRun(logData) {
         logData.rawResponse := response
         logData.events.Push("Response received")
         logData.timings.responseReceived := A_TickCount
+
+        ; Extract model version and token counts from API response
+        if RegExMatch(response, '"model"\s*:\s*"([^"]+)"', &m)
+            logData.modelVersion := m[1]
+        if RegExMatch(response, '"input_tokens"\s*:\s*(\d+)', &m)
+            logData.tokenInput := Integer(m[1])
+        if RegExMatch(response, '"output_tokens"\s*:\s*(\d+)', &m)
+            logData.tokenOutput := Integer(m[1])
+        if RegExMatch(response, '"total_tokens"\s*:\s*(\d+)', &m)
+            logData.tokenTotal := Integer(m[1])
+        if RegExMatch(response, '"cached_tokens"\s*:\s*(\d+)', &m)
+            logData.tokenCached := Integer(m[1])
+        if RegExMatch(response, '"reasoning_tokens"\s*:\s*(\d+)', &m)
+            logData.tokenReasoning := Integer(m[1])
 
         correctedText := ""
 
@@ -1009,8 +1037,10 @@ FinalizeRun(logData) {
         }
 
         if (correctedText != "") {
+            logData.textChanged := (correctedText != logData.original)
 
             if (UseSendText()) {
+                logData.pasteMethod := "sendtext"
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
                 logData.pasteAttempted := true
@@ -1019,6 +1049,7 @@ FinalizeRun(logData) {
                 A_Clipboard := correctedText
                 logData.events.Push("Text typed via SendText - COMPLETE")
             } else {
+                logData.pasteMethod := "clipboard"
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
