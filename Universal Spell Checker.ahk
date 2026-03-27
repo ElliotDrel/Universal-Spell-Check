@@ -789,34 +789,6 @@ ExtractTextFromResponseRegex(jsonResponse) {
     return ""
 }
 
-; ALTERNATIVE PARSER 2: Object-based with dynamic properties (COMPATIBLE)
-; Uses basic Object instead of Map for better AHK v2 compatibility
-ExtractTextFromResponseObject(jsonResponse) {
-    try {
-        ; This uses the existing JsonLoad but expects Object not Map
-        responseObj := JsonLoad(jsonResponse)
-
-        ; Try multiple access patterns for compatibility
-        try {
-            if (responseObj.HasOwnProp("output")) {
-                output := responseObj.output
-                if (IsObject(output) && output.Length > 0) {
-                    chunk := output[1]  ; 1-indexed
-                    if (IsObject(chunk) && chunk.HasOwnProp("content")) {
-                        content := chunk.content
-                        if (IsObject(content) && content.Length > 0) {
-                            piece := content[1]
-                            if (IsObject(piece) && piece.HasOwnProp("text"))
-                                return piece.text
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return ""
-}
-
 FinalizeRun(logData) {
     if (!logData.HasOwnProp("pasteTime") || logData.pasteTime = 0)
         logData.pasteTime := A_TickCount
