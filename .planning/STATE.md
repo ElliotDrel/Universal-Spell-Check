@@ -48,7 +48,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- URL placeholder collision: `__URL_N__` markers in `ApplyReplacements()` could theoretically collide with literal AI output text. Low probability for natural text. Consider unique per-run prefix if this ever causes a real issue.
 
 ### Blockers/Concerns
 
