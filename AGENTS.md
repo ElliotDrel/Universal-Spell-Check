@@ -8,17 +8,17 @@ Universal Spell Checker is a minimalist AutoHotkey script that provides instant 
 
 ## Primary Implementation
 
-The project uses a single active V5 script with a top-level model selector.
+The project uses a single active script with a top-level model selector.
 
-### Active Files (V5 - Current)
-- **Universal Spell Checker - V5.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
+### Active Files
+- **Universal Spell Checker.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
 - **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` — run `python generate_log_viewer.py --open` to view
 
 ### Legacy / Simple Variant
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback
 
-### Common Features (Current V5 Script)
+### Common Features
 - AutoHotkey v2.0 scripts optimized for performance
 - Direct OpenAI API integration via Responses API
 - Instant text replacement via clipboard (or `SendText()` per app)
@@ -261,9 +261,9 @@ When debugging unclear issues, prepare multiple approaches:
 - **NEVER mix parameters**: temperature and reasoning are mutually exclusive based on model type
 
 ### File Structure Awareness
-- Active script: `V5.ahk` (primary, with `modelModule` selector)
+- Active script: `Universal Spell Checker.ahk` (primary, with `modelModule` selector)
 - `replacements.json` lives alongside the script; edit it freely - script reloads it on every run
-- When modifying core logic, ensure all model branches inside the single V5 script remain consistent
+- When modifying core logic, ensure all model branches inside the single script remain consistent
 - `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` is a minimal legacy variant - do not use it as a template for new features
 
 ### Verification Standards
@@ -286,4 +286,4 @@ When debugging unclear issues, prepare multiple approaches:
 - **spellcheck.js / spellcheck-old.js**: Old JavaScript approach
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback
 
-These exist for reference but are not actively developed. The focus is on the single V5 script with model selection.
+These exist for reference but are not actively developed. The focus is on `Universal Spell Checker.ahk`.

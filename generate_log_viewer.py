@@ -173,9 +173,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
 <footer id="footer"></footer>
 
+<script type="application/json" id="log-data">%%DATA%%</script>
+<script type="application/json" id="log-stats">%%STATS%%</script>
 <script>
-const DATA = %%DATA%%;
-const STATS = %%STATS%%;
+const DATA = JSON.parse(document.getElementById('log-data').textContent);
+const STATS = JSON.parse(document.getElementById('log-stats').textContent);
 
 // --- Render stats ---
 (function() {

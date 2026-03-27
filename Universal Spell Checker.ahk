@@ -483,13 +483,27 @@ LogDetailed(data) {
     }
 }
 
-; JSON escape function for proper escaping
+; JSON escape function for proper escaping (covers all JSON-required control chars)
 JsonEscape(str) {
     str := StrReplace(str, "\", "\\")
     str := StrReplace(str, '"', '\"')
     str := StrReplace(str, "`n", "\n")
     str := StrReplace(str, "`r", "\r")
     str := StrReplace(str, "`t", "\t")
+    str := StrReplace(str, Chr(8), "\b")
+    str := StrReplace(str, Chr(12), "\f")
+    ; Escape remaining control characters (0x00-0x1F) as \u00XX
+    i := 0
+    while (i <= 0x1F) {
+        if (i != 8 && i != 9 && i != 10 && i != 12 && i != 13) {
+            ch := Chr(i)
+            if InStr(str, ch) {
+                hex := Format("\u{:04x}", i)
+                str := StrReplace(str, ch, hex)
+            }
+        }
+        i++
+    }
     return str
 }
 
