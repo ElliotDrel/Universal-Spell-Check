@@ -256,6 +256,8 @@ function renderDetail(e, idx) {
   const tok = e.tokens || {};
   const rep = e.replacements || {};
   const pl = e.prompt_leak || {};
+  let rawReq = '';
+  try { rawReq = e.raw_request ? JSON.stringify(JSON.parse(e.raw_request), null, 2) : ''; } catch { rawReq = e.raw_request || ''; }
   let rawResp = '';
   try { rawResp = e.raw_response ? JSON.stringify(JSON.parse(e.raw_response), null, 2) : ''; } catch { rawResp = e.raw_response || ''; }
 
@@ -295,6 +297,7 @@ function renderDetail(e, idx) {
       </div></div>` : ''}
     <div class="detail-section"><h4>Events</h4><pre>${esc((e.events || []).join('\n'))}</pre></div>
     ${e.error ? `<div class="detail-section"><h4>Error</h4><pre>${esc(e.error)}</pre></div>` : ''}
+    ${rawReq ? `<div class="detail-section"><h4>Raw API Request</h4><pre>${esc(rawReq)}</pre></div>` : ''}
     ${rawResp ? `<div class="detail-section"><h4>Raw API Response</h4><pre>${esc(rawResp)}</pre></div>` : ''}
     <div class="detail-section">
       <div class="kv">

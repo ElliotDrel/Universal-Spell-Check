@@ -473,6 +473,7 @@ LogDetailed(data) {
         j .= ',"replacements":{"count":' . repCount . ',"applied":' . repArr . ',"urls_protected":' . urlsProt . '}'
         j .= ',"prompt_leak":{"triggered":' . plTriggered . ',"occurrences":' . plOcc . ',"text_input_removed":' . plTextRemoved . ',"removed_chars":' . plRmChars . ',"before_length":' . plBefore . ',"after_length":' . plAfter . '}'
         j .= ',"events":' . evtArr
+        j .= ',"raw_request":"' . JsonEscape(data.HasOwnProp("rawRequest") ? data.rawRequest : "") . '"'
         j .= ',"raw_response":"' . JsonEscape(data.rawResponse) . '"'
         j .= "}`n"
 
@@ -790,6 +791,7 @@ FinalizeRun(logData) {
         original: "",
         rawAiOutput: "",
         result: "",
+        rawRequest: "",
         rawResponse: "",
         pastedText: "",
         replacementsApplied: [],
@@ -874,6 +876,7 @@ FinalizeRun(logData) {
             logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
         }
         logData.timings.payloadPrepared := A_TickCount
+        logData.rawRequest := jsonPayload
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
