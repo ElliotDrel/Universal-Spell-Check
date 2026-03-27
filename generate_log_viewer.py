@@ -163,8 +163,8 @@ def compute_stats(entries):
 
     successes = sum(1 for e in entries if e.get("status") == "SUCCESS")
     durations = [e["duration_ms"] for e in entries if "duration_ms" in e and e.get("status") == "SUCCESS"]
-    api_times = [e.get("timings", {}).get("api_ms", 0) for e in entries if e.get("status") == "SUCCESS"]
-    total_tokens = sum(e.get("tokens", {}).get("total", 0) for e in entries)
+    api_times = [(e.get("timings") or {}).get("api_ms", 0) for e in entries if e.get("status") == "SUCCESS"]
+    total_tokens = sum((e.get("tokens") or {}).get("total", 0) for e in entries)
     changed = sum(1 for e in entries if e.get("text_changed"))
 
     return {
