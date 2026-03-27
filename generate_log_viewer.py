@@ -379,8 +379,8 @@ def main():
     stats = compute_stats(entries)
 
     # Build HTML with embedded data
-    data_json = json.dumps(entries, ensure_ascii=False)
-    stats_json = json.dumps(stats, ensure_ascii=False)
+    data_json = json.dumps(entries, ensure_ascii=False).replace("<", "\\u003c")
+    stats_json = json.dumps(stats, ensure_ascii=False).replace("<", "\\u003c")
     html_out = HTML_TEMPLATE.replace("%%DATA%%", data_json).replace("%%STATS%%", stats_json)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
