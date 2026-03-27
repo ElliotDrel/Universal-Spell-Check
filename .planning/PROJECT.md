@@ -45,8 +45,36 @@ Spell checking must feel instant and invisible — select, hotkey, done. Speed i
 - Extensive iteration on logging — from plain text to structured JSONL with full timing breakdown
 - Post-processing replacements system added iteratively with URL protection, BOM handling, case-sensitive matching
 - The user treats this as a daily-driver tool — reliability and speed are non-negotiable
-- Scratchpad.md contains feature ideas and bug notes that informed Active requirements
 - Hardcoded API key is a known concern (flagged in codebase map) but accepted for speed of startup
+
+### Original Ideas (from Scratchpad.md, user's own words)
+
+**Performance — ~250-350ms target:**
+"The biggest win isn't switching providers — it's reducing output tokens. Instead of generating the full rewritten text, return only the diffs: `[{"pos":2,"old":"qucik","new":"quick"}]`. That turns 200 output tokens into maybe 20-30. With persistent connection, ~300ms real-world. That's 3x faster than your current setup."
+
+**Windows App (replace AutoHotkey):**
+"My own windows app that doesn't use auto hotkey so it can always be running the networking so the requests are faster. I also want a UI to see my past spell check history + some stats. So that it can handle the HTML formatting that pages like Google Docs use, so it can spell check and input the correctly formatted text back in to the app."
+
+**Spell Check Diff UI:**
+"Show a spell check diff in the app so you can see what was changed. Have the app be similar to Wiser Flow with the bar, where if I click the bar it will show me or if I hold a hotkey."
+
+**Case-Insensitive Replacements:**
+"What if when we are looking for things to replace we don't account for capitalization. This way we will have more replacements BUT will have to make fewer variants."
+
+**Word Dictionary for AI:**
+"I need to create a word dictionary so that the AI can use it to correct words when spell checking and the correct formatting. It might be able to do this in 2 parts via a software solution that replaces the words with the correct version and also gives the AI the correct formatting."
+
+**Local Model:**
+"Investigate using a local model for instant response times."
+
+**Terminal / CLI Integration:**
+"What would it take to use this script in terminal. So I can spell check my inputs into Claude Code and Codex CLI."
+
+**Auto Spell Check on Claude Send:**
+"Auto spell check on Claude send."
+
+**Log Viewer Staleness:**
+"Add a feature to generate_log_viewer.py so that when I open the HTML file, it somehow identifies if there are new logs. Make a pop-up to say that you probably have to re-run it, and then give it a script to re-run. Keep it simple, stupid — just do a simple date check."
 
 ## Constraints
 
