@@ -2,8 +2,9 @@
 
 ; Logging configuration
 enableLogging := true
-detailedLogPath := A_ScriptDir . "\logs\spellcheck.jsonl"
-maxLogSize := 1000000  ; 1MB max per log file
+logDir := A_ScriptDir . "\logs"
+logFilePrefix := "spellcheck"
+maxLogSize := 5 * 1024 * 1024  ; 5 MiB max per weekly log file before suffix rollover
 
 ; Post-processing replacements
 replacementsPath := A_ScriptDir . "\replacements.json"
@@ -330,23 +331,51 @@ __HtmlFragmentToPlainText(fragment) {
     return ""
 }
 
-; Log rotation function
-RotateLogIfNeeded(logPath, maxSize) {
-    try {
-        if (FileExist(logPath)) {
-            fileInfo := FileGetSize(logPath)
-            if (fileInfo > maxSize) {
-                ; Create archive filename with timestamp
-                timestamp := FormatTime(, "yyyy-MM-dd-HHmmss")
-                SplitPath(logPath, &fileName, &dir, &ext, &nameNoExt)
-                archivePath := dir . "\" . nameNoExt . "-" . timestamp . "." . ext
-                
-                ; Rename current log to archive
-                FileMove(logPath, archivePath, true)
-            }
-        }
-    } catch {
-        ; Silently fail if rotation doesn't work
+GetWeekStartStamp(timestamp := "") {
+    if (timestamp = "")
+        timestamp := A_Now
+
+    if InStr(timestamp, "-")
+        timestamp := RegExReplace(timestamp, "[^0-9]")
+
+    wday := Integer(FormatTime(timestamp, "WDay"))
+    daysFromMonday := (wday = 1) ? 6 : (wday - 2)
+    weekStart := DateAdd(timestamp, -daysFromMonday, "days")
+    return FormatTime(weekStart, "yyyy-MM-dd")
+}
+
+GetWeekEndStamp(timestamp := "") {
+    weekStartStamp := GetWeekStartStamp(timestamp)
+    weekStartValue := RegExReplace(weekStartStamp, "[^0-9]")
+    weekEnd := DateAdd(weekStartValue, 6, "days")
+    return FormatTime(weekEnd, "yyyy-MM-dd")
+}
+
+BuildWeeklyLogPath(baseDir, filePrefix, weekStartStamp, weekEndStamp, suffixIndex := 0) {
+    suffix := (suffixIndex > 0) ? "-" . (suffixIndex + 1) : ""
+    return baseDir . "\" . filePrefix . "-" . weekStartStamp . "-to-" . weekEndStamp . suffix . ".jsonl"
+}
+
+ResolveLogPathForAppend(baseDir, filePrefix, maxSize, pendingBytes, timestamp := "") {
+    if (timestamp = "")
+        timestamp := A_Now
+
+    if !DirExist(baseDir)
+        DirCreate(baseDir)
+
+    weekStartStamp := GetWeekStartStamp(timestamp)
+    weekEndStamp := GetWeekEndStamp(timestamp)
+    suffixIndex := 0
+
+    loop {
+        logPath := BuildWeeklyLogPath(baseDir, filePrefix, weekStartStamp, weekEndStamp, suffixIndex)
+        if !FileExist(logPath)
+            return logPath
+
+        if ((FileGetSize(logPath) + pendingBytes) <= maxSize)
+            return logPath
+
+        suffixIndex += 1
     }
 }
 
@@ -366,15 +395,12 @@ BuildJsonStringArray(arr) {
 
 ; Detailed logging function — writes one JSON object per line (JSONL format)
 LogDetailed(data) {
-    global enableLogging, detailedLogPath, maxLogSize
+    global enableLogging, logDir, logFilePrefix, maxLogSize
 
     if (!enableLogging)
         return
 
     try {
-        ; Rotate log if needed
-        RotateLogIfNeeded(detailedLogPath, maxLogSize)
-
         duration := data.pasteTime - data.startTime
         status := data.error ? "ERROR" : "SUCCESS"
 
@@ -477,7 +503,8 @@ LogDetailed(data) {
         j .= ',"raw_response":"' . JsonEscape(data.rawResponse) . '"'
         j .= "}`n"
 
-        FileAppend(j, detailedLogPath)
+        logPath := ResolveLogPathForAppend(logDir, logFilePrefix, maxLogSize, StrPut(j, "UTF-8") - 1, data.timestamp)
+        FileAppend(j, logPath)
     } catch {
         ; Silently fail if logging doesn't work - never break core functionality
     }
