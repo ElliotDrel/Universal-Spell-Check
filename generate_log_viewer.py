@@ -2,8 +2,13 @@
 """Generate an HTML log viewer from JSONL spell-check logs.
 
 Usage:
-    python generate_log_viewer.py            # reads logs/*.jsonl, writes logs/viewer.html, opens in browser
-    python generate_log_viewer.py --no-open # same, but skip opening in browser
+    python generate_log_viewer.py              # last week of entries, stats from all data
+    python generate_log_viewer.py --weeks 4    # last 4 weeks of entries
+    python generate_log_viewer.py --all        # all entries (may produce a large file)
+    python generate_log_viewer.py --no-open    # skip opening in browser
+
+Stats (header cards) always reflect the full dataset. The table shows only the
+recent window to keep the HTML small enough for browsers to handle.
 
 If a legacy logs/spellcheck.jsonl file exists, the script first migrates it into
 weekly spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl files and keeps the original as a .bak file.
@@ -516,7 +521,9 @@ const STATS = JSON.parse(document.getElementById('log-stats').textContent);
     sub.textContent = 'No entries recorded';
     return;
   }
-  sub.textContent = s.total + ' spell-check runs recorded';
+  sub.textContent = s.display_count < s.total
+    ? s.display_count + ' of ' + s.total + ' runs shown \u00B7 stats from all ' + s.total.toLocaleString()
+    : s.total + ' spell-check runs recorded';
   el.innerHTML = `
     <div class="stat-card"><div class="stat-value">${s.total}</div><div class="stat-label">Total Runs</div></div>
     <div class="stat-card"><div class="stat-value green">${s.success_rate}<small>%</small></div><div class="stat-label">Success Rate</div></div>
@@ -658,7 +665,7 @@ function render() {
     </tr>
     <tr class="detail-row"><td colspan="10">${renderDetail(e, i)}</td></tr>
   `).join('');
-  document.getElementById('footer').textContent = `Showing ${filtered.length} of ${DATA.length} entries \u00B7 Generated ${GENERATED_DATE.toLocaleString()}`;
+  document.getElementById('footer').textContent = `Showing ${filtered.length} of ${DATA.length} entries` + (STATS.total > DATA.length ? ` (stats from all ${STATS.total.toLocaleString()})` : '') + ` \u00B7 Generated ${GENERATED_DATE.toLocaleString()}`;
   document.querySelectorAll('thead th').forEach(th => {
     const arrow = th.querySelector('.arrow');
     if (!arrow) return;
@@ -753,8 +760,28 @@ def main():
 
     stats = compute_stats(entries)
 
+    # --- Display filtering ----------------------------------------------------
+    show_all = "--all" in sys.argv
+    weeks = 1
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if arg == "--weeks" and i + 1 < len(sys.argv):
+            try:
+                weeks = int(sys.argv[i + 1])
+            except ValueError:
+                pass
+
+    if not show_all:
+        cutoff = (datetime.now() - timedelta(weeks=weeks)).strftime("%Y-%m-%d %H:%M:%S")
+        display_entries = [e for e in entries if (e.get("timestamp") or "") >= cutoff]
+        print(f"  Showing last {weeks} week(s): {len(display_entries)} of {len(entries)} entries (use --all for everything)")
+    else:
+        display_entries = list(entries)
+        print(f"  Showing all {len(display_entries)} entries")
+
+    stats["display_count"] = len(display_entries)
+
     # Build HTML with embedded data
-    data_json = json.dumps(entries, ensure_ascii=False).replace("<", "\\u003c")
+    data_json = json.dumps(display_entries, ensure_ascii=False).replace("<", "\\u003c")
     stats_json = json.dumps(stats, ensure_ascii=False).replace("<", "\\u003c")
     generated_iso = datetime.now().isoformat()
     rerun_cmd = f'cd "{SCRIPT_DIR}" && python generate_log_viewer.py'
