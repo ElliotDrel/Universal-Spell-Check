@@ -4,18 +4,137 @@
 Usage:
     python generate_log_viewer.py            # reads logs/*.jsonl, writes logs/viewer.html, opens in browser
     python generate_log_viewer.py --no-open # same, but skip opening in browser
+
+If a legacy logs/spellcheck.jsonl file exists, the script first migrates it into
+weekly spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl files and keeps the original as a .bak file.
 """
 
 import json
 import glob
 import os
+import re
 import sys
 import html
+from datetime import datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOGS_DIR = SCRIPT_DIR / "logs"
 OUTPUT_FILE = LOGS_DIR / "viewer.html"
+LEGACY_LOG_FILE = LOGS_DIR / "spellcheck.jsonl"
+WEEKLY_LOG_PREFIX = "spellcheck"
+MAX_WEEKLY_LOG_SIZE = 5 * 1024 * 1024  # Keep in sync with Universal Spell Checker.ahk
+OLD_WEEKLY_LOG_RE = re.compile(rf"^{WEEKLY_LOG_PREFIX}-(\d{{4}}-\d{{2}}-\d{{2}})(?:-(\d+))?\.jsonl$")
+
+
+def get_week_start_stamp(dt):
+    """Return the Monday-based week start stamp for a datetime."""
+    return (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
+
+
+def get_week_end_stamp(dt):
+    """Return the Sunday-based week end stamp for a datetime."""
+    return (dt + timedelta(days=(6 - dt.weekday()))).strftime("%Y-%m-%d")
+
+
+def build_weekly_log_path(week_start_stamp, week_end_stamp, suffix_index=0):
+    """Return the canonical weekly log path for a week and optional overflow suffix."""
+    suffix = f"-{suffix_index + 1}" if suffix_index > 0 else ""
+    return LOGS_DIR / f"{WEEKLY_LOG_PREFIX}-{week_start_stamp}-to-{week_end_stamp}{suffix}.jsonl"
+
+
+def resolve_weekly_log_path(week_start_stamp, week_end_stamp, pending_bytes):
+    """Pick the weekly file that can accept the next line without crossing the size cap."""
+    suffix_index = 0
+    while True:
+        path = build_weekly_log_path(week_start_stamp, week_end_stamp, suffix_index)
+        if not path.exists():
+            return path
+        if path.stat().st_size + pending_bytes <= MAX_WEEKLY_LOG_SIZE:
+            return path
+        suffix_index += 1
+
+
+def parse_entry_timestamp(entry):
+    """Parse the existing log timestamp format."""
+    timestamp = (entry.get("timestamp") or "").strip()
+    if not timestamp:
+        return None
+    try:
+        return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def migrate_legacy_log():
+    """Split the legacy single JSONL file into weekly files and keep a backup."""
+    if not LEGACY_LOG_FILE.exists():
+        return None
+
+    migrated = 0
+    skipped = 0
+
+    with LEGACY_LOG_FILE.open(encoding="utf-8", errors="replace") as src:
+        for lineno, raw_line in enumerate(src, 1):
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                skipped += 1
+                continue
+
+            entry_dt = parse_entry_timestamp(entry)
+            if entry_dt is None:
+                skipped += 1
+                continue
+
+            week_start_stamp = get_week_start_stamp(entry_dt)
+            week_end_stamp = get_week_end_stamp(entry_dt)
+            payload = line + "\n"
+            target = resolve_weekly_log_path(week_start_stamp, week_end_stamp, len(payload.encode("utf-8")))
+            with target.open("a", encoding="utf-8", newline="\n") as dst:
+                dst.write(payload)
+            migrated += 1
+
+    backup_name = f"spellcheck-legacy-migrated-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.bak"
+    legacy_backup = LOGS_DIR / backup_name
+    LEGACY_LOG_FILE.replace(legacy_backup)
+    return {
+        "migrated": migrated,
+        "skipped": skipped,
+        "backup": legacy_backup,
+    }
+
+
+def migrate_old_weekly_log_names():
+    """Rename old single-date weekly filenames to the new start-to-end range format."""
+    renamed = []
+    skipped = []
+
+    for path in sorted(LOGS_DIR.glob(f"{WEEKLY_LOG_PREFIX}-*.jsonl")):
+        match = OLD_WEEKLY_LOG_RE.match(path.name)
+        if not match:
+            continue
+
+        week_start_stamp = match.group(1)
+        suffix_value = int(match.group(2)) if match.group(2) else 1
+        week_end_stamp = get_week_end_stamp(datetime.strptime(week_start_stamp, "%Y-%m-%d"))
+        target = build_weekly_log_path(week_start_stamp, week_end_stamp, suffix_value - 1)
+
+        if target.exists():
+            skipped.append((path.name, target.name))
+            continue
+
+        path.replace(target)
+        renamed.append((path.name, target.name))
+
+    return {
+        "renamed": renamed,
+        "skipped": skipped,
+    }
 
 
 def load_entries():
@@ -71,7 +190,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Barlow:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b0c10; --surface: #14161e; --surface-hover: #1a1d27;
+    --bg: #0b0c10; --surface: #14161e;
     --border: #252838; --border-light: #353950;
     --text: #e4dfd6; --text-mid: #aea89e; --text-dim: #6e6960;
     --accent: #c9a84c; --accent-bright: #e0bf5e;
@@ -159,12 +278,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
   /* --- Controls --- */
   .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
-  .controls input, .controls select {
+  .controls input[type="text"], .controls select {
     font-family: var(--font-body); background: var(--surface); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-size: 0.88em;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .controls input:focus, .controls select:focus {
+  .controls input[type="text"]:focus, .controls select:focus {
     outline: none; border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-subtle);
   }
@@ -280,6 +399,40 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     text-align: center; font-size: 0.78em; color: var(--text-dim); letter-spacing: 0.04em;
   }
 
+  /* --- Stale data banner --- */
+  .stale-banner {
+    display: flex; align-items: center; gap: 16px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(201,168,76,0.06));
+    border: 1px solid var(--accent); border-radius: 8px;
+    padding: 16px 20px; margin-bottom: 24px;
+    animation: fadeUp 0.5s ease 0.1s both;
+  }
+  .stale-content { flex: 1; }
+  .stale-content strong { color: var(--accent-bright); display: block; margin-bottom: 4px; }
+  .stale-msg { font-size: 0.88em; color: var(--text-mid); }
+  .stale-cmd {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px;
+  }
+  .stale-cmd code {
+    font-family: var(--font-mono); font-size: 0.82em; color: var(--text);
+    flex: 1; user-select: all;
+  }
+  .copy-btn {
+    font-family: var(--font-body); background: var(--accent); color: var(--bg);
+    border: none; border-radius: 4px; padding: 5px 14px; cursor: pointer;
+    font-size: 0.78em; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; transition: background 0.2s; white-space: nowrap;
+  }
+  .copy-btn:hover { background: var(--accent-bright); }
+  .stale-dismiss {
+    background: transparent; border: none; color: var(--text-dim);
+    font-size: 1.4em; cursor: pointer; padding: 4px 8px; line-height: 1;
+    transition: color 0.2s; align-self: flex-start;
+  }
+  .stale-dismiss:hover { color: var(--text); }
+
   /* --- Scrollbar --- */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -303,6 +456,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <h1>Spell Check <span class="sep">&middot;</span> Log Viewer</h1>
     <div class="header-sub" id="headerSub"></div>
   </header>
+
+  <div id="staleBanner" class="stale-banner" style="display:none">
+    <div class="stale-content">
+      <strong id="staleTitle"></strong>
+      <span class="stale-msg">There may be newer spell-check logs. Re-run the generator to see the latest data.</span>
+      <div class="stale-cmd">
+        <code id="rerunCmd"></code>
+        <button class="copy-btn" onclick="copyCmd()">Copy</button>
+      </div>
+    </div>
+    <button class="stale-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+  </div>
 
   <div class="stats" id="stats"></div>
 
@@ -375,6 +540,10 @@ function trunc(s, n) { return s && s.length > n ? s.slice(0, n) + '\u2026' : (s 
 function nested(obj, path) { return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : 0, obj); }
 
 let sortCol = 'timestamp', sortDir = -1;
+
+// --- Generation metadata (used by stale check + footer) ---
+const GENERATED_DATE = new Date('%%GENERATED_ISO%%');
+const RERUN_CMD = '%%RERUN_CMD%%';
 
 function getFiltered() {
   const search = document.getElementById('search').value.toLowerCase();
@@ -483,13 +652,13 @@ function render() {
       <td title="${esc(e.active_app || '')}">${esc(trunc(e.active_exe || '', 20))}</td>
       <td>${e.input_chars || 0}</td>
       <td>${e.output_chars || 0}</td>
-      <td><span class="dot ${e.text_changed ? 'dot-yes' : 'dot-no'}"></span></td>
+      <td><span class="dot ${e.text_changed ? 'dot-yes' : 'dot-no'}" title="${e.text_changed ? 'Yes' : 'No'}" aria-label="${e.text_changed ? 'Changed' : 'Unchanged'}"></span></td>
       <td>${(e.tokens || {}).total || 0}</td>
       <td><button class="expand-btn" onclick="toggle(${i})">Details</button></td>
     </tr>
     <tr class="detail-row"><td colspan="10">${renderDetail(e, i)}</td></tr>
   `).join('');
-  document.getElementById('footer').textContent = `Showing ${filtered.length} of ${DATA.length} entries`;
+  document.getElementById('footer').textContent = `Showing ${filtered.length} of ${DATA.length} entries \u00B7 Generated ${GENERATED_DATE.toLocaleString()}`;
   document.querySelectorAll('thead th').forEach(th => {
     const arrow = th.querySelector('.arrow');
     if (!arrow) return;
@@ -513,6 +682,43 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
   document.getElementById(id).addEventListener(id === 'changedOnly' ? 'change' : 'input', render);
 });
 
+// --- Stale data check ---
+(function() {
+  const now = new Date();
+  const ageHours = (now - GENERATED_DATE) / 3600000;
+  if (ageHours >= 1) {
+    let ageText;
+    if (ageHours < 24) {
+      const h = Math.round(ageHours);
+      ageText = h + ' hour' + (h !== 1 ? 's' : '') + ' ago';
+    } else {
+      const d = Math.round(ageHours / 24);
+      ageText = d + ' day' + (d !== 1 ? 's' : '') + ' ago';
+    }
+    document.getElementById('staleTitle').textContent = 'This viewer was generated ' + ageText;
+    document.getElementById('rerunCmd').textContent = RERUN_CMD;
+    document.getElementById('staleBanner').style.display = 'flex';
+  }
+})();
+
+function copyCmd() {
+  var btn = document.querySelector('.copy-btn');
+  function done() { btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy'; }, 2000); }
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(RERUN_CMD).then(done);
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = RERUN_CMD;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  }
+}
+
 render();
 </script>
 </body>
@@ -521,6 +727,23 @@ render();
 
 def main():
     print(f"Reading JSONL files from: {LOGS_DIR}")
+    rename_migration = migrate_old_weekly_log_names()
+    if rename_migration["renamed"] or rename_migration["skipped"]:
+        print(
+            "  Updated weekly filenames:"
+            f" renamed {len(rename_migration['renamed'])},"
+            f" skipped {len(rename_migration['skipped'])}"
+        )
+
+    migration = migrate_legacy_log()
+    if migration:
+        print(
+            "  Migrated legacy log:"
+            f" {migration['migrated']} entries into weekly files,"
+            f" skipped {migration['skipped']},"
+            f" backup: {migration['backup'].name}"
+        )
+
     entries = load_entries()
     print(f"  Loaded {len(entries)} log entries")
 
@@ -533,7 +756,15 @@ def main():
     # Build HTML with embedded data
     data_json = json.dumps(entries, ensure_ascii=False).replace("<", "\\u003c")
     stats_json = json.dumps(stats, ensure_ascii=False).replace("<", "\\u003c")
-    html_out = HTML_TEMPLATE.replace("%%DATA%%", data_json).replace("%%STATS%%", stats_json)
+    generated_iso = datetime.now().isoformat()
+    rerun_cmd = f'cd "{SCRIPT_DIR}" && python generate_log_viewer.py'
+    rerun_cmd_js = rerun_cmd.replace("\\", "\\\\")
+    html_out = (HTML_TEMPLATE
+        .replace("%%DATA%%", data_json)
+        .replace("%%STATS%%", stats_json)
+        .replace("%%GENERATED_ISO%%", generated_iso)
+        .replace("%%RERUN_CMD%%", rerun_cmd_js)
+    )
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
