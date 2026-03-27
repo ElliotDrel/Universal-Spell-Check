@@ -13,7 +13,7 @@ The project uses a single active script with a top-level model selector.
 ### Active Files
 - **Universal Spell Checker.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
-- **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` — run `python generate_log_viewer.py --open` to view
+- **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` — run `python generate_log_viewer.py` to view
 
 ### Legacy / Simple Variant
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback

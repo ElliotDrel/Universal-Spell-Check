@@ -2,8 +2,8 @@
 """Generate an HTML log viewer from JSONL spell-check logs.
 
 Usage:
-    python generate_log_viewer.py          # reads logs/*.jsonl, writes logs/viewer.html
-    python generate_log_viewer.py --open   # same, then opens in default browser
+    python generate_log_viewer.py            # reads logs/*.jsonl, writes logs/viewer.html, opens in browser
+    python generate_log_viewer.py --no-open # same, but skip opening in browser
 """
 
 import json
@@ -390,7 +390,7 @@ def main():
     size_mb = OUTPUT_FILE.stat().st_size / (1024 * 1024)
     print(f"  Generated: {OUTPUT_FILE} ({size_mb:.1f} MB)")
 
-    if "--open" in sys.argv:
+    if "--no-open" not in sys.argv:
         import webbrowser
         webbrowser.open(str(OUTPUT_FILE))
         print("  Opened in browser")
