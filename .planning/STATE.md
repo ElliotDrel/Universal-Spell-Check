@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-27)
 Phase: 1 of 5 (Reliability and UX Foundation)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-03-27 -- Roadmap created
+Last activity: 2026-03-27 - Completed quick task 260327-ht2: Convert all old spell-check logs to new JSONL format
 
 Progress: [..........] 0%
 
@@ -54,6 +54,12 @@ None yet.
 
 - Phase 3 research flag: Verify Predicted Outputs are still Chat Completions-only at implementation time
 - Phase 5 research flag: Quality of structured diff output for grammar corrections is untested -- validate before making default
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260327-ht2 | Convert all old spell-check logs to new JSONL format | 2026-03-27 | 9a699d6 | Verified | [260327-ht2-convert-all-old-spell-check-logs-to-new-](./quick/260327-ht2-convert-all-old-spell-check-logs-to-new-/) |
 
 ## Session Continuity
 
