@@ -1,26 +1,68 @@
 #!/bin/sh
-# Pre-commit hook to keep CLAUDE.md and AGENTS.md in sync
-# This ensures both AI tools (Claude Code and GitHub Copilot) read identical instructions
+# Pre-commit hook to:
+# 1. keep CLAUDE.md and AGENTS.md in sync
+# 2. require scriptVersion to be bumped before every commit
 
 CLAUDE_FILE="CLAUDE.md"
 AGENTS_FILE="AGENTS.md"
+SCRIPT_FILE="Universal Spell Checker.ahk"
 
-# Check if both files exist
 if [ ! -f "$CLAUDE_FILE" ]; then
-    echo "Error: $CLAUDE_FILE does not exist"
+    echo "ERROR: $CLAUDE_FILE does not exist"
     exit 1
 fi
 
-# Check which files are staged
+if [ ! -f "$SCRIPT_FILE" ]; then
+    echo "ERROR: $SCRIPT_FILE does not exist"
+    exit 1
+fi
+
+extract_script_version_from_stream() {
+    sed -n 's/^[[:space:]]*scriptVersion[[:space:]]*:=[[:space:]]*"\([^"]*\)".*$/\1/p' | head -n 1
+}
+
+require_script_version_bump() {
+    if git rev-parse --verify HEAD >/dev/null 2>&1; then
+        head_version=$(git show "HEAD:$SCRIPT_FILE" 2>/dev/null | extract_script_version_from_stream)
+    else
+        head_version=""
+    fi
+
+    staged_version=$(git show ":$SCRIPT_FILE" 2>/dev/null | extract_script_version_from_stream)
+
+    if [ -z "$staged_version" ]; then
+        echo "ERROR: Could not read staged scriptVersion from $SCRIPT_FILE."
+        echo "Stage $SCRIPT_FILE with an updated scriptVersion before committing."
+        exit 1
+    fi
+
+    if [ "$staged_version" = "$head_version" ]; then
+        echo "ERROR: scriptVersion in staged $SCRIPT_FILE was not bumped."
+        echo "Current staged scriptVersion: $staged_version"
+        if [ -n "$head_version" ]; then
+            echo "HEAD scriptVersion: $head_version"
+        fi
+        echo "Bump scriptVersion before every commit, then stage $SCRIPT_FILE again."
+        exit 1
+    fi
+}
+
 CLAUDE_STAGED=$(git diff --cached --name-only | grep -c "^$CLAUDE_FILE$" || true)
 AGENTS_STAGED=$(git diff --cached --name-only | grep -c "^$AGENTS_FILE$" || true)
+SCRIPT_STAGED=$(git diff --cached --name-only | grep -c "^$SCRIPT_FILE$" || true)
 
-# If neither file is staged, nothing to do
+if [ "$SCRIPT_STAGED" -eq 0 ]; then
+    echo "ERROR: $SCRIPT_FILE must be staged on every commit so scriptVersion can be bumped."
+    echo "Bump scriptVersion, stage $SCRIPT_FILE, and try committing again."
+    exit 1
+fi
+
+require_script_version_bump
+
 if [ "$CLAUDE_STAGED" -eq 0 ] && [ "$AGENTS_STAGED" -eq 0 ]; then
     exit 0
 fi
 
-# If both files are staged, verify they match
 if [ "$CLAUDE_STAGED" -eq 1 ] && [ "$AGENTS_STAGED" -eq 1 ]; then
     if ! diff -q "$CLAUDE_FILE" "$AGENTS_FILE" >/dev/null 2>&1; then
         echo "ERROR: Both $CLAUDE_FILE and $AGENTS_FILE are staged but their contents differ."
@@ -30,39 +72,34 @@ if [ "$CLAUDE_STAGED" -eq 1 ] && [ "$AGENTS_STAGED" -eq 1 ]; then
         diff -u "$CLAUDE_FILE" "$AGENTS_FILE" || true
         exit 1
     fi
-    # Files match, allow commit
     exit 0
 fi
 
-# If only CLAUDE.md is staged, copy to AGENTS.md
 if [ "$CLAUDE_STAGED" -eq 1 ] && [ "$AGENTS_STAGED" -eq 0 ]; then
-    # Check if AGENTS.md has unstaged changes
     if [ -f "$AGENTS_FILE" ] && git diff --name-only | grep -q "^$AGENTS_FILE$"; then
         echo "ERROR: $AGENTS_FILE has unstaged changes. Cannot auto-sync."
         echo "Please commit or stash changes to $AGENTS_FILE first."
         exit 1
     fi
 
-    echo "Syncing $CLAUDE_FILE → $AGENTS_FILE"
+    echo "Syncing $CLAUDE_FILE -> $AGENTS_FILE"
     cp "$CLAUDE_FILE" "$AGENTS_FILE"
     git add "$AGENTS_FILE"
-    echo "✓ Successfully synced and staged both files"
+    echo "Successfully synced and staged both files"
     exit 0
 fi
 
-# If only AGENTS.md is staged, copy to CLAUDE.md
 if [ "$AGENTS_STAGED" -eq 1 ] && [ "$CLAUDE_STAGED" -eq 0 ]; then
-    # Check if CLAUDE.md has unstaged changes
     if git diff --name-only | grep -q "^$CLAUDE_FILE$"; then
         echo "ERROR: $CLAUDE_FILE has unstaged changes. Cannot auto-sync."
         echo "Please commit or stash changes to $CLAUDE_FILE first."
         exit 1
     fi
 
-    echo "Syncing $AGENTS_FILE → $CLAUDE_FILE"
+    echo "Syncing $AGENTS_FILE -> $CLAUDE_FILE"
     cp "$AGENTS_FILE" "$CLAUDE_FILE"
     git add "$CLAUDE_FILE"
-    echo "✓ Successfully synced and staged both files"
+    echo "Successfully synced and staged both files"
     exit 0
 fi
 

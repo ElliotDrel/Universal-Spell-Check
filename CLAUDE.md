@@ -272,9 +272,10 @@ When debugging unclear issues, prepare multiple approaches:
 ### File Structure Awareness
 - Active script: `Universal Spell Checker.ahk` (primary, with `modelModule` selector)
 - `scriptVersion` is a manual integer-like string near the top of `Universal Spell Checker.ahk` and is logged as `script_version` on every run
-- Bump `scriptVersion` only when runtime behavior changes in the active script; do it before asking for a reload or manual retest
-- Do not bump `scriptVersion` for documentation-only edits or unrelated file changes
+- Bump `scriptVersion` before every commit in this repo, even if the commit is mostly docs, logging, or test workflow changes
+- Bump `scriptVersion` before asking for a reload or manual retest so the next log entry proves which loaded script build ran
 - When comparing logs during testing, treat mismatched `script_version` values as proof the user is still running an older loaded script
+- Pre-commit must reject commits where the staged `scriptVersion` in `Universal Spell Checker.ahk` did not change relative to `HEAD`
 - `replacements.json` lives alongside the script; edit it freely - script reloads it on every run
 - When modifying core logic, ensure all model branches inside the single script remain consistent
 - `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` is a minimal legacy variant - do not use it as a template for new features

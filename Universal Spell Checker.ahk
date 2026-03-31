@@ -1,10 +1,10 @@
 #Requires AutoHotkey v2.0
 
 ; Manual script build version. Use a simple integer string like "5", "6", "7".
-; Bump it only when this script's runtime behavior changes and do it before asking
-; anyone to reload or run tests. Every log entry records this value as
-; `script_version`, so stale reloads are easy to spot immediately.
-scriptVersion := "5"
+; Bump it before every commit in this repo, even if the commit is mostly docs or
+; test-related. Every log entry records this value as `script_version`, so stale
+; reloads and "forgot to reload" test runs are easy to spot immediately.
+scriptVersion := "6"
 
 ; Logging configuration
 enableLogging := true
