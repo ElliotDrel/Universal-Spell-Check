@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "8"
+scriptVersion := "9"
 
 ; Logging configuration
 enableLogging := true
@@ -385,7 +385,8 @@ GetClipboardText(&details := 0) {
         ansiAvailable: false,
         htmlChars: 0,
         fragmentChars: 0,
-        fallbackUsed: true
+        fallbackUsed: true,
+        probeMs: 0
     }
     if !DllCall("OpenClipboard", "ptr", 0)
         return text
@@ -394,6 +395,7 @@ GetClipboardText(&details := 0) {
     static CF_UNICODETEXT := 13
     static CF_HTML := DllCall("RegisterClipboardFormat", "str", "HTML Format", "uint")
     result := ""
+    probeStart := A_TickCount
 
     try {
         ; Prefer HTML when available so we can strip formatting noise (empty paragraphs, etc.)
@@ -444,6 +446,7 @@ GetClipboardText(&details := 0) {
 
     if (result = "")
         details.selectedChars := StrLen(text)
+    details.probeMs := A_TickCount - probeStart
 
     return result != "" ? result : text
 }
@@ -699,6 +702,29 @@ LogDetailed(data) {
             tPaste := 0
         }
 
+        diagWindow := 0
+        diagClipboard := 0
+        diagClipboardProbe := 0
+        diagPayload := 0
+        diagResponse := 0
+        diagOutput := 0
+        diagPaste := 0
+        diagException := 0
+        diagFinalize := 0
+        if (data.HasOwnProp("diagnostics") && IsObject(data.diagnostics)) {
+            d := data.diagnostics
+            diagWindow := d.HasOwnProp("windowDebugMs") ? d.windowDebugMs : 0
+            diagClipboard := d.HasOwnProp("clipboardDebugMs") ? d.clipboardDebugMs : 0
+            diagClipboardProbe := d.HasOwnProp("clipboardProbeMs") ? d.clipboardProbeMs : 0
+            diagPayload := d.HasOwnProp("payloadDebugMs") ? d.payloadDebugMs : 0
+            diagResponse := d.HasOwnProp("responseDebugMs") ? d.responseDebugMs : 0
+            diagOutput := d.HasOwnProp("outputDebugMs") ? d.outputDebugMs : 0
+            diagPaste := d.HasOwnProp("pasteDebugMs") ? d.pasteDebugMs : 0
+            diagException := d.HasOwnProp("exceptionDebugMs") ? d.exceptionDebugMs : 0
+            diagFinalize := d.HasOwnProp("finalizeQueueMs") ? d.finalizeQueueMs : 0
+        }
+        diagTotal := diagWindow + diagClipboard + diagClipboardProbe + diagPayload + diagResponse + diagOutput + diagPaste + diagException + diagFinalize
+
         ; Replacements array
         repArr := "[]"
         repCount := 0
@@ -784,6 +810,7 @@ LogDetailed(data) {
         j .= ',"raw_ai_output":"' . JsonEscape(data.rawAiOutput) . '"'
         j .= ',"tokens":{"input":' . tokIn . ',"output":' . tokOut . ',"total":' . tokTotal . ',"cached":' . tokCached . ',"reasoning":' . tokReason . '}'
         j .= ',"timings":{"clipboard_ms":' . tClip . ',"payload_ms":' . tPayload . ',"request_ms":' . tReq . ',"api_ms":' . tApi . ',"parse_ms":' . tParse . ',"replacements_ms":' . tReplace . ',"prompt_guard_ms":' . tGuard . ',"paste_ms":' . tPaste . '}'
+        j .= ',"diagnostics":{"window_ms":' . diagWindow . ',"clipboard_ms":' . diagClipboard . ',"clipboard_probe_ms":' . diagClipboardProbe . ',"payload_ms":' . diagPayload . ',"response_ms":' . diagResponse . ',"output_ms":' . diagOutput . ',"paste_ms":' . diagPaste . ',"exception_ms":' . diagException . ',"finalize_queue_ms":' . diagFinalize . ',"total_ms":' . diagTotal . '}'
         j .= ',"replacements":{"count":' . repCount . ',"applied":' . repArr . ',"urls_protected":' . urlsProt . '}'
         j .= ',"prompt_leak":{"triggered":' . plTriggered . ',"occurrences":' . plOcc . ',"text_input_removed":' . plTextRemoved . ',"removed_chars":' . plRmChars . ',"before_length":' . plBefore . ',"after_length":' . plAfter . '}'
         j .= ',"events":' . evtArr
@@ -1080,7 +1107,10 @@ ExtractTextFromResponseRegex(jsonResponse) {
 FinalizeRun(logData) {
     if (!logData.HasOwnProp("pasteTime") || logData.pasteTime = 0)
         logData.pasteTime := A_TickCount
+    finalizeQueueStart := A_TickCount
     snapshot := logData.Clone()
+    if (snapshot.HasOwnProp("diagnostics") && IsObject(snapshot.diagnostics))
+        snapshot.diagnostics.finalizeQueueMs := A_TickCount - finalizeQueueStart
     SetTimer(() => LogDetailed(snapshot), -1)
 }
 
@@ -1120,6 +1150,17 @@ FinalizeRun(logData) {
             promptGuardApplied: 0,
             textPasted: 0
         },
+        diagnostics: {
+            windowDebugMs: 0,
+            clipboardDebugMs: 0,
+            clipboardProbeMs: 0,
+            payloadDebugMs: 0,
+            responseDebugMs: 0,
+            outputDebugMs: 0,
+            pasteDebugMs: 0,
+            exceptionDebugMs: 0,
+            finalizeQueueMs: 0
+        },
         model: apiModel,
         scriptVersion: scriptVersion,
         activeApp: "",
@@ -1141,6 +1182,7 @@ FinalizeRun(logData) {
     }
 
     ; Capture active window before any clipboard operations
+    windowDebugStart := A_TickCount
     windowInfo := GetActiveWindowDebugInfo()
     logData.activeApp := windowInfo.title
     logData.activeExe := windowInfo.exe
@@ -1154,6 +1196,7 @@ FinalizeRun(logData) {
             . ", hwnd=" . logData.windowHwnd
             . ", control=" . (logData.focusedControl != "" ? logData.focusedControl : "<none>")
             . ", title=" . MakeLogPreview(logData.activeApp, 120))
+        logData.diagnostics.windowDebugMs := A_TickCount - windowDebugStart
 
         replacementsStatus := ""
         replacementsDetails := ""
@@ -1185,11 +1228,15 @@ FinalizeRun(logData) {
         else
             logData.events.Push("Clipboard source history-policy tag unavailable")
         logData.original := originalText
+        clipboardDebugStart := A_TickCount
         if (IsObject(clipboardDetails))
             logData.clipboardSource := clipboardDetails.selectedFormat
         logData.clipboardPreview := MakeLogPreview(originalText, 220)
         logData.events.Push("Clipboard details: " . BuildClipboardDebugSummary(clipboardDetails))
         logData.events.Push("Clipboard preview: " . logData.clipboardPreview)
+        logData.diagnostics.clipboardDebugMs := A_TickCount - clipboardDebugStart
+        if (IsObject(clipboardDetails) && clipboardDetails.HasOwnProp("probeMs"))
+            logData.diagnostics.clipboardProbeMs := clipboardDetails.probeMs
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
         logData.timings.clipboardCaptured := A_TickCount
 
@@ -1209,7 +1256,9 @@ FinalizeRun(logData) {
             jsonPayload .= ',"temperature":' . Temperature . '}'
             logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
         }
+        payloadDebugStart := A_TickCount
         logData.events.Push("Prompt chars=" . StrLen(prompt) . ", payload chars=" . StrLen(jsonPayload))
+        logData.diagnostics.payloadDebugMs := A_TickCount - payloadDebugStart
         logData.timings.payloadPrepared := A_TickCount
         logData.rawRequest := jsonPayload
 
@@ -1252,6 +1301,7 @@ FinalizeRun(logData) {
         ; Parse response and extract corrected text
         response := GetUtf8Response(http)
         logData.rawResponse := response
+        responseDebugStart := A_TickCount
         logData.events.Push("Response received (" . StrLen(response) . " chars)")
         logData.timings.responseReceived := A_TickCount
 
@@ -1272,6 +1322,7 @@ FinalizeRun(logData) {
             . (logData.modelVersion != "" ? logData.modelVersion : "<missing>")
             . ", tokens in/out/total/cached/reasoning="
             . logData.tokenInput . "/" . logData.tokenOutput . "/" . logData.tokenTotal . "/" . logData.tokenCached . "/" . logData.tokenReasoning)
+        logData.diagnostics.responseDebugMs := A_TickCount - responseDebugStart
 
         correctedText := ""
 
@@ -1380,6 +1431,7 @@ FinalizeRun(logData) {
 
         if (correctedText != "") {
             logData.textChanged := (correctedText != logData.original)
+            outputDebugStart := A_TickCount
             logData.outputPreview := MakeLogPreview(correctedText, 220)
             logData.events.Push("Correction summary: changed="
                 . (logData.textChanged ? "yes" : "no")
@@ -1387,6 +1439,7 @@ FinalizeRun(logData) {
                 . ", output chars=" . StrLen(correctedText)
                 . ", delta=" . (StrLen(correctedText) - StrLen(logData.original)))
             logData.events.Push("Output preview: " . logData.outputPreview)
+            logData.diagnostics.outputDebugMs := A_TickCount - outputDebugStart
 
             if (UseSendText()) {
                 logData.pasteMethod := "sendtext"
@@ -1402,8 +1455,10 @@ FinalizeRun(logData) {
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
+                pasteDebugStart := A_TickCount
                 logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
                 logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
+                logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
                 if WaitForHotkeyRelease(120)
                     logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
                 else {
@@ -1441,8 +1496,10 @@ FinalizeRun(logData) {
         logData.error := "Exception: " . e.Message
         if (!logData.pasteTime)
             logData.pasteTime := A_TickCount
+        exceptionDebugStart := A_TickCount
         logData.events.Push("Exception thrown: " . e.Message)
         logData.events.Push("Exception context: line=" . e.Line . ", what=" . e.What . ", extra=" . e.Extra)
+        logData.diagnostics.exceptionDebugMs := A_TickCount - exceptionDebugStart
         ToolTip("Error: " . e.Message)
         SetTimer(() => ToolTip(), -3000)
     } finally {
