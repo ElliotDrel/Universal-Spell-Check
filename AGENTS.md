@@ -136,6 +136,13 @@ The project uses a single active script with a top-level model selector.
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
 - **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in the weekly `spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl` files
 
+### Watchlist
+- **Notepad clipboard capture**: `notepad.exe` uses a retry copy path because `Ctrl+Alt+U` -> immediate `Ctrl+C` was intermittently timing out. Keep an eye on whether retries are succeeding on attempt 2/3 or whether full timeouts continue.
+- **Other apps**: Watch the logs for `Clipboard copy strategy: standard` followed by copy timeouts in non-Notepad apps. If another app starts failing, prefer documenting it from logs first, then consider adding app-specific retry behavior rather than slowing all apps down.
+- **Replacement cache reloads**: Failed reloads now keep the last known-good cache and schedule a deferred retry after paste. Keep an eye on repeated `immediate reload failed` / `deferred reload failed` sequences, because that points to malformed JSON, file locking, or save timing issues.
+- **Replacement cache edge case**: The current cache key is modified-time plus file size. Very fast same-size edits can be temporarily missed until a later detectable save. If this shows up in practice, the next ideas to evaluate are a stronger cache key or a more transactional read/metadata verification pass.
+- **Read-while-writing risk**: If `replacements.json` is edited while the script is reading it, stale data can still be cached under newer metadata. If this becomes observable, the next fix to consider is capturing metadata before and after the read and only accepting the reload when both snapshots match.
+
 ### Logging System (JSONL)
 - **Format**: JSON Lines — one JSON object per line in weekly files like `logs/spellcheck-2026-03-23-to-2026-03-29.jsonl`
 - **Rotation**: New entries write to the current week's file (Monday-based week start). If appending the next line would push that file past 5 MiB, the script spills into `-2`, `-3`, etc. files for that same week instead of renaming old logs
