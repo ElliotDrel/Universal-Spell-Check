@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "12"
+scriptVersion := "14"
 
 ; Logging configuration
 enableLogging := true
@@ -90,6 +90,39 @@ IsExpectedWindowActive(expectedHwnd) {
     if !expectedHwnd
         return true
     return WinActive("ahk_id " . expectedHwnd) ? true : false
+}
+
+ShowTemporaryToolTip(message, durationMs := 3000) {
+    ToolTip(message)
+    SetTimer(() => ToolTip(), -durationMs)
+}
+
+SetTransientClipboardText(text) {
+    A_Clipboard := text
+    SetClipboardHistoryPolicy(false, false)
+}
+
+AbortRun(logData, errorMessage, eventMessage := "", tooltipMessage := "", tooltipDurationMs := 3000) {
+    logData.error := errorMessage
+    logData.pasteTime := A_TickCount
+    if (eventMessage != "")
+        logData.events.Push(eventMessage)
+    if (tooltipMessage != "")
+        ShowTemporaryToolTip(tooltipMessage, tooltipDurationMs)
+    return true
+}
+
+AbortDueToFocusChange(logData, stageLabel) {
+    currentWindow := GetActiveWindowDebugInfo()
+    return AbortRun(
+        logData,
+        "Target window changed " . stageLabel,
+        "Paste aborted because focus changed " . stageLabel . ": expected hwnd="
+            . logData.windowHwnd . ", exe=" . logData.activeExe
+            . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
+            . ", title=" . MakeLogPreview(currentWindow.title, 120),
+        "Focus changed before paste. Original target was left untouched."
+    )
 }
 
 MakeLogPreview(text, maxLen := 160) {
@@ -1312,8 +1345,7 @@ FinalizeRun(logData) {
                 logData.events.Push("API error body captured (" . StrLen(logData.rawResponse) . " chars)")
             }
 
-            ToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(errPreview, 1, 200))
-            SetTimer(() => ToolTip(), -5000)
+            ShowTemporaryToolTip("API Error: " . http.Status . " - " . http.StatusText . "`nResponse: " . SubStr(errPreview, 1, 200), 5000)
             return
         }
        
@@ -1461,15 +1493,7 @@ FinalizeRun(logData) {
             logData.diagnostics.outputDebugMs := A_TickCount - outputDebugStart
 
             if !IsExpectedWindowActive(logData.windowHwnd) {
-                currentWindow := GetActiveWindowDebugInfo()
-                logData.error := "Target window changed before paste"
-                logData.pasteTime := A_TickCount
-                logData.events.Push("Paste aborted because focus changed before insertion: expected hwnd="
-                    . logData.windowHwnd . ", exe=" . logData.activeExe
-                    . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
-                    . ", title=" . MakeLogPreview(currentWindow.title, 120))
-                ToolTip("Focus changed before paste. Original target was left untouched.")
-                SetTimer(() => ToolTip(), -3000)
+                AbortDueToFocusChange(logData, "before insertion")
                 return
             }
             logData.events.Push("Paste target confirmed before insertion (hwnd=" . logData.windowHwnd . ", exe=" . logData.activeExe . ")")
@@ -1479,59 +1503,38 @@ FinalizeRun(logData) {
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
                 if !IsExpectedWindowActive(logData.windowHwnd) {
-                    currentWindow := GetActiveWindowDebugInfo()
-                    logData.error := "Target window changed before SendText"
-                    logData.pasteTime := A_TickCount
-                    logData.events.Push("Paste aborted because focus changed immediately before SendText: expected hwnd="
-                        . logData.windowHwnd . ", exe=" . logData.activeExe
-                        . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
-                        . ", title=" . MakeLogPreview(currentWindow.title, 120))
-                    ToolTip("Focus changed before paste. Original target was left untouched.")
-                    SetTimer(() => ToolTip(), -3000)
+                    AbortDueToFocusChange(logData, "immediately before SendText")
                     return
                 }
                 logData.pasteAttempted := true
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
-                A_Clipboard := correctedText
-                SetClipboardHistoryPolicy(false, false)
+                SetTransientClipboardText(correctedText)
                 logData.events.Push("Text typed via SendText - COMPLETE")
             } else {
                 logData.pasteMethod := "clipboard"
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
-                A_Clipboard := correctedText
-                SetClipboardHistoryPolicy(false, false)
                 pasteDebugStart := A_TickCount
-                logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
                 logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
-                logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
                 if WaitForHotkeyRelease(120)
                     logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
                 else {
                     logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
                     if (StrLower(logData.activeExe) = "notepad.exe") {
                         logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
-                        logData.error := "Paste hotkey release timeout"
-                        logData.pasteTime := A_TickCount
-                        ToolTip("Release Ctrl+Alt+U fully, then retry")
-                        SetTimer(() => ToolTip(), -3000)
+                        AbortRun(logData, "Paste hotkey release timeout", "", "Release Ctrl+Alt+U fully, then retry")
                         return
                     }
                     logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
                 }
                 if !IsExpectedWindowActive(logData.windowHwnd) {
-                    currentWindow := GetActiveWindowDebugInfo()
-                    logData.error := "Target window changed before Ctrl+V"
-                    logData.pasteTime := A_TickCount
-                    logData.events.Push("Paste aborted because focus changed immediately before Ctrl+V: expected hwnd="
-                        . logData.windowHwnd . ", exe=" . logData.activeExe
-                        . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
-                        . ", title=" . MakeLogPreview(currentWindow.title, 120))
-                    ToolTip("Focus changed before paste. Original target was left untouched.")
-                    SetTimer(() => ToolTip(), -3000)
+                    AbortDueToFocusChange(logData, "immediately before Ctrl+V")
                     return
                 }
+                SetTransientClipboardText(correctedText)
+                logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
+                logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
                 logData.pasteAttempted := true
                 Send("^v")
                 logData.events.Push("Text pasted via clipboard - COMPLETE")
@@ -1550,8 +1553,7 @@ FinalizeRun(logData) {
             logData.pasteTime := A_TickCount
             logData.events.Push("Response parsing failed")
             logData.events.Push("Response preview: " . MakeLogPreview(response, 260))
-            ToolTip("Error: No text returned by Responses API")
-            SetTimer(() => ToolTip(), -3000)
+            ShowTemporaryToolTip("Error: No text returned by Responses API")
         }
        
     } catch Error as e {
@@ -1562,8 +1564,7 @@ FinalizeRun(logData) {
         logData.events.Push("Exception thrown: " . e.Message)
         logData.events.Push("Exception context: line=" . e.Line . ", what=" . e.What . ", extra=" . e.Extra)
         logData.diagnostics.exceptionDebugMs := A_TickCount - exceptionDebugStart
-        ToolTip("Error: " . e.Message)
-        SetTimer(() => ToolTip(), -3000)
+        ShowTemporaryToolTip("Error: " . e.Message)
     } finally {
         FinalizeRun(logData)
     }
