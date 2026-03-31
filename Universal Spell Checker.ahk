@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "11"
+scriptVersion := "12"
 
 ; Logging configuration
 enableLogging := true
@@ -1478,6 +1478,18 @@ FinalizeRun(logData) {
                 logData.pasteMethod := "sendtext"
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
+                if !IsExpectedWindowActive(logData.windowHwnd) {
+                    currentWindow := GetActiveWindowDebugInfo()
+                    logData.error := "Target window changed before SendText"
+                    logData.pasteTime := A_TickCount
+                    logData.events.Push("Paste aborted because focus changed immediately before SendText: expected hwnd="
+                        . logData.windowHwnd . ", exe=" . logData.activeExe
+                        . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
+                        . ", title=" . MakeLogPreview(currentWindow.title, 120))
+                    ToolTip("Focus changed before paste. Original target was left untouched.")
+                    SetTimer(() => ToolTip(), -3000)
+                    return
+                }
                 logData.pasteAttempted := true
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
@@ -1507,6 +1519,18 @@ FinalizeRun(logData) {
                         return
                     }
                     logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
+                }
+                if !IsExpectedWindowActive(logData.windowHwnd) {
+                    currentWindow := GetActiveWindowDebugInfo()
+                    logData.error := "Target window changed before Ctrl+V"
+                    logData.pasteTime := A_TickCount
+                    logData.events.Push("Paste aborted because focus changed immediately before Ctrl+V: expected hwnd="
+                        . logData.windowHwnd . ", exe=" . logData.activeExe
+                        . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
+                        . ", title=" . MakeLogPreview(currentWindow.title, 120))
+                    ToolTip("Focus changed before paste. Original target was left untouched.")
+                    SetTimer(() => ToolTip(), -3000)
+                    return
                 }
                 logData.pasteAttempted := true
                 Send("^v")
