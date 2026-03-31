@@ -13,7 +13,7 @@ The project uses a single active script with a top-level model selector.
 ### Active Files
 - **Universal Spell Checker.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
-- **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` — run `python generate_log_viewer.py` to view
+- **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` - run `python generate_log_viewer.py` to view
 
 ### Legacy / Simple Variant
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback
@@ -42,7 +42,7 @@ The project uses a single active script with a top-level model selector.
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
 2. Replacements are loaded once at startup, then `replacements.json` is reparsed only when its modified timestamp or file size changes
-3. Script uses the original fast single-copy path for normal apps, but gives Notepad a short settle delay and up to 3 quick `Ctrl+C` attempts
+3. Script uses the original fast single-copy path for normal apps, but `notepad.exe` also waits for the hotkey to release, retries `Ctrl+C` up to 3 times, and may abort paste if `Ctrl+Alt+U` never fully releases
 4. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
 5. Sends text directly to OpenAI API
 6. Parses response (regex primary -> Map-based fallback)
@@ -94,7 +94,7 @@ The project uses a single active script with a top-level model selector.
   - If a metadata change or metadata read failure is detected, the script retries a full reload after paste and logs both attempts
   - If `replacements.json` is missing, the cache is cleared and no deferred retry is scheduled
   - Sorted longest-variant-first to prevent shorter substrings interfering
-  - **URL protection**: `http://` and `https://` URLs (matched via `https?://\S+`) are extracted into placeholders before replacements run, then restored after — scheme-less links like bare `www.` or `example.com` are not protected
+  - **URL protection**: `http://` and `https://` URLs (matched via `https?://\S+`) are extracted into placeholders before replacements run, then restored after - scheme-less links like bare `www.` or `example.com` are not protected
   - Runs in microseconds; logged with count and list of applied replacements
 - **Prompt-leak safeguard** (`StripPromptLeak`)
   - Hardcoded detection for leaked `instructions: ... text input:` prefix echoed by the model
@@ -107,7 +107,7 @@ The project uses a single active script with a top-level model selector.
   - Falls back to Unicode (CF_UNICODETEXT), then ANSI (CF_TEXT)
 - **Clipboard capture strategy** (`CaptureSelectedText()`)
   - Default apps keep the original single-attempt copy path for speed
-  - `notepad.exe` gets a tiny first-attempt settle delay plus 2 short retries before failing
+  - `notepad.exe` adds a small settle delay, waits for the hotkey to release before follow-up `Ctrl+C` / `Ctrl+V`, retries copy up to 3 times, and aborts paste if the hotkey never fully releases
   - Logs the chosen strategy and which copy attempt succeeded or timed out so other app failures are clearly attributed
 - **UTF-8 response reading** (`GetUtf8Response()` via ADODB.Stream)
   - Prevents mojibake on smart quotes and other non-ASCII characters
@@ -136,15 +136,13 @@ The project uses a single active script with a top-level model selector.
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
 - **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in the weekly `spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl` files
 
-### Watchlist
-- **Notepad clipboard capture**: `notepad.exe` uses a retry copy path because `Ctrl+Alt+U` -> immediate `Ctrl+C` was intermittently timing out. Keep an eye on whether retries are succeeding on attempt 2/3 or whether full timeouts continue.
-- **Other apps**: Watch the logs for `Clipboard copy strategy: standard` followed by copy timeouts in non-Notepad apps. If another app starts failing, prefer documenting it from logs first, then consider adding app-specific retry behavior rather than slowing all apps down.
+### Replacement Cache Watchlist
 - **Replacement cache reloads**: Failed reloads now keep the last known-good cache and schedule a deferred retry after paste. Keep an eye on repeated `immediate reload failed` / `deferred reload failed` sequences, because that points to malformed JSON, file locking, or save timing issues.
 - **Replacement cache edge case**: The current cache key is modified-time plus file size. Very fast same-size edits can be temporarily missed until a later detectable save. If this shows up in practice, the next ideas to evaluate are a stronger cache key or a more transactional read/metadata verification pass.
 - **Read-while-writing risk**: If `replacements.json` is edited while the script is reading it, stale data can still be cached under newer metadata. If this becomes observable, the next fix to consider is capturing metadata before and after the read and only accepting the reload when both snapshots match.
 
 ### Logging System (JSONL)
-- **Format**: JSON Lines — one JSON object per line in weekly files like `logs/spellcheck-2026-03-23-to-2026-03-29.jsonl`
+- **Format**: JSON Lines - one JSON object per line in weekly files like `logs/spellcheck-2026-03-23-to-2026-03-29.jsonl`
 - **Rotation**: New entries write to the current week's file (Monday-based week start). If appending the next line would push that file past 5 MiB, the script spills into `-2`, `-3`, etc. files for that same week instead of renaming old logs
 - **Fields per entry**: timestamp, status, error, duration_ms, model, script_version, model_version, active_app, active_exe, paste_method, text_changed, input_text, input_chars, output_text, output_chars, raw_ai_output, tokens (input/output/total/cached/reasoning), timings (clipboard/payload/request/api/parse/replacements/prompt_guard/paste in ms), replacements (count/applied/urls_protected), prompt_leak (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), events array, raw_response
 - **Viewer**: Run `python generate_log_viewer.py` to generate `logs/viewer.html` (add `--open` to auto-launch in browser). The HTML has summary stats, sortable/filterable table, expandable row details, timing breakdown bars, and search
@@ -298,6 +296,14 @@ When debugging unclear issues, prepare multiple approaches:
 - The scripts are intentionally minimal - but temporary debug logging is acceptable for troubleshooting
 - Focus on the .ahk files, not the abandoned C# application in the App folder
 
+### Clipboard / Hotkey Watchlist
+- Keep an eye on `Notepad.exe` for hotkey-release timing issues where `Ctrl+Alt+U` is still physically down when the script tries follow-up `Ctrl+C` or `Ctrl+V`
+- Known symptoms: Notepad menu/keytip overlays appearing, clipboard wait timeouts, copy succeeding only on attempt 2 or 3, or paste being aborted because the hotkey never fully released
+- When this comes up, check logs for `Clipboard copy attempt ... hotkey keys still physically down before Ctrl+C`, `... released before Ctrl+C`, `... still down after release wait`, `Paste hotkey-release wait ...`, and the current `script_version`
+- Treat mismatched `script_version` values as the first stale-reload check before assuming the runtime behavior is current
+- Keep an eye on other apps too, not just Notepad; any app that shows repeated copy timeouts, menu activation, dropped pastes, or app-specific clipboard weirdness may need the same kind of per-app handling
+- If this issue returns, likely next mitigations to consider are: send `{Esc}` before retries to clear menu state, increase Notepad retry spacing slightly, and/or use app-specific `SendEvent "^c"` / `SendEvent "^v"` handling for Notepad
+
 ## Legacy Components (Deprecated)
 
 - **Universal Spell Checker App/**: Abandoned C# .NET implementation
@@ -316,14 +322,14 @@ These exist for reference but are not actively developed. The focus is on `Unive
 
 A minimalist AutoHotkey script that provides instant AI-powered spell checking across all Windows applications. Select text, press Ctrl+Alt+U, and the corrected text replaces the selection in-place. Built for maximum speed and seamless operation with zero UI overhead.
 
-**Core Value:** Spell checking must feel instant and invisible — select, hotkey, done. Speed is the product.
+**Core Value:** Spell checking must feel instant and invisible - select, hotkey, done. Speed is the product.
 
 ### Constraints
 
-- **Platform**: Windows only — relies on AHK v2, WinHTTP COM, Windows clipboard API
+- **Platform**: Windows only - relies on AHK v2, WinHTTP COM, Windows clipboard API
 - **Runtime**: AutoHotkey v2.0 interpreter must be installed
 - **API**: OpenAI API key required with Responses API access
-- **Performance**: Every operation must be optimized for minimal latency — speed is the core value
+- **Performance**: Every operation must be optimized for minimal latency - speed is the core value
 - **Simplicity**: Self-contained .ahk files with minimal external dependencies
 - **No build step**: Scripts run directly, no compilation or bundling
 <!-- GSD:project-end -->
@@ -412,7 +418,7 @@ A minimalist AutoHotkey script that provides instant AI-powered spell checking a
 - No explicit imports (AutoHotkey v2 has built-in functions)
 - Library-style functions: all defined in single script for performance
 - No external .ahk includes (intentionally self-contained)
-- `replacements.json`: JSON key-value map (canonical → [variants])
+- `replacements.json`: JSON key-value map (canonical â†’ [variants])
 - No path aliases or special resolution mechanisms
 ## Error Handling
 - Try-catch wrapping fallible operations: `try { ... } catch Error as e { ... }`
@@ -557,11 +563,11 @@ A minimalist AutoHotkey script that provides instant AI-powered spell checking a
 ## Key Abstractions
 - Purpose: Single source of truth for model selection and parameter mapping
 - Location: `Universal Spell Checker.ahk` lines 18-48
-- Pattern: Switch statement mapping model name → parameter values
+- Pattern: Switch statement mapping model name â†’ parameter values
 - Ensures model type compatibility (e.g., reasoning models exclude temperature)
 - Purpose: Fast path (regex) + safe fallback (full JSON parsing)
-- Primary: `ExtractTextFromResponseRegex()` — no object allocation, ~10x faster
-- Fallback: `JsonLoad()` + object traversal — full compatibility, comprehensive debug logging
+- Primary: `ExtractTextFromResponseRegex()` - no object allocation, ~10x faster
+- Fallback: `JsonLoad()` + object traversal - full compatibility, comprehensive debug logging
 - Purpose: Prevent substring interference during replacements
 - Pattern: Load from JSON, sort longest-first, apply in order
 - Example: Replace "Build Purdue" before "Build" to avoid partial matches
