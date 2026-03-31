@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "9"
+scriptVersion := "10"
 
 ; Logging configuration
 enableLogging := true
@@ -501,8 +501,11 @@ CaptureSelectedText(activeExe, &text, events, &clipboardDetails := 0) {
                 events.Push("Clipboard copy attempt " . attempt . ": hotkey keys released before Ctrl+C")
             else {
                 events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still down after release wait")
-                events.Push("Clipboard copy attempt " . attempt . " aborted because hotkey keys never released")
-                continue
+                if (useRetries) {
+                    events.Push("Clipboard copy attempt " . attempt . " aborted because hotkey keys never released")
+                    continue
+                }
+                events.Push("Clipboard copy attempt " . attempt . ": continuing despite hotkey-release timeout for standard app")
             }
         }
 
@@ -1463,12 +1466,15 @@ FinalizeRun(logData) {
                     logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
                 else {
                     logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
-                    logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
-                    logData.error := "Paste hotkey release timeout"
-                    logData.pasteTime := A_TickCount
-                    ToolTip("Release Ctrl+Alt+U fully, then retry")
-                    SetTimer(() => ToolTip(), -3000)
-                    return
+                    if (StrLower(logData.activeExe) = "notepad.exe") {
+                        logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
+                        logData.error := "Paste hotkey release timeout"
+                        logData.pasteTime := A_TickCount
+                        ToolTip("Release Ctrl+Alt+U fully, then retry")
+                        SetTimer(() => ToolTip(), -3000)
+                        return
+                    }
+                    logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
                 }
                 logData.pasteAttempted := true
                 Send("^v")
