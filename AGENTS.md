@@ -91,7 +91,8 @@ The project uses a single active script with a top-level model selector.
 - **Post-processing replacements** (`replacements.json`)
   - Loaded once at startup and reparsed only when file metadata changes (modified time or size)
   - Failed reloads keep the last known-good cache instead of clearing replacements mid-run
-  - If a metadata change is detected but reload fails, the script retries a full reload after paste and logs both attempts
+  - If a metadata change or metadata read failure is detected, the script retries a full reload after paste and logs both attempts
+  - If `replacements.json` is missing, the cache is cleared and no deferred retry is scheduled
   - Sorted longest-variant-first to prevent shorter substrings interfering
   - **URL protection**: `http://` and `https://` URLs (matched via `https?://\S+`) are extracted into placeholders before replacements run, then restored after — scheme-less links like bare `www.` or `example.com` are not protected
   - Runs in microseconds; logged with count and list of applied replacements
@@ -129,7 +130,7 @@ The project uses a single active script with a top-level model selector.
 ```
 
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first; updates cached modified-time and file-size metadata
-- **`RefreshReplacementsIfChanged(&status, &details)`**: Checks `replacements.json` metadata against the cached modified-time and file-size values, reparses only when they differ, and keeps the last known-good cache if the reload fails
+- **`RefreshReplacementsIfChanged(&status, &details)`**: Checks `replacements.json` metadata against the cached modified-time and file-size values, reparses only when they differ, keeps the last known-good cache if a reload fails, and clears the cache without retry churn if the file is missing
 - **`RetryReplacementsReloadAfterPaste(events)`**: Retries a full replacements reload after paste when the earlier metadata-driven reload attempt failed, and logs the outcome
 - **`ApplyReplacements(text, &applied, &urlCount)`**: Extracts `http(s)://` URLs into `__URL_N__` placeholders first (scheme-less links not covered), then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; reports URL count and replacement list for logging
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`

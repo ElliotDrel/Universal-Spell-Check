@@ -149,34 +149,48 @@ LoadReplacements(&errorMessage := "") {
     return true
 }
 
-GetReplacementsMetadata(&lastModified, &fileSize) {
+GetReplacementsMetadata(&lastModified, &fileSize, &status := "") {
     global replacementsPath
 
     lastModified := ""
     fileSize := -1
+    status := "ok"
 
-    if (!FileExist(replacementsPath))
+    if (!FileExist(replacementsPath)) {
+        status := "missing"
         return false
+    }
 
     try {
         lastModified := FileGetTime(replacementsPath, "M")
         fileSize := FileGetSize(replacementsPath)
         return true
     } catch {
+        status := "error"
         return false
     }
 }
 
 RefreshReplacementsIfChanged(&status, &details) {
-    global replacementsLastModified, replacementsFileSize
+    global postReplacements, replacementsLastModified, replacementsFileSize
 
     status := "cached"
     details := ""
     currentModified := ""
     currentSize := -1
     cachedMetadata := FormatReplacementsMetadata(replacementsLastModified, replacementsFileSize)
+    metadataStatus := ""
 
-    if !GetReplacementsMetadata(&currentModified, &currentSize) {
+    if !GetReplacementsMetadata(&currentModified, &currentSize, &metadataStatus) {
+        if (metadataStatus = "missing") {
+            postReplacements := []
+            replacementsLastModified := ""
+            replacementsFileSize := -1
+            status := "missing"
+            details := "cached " . cachedMetadata . ", replacements file not found; cache cleared"
+            return false
+        }
+
         status := "metadata_error"
         details := "cached " . cachedMetadata . ", disk metadata unavailable"
         return true
@@ -998,6 +1012,8 @@ FinalizeRun(logData) {
         else if (replacementsStatus = "reload_failed") {
             logData.events.Push("Replacements metadata changed; immediate reload failed; keeping last known-good cache (" . replacementsDetails . ")")
             logData.events.Push("Deferred replacements reload scheduled after paste")
+        } else if (replacementsStatus = "missing") {
+            logData.events.Push("Replacements file missing; cleared replacements cache (" . replacementsDetails . ")")
         } else if (replacementsStatus = "metadata_error") {
             logData.events.Push("Replacements metadata check failed; keeping last known-good cache (" . replacementsDetails . ")")
             logData.events.Push("Deferred replacements reload scheduled after paste")
