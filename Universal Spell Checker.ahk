@@ -350,6 +350,18 @@ GetClipboardText() {
     return result != "" ? result : text
 }
 
+; Wait briefly for the Ctrl+Alt+U chord to be physically released.
+; This avoids Notepad interpreting our follow-up Ctrl+C / Ctrl+V while Alt is still active.
+WaitForHotkeyRelease(maxWaitMs := 250) {
+    deadline := A_TickCount + maxWaitMs
+    while (A_TickCount <= deadline) {
+        if !GetKeyState("Ctrl", "P") && !GetKeyState("Alt", "P") && !GetKeyState("u", "P")
+            return true
+        Sleep(10)
+    }
+    return false
+}
+
 ; Copy selected text into the clipboard.
 ; Default path preserves the original single-attempt behavior for speed.
 ; Notepad gets a couple of quick retries because copy capture is flaky there.
@@ -380,8 +392,13 @@ CaptureSelectedText(activeExe, &text, events) {
             keysStillDown++
         if GetKeyState("u", "P")
             keysStillDown++
-        if (keysStillDown)
+        if (keysStillDown) {
             events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still physically down before Ctrl+C")
+            if WaitForHotkeyRelease(useRetries ? 350 : 120)
+                events.Push("Clipboard copy attempt " . attempt . ": hotkey keys released before Ctrl+C")
+            else
+                events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still down after release wait")
+        }
 
         Send("^c")
         if ClipWait(waitSeconds) {
@@ -1233,6 +1250,10 @@ FinalizeRun(logData) {
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
+                if WaitForHotkeyRelease(120)
+                    logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
+                else
+                    logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
                 logData.pasteAttempted := true
                 Send("^v")
                 logData.events.Push("Text pasted via clipboard - COMPLETE")
