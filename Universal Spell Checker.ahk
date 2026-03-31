@@ -1,10 +1,11 @@
 #Requires AutoHotkey v2.0
 
 ; Manual script build version. Use a simple integer string like "5", "6", "7".
-; Bump it before every commit in this repo, even if the commit is mostly docs or
-; test-related. Every log entry records this value as `script_version`, so stale
-; reloads and "forgot to reload" test runs are easy to spot immediately.
-scriptVersion := "6"
+; Bump it before commits that include this script and before asking anyone to
+; reload or manually retest it. Every log entry records this value as
+; `script_version`, so stale reloads and "forgot to reload" test runs are easy
+; to spot immediately.
+scriptVersion := "7"
 
 ; Logging configuration
 enableLogging := true
@@ -402,8 +403,11 @@ CaptureSelectedText(activeExe, &text, events) {
             events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still physically down before Ctrl+C")
             if WaitForHotkeyRelease(useRetries ? 350 : 120)
                 events.Push("Clipboard copy attempt " . attempt . ": hotkey keys released before Ctrl+C")
-            else
+            else {
                 events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still down after release wait")
+                events.Push("Clipboard copy attempt " . attempt . " aborted because hotkey keys never released")
+                continue
+            }
         }
 
         Send("^c")
@@ -1261,8 +1265,15 @@ FinalizeRun(logData) {
                 A_Clipboard := correctedText
                 if WaitForHotkeyRelease(120)
                     logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
-                else
+                else {
                     logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
+                    logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
+                    logData.error := "Paste hotkey release timeout"
+                    logData.pasteTime := A_TickCount
+                    ToolTip("Release Ctrl+Alt+U fully, then retry")
+                    SetTimer(() => ToolTip(), -3000)
+                    return
+                }
                 logData.pasteAttempted := true
                 Send("^v")
                 logData.events.Push("Text pasted via clipboard - COMPLETE")

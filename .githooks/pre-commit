@@ -1,7 +1,7 @@
 #!/bin/sh
 # Pre-commit hook to:
 # 1. keep CLAUDE.md and AGENTS.md in sync
-# 2. require scriptVersion to be bumped before every commit
+# 2. require scriptVersion to be bumped only when Universal Spell Checker.ahk is committed
 
 CLAUDE_FILE="CLAUDE.md"
 AGENTS_FILE="AGENTS.md"
@@ -21,6 +21,17 @@ extract_script_version_from_stream() {
     sed -n 's/^[[:space:]]*scriptVersion[[:space:]]*:=[[:space:]]*"\([^"]*\)".*$/\1/p' | head -n 1
 }
 
+is_integer_string() {
+    case "$1" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 require_script_version_bump() {
     if git rev-parse --verify HEAD >/dev/null 2>&1; then
         head_version=$(git show "HEAD:$SCRIPT_FILE" 2>/dev/null | extract_script_version_from_stream)
@@ -36,6 +47,18 @@ require_script_version_bump() {
         exit 1
     fi
 
+    if ! is_integer_string "$staged_version"; then
+        echo "ERROR: Staged scriptVersion must be a numeric string."
+        echo "Found: $staged_version"
+        exit 1
+    fi
+
+    if [ -n "$head_version" ] && ! is_integer_string "$head_version"; then
+        echo "ERROR: HEAD scriptVersion is not numeric: $head_version"
+        echo "Fix $SCRIPT_FILE before committing."
+        exit 1
+    fi
+
     if [ "$staged_version" = "$head_version" ]; then
         echo "ERROR: scriptVersion in staged $SCRIPT_FILE was not bumped."
         echo "Current staged scriptVersion: $staged_version"
@@ -45,19 +68,22 @@ require_script_version_bump() {
         echo "Bump scriptVersion before every commit, then stage $SCRIPT_FILE again."
         exit 1
     fi
+
+    if [ -n "$head_version" ] && [ "$staged_version" -le "$head_version" ]; then
+        echo "ERROR: scriptVersion must increase on every commit."
+        echo "Staged scriptVersion: $staged_version"
+        echo "HEAD scriptVersion: $head_version"
+        exit 1
+    fi
 }
 
 CLAUDE_STAGED=$(git diff --cached --name-only | grep -c "^$CLAUDE_FILE$" || true)
 AGENTS_STAGED=$(git diff --cached --name-only | grep -c "^$AGENTS_FILE$" || true)
 SCRIPT_STAGED=$(git diff --cached --name-only | grep -c "^$SCRIPT_FILE$" || true)
 
-if [ "$SCRIPT_STAGED" -eq 0 ]; then
-    echo "ERROR: $SCRIPT_FILE must be staged on every commit so scriptVersion can be bumped."
-    echo "Bump scriptVersion, stage $SCRIPT_FILE, and try committing again."
-    exit 1
+if [ "$SCRIPT_STAGED" -eq 1 ]; then
+    require_script_version_bump
 fi
-
-require_script_version_bump
 
 if [ "$CLAUDE_STAGED" -eq 0 ] && [ "$AGENTS_STAGED" -eq 0 ]; then
     exit 0

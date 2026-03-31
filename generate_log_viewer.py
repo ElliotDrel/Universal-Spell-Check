@@ -639,6 +639,7 @@ function renderDetail(e, idx) {
     ${rawResp ? `<div class="detail-section"><h4>Raw API Response</h4><pre>${esc(rawResp)}</pre></div>` : ''}
     <div class="detail-section">
       <div class="kv">
+        <span class="k">Script version</span><span class="v">${esc(e.script_version || '')}</span>
         <span class="k">Model version</span><span class="v">${esc(e.model_version || '')}</span>
         <span class="k">Active app</span><span class="v">${esc(e.active_app || '')}</span>
         <span class="k">Active exe</span><span class="v">${esc(e.active_exe || '')}</span>
