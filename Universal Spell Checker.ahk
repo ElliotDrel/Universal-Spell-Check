@@ -83,17 +83,22 @@ UseSendText() {
 ; JSON format: { "canonical": ["variant1", "variant2", ...], ... }
 ; Builds a flat list of [variant, canonical] sorted longest-first so longer
 ; phrases are replaced before any shorter substring could interfere.
-LoadReplacements() {
-    global replacementsPath, postReplacements, replacementsLastModified, replacementsFileSize
-    postReplacements := []
-    replacementsLastModified := ""
-    replacementsFileSize := -1
+FormatReplacementsMetadata(lastModified, fileSize) {
+    return "mtime=" . (lastModified != "" ? lastModified : "<none>") . ", size=" . fileSize
+}
+
+TryBuildReplacementsCache(&pairs, &lastModified, &fileSize, &errorMessage) {
+    global replacementsPath
+
+    pairs := []
+    lastModified := ""
+    fileSize := -1
+    errorMessage := ""
 
     if (!FileExist(replacementsPath))
         return false
 
     try {
-        pairs := []
         rawJson := FileRead(replacementsPath, "UTF-8")
         if (SubStr(rawJson, 1, 1) = Chr(0xFEFF))
             rawJson := SubStr(rawJson, 2)
@@ -119,15 +124,29 @@ LoadReplacements() {
                 i--
             }
         }
-        postReplacements := pairs
-        replacementsLastModified := FileGetTime(replacementsPath, "M")
-        replacementsFileSize := FileGetSize(replacementsPath)
+        lastModified := FileGetTime(replacementsPath, "M")
+        fileSize := FileGetSize(replacementsPath)
         return true
 
-    } catch {
-        ; Silently fail - replacements are optional
+    } catch Error as e {
+        errorMessage := e.Message
         return false
     }
+}
+
+LoadReplacements(&errorMessage := "") {
+    global postReplacements, replacementsLastModified, replacementsFileSize
+
+    pairs := []
+    lastModified := ""
+    fileSize := -1
+    if !TryBuildReplacementsCache(&pairs, &lastModified, &fileSize, &errorMessage)
+        return false
+
+    postReplacements := pairs
+    replacementsLastModified := lastModified
+    replacementsFileSize := fileSize
+    return true
 }
 
 GetReplacementsMetadata(&lastModified, &fileSize) {
@@ -148,23 +167,48 @@ GetReplacementsMetadata(&lastModified, &fileSize) {
     }
 }
 
-RefreshReplacementsIfChanged(&status) {
-    global postReplacements, replacementsLastModified, replacementsFileSize
+RefreshReplacementsIfChanged(&status, &details) {
+    global replacementsLastModified, replacementsFileSize
 
     status := "cached"
+    details := ""
     currentModified := ""
     currentSize := -1
+    cachedMetadata := FormatReplacementsMetadata(replacementsLastModified, replacementsFileSize)
 
     if !GetReplacementsMetadata(&currentModified, &currentSize) {
-        postReplacements := []
-        replacementsLastModified := ""
-        replacementsFileSize := -1
-        status := "missing"
-        return
+        status := "metadata_error"
+        details := "cached " . cachedMetadata . ", disk metadata unavailable"
+        return true
     }
 
+    currentMetadata := FormatReplacementsMetadata(currentModified, currentSize)
     if (currentModified != replacementsLastModified || currentSize != replacementsFileSize) {
-        status := LoadReplacements() ? "reloaded" : "error"
+        loadError := ""
+        if LoadReplacements(&loadError) {
+            status := "reloaded"
+            details := "cached " . cachedMetadata . " -> disk " . currentMetadata
+            return false
+        }
+
+        status := "reload_failed"
+        details := "cached " . cachedMetadata . " -> disk " . currentMetadata . (loadError != "" ? " (" . loadError . ")" : "")
+        return true
+    }
+
+    details := currentMetadata
+    return false
+}
+
+RetryReplacementsReloadAfterPaste(events) {
+    global replacementsLastModified, replacementsFileSize
+
+    events.Push("Deferred replacements reload started")
+    loadError := ""
+    if LoadReplacements(&loadError) {
+        events.Push("Deferred replacements reload succeeded; cache refreshed to " . FormatReplacementsMetadata(replacementsLastModified, replacementsFileSize))
+    } else {
+        events.Push("Deferred replacements reload failed; still using last known-good cache" . (loadError != "" ? " (" . loadError . ")" : ""))
     }
 }
 
@@ -947,13 +991,18 @@ FinalizeRun(logData) {
 
     try {
         replacementsStatus := ""
-        RefreshReplacementsIfChanged(&replacementsStatus)
+        replacementsDetails := ""
+        deferredReplacementsReload := RefreshReplacementsIfChanged(&replacementsStatus, &replacementsDetails)
         if (replacementsStatus = "reloaded")
-            logData.events.Push("Replacements reloaded from disk after metadata change")
-        else if (replacementsStatus = "missing")
-            logData.events.Push("Replacements file missing or unreadable; cache cleared")
-        else if (replacementsStatus = "error")
-            logData.events.Push("Replacements reload failed; cache cleared")
+            logData.events.Push("Replacements metadata changed; immediate reload succeeded (" . replacementsDetails . ")")
+        else if (replacementsStatus = "reload_failed") {
+            logData.events.Push("Replacements metadata changed; immediate reload failed; keeping last known-good cache (" . replacementsDetails . ")")
+            logData.events.Push("Deferred replacements reload scheduled after paste")
+        } else if (replacementsStatus = "metadata_error") {
+            logData.events.Push("Replacements metadata check failed; keeping last known-good cache (" . replacementsDetails . ")")
+            logData.events.Push("Deferred replacements reload scheduled after paste")
+        } else
+            logData.events.Push("Replacements metadata unchanged; using cached replacements (" . replacementsDetails . ")")
 
         originalText := ""
         if !CaptureSelectedText(logData.activeExe, &originalText, logData.events) {
@@ -1178,6 +1227,9 @@ FinalizeRun(logData) {
             logData.timings.textPasted := A_TickCount
             logData.result := correctedText
             logData.pastedText := correctedText
+
+            if (deferredReplacementsReload)
+                RetryReplacementsReloadAfterPaste(logData.events)
         } else {
             logData.error := "Responses API returned no text"
             logData.pasteTime := A_TickCount

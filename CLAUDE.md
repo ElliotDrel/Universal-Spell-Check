@@ -90,6 +90,8 @@ The project uses a single active script with a top-level model selector.
   - Uses `Integer()`/`Float()` for AHK v2 compatibility
 - **Post-processing replacements** (`replacements.json`)
   - Loaded once at startup and reparsed only when file metadata changes (modified time or size)
+  - Failed reloads keep the last known-good cache instead of clearing replacements mid-run
+  - If a metadata change is detected but reload fails, the script retries a full reload after paste and logs both attempts
   - Sorted longest-variant-first to prevent shorter substrings interfering
   - **URL protection**: `http://` and `https://` URLs (matched via `https?://\S+`) are extracted into placeholders before replacements run, then restored after — scheme-less links like bare `www.` or `example.com` are not protected
   - Runs in microseconds; logged with count and list of applied replacements
@@ -127,7 +129,8 @@ The project uses a single active script with a top-level model selector.
 ```
 
 - **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first; updates cached modified-time and file-size metadata
-- **`RefreshReplacementsIfChanged(&status)`**: Checks `replacements.json` metadata against the cached modified-time and file-size values, and only reparses when they differ
+- **`RefreshReplacementsIfChanged(&status, &details)`**: Checks `replacements.json` metadata against the cached modified-time and file-size values, reparses only when they differ, and keeps the last known-good cache if the reload fails
+- **`RetryReplacementsReloadAfterPaste(events)`**: Retries a full replacements reload after paste when the earlier metadata-driven reload attempt failed, and logs the outcome
 - **`ApplyReplacements(text, &applied, &urlCount)`**: Extracts `http(s)://` URLs into `__URL_N__` placeholders first (scheme-less links not covered), then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; reports URL count and replacement list for logging
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
 - **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in the weekly `spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl` files
