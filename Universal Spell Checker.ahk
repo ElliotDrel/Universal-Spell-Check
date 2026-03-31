@@ -1,5 +1,11 @@
 #Requires AutoHotkey v2.0
 
+; Manual script build version. Use a simple integer string like "5", "6", "7".
+; Bump it only when this script's runtime behavior changes and do it before asking
+; anyone to reload or run tests. Every log entry records this value as
+; `script_version`, so stale reloads are easy to spot immediately.
+scriptVersion := "5"
+
 ; Logging configuration
 enableLogging := true
 logDir := A_ScriptDir . "\logs"
@@ -635,6 +641,7 @@ LogDetailed(data) {
 
         ; New fields with safe defaults
         model := data.HasOwnProp("model") ? data.model : ""
+        scriptVer := data.HasOwnProp("scriptVersion") ? data.scriptVersion : ""
         activeApp := data.HasOwnProp("activeApp") ? data.activeApp : ""
         activeExe := data.HasOwnProp("activeExe") ? data.activeExe : ""
         pasteMethod := data.HasOwnProp("pasteMethod") ? data.pasteMethod : ""
@@ -653,6 +660,7 @@ LogDetailed(data) {
         j .= ',"error":"' . JsonEscape(data.error) . '"'
         j .= ',"duration_ms":' . duration
         j .= ',"model":"' . JsonEscape(model) . '"'
+        j .= ',"script_version":"' . JsonEscape(scriptVer) . '"'
         j .= ',"model_version":"' . JsonEscape(modelVer) . '"'
         j .= ',"active_app":"' . JsonEscape(activeApp) . '"'
         j .= ',"active_exe":"' . JsonEscape(activeExe) . '"'
@@ -1002,6 +1010,7 @@ FinalizeRun(logData) {
             textPasted: 0
         },
         model: apiModel,
+        scriptVersion: scriptVersion,
         activeApp: "",
         activeExe: "",
         pasteMethod: "",

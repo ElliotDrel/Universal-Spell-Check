@@ -139,7 +139,7 @@ The project uses a single active script with a top-level model selector.
 ### Logging System (JSONL)
 - **Format**: JSON Lines — one JSON object per line in weekly files like `logs/spellcheck-2026-03-23-to-2026-03-29.jsonl`
 - **Rotation**: New entries write to the current week's file (Monday-based week start). If appending the next line would push that file past 5 MiB, the script spills into `-2`, `-3`, etc. files for that same week instead of renaming old logs
-- **Fields per entry**: timestamp, status, error, duration_ms, model, model_version, active_app, active_exe, paste_method, text_changed, input_text, input_chars, output_text, output_chars, raw_ai_output, tokens (input/output/total/cached/reasoning), timings (clipboard/payload/request/api/parse/replacements/prompt_guard/paste in ms), replacements (count/applied/urls_protected), prompt_leak (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), events array, raw_response
+- **Fields per entry**: timestamp, status, error, duration_ms, model, script_version, model_version, active_app, active_exe, paste_method, text_changed, input_text, input_chars, output_text, output_chars, raw_ai_output, tokens (input/output/total/cached/reasoning), timings (clipboard/payload/request/api/parse/replacements/prompt_guard/paste in ms), replacements (count/applied/urls_protected), prompt_leak (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), events array, raw_response
 - **Viewer**: Run `python generate_log_viewer.py` to generate `logs/viewer.html` (add `--open` to auto-launch in browser). The HTML has summary stats, sortable/filterable table, expandable row details, timing breakdown bars, and search
 
 ## Critical Debugging Principles (MUST FOLLOW)
@@ -271,6 +271,10 @@ When debugging unclear issues, prepare multiple approaches:
 
 ### File Structure Awareness
 - Active script: `Universal Spell Checker.ahk` (primary, with `modelModule` selector)
+- `scriptVersion` is a manual integer-like string near the top of `Universal Spell Checker.ahk` and is logged as `script_version` on every run
+- Bump `scriptVersion` only when runtime behavior changes in the active script; do it before asking for a reload or manual retest
+- Do not bump `scriptVersion` for documentation-only edits or unrelated file changes
+- When comparing logs during testing, treat mismatched `script_version` values as proof the user is still running an older loaded script
 - `replacements.json` lives alongside the script; edit it freely - script reloads it on every run
 - When modifying core logic, ensure all model branches inside the single script remain consistent
 - `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` is a minimal legacy variant - do not use it as a template for new features
