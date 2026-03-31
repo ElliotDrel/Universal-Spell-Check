@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "10"
+scriptVersion := "11"
 
 ; Logging configuration
 enableLogging := true
@@ -77,13 +77,19 @@ sendTextApps := [
     ; "AnotherApp.exe"
 ]
 
-UseSendText() {
+UseSendTextForExe(activeExe) {
     global sendTextApps
     for exe in sendTextApps {
-        if WinActive("ahk_exe " exe)
+        if (StrLower(exe) = StrLower(activeExe))
             return true
     }
     return false
+}
+
+IsExpectedWindowActive(expectedHwnd) {
+    if !expectedHwnd
+        return true
+    return WinActive("ahk_id " . expectedHwnd) ? true : false
 }
 
 MakeLogPreview(text, maxLen := 160) {
@@ -512,9 +518,13 @@ CaptureSelectedText(activeExe, &text, events, &clipboardDetails := 0) {
         Send("^c")
         if ClipWait(waitSeconds) {
             text := GetClipboardText(&clipboardDetails)
-            events.Push("Clipboard copy succeeded on attempt " . attempt . " (" . BuildClipboardDebugSummary(clipboardDetails) . ")")
-            if (text = "")
+            if (text = "") {
+                events.Push("Clipboard copy attempt " . attempt . " reached clipboard but extracted empty text (" . BuildClipboardDebugSummary(clipboardDetails) . ")")
                 events.Push("Clipboard copy attempt " . attempt . " produced empty text after extraction")
+                continue
+            }
+
+            events.Push("Clipboard copy succeeded on attempt " . attempt . " (" . BuildClipboardDebugSummary(clipboardDetails) . ")")
             return true
         }
 
@@ -1081,28 +1091,34 @@ GetUtf8Response(http) {
 }
 
 ; ALTERNATIVE PARSER 1: Regex-based (FASTEST - no object parsing overhead)
+JsonUnescapeResponseText(text) {
+    ; Decode surrogate pairs first so emoji and other non-BMP characters survive.
+    while RegExMatch(text, "\\u([dD][89ABab][0-9A-Fa-f]{2})\\u([dD][c-fC-F][0-9A-Fa-f]{2})", &pairMatch) {
+        high := Integer("0x" . pairMatch[1])
+        low := Integer("0x" . pairMatch[2])
+        codepoint := 0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00)
+        text := StrReplace(text, pairMatch[0], Chr(codepoint), , , 1)
+    }
+
+    while RegExMatch(text, "\\u([0-9A-Fa-f]{4})", &unicodeMatch) {
+        codepoint := Integer("0x" . unicodeMatch[1])
+        text := StrReplace(text, unicodeMatch[0], Chr(codepoint), , , 1)
+    }
+
+    text := StrReplace(text, '\"', '"')
+    text := StrReplace(text, "\n", "`n")
+    text := StrReplace(text, "\r", "`r")
+    text := StrReplace(text, "\t", "`t")
+    text := StrReplace(text, "\/", "/")
+    text := StrReplace(text, "\\", "\")
+    return text
+}
+
 ; Extracts text directly from JSON response using regex
 ExtractTextFromResponseRegex(jsonResponse) {
     ; Match any output_text block anywhere in the output array
     if RegExMatch(jsonResponse, 's)"type"\s*:\s*"output_text"[^}]*"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &match) {
-        ; Unescape JSON string (in correct order to avoid double-unescaping)
-        text := match[1]
-
-        ; Handle Unicode escapes FIRST (before unescaping backslashes)
-        while RegExMatch(text, "\\u([0-9A-Fa-f]{4})", &unicodeMatch) {
-            codepoint := Integer("0x" . unicodeMatch[1])
-            text := StrReplace(text, unicodeMatch[0], Chr(codepoint), , , 1)
-        }
-
-        ; Then handle standard JSON escapes
-        text := StrReplace(text, '\"', '"')
-        text := StrReplace(text, "\n", "`n")
-        text := StrReplace(text, "\r", "`r")
-        text := StrReplace(text, "\t", "`t")
-        text := StrReplace(text, "\/", "/")
-        text := StrReplace(text, "\\", "\")  ; Do backslash LAST
-
-        return text
+        return JsonUnescapeResponseText(match[1])
     }
     return ""
 }
@@ -1444,7 +1460,21 @@ FinalizeRun(logData) {
             logData.events.Push("Output preview: " . logData.outputPreview)
             logData.diagnostics.outputDebugMs := A_TickCount - outputDebugStart
 
-            if (UseSendText()) {
+            if !IsExpectedWindowActive(logData.windowHwnd) {
+                currentWindow := GetActiveWindowDebugInfo()
+                logData.error := "Target window changed before paste"
+                logData.pasteTime := A_TickCount
+                logData.events.Push("Paste aborted because focus changed before insertion: expected hwnd="
+                    . logData.windowHwnd . ", exe=" . logData.activeExe
+                    . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
+                    . ", title=" . MakeLogPreview(currentWindow.title, 120))
+                ToolTip("Focus changed before paste. Original target was left untouched.")
+                SetTimer(() => ToolTip(), -3000)
+                return
+            }
+            logData.events.Push("Paste target confirmed before insertion (hwnd=" . logData.windowHwnd . ", exe=" . logData.activeExe . ")")
+
+            if (UseSendTextForExe(logData.activeExe)) {
                 logData.pasteMethod := "sendtext"
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
@@ -1452,12 +1482,14 @@ FinalizeRun(logData) {
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
                 A_Clipboard := correctedText
+                SetClipboardHistoryPolicy(false, false)
                 logData.events.Push("Text typed via SendText - COMPLETE")
             } else {
                 logData.pasteMethod := "clipboard"
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
+                SetClipboardHistoryPolicy(false, false)
                 pasteDebugStart := A_TickCount
                 logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
                 logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
