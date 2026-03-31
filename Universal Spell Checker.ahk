@@ -9,6 +9,8 @@ maxLogSize := 5 * 1024 * 1024  ; 5 MiB max per weekly log file before suffix rol
 ; Post-processing replacements
 replacementsPath := A_ScriptDir . "\replacements.json"
 postReplacements := []    ; Array of [variant, canonical] pairs, sorted longest-first
+replacementsLastModified := ""
+replacementsFileSize := -1
 
 ; API configuration
 ; Select the model module here (single source of truth):
@@ -82,11 +84,13 @@ UseSendText() {
 ; Builds a flat list of [variant, canonical] sorted longest-first so longer
 ; phrases are replaced before any shorter substring could interfere.
 LoadReplacements() {
-    global replacementsPath, postReplacements
+    global replacementsPath, postReplacements, replacementsLastModified, replacementsFileSize
     postReplacements := []
+    replacementsLastModified := ""
+    replacementsFileSize := -1
 
     if (!FileExist(replacementsPath))
-        return
+        return false
 
     try {
         pairs := []
@@ -116,12 +120,56 @@ LoadReplacements() {
             }
         }
         postReplacements := pairs
-
+        replacementsLastModified := FileGetTime(replacementsPath, "M")
+        replacementsFileSize := FileGetSize(replacementsPath)
+        return true
 
     } catch {
         ; Silently fail - replacements are optional
+        return false
     }
 }
+
+GetReplacementsMetadata(&lastModified, &fileSize) {
+    global replacementsPath
+
+    lastModified := ""
+    fileSize := -1
+
+    if (!FileExist(replacementsPath))
+        return false
+
+    try {
+        lastModified := FileGetTime(replacementsPath, "M")
+        fileSize := FileGetSize(replacementsPath)
+        return true
+    } catch {
+        return false
+    }
+}
+
+RefreshReplacementsIfChanged(&status) {
+    global postReplacements, replacementsLastModified, replacementsFileSize
+
+    status := "cached"
+    currentModified := ""
+    currentSize := -1
+
+    if !GetReplacementsMetadata(&currentModified, &currentSize) {
+        postReplacements := []
+        replacementsLastModified := ""
+        replacementsFileSize := -1
+        status := "missing"
+        return
+    }
+
+    if (currentModified != replacementsLastModified || currentSize != replacementsFileSize) {
+        status := LoadReplacements() ? "reloaded" : "error"
+    }
+}
+
+; Prime the replacements cache on startup. Later runs only reparse when metadata changes.
+LoadReplacements()
 
 ; Apply post-processing replacements to AI output. Runs in microseconds.
 ; &applied receives a list of "variant->canonical" strings for every replacement that fired.
@@ -898,7 +946,15 @@ FinalizeRun(logData) {
         logData.activeExe := "unknown"
 
     try {
-        LoadReplacements()                 ; reload replacements.json on every run
+        replacementsStatus := ""
+        RefreshReplacementsIfChanged(&replacementsStatus)
+        if (replacementsStatus = "reloaded")
+            logData.events.Push("Replacements reloaded from disk after metadata change")
+        else if (replacementsStatus = "missing")
+            logData.events.Push("Replacements file missing or unreadable; cache cleared")
+        else if (replacementsStatus = "error")
+            logData.events.Push("Replacements reload failed; cache cleared")
+
         originalText := ""
         if !CaptureSelectedText(logData.activeExe, &originalText, logData.events) {
             logData.error := "Clipboard wait timeout"

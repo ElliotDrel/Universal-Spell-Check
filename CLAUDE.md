@@ -41,7 +41,7 @@ The project uses a single active script with a top-level model selector.
 
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
-2. `LoadReplacements()` reloads `replacements.json` (catches live edits)
+2. Replacements are loaded once at startup, then `replacements.json` is reparsed only when its modified timestamp or file size changes
 3. Script uses the original fast single-copy path for normal apps, but gives Notepad a short settle delay and up to 3 quick `Ctrl+C` attempts
 4. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
 5. Sends text directly to OpenAI API
@@ -89,7 +89,7 @@ The project uses a single active script with a top-level model selector.
   - Only used if regex extraction fails
   - Uses `Integer()`/`Float()` for AHK v2 compatibility
 - **Post-processing replacements** (`replacements.json`)
-  - Reloaded fresh on every invocation so edits take effect without restart
+  - Loaded once at startup and reparsed only when file metadata changes (modified time or size)
   - Sorted longest-variant-first to prevent shorter substrings interfering
   - **URL protection**: `http://` and `https://` URLs (matched via `https?://\S+`) are extracted into placeholders before replacements run, then restored after — scheme-less links like bare `www.` or `example.com` are not protected
   - Runs in microseconds; logged with count and list of applied replacements
@@ -126,7 +126,8 @@ The project uses a single active script with a top-level model selector.
 }
 ```
 
-- **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first
+- **`LoadReplacements()`**: Parses the JSON, strips UTF-8 BOM if present, flattens to `[variant, canonical]` pairs, and uses case-sensitive `StrCompare(..., true)` to keep case-only variants (for example `night shift` vs `Night Shift`) before sorting longest-first; updates cached modified-time and file-size metadata
+- **`RefreshReplacementsIfChanged(&status)`**: Checks `replacements.json` metadata against the cached modified-time and file-size values, and only reparses when they differ
 - **`ApplyReplacements(text, &applied, &urlCount)`**: Extracts `http(s)://` URLs into `__URL_N__` placeholders first (scheme-less links not covered), then runs case-sensitive `InStr(..., true)` + `StrReplace(..., true, &count)` for exact variant matching, then restores URLs; reports URL count and replacement list for logging
 - **`StripPromptLeak(text, promptText, &details)`**: Simple guard for rare instruction-echo outputs; removes `"instructions: " . promptText` when present, then strips a leading `text input:`
 - **Timing**: Captured in `timings.replacementsApplied` and `timings.promptGuardApplied`; logged as delta-ms values in the weekly `spellcheck-YYYY-MM-DD-to-YYYY-MM-DD.jsonl` files
@@ -570,7 +571,7 @@ A minimalist AutoHotkey script that provides instant AI-powered spell checking a
 - Sorted replacement pairs: Longest-first prevents substring interference
 - Clipboard format preference: HTML reduces formatting noise
 - URL protection: Extract/restore around replacements rather than conditional logic during replacements
-- Per-run `replacements.json` reload: Allows live edits without script restart
+- Metadata-checked `replacements.json` cache: Allows live edits without per-run reparsing
 - API key hardcoded (intentional design choice for fast startup, offline-first)
 - Clipboard history exclusion: Mark source text as transient
 - Prompt leak detection: Safeguard against instruction echo in output
