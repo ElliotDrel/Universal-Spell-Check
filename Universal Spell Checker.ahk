@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "14"
+scriptVersion := "15"
 
 ; Logging configuration
 enableLogging := true
@@ -86,12 +86,6 @@ UseSendTextForExe(activeExe) {
     return false
 }
 
-IsExpectedWindowActive(expectedHwnd) {
-    if !expectedHwnd
-        return true
-    return WinActive("ahk_id " . expectedHwnd) ? true : false
-}
-
 ShowTemporaryToolTip(message, durationMs := 3000) {
     ToolTip(message)
     SetTimer(() => ToolTip(), -durationMs)
@@ -110,19 +104,6 @@ AbortRun(logData, errorMessage, eventMessage := "", tooltipMessage := "", toolti
     if (tooltipMessage != "")
         ShowTemporaryToolTip(tooltipMessage, tooltipDurationMs)
     return true
-}
-
-AbortDueToFocusChange(logData, stageLabel) {
-    currentWindow := GetActiveWindowDebugInfo()
-    return AbortRun(
-        logData,
-        "Target window changed " . stageLabel,
-        "Paste aborted because focus changed " . stageLabel . ": expected hwnd="
-            . logData.windowHwnd . ", exe=" . logData.activeExe
-            . "; current hwnd=" . currentWindow.hwnd . ", exe=" . currentWindow.exe
-            . ", title=" . MakeLogPreview(currentWindow.title, 120),
-        "Focus changed before paste. Original target was left untouched."
-    )
 }
 
 MakeLogPreview(text, maxLen := 160) {
@@ -1492,20 +1473,10 @@ FinalizeRun(logData) {
             logData.events.Push("Output preview: " . logData.outputPreview)
             logData.diagnostics.outputDebugMs := A_TickCount - outputDebugStart
 
-            if !IsExpectedWindowActive(logData.windowHwnd) {
-                AbortDueToFocusChange(logData, "before insertion")
-                return
-            }
-            logData.events.Push("Paste target confirmed before insertion (hwnd=" . logData.windowHwnd . ", exe=" . logData.activeExe . ")")
-
             if (UseSendTextForExe(logData.activeExe)) {
                 logData.pasteMethod := "sendtext"
                 ; Type the corrected text directly (replaces current selection)
                 logData.events.Push("INSERTION METHOD: SendText (direct typing)")
-                if !IsExpectedWindowActive(logData.windowHwnd) {
-                    AbortDueToFocusChange(logData, "immediately before SendText")
-                    return
-                }
                 logData.pasteAttempted := true
                 SendText(correctedText)
                 ; Optionally mirror to clipboard for user convenience
@@ -1527,10 +1498,6 @@ FinalizeRun(logData) {
                         return
                     }
                     logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
-                }
-                if !IsExpectedWindowActive(logData.windowHwnd) {
-                    AbortDueToFocusChange(logData, "immediately before Ctrl+V")
-                    return
                 }
                 SetTransientClipboardText(correctedText)
                 logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
