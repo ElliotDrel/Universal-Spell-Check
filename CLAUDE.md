@@ -42,7 +42,7 @@ The project uses a single active script with a top-level model selector.
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
 2. `LoadReplacements()` reloads `replacements.json` (catches live edits)
-3. Script clears clipboard and copies selection (Ctrl+C)
+3. Script uses the original fast single-copy path for normal apps, but gives Notepad a short settle delay and up to 3 quick `Ctrl+C` attempts
 4. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
 5. Sends text directly to OpenAI API
 6. Parses response (regex primary -> Map-based fallback)
@@ -102,6 +102,10 @@ The project uses a single active script with a top-level model selector.
 - **Enhanced clipboard reading** (`GetClipboardText()`)
   - Prefers HTML clipboard format (strips empty paragraphs / formatting noise)
   - Falls back to Unicode (CF_UNICODETEXT), then ANSI (CF_TEXT)
+- **Clipboard capture strategy** (`CaptureSelectedText()`)
+  - Default apps keep the original single-attempt copy path for speed
+  - `notepad.exe` gets a tiny first-attempt settle delay plus 2 short retries before failing
+  - Logs the chosen strategy and which copy attempt succeeded or timed out so other app failures are clearly attributed
 - **UTF-8 response reading** (`GetUtf8Response()` via ADODB.Stream)
   - Prevents mojibake on smart quotes and other non-ASCII characters
 - **Per-app paste method** (`sendTextApps` / `UseSendText()`)

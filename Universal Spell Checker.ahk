@@ -244,6 +244,52 @@ GetClipboardText() {
     return result != "" ? result : text
 }
 
+; Copy selected text into the clipboard.
+; Default path preserves the original single-attempt behavior for speed.
+; Notepad gets a couple of quick retries because copy capture is flaky there.
+CaptureSelectedText(activeExe, &text, events) {
+    retryApps := Map("notepad.exe", true)
+    exeKey := StrLower(activeExe)
+    useRetries := retryApps.Has(exeKey)
+    attempts := useRetries ? 3 : 1
+    waitSeconds := useRetries ? 0.4 : 1
+    text := ""
+
+    events.Push("Clipboard copy strategy: " . (useRetries ? "retry" : "standard") . " for " . activeExe)
+
+    loop attempts {
+        attempt := A_Index
+        A_Clipboard := ""
+
+        if (useRetries) {
+            ; The first attempt gets only a tiny settle delay. Retries wait a bit longer
+            ; so Notepad can finish releasing Ctrl+Alt+U before we send Ctrl+C again.
+            Sleep(attempt = 1 ? 30 : 75)
+        }
+
+        keysStillDown := 0
+        if GetKeyState("Ctrl", "P")
+            keysStillDown++
+        if GetKeyState("Alt", "P")
+            keysStillDown++
+        if GetKeyState("u", "P")
+            keysStillDown++
+        if (keysStillDown)
+            events.Push("Clipboard copy attempt " . attempt . ": hotkey keys still physically down before Ctrl+C")
+
+        Send("^c")
+        if ClipWait(waitSeconds) {
+            text := GetClipboardText()
+            events.Push("Clipboard copy succeeded on attempt " . attempt)
+            return true
+        }
+
+        events.Push("Clipboard copy attempt " . attempt . " timed out")
+    }
+
+    return false
+}
+
 ; Mark current clipboard content for Windows clipboard-history/cloud behavior.
 ; `canIncludeInHistory := false` makes transient data (like source Ctrl+C text) less likely to appear in Win+V history.
 SetClipboardHistoryPolicy(canIncludeInHistory := true, canUploadToCloud := true) {
@@ -853,12 +899,11 @@ FinalizeRun(logData) {
 
     try {
         LoadReplacements()                 ; reload replacements.json on every run
-        A_Clipboard := ""                  ; clear clipboard
-        Send("^c")                         ; copy selection
-        if !ClipWait(1) {
+        originalText := ""
+        if !CaptureSelectedText(logData.activeExe, &originalText, logData.events) {
             logData.error := "Clipboard wait timeout"
             logData.pasteTime := A_TickCount
-            logData.events.Push("Clipboard wait timed out")
+            logData.events.Push("Clipboard wait timed out after configured copy attempts for " . logData.activeExe)
             return
         }
 
@@ -866,8 +911,6 @@ FinalizeRun(logData) {
             logData.events.Push("Clipboard source marked as transient (history/cloud excluded)")
         else
             logData.events.Push("Clipboard source history-policy tag unavailable")
-
-        originalText := GetClipboardText()  ; store original text before processing
         logData.original := originalText
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
         logData.timings.clipboardCaptured := A_TickCount
