@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "7"
+scriptVersion := "8"
 
 ; Logging configuration
 enableLogging := true
@@ -84,6 +84,66 @@ UseSendText() {
             return true
     }
     return false
+}
+
+MakeLogPreview(text, maxLen := 160) {
+    preview := StrReplace(text, "`r", "\r")
+    preview := StrReplace(preview, "`n", "\n")
+    preview := StrReplace(preview, "`t", "\t")
+    if (StrLen(preview) > maxLen)
+        return SubStr(preview, 1, maxLen) . "..."
+    return preview
+}
+
+GetHotkeyPhysicalState() {
+    return "Ctrl=" . (GetKeyState("Ctrl", "P") ? "down" : "up")
+        . ", Alt=" . (GetKeyState("Alt", "P") ? "down" : "up")
+        . ", U=" . (GetKeyState("u", "P") ? "down" : "up")
+}
+
+GetActiveWindowDebugInfo() {
+    info := {
+        title: "",
+        exe: "unknown",
+        class: "",
+        hwnd: 0,
+        focusedControl: ""
+    }
+
+    info.hwnd := WinExist("A")
+    try info.title := WinGetTitle("A")
+    catch
+        info.title := ""
+    try info.exe := WinGetProcessName("A")
+    catch
+        info.exe := "unknown"
+    try info.class := WinGetClass("A")
+    catch
+        info.class := ""
+    try info.focusedControl := ControlGetFocus("A")
+    catch
+        info.focusedControl := ""
+
+    return info
+}
+
+BuildClipboardDebugSummary(details) {
+    if !IsObject(details)
+        return "clipboard details unavailable"
+
+    return "selected="
+        . (details.HasOwnProp("selectedFormat") ? details.selectedFormat : "<unknown>")
+        . ", chars="
+        . (details.HasOwnProp("selectedChars") ? details.selectedChars : 0)
+        . ", html="
+        . ((details.HasOwnProp("htmlAvailable") && details.htmlAvailable) ? "yes" : "no")
+        . ", unicode="
+        . ((details.HasOwnProp("unicodeAvailable") && details.unicodeAvailable) ? "yes" : "no")
+        . ", ansi="
+        . ((details.HasOwnProp("ansiAvailable") && details.ansiAvailable) ? "yes" : "no")
+        . ((details.HasOwnProp("htmlChars") && details.htmlChars > 0) ? ", html_chars=" . details.htmlChars : "")
+        . ((details.HasOwnProp("fragmentChars") && details.fragmentChars > 0) ? ", fragment_chars=" . details.fragmentChars : "")
+        . ((details.HasOwnProp("fallbackUsed") && details.fallbackUsed) ? ", fallback=yes" : "")
 }
 
 ; Load post-processing replacements from replacements.json.
@@ -314,9 +374,19 @@ StripPromptLeak(text, promptText, &details) {
 }
 
 ; Read clipboard text preferring Unicode; fall back to CP1252 if only ANSI is present
-GetClipboardText() {
+GetClipboardText(&details := 0) {
     ; Default to AutoHotkey's view in case the clipboard can't be opened
     text := A_Clipboard
+    details := {
+        selectedFormat: "ahk_fallback",
+        selectedChars: StrLen(text),
+        htmlAvailable: false,
+        unicodeAvailable: false,
+        ansiAvailable: false,
+        htmlChars: 0,
+        fragmentChars: 0,
+        fallbackUsed: true
+    }
     if !DllCall("OpenClipboard", "ptr", 0)
         return text
 
@@ -327,32 +397,53 @@ GetClipboardText() {
 
     try {
         ; Prefer HTML when available so we can strip formatting noise (empty paragraphs, etc.)
-        if (CF_HTML && DllCall("IsClipboardFormatAvailable", "uint", CF_HTML)) {
+        details.htmlAvailable := CF_HTML && DllCall("IsClipboardFormatAvailable", "uint", CF_HTML)
+        details.unicodeAvailable := DllCall("IsClipboardFormatAvailable", "uint", CF_UNICODETEXT) ? true : false
+        details.ansiAvailable := DllCall("IsClipboardFormatAvailable", "uint", CF_TEXT) ? true : false
+
+        if (details.htmlAvailable) {
             htmlBlob := __ReadClipboardString(CF_HTML, "UTF-8")
             if (htmlBlob != "") {
+                details.htmlChars := StrLen(htmlBlob)
                 fragment := __ExtractHtmlFragment(htmlBlob)
                 if (fragment != "") {
+                    details.fragmentChars := StrLen(fragment)
                     htmlText := __HtmlFragmentToPlainText(fragment)
-                    if (htmlText != "")
+                    if (htmlText != "") {
                         result := htmlText
+                        details.selectedFormat := "html"
+                        details.selectedChars := StrLen(result)
+                        details.fallbackUsed := false
+                    }
                 }
             }
         }
 
-        if (result = "" && DllCall("IsClipboardFormatAvailable", "uint", CF_UNICODETEXT)) {
+        if (result = "" && details.unicodeAvailable) {
             unicodeText := __ReadClipboardString(CF_UNICODETEXT, "UTF-16")
-            if (unicodeText != "")
+            if (unicodeText != "") {
                 result := unicodeText
+                details.selectedFormat := "unicode"
+                details.selectedChars := StrLen(result)
+                details.fallbackUsed := false
+            }
         }
 
-        if (result = "" && DllCall("IsClipboardFormatAvailable", "uint", CF_TEXT)) {
+        if (result = "" && details.ansiAvailable) {
             ansiText := __ReadClipboardString(CF_TEXT, "CP1252")
-            if (ansiText != "")
+            if (ansiText != "") {
                 result := ansiText
+                details.selectedFormat := "ansi"
+                details.selectedChars := StrLen(result)
+                details.fallbackUsed := false
+            }
         }
     } finally {
         DllCall("CloseClipboard")
     }
+
+    if (result = "")
+        details.selectedChars := StrLen(text)
 
     return result != "" ? result : text
 }
@@ -372,19 +463,21 @@ WaitForHotkeyRelease(maxWaitMs := 250) {
 ; Copy selected text into the clipboard.
 ; Default path preserves the original single-attempt behavior for speed.
 ; Notepad gets a couple of quick retries because copy capture is flaky there.
-CaptureSelectedText(activeExe, &text, events) {
+CaptureSelectedText(activeExe, &text, events, &clipboardDetails := 0) {
     retryApps := Map("notepad.exe", true)
     exeKey := StrLower(activeExe)
     useRetries := retryApps.Has(exeKey)
     attempts := useRetries ? 3 : 1
     waitSeconds := useRetries ? 0.4 : 1
     text := ""
+    clipboardDetails := ""
 
     events.Push("Clipboard copy strategy: " . (useRetries ? "retry" : "standard") . " for " . activeExe)
 
     loop attempts {
         attempt := A_Index
         A_Clipboard := ""
+        events.Push("Clipboard copy attempt " . attempt . ": hotkey state before Ctrl+C: " . GetHotkeyPhysicalState())
 
         if (useRetries) {
             ; The first attempt gets only a tiny settle delay. Retries wait a bit longer
@@ -412,8 +505,10 @@ CaptureSelectedText(activeExe, &text, events) {
 
         Send("^c")
         if ClipWait(waitSeconds) {
-            text := GetClipboardText()
-            events.Push("Clipboard copy succeeded on attempt " . attempt)
+            text := GetClipboardText(&clipboardDetails)
+            events.Push("Clipboard copy succeeded on attempt " . attempt . " (" . BuildClipboardDebugSummary(clipboardDetails) . ")")
+            if (text = "")
+                events.Push("Clipboard copy attempt " . attempt . " produced empty text after extraction")
             return true
         }
 
@@ -648,7 +743,13 @@ LogDetailed(data) {
         scriptVer := data.HasOwnProp("scriptVersion") ? data.scriptVersion : ""
         activeApp := data.HasOwnProp("activeApp") ? data.activeApp : ""
         activeExe := data.HasOwnProp("activeExe") ? data.activeExe : ""
+        windowClass := data.HasOwnProp("windowClass") ? data.windowClass : ""
+        focusedControl := data.HasOwnProp("focusedControl") ? data.focusedControl : ""
+        windowHwnd := data.HasOwnProp("windowHwnd") ? data.windowHwnd : 0
         pasteMethod := data.HasOwnProp("pasteMethod") ? data.pasteMethod : ""
+        clipboardSource := data.HasOwnProp("clipboardSource") ? data.clipboardSource : ""
+        clipboardPreview := data.HasOwnProp("clipboardPreview") ? data.clipboardPreview : ""
+        outputPreview := data.HasOwnProp("outputPreview") ? data.outputPreview : ""
         textChanged := (data.HasOwnProp("textChanged") && data.textChanged) ? "true" : "false"
         modelVer := data.HasOwnProp("modelVersion") ? data.modelVersion : ""
         tokIn := data.HasOwnProp("tokenInput") ? data.tokenInput : 0
@@ -668,7 +769,13 @@ LogDetailed(data) {
         j .= ',"model_version":"' . JsonEscape(modelVer) . '"'
         j .= ',"active_app":"' . JsonEscape(activeApp) . '"'
         j .= ',"active_exe":"' . JsonEscape(activeExe) . '"'
+        j .= ',"window_class":"' . JsonEscape(windowClass) . '"'
+        j .= ',"focused_control":"' . JsonEscape(focusedControl) . '"'
+        j .= ',"window_hwnd":' . windowHwnd
         j .= ',"paste_method":"' . JsonEscape(pasteMethod) . '"'
+        j .= ',"clipboard_source":"' . JsonEscape(clipboardSource) . '"'
+        j .= ',"clipboard_preview":"' . JsonEscape(clipboardPreview) . '"'
+        j .= ',"output_preview":"' . JsonEscape(outputPreview) . '"'
         j .= ',"text_changed":' . textChanged
         j .= ',"input_text":"' . JsonEscape(data.original) . '"'
         j .= ',"input_chars":' . StrLen(data.original)
@@ -1017,7 +1124,13 @@ FinalizeRun(logData) {
         scriptVersion: scriptVersion,
         activeApp: "",
         activeExe: "",
+        windowClass: "",
+        focusedControl: "",
+        windowHwnd: 0,
         pasteMethod: "",
+        clipboardSource: "",
+        clipboardPreview: "",
+        outputPreview: "",
         modelVersion: "",
         textChanged: false,
         tokenInput: 0,
@@ -1028,12 +1141,20 @@ FinalizeRun(logData) {
     }
 
     ; Capture active window before any clipboard operations
-    logData.activeApp := WinGetTitle("A")
-    try logData.activeExe := WinGetProcessName("A")
-    catch
-        logData.activeExe := "unknown"
+    windowInfo := GetActiveWindowDebugInfo()
+    logData.activeApp := windowInfo.title
+    logData.activeExe := windowInfo.exe
+    logData.windowClass := windowInfo.class
+    logData.focusedControl := windowInfo.focusedControl
+    logData.windowHwnd := windowInfo.hwnd
 
     try {
+        logData.events.Push("Active window: exe=" . logData.activeExe
+            . ", class=" . (logData.windowClass != "" ? logData.windowClass : "<none>")
+            . ", hwnd=" . logData.windowHwnd
+            . ", control=" . (logData.focusedControl != "" ? logData.focusedControl : "<none>")
+            . ", title=" . MakeLogPreview(logData.activeApp, 120))
+
         replacementsStatus := ""
         replacementsDetails := ""
         deferredReplacementsReload := RefreshReplacementsIfChanged(&replacementsStatus, &replacementsDetails)
@@ -1051,7 +1172,8 @@ FinalizeRun(logData) {
             logData.events.Push("Replacements metadata unchanged; using cached replacements (" . replacementsDetails . ")")
 
         originalText := ""
-        if !CaptureSelectedText(logData.activeExe, &originalText, logData.events) {
+        clipboardDetails := ""
+        if !CaptureSelectedText(logData.activeExe, &originalText, logData.events, &clipboardDetails) {
             logData.error := "Clipboard wait timeout"
             logData.pasteTime := A_TickCount
             logData.events.Push("Clipboard wait timed out after configured copy attempts for " . logData.activeExe)
@@ -1063,6 +1185,11 @@ FinalizeRun(logData) {
         else
             logData.events.Push("Clipboard source history-policy tag unavailable")
         logData.original := originalText
+        if (IsObject(clipboardDetails))
+            logData.clipboardSource := clipboardDetails.selectedFormat
+        logData.clipboardPreview := MakeLogPreview(originalText, 220)
+        logData.events.Push("Clipboard details: " . BuildClipboardDebugSummary(clipboardDetails))
+        logData.events.Push("Clipboard preview: " . logData.clipboardPreview)
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
         logData.timings.clipboardCaptured := A_TickCount
 
@@ -1082,6 +1209,7 @@ FinalizeRun(logData) {
             jsonPayload .= ',"temperature":' . Temperature . '}'
             logData.events.Push("Payload prepared for " . apiModel . " (verbosity: " . Verbosity . ", temperature: " . Temperature . ")")
         }
+        logData.events.Push("Prompt chars=" . StrLen(prompt) . ", payload chars=" . StrLen(jsonPayload))
         logData.timings.payloadPrepared := A_TickCount
         logData.rawRequest := jsonPayload
 
@@ -1124,7 +1252,7 @@ FinalizeRun(logData) {
         ; Parse response and extract corrected text
         response := GetUtf8Response(http)
         logData.rawResponse := response
-        logData.events.Push("Response received")
+        logData.events.Push("Response received (" . StrLen(response) . " chars)")
         logData.timings.responseReceived := A_TickCount
 
         ; Extract model version and token counts from API response
@@ -1140,6 +1268,10 @@ FinalizeRun(logData) {
             logData.tokenCached := Integer(m[1])
         if RegExMatch(response, '"reasoning_tokens"\s*:\s*(\d+)', &m)
             logData.tokenReasoning := Integer(m[1])
+        logData.events.Push("API response metadata: model="
+            . (logData.modelVersion != "" ? logData.modelVersion : "<missing>")
+            . ", tokens in/out/total/cached/reasoning="
+            . logData.tokenInput . "/" . logData.tokenOutput . "/" . logData.tokenTotal . "/" . logData.tokenCached . "/" . logData.tokenReasoning)
 
         correctedText := ""
 
@@ -1248,6 +1380,13 @@ FinalizeRun(logData) {
 
         if (correctedText != "") {
             logData.textChanged := (correctedText != logData.original)
+            logData.outputPreview := MakeLogPreview(correctedText, 220)
+            logData.events.Push("Correction summary: changed="
+                . (logData.textChanged ? "yes" : "no")
+                . ", input chars=" . StrLen(logData.original)
+                . ", output chars=" . StrLen(correctedText)
+                . ", delta=" . (StrLen(correctedText) - StrLen(logData.original)))
+            logData.events.Push("Output preview: " . logData.outputPreview)
 
             if (UseSendText()) {
                 logData.pasteMethod := "sendtext"
@@ -1263,6 +1402,8 @@ FinalizeRun(logData) {
                 ; Default: paste via clipboard
                 logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
                 A_Clipboard := correctedText
+                logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
+                logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
                 if WaitForHotkeyRelease(120)
                     logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
                 else {
@@ -1291,6 +1432,7 @@ FinalizeRun(logData) {
             logData.error := "Responses API returned no text"
             logData.pasteTime := A_TickCount
             logData.events.Push("Response parsing failed")
+            logData.events.Push("Response preview: " . MakeLogPreview(response, 260))
             ToolTip("Error: No text returned by Responses API")
             SetTimer(() => ToolTip(), -3000)
         }
@@ -1300,6 +1442,7 @@ FinalizeRun(logData) {
         if (!logData.pasteTime)
             logData.pasteTime := A_TickCount
         logData.events.Push("Exception thrown: " . e.Message)
+        logData.events.Push("Exception context: line=" . e.Line . ", what=" . e.What . ", extra=" . e.Extra)
         ToolTip("Error: " . e.Message)
         SetTimer(() => ToolTip(), -3000)
     } finally {
