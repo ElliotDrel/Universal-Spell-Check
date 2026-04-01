@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "15"
+scriptVersion := "16"
 
 ; Logging configuration
 enableLogging := true
@@ -66,24 +66,6 @@ promptInstructionText := "Fix the grammar and spelling of the text below. Preser
 ; Create logs directory if it doesn't exist
 if (!DirExist(A_ScriptDir . "\logs")) {
     DirCreate(A_ScriptDir . "\logs")
-}
-
-; Configure per-app paste behavior
-; - Add exe names (e.g., "notepad.exe") to `sendTextApps` to use keystroke typing
-; - Default for all other apps is clipboard + Ctrl+V paste
-sendTextApps := [
-    ; Examples (replace or extend as needed):
-    ; "SomeApp.exe",
-    ; "AnotherApp.exe"
-]
-
-UseSendTextForExe(activeExe) {
-    global sendTextApps
-    for exe in sendTextApps {
-        if (StrLower(exe) = StrLower(activeExe))
-            return true
-    }
-    return false
 }
 
 ShowTemporaryToolTip(message, durationMs := 3000) {
@@ -1473,39 +1455,27 @@ FinalizeRun(logData) {
             logData.events.Push("Output preview: " . logData.outputPreview)
             logData.diagnostics.outputDebugMs := A_TickCount - outputDebugStart
 
-            if (UseSendTextForExe(logData.activeExe)) {
-                logData.pasteMethod := "sendtext"
-                ; Type the corrected text directly (replaces current selection)
-                logData.events.Push("INSERTION METHOD: SendText (direct typing)")
-                logData.pasteAttempted := true
-                SendText(correctedText)
-                ; Optionally mirror to clipboard for user convenience
-                SetTransientClipboardText(correctedText)
-                logData.events.Push("Text typed via SendText - COMPLETE")
-            } else {
-                logData.pasteMethod := "clipboard"
-                ; Default: paste via clipboard
-                logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
-                pasteDebugStart := A_TickCount
-                logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
-                if WaitForHotkeyRelease(120)
-                    logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
-                else {
-                    logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
-                    if (StrLower(logData.activeExe) = "notepad.exe") {
-                        logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
-                        AbortRun(logData, "Paste hotkey release timeout", "", "Release Ctrl+Alt+U fully, then retry")
-                        return
-                    }
-                    logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
+            logData.pasteMethod := "clipboard"
+            logData.events.Push("INSERTION METHOD: Clipboard paste (Ctrl+V)")
+            pasteDebugStart := A_TickCount
+            logData.events.Push("Paste hotkey state before release wait: " . GetHotkeyPhysicalState())
+            if WaitForHotkeyRelease(120)
+                logData.events.Push("Paste hotkey-release wait completed before Ctrl+V")
+            else {
+                logData.events.Push("Paste hotkey-release wait timed out before Ctrl+V")
+                if (StrLower(logData.activeExe) = "notepad.exe") {
+                    logData.events.Push("Paste aborted because hotkey keys never released before Ctrl+V")
+                    AbortRun(logData, "Paste hotkey release timeout", "", "Release Ctrl+Alt+U fully, then retry")
+                    return
                 }
-                SetTransientClipboardText(correctedText)
-                logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
-                logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
-                logData.pasteAttempted := true
-                Send("^v")
-                logData.events.Push("Text pasted via clipboard - COMPLETE")
+                logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
             }
+            SetTransientClipboardText(correctedText)
+            logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
+            logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
+            logData.pasteAttempted := true
+            Send("^v")
+            logData.events.Push("Text pasted via clipboard - COMPLETE")
             
             ; Capture paste timing and log success
             logData.pasteTime := A_TickCount
