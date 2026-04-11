@@ -22,20 +22,23 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Persistent Background Server
-**Goal**: A basic always-running local server that maintains a warm connection to the OpenAI API, so the AHK script delegates requests through it instead of opening a new HTTP connection every invocation -- eliminating cold-start TLS/HTTP overhead
+**Goal**: A transparent HTTP proxy server on localhost:48080 that maintains a warm httpx connection pool to the OpenAI API, so the AHK script delegates requests through it instead of opening a new HTTP connection every invocation -- eliminating cold-start TLS/HTTP overhead. Also migrates the API key from hardcoded to environment variable (SEC-01).
 **Depends on**: Nothing (first phase)
-**Requirements**: PERF-01
+**Requirements**: PERF-01, SEC-01
 **Success Criteria** (what must be TRUE):
-  1. A background server process starts automatically (or on first use) and stays running across spell-check invocations
+  1. A background server process starts automatically and stays running across spell-check invocations
   2. The AHK script sends spell-check requests to the local server instead of directly to the OpenAI API
   3. The second and subsequent spell checks in a session are measurably faster than a cold direct-to-API call (connection reuse eliminates TLS handshake)
-  4. If the server is not running, the AHK script falls back to the current direct API path so spell checking never breaks
-**Plans**: TBD
+  4. If the server is not running, the AHK script shows an error tooltip (no fallback to direct API -- user decision)
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md -- Create Python proxy server with persistent connection pooling
+- [ ] 01-02-PLAN.md -- Modify AHK script to use proxy, migrate API key to env var, add proxy timing to logs
 
 ### Phase 2: Reliability and UX Foundation
 **Goal**: Every hotkey invocation is correct, safe, and visible -- clipboard content is never lost, pastes never fail silently, modifier keys never stick, and the user always knows what is happening
 **Depends on**: Phase 1
-**Requirements**: REL-01, REL-02, REL-03, UX-01, UX-02, UX-03, UX-04, SEC-01, QUAL-01
+**Requirements**: REL-01, REL-02, REL-03, UX-01, UX-02, UX-03, UX-04, QUAL-01
 **Success Criteria** (what must be TRUE):
   1. User's clipboard content is identical before and after a spell check invocation (ClipboardAll save/restore)
   2. Corrected text is pasted reliably every time without stale clipboard content appearing (no race condition)
@@ -92,7 +95,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Persistent Background Server | 0/TBD | Not started | - |
+| 1. Persistent Background Server | 0/2 | Planning complete | - |
 | 2. Reliability and UX Foundation | 0/TBD | Not started | - |
 | 3. Error Handling and Resilience | 0/TBD | Not started | - |
 | 4. Connection and Latency Optimization | 0/TBD | Not started | - |
