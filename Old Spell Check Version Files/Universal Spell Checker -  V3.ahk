@@ -164,7 +164,7 @@ FinalizeRun(logData) {
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
        
         ; OpenAI API call
-        apiKey := "REDACTED"
+        apiKey := "REDACTED"  ; moved to .env — see Universal Spell Checker.ahk
        
         ; Create the prompt (same as Python file)
         prompt := "instructions: Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text. `ntext input: " . originalText
