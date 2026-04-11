@@ -17,3 +17,7 @@ logs/viewer.html
 
 # Ignore Python cache
 __pycache__/
+
+# 
+.env
+.env*
