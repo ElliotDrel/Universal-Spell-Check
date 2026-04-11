@@ -1,0 +1,229 @@
+"""Transparent proxy server with persistent connection pooling to OpenAI API.
+
+Maintains a warm httpx connection pool so the AHK spell-checker avoids
+per-invocation TLS/TCP handshake overhead (~40-100ms savings).
+"""
+
+import asyncio
+import logging
+import os
+import sys
+import time
+
+import httpx
+import uvicorn
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import Response, JSONResponse
+from starlette.routing import Route
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+LISTEN_HOST = "127.0.0.1"
+LISTEN_PORT = 48080
+OPENAI_BASE_URL = "https://api.openai.com"
+KEEPALIVE_EXPIRY = 120.0          # seconds -- keep idle connections warm (D-07)
+KEEPALIVE_PING_INTERVAL = 45      # seconds between keep-alive pings (D-08)
+
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+PID_FILE = os.path.join(_script_dir, "logs", "server.pid")
+LOG_FILE = os.path.join(_script_dir, "logs", "server.log")
+
+# ---------------------------------------------------------------------------
+# Logging -- critical because pythonw.exe swallows all stdout/stderr (D-11)
+# ---------------------------------------------------------------------------
+
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+log = logging.getLogger("spellcheck-server")
+
+# ---------------------------------------------------------------------------
+# Global state
+# ---------------------------------------------------------------------------
+
+http_client: httpx.AsyncClient | None = None
+keepalive_task: asyncio.Task | None = None
+
+# ---------------------------------------------------------------------------
+# PID file management (D-05)
+# ---------------------------------------------------------------------------
+
+def write_pid_file():
+    """Write current PID to file. Exit if another instance is alive."""
+    if os.path.exists(PID_FILE):
+        try:
+            with open(PID_FILE, "r") as f:
+                existing_pid = int(f.read().strip())
+            # Check if process is still alive
+            os.kill(existing_pid, 0)
+            # Process is alive -- duplicate instance
+            log.warning(
+                "Another instance is running (PID %d). Exiting.", existing_pid
+            )
+            sys.exit(1)
+        except (OSError, ValueError):
+            # Process is dead or PID file is corrupt -- stale, overwrite
+            pass
+
+    with open(PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+
+
+def remove_pid_file():
+    """Remove PID file on shutdown."""
+    try:
+        os.remove(PID_FILE)
+    except OSError:
+        pass
+
+# ---------------------------------------------------------------------------
+# Keep-alive ping loop (D-08)
+# ---------------------------------------------------------------------------
+
+async def keepalive_ping_loop():
+    """Ping OpenAI every KEEPALIVE_PING_INTERVAL seconds to keep connections warm."""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    auth_header = "Bearer " + api_key
+    target = OPENAI_BASE_URL + "/v1/models"
+
+    while True:
+        await asyncio.sleep(KEEPALIVE_PING_INTERVAL)
+        try:
+            await http_client.get(target, headers={"authorization": auth_header})
+        except Exception as exc:
+            log.warning("Keep-alive ping failed: %s", exc)
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+
+async def startup():
+    """Initialize connection pool, PID file, and keep-alive task."""
+    global http_client, keepalive_task
+
+    write_pid_file()
+
+    http_client = httpx.AsyncClient(
+        http2=True,
+        limits=httpx.Limits(
+            max_keepalive_connections=5,
+            max_connections=10,
+            keepalive_expiry=KEEPALIVE_EXPIRY,
+        ),
+        timeout=httpx.Timeout(
+            connect=5.0,
+            read=35.0,
+            write=5.0,
+            pool=5.0,
+        ),
+    )
+
+    keepalive_task = asyncio.create_task(keepalive_ping_loop())
+
+    log.info(
+        "Server started on %s:%d (PID %d)", LISTEN_HOST, LISTEN_PORT, os.getpid()
+    )
+
+
+async def shutdown():
+    """Tear down connection pool, cancel keep-alive, remove PID file."""
+    global http_client, keepalive_task
+
+    if keepalive_task is not None:
+        keepalive_task.cancel()
+        try:
+            await keepalive_task
+        except asyncio.CancelledError:
+            pass
+
+    if http_client is not None:
+        await http_client.aclose()
+
+    remove_pid_file()
+    log.info("Server shut down")
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+async def proxy_request(request: Request) -> Response:
+    """Forward POST /v1/responses to OpenAI with warm connection pool."""
+    body = await request.body()
+    auth = request.headers.get("authorization", "")
+    target_url = OPENAI_BASE_URL + request.url.path
+
+    start = time.perf_counter()
+    try:
+        resp = await http_client.post(
+            target_url,
+            content=body,
+            headers={
+                "content-type": "application/json; charset=utf-8",
+                "authorization": auth,
+            },
+        )
+        proxy_ms = round((time.perf_counter() - start) * 1000, 1)
+
+        response_headers = {
+            "content-type": resp.headers.get("content-type", "application/json"),
+            "x-proxy-ms": str(proxy_ms),
+        }
+
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers=response_headers,
+        )
+
+    except httpx.ConnectError as exc:
+        proxy_ms = round((time.perf_counter() - start) * 1000, 1)
+        log.error("Upstream connection failed: %s", exc)
+        return JSONResponse(
+            {"error": "upstream_connect_failed", "detail": str(exc)},
+            status_code=502,
+            headers={"x-proxy-ms": str(proxy_ms)},
+        )
+
+    except httpx.TimeoutException as exc:
+        proxy_ms = round((time.perf_counter() - start) * 1000, 1)
+        log.error("Upstream timeout: %s", exc)
+        return JSONResponse(
+            {"error": "upstream_timeout", "detail": str(exc)},
+            status_code=504,
+            headers={"x-proxy-ms": str(proxy_ms)},
+        )
+
+
+async def health(request: Request) -> Response:
+    """Health check endpoint for AHK to verify server is running."""
+    return JSONResponse({"status": "ok"})
+
+# ---------------------------------------------------------------------------
+# App assembly
+# ---------------------------------------------------------------------------
+
+app = Starlette(
+    routes=[
+        Route("/v1/responses", proxy_request, methods=["POST"]),
+        Route("/health", health, methods=["GET"]),
+    ],
+    on_startup=[startup],
+    on_shutdown=[shutdown],
+)
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    try:
+        uvicorn.run(app, host=LISTEN_HOST, port=LISTEN_PORT, log_level="warning")
+    except Exception as e:
+        log.critical("Server failed to start: %s", e)
+        remove_pid_file()
