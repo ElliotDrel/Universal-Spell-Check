@@ -5,6 +5,7 @@ per-invocation TLS/TCP handshake overhead (~40-100ms savings).
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 import logging
 import os
 import sys
@@ -100,13 +101,16 @@ async def keepalive_ping_loop():
             log.warning("Keep-alive ping failed: %s", exc)
 
 # ---------------------------------------------------------------------------
-# Lifecycle
+# Lifecycle (Starlette 1.0 lifespan context manager)
 # ---------------------------------------------------------------------------
 
-async def startup():
-    """Initialize connection pool, PID file, and keep-alive task."""
+@asynccontextmanager
+async def lifespan(app):
+    """Initialize connection pool, PID file, and keep-alive task on startup;
+    tear down on shutdown."""
     global http_client, keepalive_task
 
+    # --- Startup ---
     write_pid_file()
 
     http_client = httpx.AsyncClient(
@@ -130,11 +134,9 @@ async def startup():
         "Server started on %s:%d (PID %d)", LISTEN_HOST, LISTEN_PORT, os.getpid()
     )
 
+    yield
 
-async def shutdown():
-    """Tear down connection pool, cancel keep-alive, remove PID file."""
-    global http_client, keepalive_task
-
+    # --- Shutdown ---
     if keepalive_task is not None:
         keepalive_task.cancel()
         try:
@@ -213,8 +215,7 @@ app = Starlette(
         Route("/v1/responses", proxy_request, methods=["POST"]),
         Route("/health", health, methods=["GET"]),
     ],
-    on_startup=[startup],
-    on_shutdown=[shutdown],
+    lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------------------
