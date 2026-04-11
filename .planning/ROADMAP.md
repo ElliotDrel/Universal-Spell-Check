@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. If the server is not running, the AHK script shows an error tooltip (no fallback to direct API -- user decision)
 **Plans:** 2 plans
 Plans:
-- [ ] 01-01-PLAN.md -- Create Python proxy server with persistent connection pooling
-- [ ] 01-02-PLAN.md -- Modify AHK script to use proxy, migrate API key to env var, add proxy timing to logs
+- [x] 01-01-PLAN.md -- Create Python proxy server with persistent connection pooling
+- [x] 01-02-PLAN.md -- Modify AHK script to use proxy, migrate API key to env var, add proxy timing to logs
 
 ### Phase 2: Reliability and UX Foundation
 **Goal**: Every hotkey invocation is correct, safe, and visible -- clipboard content is never lost, pastes never fail silently, modifier keys never stick, and the user always knows what is happening
