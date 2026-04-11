@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "16"
+scriptVersion := "18"
 
 ; Logging configuration
 enableLogging := true
@@ -18,6 +18,10 @@ replacementsPath := A_ScriptDir . "\replacements.json"
 postReplacements := []    ; Array of [variant, canonical] pairs, sorted longest-first
 replacementsLastModified := ""
 replacementsFileSize := -1
+
+; Environment configuration
+envPath := A_ScriptDir . "\.env"
+apiKey := ""
 
 ; API configuration
 ; Select the model module here (single source of truth):
@@ -58,6 +62,14 @@ switch modelModule {
 }
 
 apiUrl := "https://api.openai.com/v1/responses"
+
+; Proxy server configuration (per D-03, D-04, D-06)
+proxyHost := "127.0.0.1"
+proxyPort := 48080
+proxyBaseUrl := "http://" . proxyHost . ":" . proxyPort
+proxyApiUrl := proxyBaseUrl . "/v1/responses"
+proxyHealthUrl := proxyBaseUrl . "/health"
+serverScriptPath := A_ScriptDir . "\spellcheck-server.pyw"
 
 ; Prompt text (single source of truth).
 ; Reused for request construction and prompt-leak safeguard detection.
@@ -127,6 +139,107 @@ GetActiveWindowDebugInfo() {
         info.focusedControl := ""
 
     return info
+}
+
+LoadRequiredEnvValue(envFilePath, envKey) {
+    value := ReadEnvValueFromFile(envFilePath, envKey, &errorMessage)
+    if (errorMessage != "") {
+        MsgBox("Failed to load " . envKey . " from " . envFilePath . "`n`n" . errorMessage)
+        ExitApp
+    }
+
+    if (value = "") {
+        MsgBox("Missing required " . envKey . " in " . envFilePath)
+        ExitApp
+    }
+
+    return value
+}
+
+ReadEnvValueFromFile(envFilePath, envKey, &errorMessage := "") {
+    errorMessage := ""
+    if (!FileExist(envFilePath)) {
+        errorMessage := ".env file not found"
+        return ""
+    }
+
+    try rawEnv := FileRead(envFilePath, "UTF-8")
+    catch Error as e {
+        errorMessage := e.Message
+        return ""
+    }
+
+    if (SubStr(rawEnv, 1, 1) = Chr(0xFEFF))
+        rawEnv := SubStr(rawEnv, 2)
+
+    for , rawLine in StrSplit(rawEnv, "`n") {
+        line := Trim(rawLine, " `t`r`n")
+        if (line = "")
+            continue
+        if (SubStr(line, 1, 1) = "#")
+            continue
+        if (SubStr(line, 1, 7) = "export ")
+            line := LTrim(SubStr(line, 8), " `t")
+
+        equalsPos := InStr(line, "=")
+        if (!equalsPos)
+            continue
+
+        key := Trim(SubStr(line, 1, equalsPos - 1), " `t")
+        if (key != envKey)
+            continue
+
+        value := Trim(SubStr(line, equalsPos + 1), " `t")
+        if (StrLen(value) >= 2) {
+            firstChar := SubStr(value, 1, 1)
+            lastChar := SubStr(value, -1)
+            if ((firstChar = '"' && lastChar = '"') || (firstChar = "'" && lastChar = "'"))
+                value := SubStr(value, 2, StrLen(value) - 2)
+        }
+        return value
+    }
+
+    return ""
+}
+
+; Check if proxy server is responding (fast health check with 300ms timeout)
+IsProxyAvailable() {
+    global proxyHealthUrl
+    try {
+        http := ComObject("WinHttp.WinHttpRequest.5.1")
+        http.SetTimeouts(300, 300, 300, 300)
+        http.Open("GET", proxyHealthUrl, false)
+        http.Send()
+        return (http.Status = 200)
+    } catch {
+        return false
+    }
+}
+
+; Auto-launch proxy server if not already running (per D-04, D-05)
+EnsureServerRunning() {
+    global serverScriptPath
+    if (IsProxyAvailable())
+        return true
+
+    if !FileExist(serverScriptPath)
+        return false
+
+    ; Launch hidden via pythonw.exe (no console window)
+    try {
+        Run('"pythonw.exe" "' . serverScriptPath . '"', A_ScriptDir, "Hide")
+    } catch Error as e {
+        return false
+    }
+
+    ; Poll for server readiness (up to 5 seconds)
+    deadline := A_TickCount + 5000
+    while (A_TickCount < deadline) {
+        if (IsProxyAvailable())
+            return true
+        Sleep(100)
+    }
+    return false
 }
 
 BuildClipboardDebugSummary(details) {
@@ -293,6 +406,14 @@ RetryReplacementsReloadAfterPaste(events) {
     } else {
         events.Push("Deferred replacements reload failed; still using last known-good cache" . (loadError != "" ? " (" . loadError . ")" : ""))
     }
+}
+
+; Load required environment settings once at startup to keep the hotkey path fast.
+apiKey := LoadRequiredEnvValue(envPath, "OPENAI_API_KEY")
+
+; Auto-launch proxy server on script startup (per D-04)
+if (!EnsureServerRunning()) {
+    ShowTemporaryToolTip("Spell check proxy server failed to start.`nCheck logs/server.log for details.", 5000)
 }
 
 ; Prime the replacements cache on startup. Later runs only reparse when metadata changes.
@@ -1193,7 +1314,8 @@ FinalizeRun(logData) {
         tokenOutput: 0,
         tokenTotal: 0,
         tokenCached: 0,
-        tokenReasoning: 0
+        tokenReasoning: 0,
+        proxyMs: ""
     }
 
     ; Capture active window before any clipboard operations
@@ -1255,9 +1377,6 @@ FinalizeRun(logData) {
         logData.events.Push("Clipboard captured (" . (StrLen(originalText)) . " chars)")
         logData.timings.clipboardCaptured := A_TickCount
 
-        ; OpenAI API call
-        apiKey := "REDACTED"
-        
         ; Create the prompt from shared instruction text
         prompt := "instructions: " . promptInstructionText . "`ntext input: " . originalText
        
@@ -1279,7 +1398,7 @@ FinalizeRun(logData) {
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
-        http.Open("POST", apiUrl, false)
+        http.Open("POST", proxyApiUrl, false)
         http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("Authorization", "Bearer " . apiKey)
         logData.timings.requestSent := A_TickCount
@@ -1318,6 +1437,14 @@ FinalizeRun(logData) {
         responseDebugStart := A_TickCount
         logData.events.Push("Response received (" . StrLen(response) . " chars)")
         logData.timings.responseReceived := A_TickCount
+
+        ; Capture proxy timing headers (per D-10, D-12)
+        try {
+            logData.proxyMs := http.GetResponseHeader("X-Proxy-Ms")
+        } catch {
+            logData.proxyMs := ""
+        }
+        logData.events.Push("Proxy headers: proxy_ms=" . logData.proxyMs)
 
         ; Extract model version and token counts from API response
         if RegExMatch(response, '"model"\s*:\s*"([^"]+)"', &m)
