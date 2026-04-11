@@ -6,6 +6,7 @@ per-invocation TLS/TCP handshake overhead (~40-100ms savings).
 
 import asyncio
 from contextlib import asynccontextmanager
+import ctypes
 import logging
 import os
 import sys
@@ -75,21 +76,29 @@ keepalive_task: asyncio.Task | None = None
 # PID file management (D-05)
 # ---------------------------------------------------------------------------
 
+def _is_process_alive(pid: int) -> bool:
+    """Check if a process is alive using Windows API (os.kill unreliable on Win)."""
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if handle:
+        kernel32.CloseHandle(handle)
+        return True
+    return False
+
+
 def write_pid_file():
     """Write current PID to file. Exit if another instance is alive."""
     if os.path.exists(PID_FILE):
         try:
             with open(PID_FILE, "r") as f:
                 existing_pid = int(f.read().strip())
-            # Check if process is still alive
-            os.kill(existing_pid, 0)
-            # Process is alive -- duplicate instance
-            log.warning(
-                "Another instance is running (PID %d). Exiting.", existing_pid
-            )
-            sys.exit(1)
-        except (OSError, ValueError):
-            # Process is dead or PID file is corrupt -- stale, overwrite
+            if _is_process_alive(existing_pid):
+                log.warning(
+                    "Another instance is running (PID %d). Exiting.", existing_pid
+                )
+                sys.exit(1)
+        except ValueError:
+            # PID file is corrupt -- stale, overwrite
             pass
 
     with open(PID_FILE, "w") as f:
@@ -117,14 +126,11 @@ async def keepalive_ping_loop():
         await asyncio.sleep(KEEPALIVE_PING_INTERVAL)
 
         # Check if parent AHK process is still alive
-        if PARENT_PID is not None:
-            try:
-                os.kill(PARENT_PID, 0)
-            except OSError:
-                log.info("Parent process (PID %d) is gone. Shutting down.", PARENT_PID)
-                logging.shutdown()
-                remove_pid_file()
-                os._exit(0)
+        if PARENT_PID is not None and not _is_process_alive(PARENT_PID):
+            log.info("Parent process (PID %d) is gone. Shutting down.", PARENT_PID)
+            logging.shutdown()
+            remove_pid_file()
+            os._exit(0)
 
         try:
             await http_client.get(target, headers={"authorization": auth_header})
