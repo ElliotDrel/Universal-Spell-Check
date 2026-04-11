@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** Spell checking must feel instant and invisible -- select, hotkey, done. Speed is the product.
-**Current focus:** Phase 1: Reliability and UX Foundation
+**Current focus:** Phase 1: Persistent Background Server
 
 ## Current Position
 
-Phase: 1 of 5 (Reliability and UX Foundation)
+Phase: 1 of 6 (Persistent Background Server)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-03-27 - Completed quick task 260327-ht2: Convert all old spell-check logs to new JSONL format
+Last activity: 2026-04-11 - Roadmap restructured: inserted Persistent Background Server as Phase 1, renumbered all phases
 
-Progress: [..........] 0%
+Progress: [............] 0%
 
 ## Performance Metrics
 
@@ -42,7 +42,7 @@ Progress: [..........] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Roadmap]: Reliability before performance -- fix correctness issues (clipboard, paste, keys) before optimizing latency
+- [Roadmap]: Speed first -- persistent background server before reliability work, then optimize further in Phase 4
 - [Roadmap]: PERF-02 (debug log gating) placed in Phase 2 with error handling since both reduce noise and improve signal clarity
 - [Roadmap]: Diff-based output (PERF-04) isolated in Phase 5 due to high risk and need for quality validation
 
@@ -50,10 +50,14 @@ Recent decisions affecting current work:
 
 - URL placeholder collision: `__URL_N__` markers in `ApplyReplacements()` could theoretically collide with literal AI output text. Low probability for natural text. Consider unique per-run prefix if this ever causes a real issue.
 
+### Roadmap Evolution
+
+- 2026-04-11: Inserted "Persistent Background Server" as Phase 1, renumbered all existing phases +1 (old 1→2, 2→3, 3→4, 4→5, 5→6). Phase 4 now builds on Phase 1's basic server with advanced optimization.
+
 ### Blockers/Concerns
 
-- Phase 3 research flag: Verify Predicted Outputs are still Chat Completions-only at implementation time
-- Phase 5 research flag: Quality of structured diff output for grammar corrections is untested -- validate before making default
+- Phase 4 research flag: Verify Predicted Outputs are still Chat Completions-only at implementation time
+- Phase 6 research flag: Quality of structured diff output for grammar corrections is untested -- validate before making default
 
 ### Quick Tasks Completed
 
@@ -63,6 +67,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-27
-Stopped at: Roadmap created, ready to plan Phase 1
+Last session: 2026-04-11
+Stopped at: Roadmap restructured, ready to plan Phase 1 (Persistent Background Server)
 Resume file: None
