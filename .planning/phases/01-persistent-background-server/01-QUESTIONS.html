@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 1: Persistent Background Server - Discussion Questions</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin-bottom: 8px; }
+.subtitle { color: #64748b; margin-bottom: 20px; font-size: 0.9rem; }
+.stats-bar { display: flex; gap: 24px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 24px; margin-bottom: 24px; }
+.stat { text-align: center; }
+.stat-num { font-size: 1.5rem; font-weight: 700; }
+.stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+.stat-num.green { color: #16a34a; }
+.stat-num.orange { color: #ea580c; }
+.progress-wrap { flex: 1; }
+.progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: #22c55e; border-radius: 4px; transition: width 0.3s; }
+.section { margin-bottom: 24px; }
+.section-header { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px 8px 0 0; padding: 12px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.section-header:hover { background: #f1f5f9; }
+.section-header h2 { font-size: 1.1rem; }
+.section-badge { font-size: 0.8rem; color: #64748b; }
+.section-body { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.section-body.collapsed { display: none; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; transition: border-color 0.2s, background 0.2s; }
+.card.answered { border: 2px solid #22c55e; background: #f0fdf4; }
+.card-id { display: inline-block; background: #e2e8f0; color: #475569; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+.card.answered .card-id { background: #bbf7d0; color: #166534; }
+.card-title { font-weight: 600; margin-bottom: 6px; }
+.card-context { font-size: 0.8rem; color: #64748b; font-style: italic; margin-bottom: 12px; line-height: 1.4; }
+.option { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 8px; border-radius: 6px; cursor: pointer; }
+.option:hover { background: #f1f5f9; }
+.option input[type="radio"] { margin-top: 3px; flex-shrink: 0; }
+.option-label { font-weight: 500; font-size: 0.9rem; }
+.option-desc { font-size: 0.8rem; color: #64748b; }
+.chat-more { width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8rem; resize: vertical; min-height: 48px; font-family: inherit; }
+.chat-more:focus { outline: none; border-color: #3b82f6; }
+.chat-more.has-content { border: 2px solid #f97316; }
+.btn-bar { display: flex; gap: 12px; margin: 24px 0; }
+.btn { padding: 10px 24px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #e2e8f0; color: #475569; }
+.btn-secondary:hover { background: #cbd5e1; }
+.instructions { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin-bottom: 24px; font-size: 0.85rem; line-height: 1.5; }
+.instructions code { background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Phase 1: Persistent Background Server</h1>
+<p class="subtitle">Discussion Questions - Answer at your own pace, then tell Claude "finalize"</p>
+
+<div class="instructions">
+  <strong>How to use:</strong> Select an option for each question. Optionally add context in the "Chat more" box.
+  Click <strong>Save Answers</strong> to download the updated JSON. Replace the original file, then tell Claude <code>refresh</code> or <code>finalize</code>.
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num" id="total-num">9</div><div class="stat-label">Total</div></div>
+  <div class="stat"><div class="stat-num green" id="answered-num">0</div><div class="stat-label">Answered</div></div>
+  <div class="stat"><div class="stat-num orange" id="remaining-num">9</div><div class="stat-label">Remaining</div></div>
+  <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div></div>
+</div>
+
+<div class="btn-bar">
+  <button class="btn btn-primary" onclick="saveAnswers()">Save Answers</button>
+  <button class="btn btn-secondary" onclick="expandAll()">Expand All</button>
+  <button class="btn btn-secondary" onclick="collapseAll()">Collapse All</button>
+</div>
+
+<div id="sections-container"></div>
+
+<div class="btn-bar">
+  <button class="btn btn-primary" onclick="saveAnswers()">Save Answers</button>
+</div>
+
+<script>
+const DATA = {
+  "phase": "01-persistent-background-server",
+  "generated_at": "2026-04-11T12:30:00Z",
+  "stats": { "total": 9, "answered": 0, "chat_more": 0, "remaining": 9 },
+  "sections": [
+    {
+      "id": "ahk-server-communication",
+      "title": "AHK-to-Server Communication",
+      "questions": [
+        {
+          "id": "Q-01", "title": "Request/response contract",
+          "context": "Research confirmed: Python (Starlette + httpx) is the stack -- all deps already installed. Currently AHK builds the full OpenAI JSON payload (model-specific branching for reasoning vs standard) and sends it directly. The server could be a dumb proxy or take on payload construction. Goal: maintain current functionality exactly.",
+          "options": [
+            { "id": "a", "label": "Transparent proxy -- AHK sends full OpenAI payload, server forwards it unchanged", "description": "Minimal AHK change (just swap URL). Server is a connection-warmer only. All model logic stays in AHK. Lowest risk to current functionality." },
+            { "id": "b", "label": "Smart proxy -- AHK sends text + model name, server builds the OpenAI payload", "description": "Simpler AHK code long-term, but duplicates model-specific logic in Python. Higher risk of behavior changes." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        },
+        {
+          "id": "Q-02", "title": "Port selection",
+          "context": "Research recommends fixed port 48080 (in the 49152-65535 dynamic/private range). Personal tool on one machine, so port conflict risk is low.",
+          "options": [
+            { "id": "a", "label": "Fixed port (48080)", "description": "Simplest -- AHK always knows where to connect. If it conflicts, server logs the error. Research recommends this." },
+            { "id": "b", "label": "Dynamic port with file-based discovery", "description": "Server writes port to a file, AHK reads it. Zero conflict risk, slightly more complex." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        }
+      ]
+    },
+    {
+      "id": "server-lifecycle",
+      "title": "Server Lifecycle",
+      "questions": [
+        {
+          "id": "Q-03", "title": "How the server starts",
+          "context": "AHK script runs on demand or auto-starts with Windows. The server needs to be running before the first spell check to avoid cold start. pythonw.exe runs .pyw invisibly.",
+          "options": [
+            { "id": "a", "label": "AHK auto-launches server on script startup (always warm)", "description": "Server starts when AHK starts. Always warm for first spell check. Research recommends this." },
+            { "id": "b", "label": "Lazy start -- AHK starts server on first spell check if not running", "description": "First check has ~3s cold-start penalty. No background process when not using spell check." },
+            { "id": "c", "label": "Windows startup task (independent of AHK)", "description": "Server runs even when AHK isn't loaded. Always warm. Requires one-time Task Scheduler setup." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        },
+        {
+          "id": "Q-04", "title": "Server shutdown behavior",
+          "context": "An idle Starlette/uvicorn server uses ~10 MB RAM. Research warns about zombie processes if AHK reloads. PID file prevents duplicates.",
+          "options": [
+            { "id": "a", "label": "Runs until system shutdown or manual kill", "description": "Always warm. Simple. PID file prevents duplicates." },
+            { "id": "b", "label": "Tied to AHK lifecycle (shuts down when AHK exits)", "description": "Clean lifecycle. No orphans. But cold start on AHK reload." },
+            { "id": "c", "label": "Auto-shutdown after idle timeout (e.g., 30 min)", "description": "Saves resources when not spell checking. Cold start after idle." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        },
+        {
+          "id": "Q-05", "title": "Fallback detection strategy",
+          "context": "Success criteria #4: AHK must fall back to direct API if server is down. Research recommends /health with 300ms timeout.",
+          "options": [
+            { "id": "a", "label": "Health check before each request (300ms timeout)", "description": "Proactive detection. Adds ~1-2ms when up, avoids waiting for dead server. Research recommends this." },
+            { "id": "b", "label": "Try proxy first, fall back on timeout/error", "description": "No extra round-trip when up. But waits for full timeout if dead." },
+            { "id": "c", "label": "Cache status -- check once at startup, re-check on failure", "description": "One health check, then assume up. Fast but stale if server dies mid-session." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        }
+      ]
+    },
+    {
+      "id": "api-key-handling",
+      "title": "API Key Handling",
+      "questions": [
+        {
+          "id": "Q-06", "title": "Where the API key lives for the server",
+          "context": "Currently hardcoded in AHK (line 1259). SEC-01 (env var) is Phase 2 scope. Research pattern: AHK passes it in Authorization header, server forwards it.",
+          "options": [
+            { "id": "a", "label": "AHK passes key in Authorization header, server forwards transparently", "description": "Server never stores the key. Zero change to key management. Research recommends this." },
+            { "id": "b", "label": "Hardcode key in server config too", "description": "Duplicates key in two places. Simpler server code but two places to update." },
+            { "id": "c", "label": "Move to env var now (pull SEC-01 into Phase 1)", "description": "Both AHK and server read OPENAI_API_KEY. Cleaner but expands scope." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        }
+      ]
+    },
+    {
+      "id": "logging-observability",
+      "title": "Logging and Observability",
+      "questions": [
+        {
+          "id": "Q-07", "title": "Server-side logging",
+          "context": "pythonw.exe swallows all stdout/stderr -- must log to file. AHK currently logs 30+ fields per invocation. Question: how much server logging?",
+          "options": [
+            { "id": "a", "label": "Server returns timing in response headers, AHK logs everything", "description": "Single log sink. Server adds X-Proxy-Ms and X-Connection-Reused headers." },
+            { "id": "b", "label": "Minimal server logging (errors + startup/shutdown only)", "description": "Server writes to logs/server.log for crashes. AHK logs round-trip. Simplest." },
+            { "id": "c", "label": "Server logs detailed JSONL too (separate file)", "description": "Rich debugging but harder to correlate. Overkill for Phase 1." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        },
+        {
+          "id": "Q-08", "title": "AHK log changes",
+          "context": "Current logs capture api_ms, parse_ms, paste_ms etc. With proxy, should we distinguish proxy vs direct path?",
+          "options": [
+            { "id": "a", "label": "Add proxy_used flag + proxy_ms timing to existing log schema", "description": "Minimal addition. Know which path was used and proxy overhead. Existing viewer still works." },
+            { "id": "b", "label": "No log changes -- api_ms captures total round-trip regardless", "description": "Simplest. Compare distributions manually between proxy/direct runs." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        }
+      ]
+    },
+    {
+      "id": "connection-tuning",
+      "title": "Connection Tuning",
+      "questions": [
+        {
+          "id": "Q-09", "title": "Keep-alive expiry for Phase 1",
+          "context": "httpx defaults to 5s (too short). OpenAI appears to idle-timeout at ~60s (LOW confidence). No proactive pinging in Phase 1 -- that's Phase 4 optimization.",
+          "options": [
+            { "id": "a", "label": "keepalive_expiry=120s (research recommendation)", "description": "Simple. First request after long idle pays TLS cost once. Good baseline." },
+            { "id": "b", "label": "keepalive_expiry=300s (5 min, more aggressive)", "description": "Longer warm windows. May outlast OpenAI's server-side timeout." }
+          ],
+          "answer": null, "chat_more": "", "status": "unanswered"
+        }
+      ]
+    }
+  ]
+};
+
+const container = document.getElementById('sections-container');
+
+function render() {
+  container.innerHTML = '';
+  DATA.sections.forEach(section => {
+    const answered = section.questions.filter(q => q.answer).length;
+    const div = document.createElement('div');
+    div.className = 'section';
+    div.innerHTML = `
+      <div class="section-header" onclick="toggleSection('${section.id}')">
+        <h2>${section.title} (${section.questions.length} questions)</h2>
+        <span class="section-badge">${answered}/${section.questions.length} answered</span>
+      </div>
+      <div class="section-body" id="body-${section.id}">
+        ${section.questions.map(q => renderCard(q, section.id)).join('')}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  updateStats();
+}
+
+function renderCard(q, sectionId) {
+  const cls = q.answer ? 'card answered' : 'card';
+  const chatCls = q.chat_more ? 'chat-more has-content' : 'chat-more';
+  return `
+    <div class="${cls}" id="card-${q.id}">
+      <span class="card-id">${q.id}</span>
+      <div class="card-title">${q.title}</div>
+      <div class="card-context">${q.context}</div>
+      ${q.options.map(o => `
+        <label class="option">
+          <input type="radio" name="${q.id}" value="${o.id}" ${q.answer === o.id ? 'checked' : ''} onchange="selectOption('${q.id}', '${o.id}')">
+          <div>
+            <div class="option-label">${o.label}</div>
+            ${o.description ? `<div class="option-desc">${o.description}</div>` : ''}
+          </div>
+        </label>
+      `).join('')}
+      <textarea class="${chatCls}" placeholder="Add context, nuance, or clarification..." oninput="updateChatMore('${q.id}', this)">${q.chat_more || ''}</textarea>
+    </div>
+  `;
+}
+
+function findQuestion(id) {
+  for (const s of DATA.sections)
+    for (const q of s.questions)
+      if (q.id === id) return q;
+  return null;
+}
+
+function selectOption(qId, optId) {
+  const q = findQuestion(qId);
+  if (q) { q.answer = optId; q.status = 'answered'; }
+  const card = document.getElementById('card-' + qId);
+  if (card) { card.className = 'card answered'; card.querySelector('.card-id').style.background = '#bbf7d0'; card.querySelector('.card-id').style.color = '#166534'; }
+  updateStats();
+}
+
+function updateChatMore(qId, el) {
+  const q = findQuestion(qId);
+  if (q) { q.chat_more = el.value; if (!q.answer && el.value) q.status = 'chat-more'; }
+  el.className = el.value ? 'chat-more has-content' : 'chat-more';
+  updateStats();
+}
+
+function updateStats() {
+  let answered = 0, chatMore = 0;
+  DATA.sections.forEach(s => s.questions.forEach(q => { if (q.answer) answered++; if (q.chat_more && !q.answer) chatMore++; }));
+  DATA.stats.answered = answered;
+  DATA.stats.chat_more = chatMore;
+  DATA.stats.remaining = DATA.stats.total - answered;
+  document.getElementById('total-num').textContent = DATA.stats.total;
+  document.getElementById('answered-num').textContent = answered;
+  document.getElementById('remaining-num').textContent = DATA.stats.remaining;
+  document.getElementById('progress-fill').style.width = (answered / DATA.stats.total * 100) + '%';
+  // Update section badges
+  DATA.sections.forEach(s => {
+    const a = s.questions.filter(q => q.answer).length;
+    const badge = document.querySelector(`#body-${s.id}`)?.previousElementSibling?.querySelector('.section-badge');
+    if (badge) badge.textContent = `${a}/${s.questions.length} answered`;
+  });
+}
+
+function toggleSection(id) {
+  const body = document.getElementById('body-' + id);
+  if (body) body.classList.toggle('collapsed');
+}
+
+function expandAll() { document.querySelectorAll('.section-body').forEach(b => b.classList.remove('collapsed')); }
+function collapseAll() { document.querySelectorAll('.section-body').forEach(b => b.classList.add('collapsed')); }
+
+function saveAnswers() {
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '01-QUESTIONS.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+render();
+</script>
+</body>
+</html>

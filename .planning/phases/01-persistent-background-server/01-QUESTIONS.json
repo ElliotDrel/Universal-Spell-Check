@@ -1,0 +1,247 @@
+{
+  "phase": "01-persistent-background-server",
+  "generated_at": "2026-04-11T12:30:00Z",
+  "stats": {
+    "total": 9,
+    "answered": 4,
+    "chat_more": 5,
+    "remaining": 5
+  },
+  "sections": [
+    {
+      "id": "ahk-server-communication",
+      "title": "AHK-to-Server Communication",
+      "questions": [
+        {
+          "id": "Q-01",
+          "title": "Request/response contract",
+          "context": "Research confirmed: Python (Starlette + httpx) is the stack -- all deps already installed. Currently AHK builds the full OpenAI JSON payload (model-specific branching for reasoning vs standard) and sends it directly. The server could be a dumb proxy or take on payload construction. Goal: maintain current functionality exactly.",
+          "options": [
+            {
+              "id": "a",
+              "label": "Transparent proxy -- AHK sends full OpenAI payload, server forwards it unchanged",
+              "description": "Minimal AHK change (just swap URL). Server is a connection-warmer only. All model logic stays in AHK. Lowest risk to current functionality."
+            },
+            {
+              "id": "b",
+              "label": "Smart proxy -- AHK sends text + model name, server builds the OpenAI payload",
+              "description": "Simpler AHK code long-term, but duplicates model-specific logic in Python. Higher risk of behavior changes."
+            }
+          ],
+          "answer": null,
+          "chat_more": "I need more detail on what you mean. First of all, is there a way to remove AHK from the equation if I have a server running, or is that only possible for the Windows app?\n\nIf it's not possible with just a basic server running, which of the following options would result in the fastest time to Paste in? I know from earlier research that what takes the longest is the network request, so what I was recommended to do is to keep the network request open via server. All I have to do is send the payload as soon as I want to spell check something.",
+          "status": "chat-more"
+        },
+        {
+          "id": "Q-02",
+          "title": "Port selection",
+          "context": "Research recommends fixed port 48080 (in the 49152-65535 dynamic/private range). Personal tool on one machine, so port conflict risk is low.",
+          "options": [
+            {
+              "id": "a",
+              "label": "Fixed port (48080)",
+              "description": "Simplest -- AHK always knows where to connect. If it conflicts, server logs the error. Research recommends this."
+            },
+            {
+              "id": "b",
+              "label": "Dynamic port with file-based discovery",
+              "description": "Server writes port to a file, AHK reads it. Zero conflict risk, slightly more complex."
+            }
+          ],
+          "answer": "a",
+          "chat_more": "",
+          "status": "answered"
+        }
+      ]
+    },
+    {
+      "id": "server-lifecycle",
+      "title": "Server Lifecycle",
+      "questions": [
+        {
+          "id": "Q-03",
+          "title": "How the server starts",
+          "context": "AHK script runs on demand or auto-starts with Windows. The server needs to be running before the first spell check to avoid cold start. pythonw.exe runs .pyw invisibly.",
+          "options": [
+            {
+              "id": "a",
+              "label": "AHK auto-launches server on script startup (always warm)",
+              "description": "Server starts when AHK starts. Always warm for first spell check. Research recommends this."
+            },
+            {
+              "id": "b",
+              "label": "Lazy start -- AHK starts server on first spell check if not running",
+              "description": "First check has ~3s cold-start penalty. No background process when not using spell check."
+            },
+            {
+              "id": "c",
+              "label": "Windows startup task (independent of AHK)",
+              "description": "Server runs even when AHK isn't loaded. Always warm. Requires one-time Task Scheduler setup."
+            }
+          ],
+          "answer": "a",
+          "chat_more": "",
+          "status": "answered"
+        },
+        {
+          "id": "Q-04",
+          "title": "Server shutdown behavior",
+          "context": "An idle Starlette/uvicorn server uses ~10 MB RAM. Research warns about zombie processes if AHK reloads. PID file prevents duplicates.",
+          "options": [
+            {
+              "id": "a",
+              "label": "Runs until system shutdown or manual kill",
+              "description": "Always warm. Simple. PID file prevents duplicates."
+            },
+            {
+              "id": "b",
+              "label": "Tied to AHK lifecycle (shuts down when AHK exits)",
+              "description": "Clean lifecycle. No orphans. But cold start on AHK reload."
+            },
+            {
+              "id": "c",
+              "label": "Auto-shutdown after idle timeout (e.g., 30 min)",
+              "description": "Saves resources when not spell checking. Cold start after idle."
+            }
+          ],
+          "answer": "a",
+          "chat_more": "",
+          "status": "answered"
+        },
+        {
+          "id": "Q-05",
+          "title": "Fallback detection strategy",
+          "context": "Success criteria #4: AHK must fall back to direct API if server is down. Research recommends /health with 300ms timeout.",
+          "options": [
+            {
+              "id": "a",
+              "label": "Health check before each request (300ms timeout)",
+              "description": "Proactive detection. Adds ~1-2ms when up, avoids waiting for dead server. Research recommends this."
+            },
+            {
+              "id": "b",
+              "label": "Try proxy first, fall back on timeout/error",
+              "description": "No extra round-trip when up. But waits for full timeout if dead."
+            },
+            {
+              "id": "c",
+              "label": "Cache status -- check once at startup, re-check on failure",
+              "description": "One health check, then assume up. Fast but stale if server dies mid-session."
+            }
+          ],
+          "answer": null,
+          "chat_more": "What do you mean by a health check? I feel like a health check and a fallback decision are two different questions, and I feel like you merged it into one. The answer to the fallback system is just fail; show the user an error that the server is down. This is a local tool for myself. There's an issue; I need to figure out what it is and fix it. I don't need it to have a good, graceful fallback.",
+          "status": "chat-more"
+        }
+      ]
+    },
+    {
+      "id": "api-key-handling",
+      "title": "API Key Handling",
+      "questions": [
+        {
+          "id": "Q-06",
+          "title": "Where the API key lives for the server",
+          "context": "Currently hardcoded in AHK (line 1259). SEC-01 (env var) is Phase 2 scope. Research pattern: AHK passes it in Authorization header, server forwards it.",
+          "options": [
+            {
+              "id": "a",
+              "label": "AHK passes key in Authorization header, server forwards transparently",
+              "description": "Server never stores the key. Zero change to key management. Research recommends this."
+            },
+            {
+              "id": "b",
+              "label": "Hardcode key in server config too",
+              "description": "Duplicates key in two places. Simpler server code but two places to update."
+            },
+            {
+              "id": "c",
+              "label": "Move to env var now (pull SEC-01 into Phase 1)",
+              "description": "Both AHK and server read OPENAI_API_KEY. Cleaner but expands scope."
+            }
+          ],
+          "answer": "c",
+          "chat_more": "",
+          "status": "answered"
+        }
+      ]
+    },
+    {
+      "id": "logging-observability",
+      "title": "Logging and Observability",
+      "questions": [
+        {
+          "id": "Q-07",
+          "title": "Server-side logging",
+          "context": "pythonw.exe swallows all stdout/stderr -- must log to file. AHK currently logs 30+ fields per invocation. Question: how much server logging?",
+          "options": [
+            {
+              "id": "a",
+              "label": "Server returns timing in response headers, AHK logs everything",
+              "description": "Single log sink. Server adds X-Proxy-Ms and X-Connection-Reused headers."
+            },
+            {
+              "id": "b",
+              "label": "Minimal server logging (errors + startup/shutdown only)",
+              "description": "Server writes to logs/server.log for crashes. AHK logs round-trip. Simplest."
+            },
+            {
+              "id": "c",
+              "label": "Server logs detailed JSONL too (separate file)",
+              "description": "Rich debugging but harder to correlate. Overkill for Phase 1."
+            }
+          ],
+          "answer": null,
+          "chat_more": "If the server would be faster at executing, let's move everything to the server. If the AHK file would be faster executing, we'll leave it in the AHK. Honestly, doesn't matter to me wherever it's easier, but we probably should have one source of truth. We can either just use the server for one part of the system, desending the request and then the AHK file doing the rest, or have it the other way around, when the server does everything and then the AHK file is just initiating the hot key.",
+          "status": "chat-more"
+        },
+        {
+          "id": "Q-08",
+          "title": "AHK log changes",
+          "context": "Current logs capture api_ms, parse_ms, paste_ms etc. With proxy, should we distinguish proxy vs direct path?",
+          "options": [
+            {
+              "id": "a",
+              "label": "Add proxy_used flag + proxy_ms timing to existing log schema",
+              "description": "Minimal addition. Know which path was used and proxy overhead. Existing viewer still works."
+            },
+            {
+              "id": "b",
+              "label": "No log changes -- api_ms captures total round-trip regardless",
+              "description": "Simplest. Compare distributions manually between proxy/direct runs."
+            }
+          ],
+          "answer": null,
+          "chat_more": "Since we will be, I don't want to maintain two different functionalities. The goal of the service is to make this better and faster, so we won't need to have the old functionality. Also, for logging purposes, we need to add all of the additional logs to thoroughly track everything that's happening in the system to make debugging really easy. Oh, and then also optimization so that we can see exactly where there are issues and where there is delay and lag. ",
+          "status": "chat-more"
+        }
+      ]
+    },
+    {
+      "id": "connection-tuning",
+      "title": "Connection Tuning",
+      "questions": [
+        {
+          "id": "Q-09",
+          "title": "Keep-alive expiry for Phase 1",
+          "context": "httpx defaults to 5s (too short). OpenAI appears to idle-timeout at ~60s (LOW confidence). No proactive pinging in Phase 1 -- that's Phase 4 optimization.",
+          "options": [
+            {
+              "id": "a",
+              "label": "keepalive_expiry=120s (research recommendation)",
+              "description": "Simple. First request after long idle pays TLS cost once. Good baseline."
+            },
+            {
+              "id": "b",
+              "label": "keepalive_expiry=300s (5 min, more aggressive)",
+              "description": "Longer warm windows. May outlast OpenAI's server-side timeout."
+            }
+          ],
+          "answer": null,
+          "chat_more": "what is this, and what does this have to do with anything",
+          "status": "chat-more"
+        }
+      ]
+    }
+  ]
+}
