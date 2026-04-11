@@ -116,7 +116,7 @@ The project uses a single active script with a top-level model selector.
   - Override: `SendText()` direct typing for apps listed in `sendTextApps`
 - Log API error bodies on non-200 responses for quick root-cause checks
 - Single clipboard operation for text replacement
-- Hardcoded API key to avoid configuration delays
+- `.env`-backed API key loaded once at startup to keep the hotkey path free of per-run config I/O
 
 ### Post-Processing Replacements System
 
@@ -355,7 +355,7 @@ A minimalist AutoHotkey script that provides instant AI-powered spell checking a
 - Clipboard API - Windows native clipboard format handling (CF_HTML, CF_UNICODETEXT, CF_TEXT)
 - Process/Window API - WinGetTitle, WinGetProcessName for active application tracking
 ## Configuration
-- API Key: Hardcoded in script (`.ahk` file line 877) - "sk-proj-..." format
+- API Key: `OPENAI_API_KEY` in root `.env`, loaded once at script startup
 - Model selection: Top-level `modelModule` variable (line 18) - supports "gpt-4.1", "gpt-5.1", "gpt-5-mini"
 - Per-app paste behavior: `sendTextApps` array (line 64) configurable for keystroke typing override
 - No build process - AutoHotkey scripts run directly
