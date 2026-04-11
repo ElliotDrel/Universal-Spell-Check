@@ -913,6 +913,7 @@ LogDetailed(data) {
         tokTotal := data.HasOwnProp("tokenTotal") ? data.tokenTotal : 0
         tokCached := data.HasOwnProp("tokenCached") ? data.tokenCached : 0
         tokReason := data.HasOwnProp("tokenReasoning") ? data.tokenReasoning : 0
+        proxyMs := data.HasOwnProp("proxyMs") ? data.proxyMs : ""
 
         ; Build single-line JSON object
         j := "{"
@@ -940,6 +941,7 @@ LogDetailed(data) {
         j .= ',"raw_ai_output":"' . JsonEscape(data.rawAiOutput) . '"'
         j .= ',"tokens":{"input":' . tokIn . ',"output":' . tokOut . ',"total":' . tokTotal . ',"cached":' . tokCached . ',"reasoning":' . tokReason . '}'
         j .= ',"timings":{"clipboard_ms":' . tClip . ',"payload_ms":' . tPayload . ',"request_ms":' . tReq . ',"api_ms":' . tApi . ',"parse_ms":' . tParse . ',"replacements_ms":' . tReplace . ',"prompt_guard_ms":' . tGuard . ',"paste_ms":' . tPaste . '}'
+        j .= ',"proxy":{"proxy_ms":"' . JsonEscape(proxyMs) . '"}'
         j .= ',"diagnostics":{"window_ms":' . diagWindow . ',"clipboard_ms":' . diagClipboard . ',"clipboard_probe_ms":' . diagClipboardProbe . ',"payload_ms":' . diagPayload . ',"response_ms":' . diagResponse . ',"output_ms":' . diagOutput . ',"paste_ms":' . diagPaste . ',"exception_ms":' . diagException . ',"finalize_queue_ms":' . diagFinalize . ',"total_ms":' . diagTotal . '}'
         j .= ',"replacements":{"count":' . repCount . ',"applied":' . repArr . ',"urls_protected":' . urlsProt . '}'
         j .= ',"prompt_leak":{"triggered":' . plTriggered . ',"occurrences":' . plOcc . ',"text_input_removed":' . plTextRemoved . ',"removed_chars":' . plRmChars . ',"before_length":' . plBefore . ',"after_length":' . plAfter . '}'
