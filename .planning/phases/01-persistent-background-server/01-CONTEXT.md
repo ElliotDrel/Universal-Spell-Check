@@ -31,9 +31,9 @@ A transparent HTTP proxy server running on localhost that maintains a warm conne
 - **D-09:** Pull SEC-01 into Phase 1. Both AHK and server read the API key from the `OPENAI_API_KEY` environment variable. AHK passes it in the Authorization header, server forwards it transparently. Remove the hardcoded key from the AHK script.
 
 ### Logging and Observability
-- **D-10:** Single source of truth: AHK logs everything to existing JSONL. Server returns timing metadata in response headers (`X-Proxy-Ms`, `X-Connection-Reused`, `X-TLS-Handshake-Ms`, `X-DNS-Ms`, `X-TCP-Connect-Ms`). AHK captures these into log entries.
+- **D-10:** Single source of truth: AHK logs everything to existing JSONL. Server returns `X-Proxy-Ms` response header (total proxy round-trip). Connection reuse is inferable from the value (sub-10ms = warm, 50ms+ = cold). Detailed breakdown (TLS, DNS, TCP, explicit reuse flag) deferred to Phase 4.
 - **D-11:** Server writes minimal logs to `logs/server.log` (startup, shutdown, errors only). Critical because `pythonw.exe` swallows stdout/stderr.
-- **D-12:** New AHK log fields: `proxy_ms` (localhost round-trip), `connection_reused` (bool), `tls_handshake_ms`, `dns_ms`, `tcp_connect_ms` (all from server response headers). Full breakdown for debugging and optimization.
+- **D-12:** New AHK log field: `proxy_ms` (from server `X-Proxy-Ms` response header). Single real measurement — no placeholder fields.
 - **D-13:** No dual-path logging. The server IS the path — no "proxy vs direct" distinction needed in logs.
 
 ### Claude's Discretion
