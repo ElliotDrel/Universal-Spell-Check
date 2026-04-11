@@ -24,6 +24,7 @@ from starlette.routing import Route
 
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = 48080
+PARENT_PID = None  # Set via --parent-pid; server exits when parent dies
 OPENAI_BASE_URL = "https://api.openai.com"
 KEEPALIVE_EXPIRY = 120.0          # seconds -- keep idle connections warm (D-07)
 KEEPALIVE_PING_INTERVAL = 45      # seconds between keep-alive pings (D-08)
@@ -31,6 +32,25 @@ KEEPALIVE_PING_INTERVAL = 45      # seconds between keep-alive pings (D-08)
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 PID_FILE = os.path.join(_script_dir, "logs", "server.pid")
 LOG_FILE = os.path.join(_script_dir, "logs", "server.log")
+_ENV_FILE = os.path.join(_script_dir, ".env")
+
+
+def _load_api_key() -> str:
+    """Load OPENAI_API_KEY from .env file, falling back to environment variable."""
+    if os.path.exists(_ENV_FILE):
+        with open(_ENV_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[7:].lstrip()
+                if line.startswith("OPENAI_API_KEY="):
+                    value = line.split("=", 1)[1].strip()
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                        value = value[1:-1]
+                    return value
+    return os.environ.get("OPENAI_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Logging -- critical because pythonw.exe swallows all stdout/stderr (D-11)
@@ -89,12 +109,23 @@ def remove_pid_file():
 
 async def keepalive_ping_loop():
     """Ping OpenAI every KEEPALIVE_PING_INTERVAL seconds to keep connections warm."""
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = _load_api_key()
     auth_header = "Bearer " + api_key
     target = OPENAI_BASE_URL + "/v1/models"
 
     while True:
         await asyncio.sleep(KEEPALIVE_PING_INTERVAL)
+
+        # Check if parent AHK process is still alive
+        if PARENT_PID is not None:
+            try:
+                os.kill(PARENT_PID, 0)
+            except OSError:
+                log.info("Parent process (PID %d) is gone. Shutting down.", PARENT_PID)
+                logging.shutdown()
+                remove_pid_file()
+                os._exit(0)
+
         try:
             await http_client.get(target, headers={"authorization": auth_header})
         except Exception as exc:
@@ -223,8 +254,17 @@ app = Starlette(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Parse --parent-pid argument
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if arg == "--parent-pid" and i < len(sys.argv) - 1:
+            try:
+                PARENT_PID = int(sys.argv[i + 1])
+            except ValueError:
+                pass
+            break
+
     try:
-        uvicorn.run(app, host=LISTEN_HOST, port=LISTEN_PORT, log_level="warning")
+        uvicorn.run(app, host=LISTEN_HOST, port=LISTEN_PORT, log_level="warning", log_config=None)
     except Exception as e:
         log.critical("Server failed to start: %s", e)
         remove_pid_file()

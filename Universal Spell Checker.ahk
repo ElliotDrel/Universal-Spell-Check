@@ -227,7 +227,7 @@ EnsureServerRunning() {
 
     ; Launch hidden via pythonw.exe (no console window)
     try {
-        Run('"pythonw.exe" "' . serverScriptPath . '"', A_ScriptDir, "Hide")
+        Run('"pythonw.exe" "' . serverScriptPath . '" --parent-pid ' . ProcessExist(), A_ScriptDir, "Hide")
     } catch Error as e {
         return false
     }
