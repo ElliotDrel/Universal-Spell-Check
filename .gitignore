@@ -14,10 +14,14 @@ obj/
 *.log
 logs/*.jsonl
 logs/viewer.html
+logs/benchmarks/
 
 # Ignore Python cache
 __pycache__/
 
-# 
+# Environment variables 
 .env
 .env*
+
+Server Files
+server.pid
