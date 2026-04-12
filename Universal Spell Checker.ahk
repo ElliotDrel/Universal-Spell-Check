@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "19"
+scriptVersion := "20"
 
 ; Logging configuration
 enableLogging := true
@@ -85,9 +85,33 @@ ShowTemporaryToolTip(message, durationMs := 3000) {
     SetTimer(() => ToolTip(), -durationMs)
 }
 
-SetTransientClipboardText(text) {
-    A_Clipboard := text
-    SetClipboardHistoryPolicy(false, false)
+FormatCaughtError(e) {
+    return e.Message
+        . (e.Line ? " | line=" . e.Line : "")
+        . (e.What != "" ? " | what=" . e.What : "")
+        . (e.Extra != "" ? " | extra=" . e.Extra : "")
+}
+
+WriteInternalErrorLog(context, details) {
+    global logDir
+    try {
+        if (!DirExist(logDir))
+            DirCreate(logDir)
+        entry := FormatTime(, "yyyy-MM-dd HH:mm:ss")
+            . " [" . context . "] "
+            . details . "`n"
+        FileAppend(entry, logDir . "\internal-errors.log", "UTF-8")
+    } catch {
+        ; Never let fallback logging break the main flow.
+    }
+}
+
+AppendErrorDetail(&details, message) {
+    if (message = "")
+        return
+    if (details != "")
+        details .= "; "
+    details .= message
 }
 
 AbortRun(logData, errorMessage, eventMessage := "", tooltipMessage := "", tooltipDurationMs := 3000) {
@@ -144,11 +168,13 @@ GetActiveWindowDebugInfo() {
 LoadRequiredEnvValue(envFilePath, envKey) {
     value := ReadEnvValueFromFile(envFilePath, envKey, &errorMessage)
     if (errorMessage != "") {
+        WriteInternalErrorLog("LoadRequiredEnvValue", "Failed to load " . envKey . " from " . envFilePath . " (" . errorMessage . ")")
         MsgBox("Failed to load " . envKey . " from " . envFilePath . "`n`n" . errorMessage)
         ExitApp
     }
 
     if (value = "") {
+        WriteInternalErrorLog("LoadRequiredEnvValue", "Missing required " . envKey . " in " . envFilePath)
         MsgBox("Missing required " . envKey . " in " . envFilePath)
         ExitApp
     }
@@ -211,7 +237,8 @@ IsProxyAvailable() {
         http.Open("GET", proxyHealthUrl, false)
         http.Send()
         return (http.Status = 200)
-    } catch {
+    } catch Error as e {
+        WriteInternalErrorLog("IsProxyAvailable", FormatCaughtError(e))
         return false
     }
 }
@@ -229,6 +256,7 @@ EnsureServerRunning() {
     try {
         Run('"pythonw.exe" "' . serverScriptPath . '" --parent-pid ' . ProcessExist(), A_ScriptDir, "Hide")
     } catch Error as e {
+        WriteInternalErrorLog("EnsureServerRunning", "Proxy launch failed: " . FormatCaughtError(e))
         return false
     }
 
@@ -331,12 +359,13 @@ LoadReplacements(&errorMessage := "") {
     return true
 }
 
-GetReplacementsMetadata(&lastModified, &fileSize, &status := "") {
+GetReplacementsMetadata(&lastModified, &fileSize, &status := "", &errorMessage := "") {
     global replacementsPath
 
     lastModified := ""
     fileSize := -1
     status := "ok"
+    errorMessage := ""
 
     if (!FileExist(replacementsPath)) {
         status := "missing"
@@ -347,8 +376,9 @@ GetReplacementsMetadata(&lastModified, &fileSize, &status := "") {
         lastModified := FileGetTime(replacementsPath, "M")
         fileSize := FileGetSize(replacementsPath)
         return true
-    } catch {
+    } catch Error as e {
         status := "error"
+        errorMessage := FormatCaughtError(e)
         return false
     }
 }
@@ -362,8 +392,9 @@ RefreshReplacementsIfChanged(&status, &details) {
     currentSize := -1
     cachedMetadata := FormatReplacementsMetadata(replacementsLastModified, replacementsFileSize)
     metadataStatus := ""
+    metadataError := ""
 
-    if !GetReplacementsMetadata(&currentModified, &currentSize, &metadataStatus) {
+    if !GetReplacementsMetadata(&currentModified, &currentSize, &metadataStatus, &metadataError) {
         if (metadataStatus = "missing") {
             postReplacements := []
             replacementsLastModified := ""
@@ -374,7 +405,7 @@ RefreshReplacementsIfChanged(&status, &details) {
         }
 
         status := "metadata_error"
-        details := "cached " . cachedMetadata . ", disk metadata unavailable"
+        details := "cached " . cachedMetadata . ", disk metadata unavailable" . (metadataError != "" ? " (" . metadataError . ")" : "")
         return true
     }
 
@@ -413,6 +444,7 @@ apiKey := LoadRequiredEnvValue(envPath, "OPENAI_API_KEY")
 
 ; Auto-launch proxy server on script startup (per D-04)
 if (!EnsureServerRunning()) {
+    WriteInternalErrorLog("Startup", "Proxy server failed to start or respond at " . proxyHealthUrl)
     ShowTemporaryToolTip("Spell check proxy server failed to start.`nCheck logs/server.log for details.", 5000)
 }
 
@@ -653,22 +685,43 @@ CaptureSelectedText(activeExe, &text, events, &clipboardDetails := 0) {
 
 ; Mark current clipboard content for Windows clipboard-history/cloud behavior.
 ; `canIncludeInHistory := false` makes transient data (like source Ctrl+C text) less likely to appear in Win+V history.
-SetClipboardHistoryPolicy(canIncludeInHistory := true, canUploadToCloud := true) {
+SetClipboardHistoryPolicy(canIncludeInHistory := true, canUploadToCloud := true, &errorDetails := "") {
     static CF_CAN_INCLUDE := DllCall("RegisterClipboardFormat", "str", "CanIncludeInClipboardHistory", "uint")
     static CF_CAN_UPLOAD := DllCall("RegisterClipboardFormat", "str", "CanUploadToCloudClipboard", "uint")
+    errorDetails := ""
 
-    if !DllCall("OpenClipboard", "ptr", 0)
+    if !DllCall("OpenClipboard", "ptr", 0) {
+        errorDetails := "OpenClipboard failed (last_error=" . DllCall("GetLastError") . ")"
         return false
+    }
 
     anySet := false
     try {
-        if (CF_CAN_INCLUDE)
-            anySet := __SetClipboardDwordFormat(CF_CAN_INCLUDE, canIncludeInHistory ? 1 : 0) || anySet
-        if (CF_CAN_UPLOAD)
-            anySet := __SetClipboardDwordFormat(CF_CAN_UPLOAD, canUploadToCloud ? 1 : 0) || anySet
+        if (CF_CAN_INCLUDE) {
+            lastError := 0
+            if (__SetClipboardDwordFormat(CF_CAN_INCLUDE, canIncludeInHistory ? 1 : 0, &lastError))
+                anySet := true
+            else
+                AppendErrorDetail(&errorDetails, "CanIncludeInClipboardHistory failed (last_error=" . lastError . ")")
+        } else
+            AppendErrorDetail(&errorDetails, "RegisterClipboardFormat(CanIncludeInClipboardHistory) returned 0")
+
+        if (CF_CAN_UPLOAD) {
+            lastError := 0
+            if (__SetClipboardDwordFormat(CF_CAN_UPLOAD, canUploadToCloud ? 1 : 0, &lastError))
+                anySet := true
+            else
+                AppendErrorDetail(&errorDetails, "CanUploadToCloudClipboard failed (last_error=" . lastError . ")")
+        } else
+            AppendErrorDetail(&errorDetails, "RegisterClipboardFormat(CanUploadToCloudClipboard) returned 0")
     } finally {
         DllCall("CloseClipboard")
     }
+
+    if (anySet && errorDetails != "")
+        errorDetails := "partial failure: " . errorDetails
+    if (!anySet && errorDetails = "")
+        errorDetails := "clipboard history policy formats were unavailable"
     return anySet
 }
 
@@ -737,7 +790,8 @@ __HtmlFragmentToPlainText(fragment) {
         doc.Close()
         if (doc.body)
             return doc.body.innerText
-    } catch {
+    } catch Error as e {
+        WriteInternalErrorLog("__HtmlFragmentToPlainText", FormatCaughtError(e))
         ; Fall through to caller so it can try Unicode/plain text representations
     }
     return ""
@@ -957,8 +1011,8 @@ LogDetailed(data) {
 
         logPath := ResolveLogPathForAppend(logDir, logFilePrefix, maxLogSize, StrPut(j, "UTF-8") - 1, data.timestamp)
         FileAppend(j, logPath)
-    } catch {
-        ; Silently fail if logging doesn't work - never break core functionality
+    } catch Error as e {
+        WriteInternalErrorLog("LogDetailed", FormatCaughtError(e))
     }
 }
 
@@ -1367,10 +1421,17 @@ FinalizeRun(logData) {
             return
         }
 
-        if (SetClipboardHistoryPolicy(false, false))
+        clipboardHistoryPolicyError := ""
+        if (SetClipboardHistoryPolicy(false, false, &clipboardHistoryPolicyError)) {
             logData.events.Push("Clipboard source marked as transient (history/cloud excluded)")
-        else
-            logData.events.Push("Clipboard source history-policy tag unavailable")
+            if (clipboardHistoryPolicyError != "") {
+                logData.events.Push("Clipboard source history-policy warning (" . clipboardHistoryPolicyError . ")")
+                WriteInternalErrorLog("SetClipboardHistoryPolicy(source)", clipboardHistoryPolicyError)
+            }
+        } else {
+            logData.events.Push("Clipboard source history-policy tag unavailable" . (clipboardHistoryPolicyError != "" ? " (" . clipboardHistoryPolicyError . ")" : ""))
+            WriteInternalErrorLog("SetClipboardHistoryPolicy(source)", clipboardHistoryPolicyError != "" ? clipboardHistoryPolicyError : "SetClipboardHistoryPolicy returned false during source capture")
+        }
         logData.original := originalText
         clipboardDebugStart := A_TickCount
         if (IsObject(clipboardDetails))
@@ -1421,10 +1482,12 @@ FinalizeRun(logData) {
             errPreview := ""
             try {
                 errPreview := GetUtf8Response(http)
-            } catch {
+            } catch Error as utf8Err {
+                logData.events.Push("API error body UTF-8 read failed: " . FormatCaughtError(utf8Err))
                 try {
                     errPreview := http.ResponseText
-                } catch {
+                } catch Error as responseTextErr {
+                    logData.events.Push("API error body ResponseText fallback failed: " . FormatCaughtError(responseTextErr))
                     errPreview := ""
                 }
             }
@@ -1448,8 +1511,9 @@ FinalizeRun(logData) {
         ; Capture proxy timing headers (per D-10, D-12)
         try {
             logData.proxyMs := http.GetResponseHeader("X-Proxy-Ms")
-        } catch {
+        } catch Error as proxyHeaderErr {
             logData.proxyMs := ""
+            logData.events.Push("Proxy header read failed: " . FormatCaughtError(proxyHeaderErr))
         }
         logData.events.Push("Proxy headers: proxy_ms=" . logData.proxyMs)
 
