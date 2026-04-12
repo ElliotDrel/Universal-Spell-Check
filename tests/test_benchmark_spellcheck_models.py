@@ -10,6 +10,23 @@ import httpx
 import benchmark_spellcheck_models as bench
 
 
+class MockTransport:
+    """Wraps a callable (case, model) -> ApiCallResult for tests."""
+
+    def __init__(self, fn):
+        self._fn = fn
+
+    def send(self, case, model):
+        payload_text = bench.build_ahk_request_payload_string(case, model)
+        result = self._fn(payload_text)
+        if result.request_info is None:
+            result.request_info = {"provider": "openai"}
+        return result
+
+    def close(self):
+        pass
+
+
 class BenchmarkSpellcheckModelsTests(unittest.TestCase):
     def test_versioned_dataset_path_format(self):
         versioned_path = bench.build_versioned_dataset_path(
@@ -523,7 +540,7 @@ class BenchmarkSpellcheckModelsTests(unittest.TestCase):
         preflight, warmups, records = bench.run_benchmark(
             [case],
             ["good-model", "bad-model"],
-            fake_caller,
+            MockTransport(fake_caller),
             [],
         )
 
@@ -615,7 +632,7 @@ class BenchmarkSpellcheckModelsTests(unittest.TestCase):
             result_holder["result"] = bench.run_benchmark(
                 cases,
                 ["good-model"],
-                fake_caller,
+                MockTransport(fake_caller),
                 [],
                 batch_size=2,
                 progress_every=0,

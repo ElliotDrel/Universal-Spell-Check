@@ -22,6 +22,8 @@ from typing import Any, Callable
 import difflib
 import httpx
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types as genai_types
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -46,7 +48,7 @@ OUTPUT_TEXT_RE = re.compile(
     re.DOTALL,
 )
 
-DEFAULT_MODELS = ["gpt-4.1", "gpt-5.4-mini", "gpt-5.4-nano"]
+DEFAULT_MODELS = ["gpt-4.1", "gemini-2.5-flash-lite", "gemini-2.5-flash"]
 DEFAULT_BUCKETS = [
     "unchanged",
     "capitalization_only",
@@ -93,6 +95,8 @@ class ApiCallResult:
     retry_count: int = 0
     rate_limit_observed: bool = False
     response_headers: dict[str, str] | None = None
+    extracted_text: str | None = None
+    request_info: dict[str, Any] | None = None
 
 
 @dataclass
@@ -103,6 +107,12 @@ class AhkModelProfile:
     temperature: float | None
     reasoning_effort: str
     reasoning_summary: str
+
+
+def get_provider(model: str) -> str:
+    if model.startswith("gemini-"):
+        return "gemini"
+    return "openai"
 
 
 def parse_args() -> argparse.Namespace:
@@ -158,7 +168,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def get_ahk_model_profile(model: str) -> AhkModelProfile:
-    if model == "gpt-4.1":
+    if model in {"gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"} or model.startswith("ft:gpt-4.1"):
         return AhkModelProfile(
             api_model=model,
             api_uses_reasoning=False,
@@ -176,7 +186,7 @@ def get_ahk_model_profile(model: str) -> AhkModelProfile:
             reasoning_effort="none",
             reasoning_summary="auto",
         )
-    if model == "gpt-5-mini":
+    if model in {"gpt-5-mini", "gpt-5-nano"}:
         return AhkModelProfile(
             api_model=model,
             api_uses_reasoning=True,
@@ -285,12 +295,121 @@ class ResponsesTransport:
             client.close()
 
 
-def load_api_key() -> str:
+class MultiProviderTransport:
+    def __init__(
+        self,
+        api_keys: dict[str, str],
+        max_rate_limit_retries: int = 2,
+    ) -> None:
+        self._max_rate_limit_retries = max_rate_limit_retries
+        self._openai: ResponsesTransport | None = None
+        if "openai" in api_keys:
+            self._openai = ResponsesTransport(api_keys["openai"], max_rate_limit_retries)
+        self._gemini_client: genai.Client | None = None
+        if "gemini" in api_keys:
+            self._gemini_client = genai.Client(api_key=api_keys["gemini"])
+
+    def send(self, case: GoldCase, model: str) -> ApiCallResult:
+        provider = get_provider(model)
+        if provider == "openai":
+            return self._send_openai(case, model)
+        if provider == "gemini":
+            return self._send_gemini(case, model)
+        return ApiCallResult(
+            False, None, 0, "", None,
+            error=f"Unknown provider for model: {model}",
+        )
+
+    def _send_openai(self, case: GoldCase, model: str) -> ApiCallResult:
+        if not self._openai:
+            return ApiCallResult(False, None, 0, "", None, error="OPENAI_API_KEY not configured")
+        payload_text = build_ahk_request_payload_string(case, model)
+        result = self._openai.send(payload_text)
+        result.request_info = {"provider": "openai", "payload": json.loads(payload_text)}
+        return result
+
+    def _send_gemini(self, case: GoldCase, model: str) -> ApiCallResult:
+        if not self._gemini_client:
+            return ApiCallResult(False, None, 0, "", None, error="GEMINI_API_KEY not configured")
+        source_text = case.source_text
+        config_kwargs: dict[str, Any] = {"temperature": 0.3}
+        if "flash-lite" not in model:
+            config_kwargs["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=0)
+        config = genai_types.GenerateContentConfig(
+            system_instruction=PROMPT_INSTRUCTION_TEXT,
+            **config_kwargs,
+        )
+        started = time.perf_counter()
+        retry_count = 0
+        rate_limit_observed = False
+        while True:
+            try:
+                response = self._gemini_client.models.generate_content(
+                    model=model,
+                    contents=source_text,
+                    config=config,
+                )
+                api_ms = round((time.perf_counter() - started) * 1000, 1)
+                text = response.text or ""
+                usage: dict[str, Any] = {}
+                if response.usage_metadata:
+                    usage = {
+                        "input_tokens": response.usage_metadata.prompt_token_count,
+                        "output_tokens": response.usage_metadata.candidates_token_count,
+                        "total_tokens": response.usage_metadata.total_token_count,
+                    }
+                return ApiCallResult(
+                    ok=True, status_code=200, api_ms=api_ms,
+                    raw_text=text, response_json={"usage": usage},
+                    extracted_text=text,
+                    retry_count=retry_count,
+                    rate_limit_observed=rate_limit_observed,
+                    request_info={
+                        "provider": "gemini", "model": model,
+                        "temperature": 0.3,
+                        "thinking_disabled": "flash-lite" not in model,
+                    },
+                )
+            except Exception as exc:
+                err_str = str(exc)
+                is_rate_limit = "429" in err_str or "ResourceExhausted" in err_str
+                if is_rate_limit:
+                    rate_limit_observed = True
+                    if retry_count < self._max_rate_limit_retries:
+                        delay = min(2.0 * (2 ** retry_count), 30.0)
+                        retry_count += 1
+                        time.sleep(delay)
+                        continue
+                api_ms = round((time.perf_counter() - started) * 1000, 1)
+                return ApiCallResult(
+                    ok=False, status_code=429 if is_rate_limit else None,
+                    api_ms=api_ms,
+                    raw_text="", response_json=None, error=err_str,
+                    retry_count=retry_count,
+                    rate_limit_observed=rate_limit_observed,
+                    request_info={"provider": "gemini", "model": model},
+                )
+
+    def close(self) -> None:
+        if self._openai:
+            self._openai.close()
+
+
+def load_api_keys(models: list[str]) -> dict[str, str]:
     load_dotenv(ENV_PATH)
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError(f"OPENAI_API_KEY is missing from {ENV_PATH}")
-    return api_key
+    keys: dict[str, str] = {}
+    providers_needed = {get_provider(m) for m in models}
+    if "openai" in providers_needed:
+        key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError(f"OPENAI_API_KEY is missing from {ENV_PATH}")
+        keys["openai"] = key
+    if "gemini" in providers_needed:
+        key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError(f"GEMINI_API_KEY is missing from {ENV_PATH}")
+        keys["gemini"] = key
+    return keys
 
 
 def load_replacements(path: Path) -> list[tuple[str, str]]:
@@ -939,14 +1058,13 @@ def send_responses_request_raw(
 
 def preflight_models(
     models: list[str],
-    caller: Callable[[str], ApiCallResult],
+    transport: MultiProviderTransport,
 ) -> dict[str, dict[str, Any]]:
     statuses: dict[str, dict[str, Any]] = {}
     probe_case = build_probe_case()
 
     for model in models:
-        payload_text = build_ahk_request_payload_string(probe_case, model)
-        result = caller(payload_text)
+        result = transport.send(probe_case, model)
         statuses[model] = {
             "status": "ok" if result.ok else "error",
             "status_code": result.status_code,
@@ -965,13 +1083,13 @@ def finalize_output(raw_text: str, replacements: list[tuple[str, str]]) -> tuple
 def run_single_case(
     case: GoldCase,
     model: str,
-    caller: Callable[[str], ApiCallResult],
+    transport: MultiProviderTransport,
     replacements: list[tuple[str, str]],
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    payload_text = build_ahk_request_payload_string(case, model)
-    payload = json.loads(payload_text)
-    result = caller(payload_text)
+    result = transport.send(case, model)
+    payload = result.request_info or {}
+    payload_text = json.dumps(payload, ensure_ascii=False)
     raw_output = ""
     postprocessed_output = ""
     normalized_output = ""
@@ -987,7 +1105,10 @@ def run_single_case(
     urls_protected = 0
 
     if result.ok:
-        raw_output = extract_output_text(result.response_json, result.raw_text)
+        if result.extracted_text is not None:
+            raw_output = result.extracted_text
+        else:
+            raw_output = extract_output_text(result.response_json, result.raw_text)
         postprocessed_output, prompt_guard, applied_replacements, urls_protected = finalize_output(
             raw_output,
             replacements,
@@ -1267,7 +1388,7 @@ def format_elapsed_seconds(started_at: float) -> str:
 def run_benchmark(
     cases: list[GoldCase],
     models: list[str],
-    caller: Callable[[str], ApiCallResult],
+    transport: MultiProviderTransport,
     replacements: list[tuple[str, str]],
     batch_size: int = 10,
     progress_every: int = 10,
@@ -1278,7 +1399,7 @@ def run_benchmark(
         f"({len(cases) * len(models)} planned calls)"
     )
     print("Preflight: validating model availability")
-    preflight = preflight_models(models, caller)
+    preflight = preflight_models(models, transport)
     warmups: dict[str, Any] = {}
     runnable_models = [model for model, info in preflight.items() if info["status"] == "ok"]
     skipped_models = [model for model, info in preflight.items() if info["status"] != "ok"]
@@ -1292,7 +1413,7 @@ def run_benchmark(
     warmup_case = cases[0]
     print(f"Warmup: 1 case per runnable model ({len(runnable_models)} total)")
     for model in runnable_models:
-        warmups[model] = run_single_case(warmup_case, model, caller, replacements)
+        warmups[model] = run_single_case(warmup_case, model, transport, replacements)
 
     total_calls = len(cases) * len(runnable_models)
     effective_batch_size = max(1, batch_size)
@@ -1313,7 +1434,7 @@ def run_benchmark(
         for batch_start in range(0, len(jobs), effective_batch_size):
             batch_jobs = jobs[batch_start : batch_start + effective_batch_size]
             futures = {
-                executor.submit(run_single_case, case, model, caller, replacements): job_index
+                executor.submit(run_single_case, case, model, transport, replacements): job_index
                 for job_index, case, model in batch_jobs
             }
             for future in concurrent.futures.as_completed(futures):
@@ -1383,14 +1504,14 @@ def main() -> int:
         print(f"Cases: {len(cases)}")
         return 0
 
-    api_key = load_api_key()
+    api_keys = load_api_keys(args.models)
 
-    transport = ResponsesTransport(api_key, max_rate_limit_retries=args.max_rate_limit_retries)
+    transport = MultiProviderTransport(api_keys, max_rate_limit_retries=args.max_rate_limit_retries)
     try:
         preflight, warmups, records = run_benchmark(
             cases,
             args.models,
-            transport.send,
+            transport,
             replacements,
             batch_size=args.batch_size,
             progress_every=args.progress_every,
