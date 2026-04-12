@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "18"
+scriptVersion := "19"
 
 ; Logging configuration
 enableLogging := true
@@ -672,16 +672,20 @@ SetClipboardHistoryPolicy(canIncludeInHistory := true, canUploadToCloud := true)
     return anySet
 }
 
-__SetClipboardDwordFormat(formatId, value) {
+__SetClipboardDwordFormat(formatId, value, &lastError := 0) {
     static GMEM_MOVEABLE := 0x2
     static GMEM_ZEROINIT := 0x40
 
+    lastError := 0
     hMem := DllCall("GlobalAlloc", "uint", GMEM_MOVEABLE | GMEM_ZEROINIT, "uptr", 4, "ptr")
-    if !hMem
+    if !hMem {
+        lastError := DllCall("GetLastError")
         return false
+    }
 
     pMem := DllCall("GlobalLock", "ptr", hMem, "ptr")
     if !pMem {
+        lastError := DllCall("GetLastError")
         DllCall("GlobalFree", "ptr", hMem)
         return false
     }
@@ -690,6 +694,7 @@ __SetClipboardDwordFormat(formatId, value) {
     DllCall("GlobalUnlock", "ptr", hMem)
 
     if !DllCall("SetClipboardData", "uint", formatId, "ptr", hMem, "ptr") {
+        lastError := DllCall("GetLastError")
         DllCall("GlobalFree", "ptr", hMem)
         return false
     }
@@ -1599,7 +1604,7 @@ FinalizeRun(logData) {
                 }
                 logData.events.Push("Paste continuing despite hotkey-release timeout for standard app")
             }
-            SetTransientClipboardText(correctedText)
+            A_Clipboard := correctedText
             logData.events.Push("Clipboard updated for paste (" . StrLen(correctedText) . " chars)")
             logData.diagnostics.pasteDebugMs := A_TickCount - pasteDebugStart
             logData.pasteAttempted := true
