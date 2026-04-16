@@ -21,6 +21,7 @@ The project uses a single active script with a top-level model selector.
 ### Common Features
 - AutoHotkey v2.0 scripts optimized for performance
 - Direct OpenAI API integration via Responses API
+- Local `spellcheck-server.pyw` proxy is required; the script hard-fails if the proxy cannot be started or recovered
 - Instant text replacement via clipboard (or `SendText()` per app)
 - Global hotkey: Ctrl+Alt+U
 - Structured JSONL logging with full timing breakdown, token counts, active app tracking
@@ -42,13 +43,15 @@ The project uses a single active script with a top-level model selector.
 ### Text Processing Flow (Optimized)
 1. User selects text and presses Ctrl+Alt+U
 2. Replacements are loaded once at startup, then `replacements.json` is reparsed only when its modified timestamp or file size changes
-3. Script uses the original fast single-copy path for normal apps, but `notepad.exe` also waits for the hotkey to release, retries `Ctrl+C` up to 3 times, and may abort paste if `Ctrl+Alt+U` never fully releases
-4. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
-5. Sends text directly to OpenAI API
-6. Parses response (regex primary -> Map-based fallback)
-7. `ApplyReplacements()` fixes known brand/term casing in AI output
-8. `StripPromptLeak()` removes accidental echoed instruction blocks (simple string check against `promptInstructionText`)
-9. Replaces selected text via clipboard paste (Ctrl+V) or `SendText()` depending on active app
+3. On startup, the script requires the local proxy to be healthy; it uses a 3-attempt launch/restart sequence with 5s, 30s, and 60s readiness budgets
+4. Script uses the original fast single-copy path for normal apps, but `notepad.exe` also waits for the hotkey to release, retries `Ctrl+C` up to 3 times, and may abort paste if `Ctrl+Alt+U` never fully releases
+5. `GetClipboardText()` reads content, preferring HTML format to strip formatting noise
+6. Before each request, the script does a fast proxy health check and reruns the same recovery sequence if the proxy died mid-session
+7. Sends text to the local proxy, which forwards to the OpenAI Responses API using a warm connection pool
+8. Parses response (regex primary -> Map-based fallback)
+9. `ApplyReplacements()` fixes known brand/term casing in AI output
+10. `StripPromptLeak()` removes accidental echoed instruction blocks (simple string check against `promptInstructionText`)
+11. Replaces selected text via clipboard paste (Ctrl+V) or `SendText()` depending on active app
 
 ### OpenAI API Integration
 - **Endpoint**: `https://api.openai.com/v1/responses` (all models use Responses API)
@@ -80,6 +83,12 @@ The project uses a single active script with a top-level model selector.
 - `store`: `true` (required for all models)
 
 ### Performance Optimizations
+- **Required persistent proxy startup/recovery**
+  - `spellcheck-server.pyw` is mandatory for every spell check; the script exits if all recovery attempts fail
+  - Attempt 1 waits 5s and shows a single "starting slowly" tooltip on failure
+  - Attempt 2 performs a full shutdown/restart and waits 30s
+  - Attempt 3 performs another full shutdown/restart and waits 60s
+  - Expected probe failures during those waits use silent health checks so `internal-errors.log` only gets concise per-attempt summaries plus final exhaustion
 - Direct WinHTTP COM object for API calls
 - **Regex-based JSON text extraction** (primary method - fastest)
   - Single RegEx match extracts corrected text directly
@@ -295,6 +304,7 @@ When debugging unclear issues, prepare multiple approaches:
 - **Official docs only**: When user emphasizes official documentation, be strategic in searches when direct access fails
 - The scripts are intentionally minimal - but temporary debug logging is acceptable for troubleshooting
 - Focus on the .ahk files, not the abandoned C# application in the App folder
+- Proxy startup is now a required dependency path: keep the 5s/30s/60s attempt ladder, full restart between attempts 2 and 3, and fail fast with `ExitApp` after exhaustion so the script never stays loaded in a broken state
 
 ### Clipboard / Hotkey Watchlist
 - Keep an eye on `Notepad.exe` for hotkey-release timing issues where `Ctrl+Alt+U` is still physically down when the script tries follow-up `Ctrl+C` or `Ctrl+V`

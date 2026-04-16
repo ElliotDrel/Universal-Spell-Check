@@ -5,7 +5,7 @@
 ; reload or manually retest it. Every log entry records this value as
 ; `script_version`, so stale reloads and "forgot to reload" test runs are easy
 ; to spot immediately.
-scriptVersion := "20"
+scriptVersion := "21"
 
 ; Logging configuration
 enableLogging := true
@@ -70,6 +70,11 @@ proxyBaseUrl := "http://" . proxyHost . ":" . proxyPort
 proxyApiUrl := proxyBaseUrl . "/v1/responses"
 proxyHealthUrl := proxyBaseUrl . "/health"
 serverScriptPath := A_ScriptDir . "\spellcheck-server.pyw"
+proxyPidFilePath := logDir . "\server.pid"
+proxyStartupBudgets := [5000, 30000, 60000]
+proxyLastLaunchedPid := 0
+proxyFatalExitRequested := false
+proxyFatalExitMessage := ""
 
 ; Prompt text (single source of truth).
 ; Reused for request construction and prompt-leak safeguard detection.
@@ -83,6 +88,13 @@ if (!DirExist(A_ScriptDir . "\logs")) {
 ShowTemporaryToolTip(message, durationMs := 3000) {
     ToolTip(message)
     SetTimer(() => ToolTip(), -durationMs)
+}
+
+ShowFatalTooltipAndExit(message, durationMs := 5000) {
+    ToolTip(message)
+    Sleep(durationMs)
+    ToolTip()
+    ExitApp
 }
 
 FormatCaughtError(e) {
@@ -112,6 +124,26 @@ AppendErrorDetail(&details, message) {
     if (details != "")
         details .= "; "
     details .= message
+}
+
+JoinMessages(messages, separator := "; ") {
+    joined := ""
+    if !IsObject(messages)
+        return joined
+
+    for , message in messages {
+        if (message = "")
+            continue
+        if (joined != "")
+            joined .= separator
+        joined .= message
+    }
+    return joined
+}
+
+PushProxyEvent(events, message) {
+    if (IsObject(events))
+        events.Push(message)
 }
 
 AbortRun(logData, errorMessage, eventMessage := "", tooltipMessage := "", tooltipDurationMs := 3000) {
@@ -229,44 +261,226 @@ ReadEnvValueFromFile(envFilePath, envKey, &errorMessage := "") {
 }
 
 ; Check if proxy server is responding (fast health check with 300ms timeout)
-IsProxyAvailable() {
+IsProxyAvailable(silent := false, &failureDetail := "") {
     global proxyHealthUrl
+    failureDetail := ""
     try {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(300, 300, 300, 300)
         http.Open("GET", proxyHealthUrl, false)
         http.Send()
-        return (http.Status = 200)
+        if (http.Status = 200)
+            return true
+        failureDetail := "health returned HTTP " . http.Status . " " . http.StatusText
+        if (!silent)
+            WriteInternalErrorLog("IsProxyAvailable", failureDetail)
+        return false
     } catch Error as e {
-        WriteInternalErrorLog("IsProxyAvailable", FormatCaughtError(e))
+        failureDetail := FormatCaughtError(e)
+        if (!silent)
+            WriteInternalErrorLog("IsProxyAvailable", failureDetail)
         return false
     }
 }
 
-; Auto-launch proxy server if not already running (per D-04, D-05)
-EnsureServerRunning() {
-    global serverScriptPath
-    if (IsProxyAvailable())
-        return true
-
-    if !FileExist(serverScriptPath)
-        return false
-
-    ; Launch hidden via pythonw.exe (no console window)
-    try {
-        Run('"pythonw.exe" "' . serverScriptPath . '" --parent-pid ' . ProcessExist(), A_ScriptDir, "Hide")
-    } catch Error as e {
-        WriteInternalErrorLog("EnsureServerRunning", "Proxy launch failed: " . FormatCaughtError(e))
-        return false
-    }
-
-    ; Poll for server readiness (up to 5 seconds)
-    deadline := A_TickCount + 5000
-    while (A_TickCount < deadline) {
-        if (IsProxyAvailable())
+WaitForProxyReady(timeoutMs, &lastProbeDetail := "") {
+    lastProbeDetail := ""
+    startTick := A_TickCount
+    while ((A_TickCount - startTick) < timeoutMs) {
+        probeDetail := ""
+        if (IsProxyAvailable(true, &probeDetail))
             return true
+        if (probeDetail != "")
+            lastProbeDetail := probeDetail
         Sleep(100)
     }
+
+    probeDetail := ""
+    if (IsProxyAvailable(true, &probeDetail))
+        return true
+    if (probeDetail != "")
+        lastProbeDetail := probeDetail
+    return false
+}
+
+ReadProxyPidFile(&detail := "") {
+    global proxyPidFilePath
+    detail := ""
+    if !FileExist(proxyPidFilePath) {
+        detail := "server.pid missing"
+        return 0
+    }
+
+    try rawPid := Trim(FileRead(proxyPidFilePath, "UTF-8"), " `t`r`n")
+    catch Error as e {
+        detail := "server.pid read failed (" . FormatCaughtError(e) . ")"
+        return 0
+    }
+
+    if (rawPid = "") {
+        detail := "server.pid empty"
+        return 0
+    }
+
+    try pid := Integer(rawPid)
+    catch Error {
+        detail := "server.pid invalid (" . rawPid . ")"
+        return 0
+    }
+
+    detail := "server.pid PID=" . pid
+    return pid
+}
+
+WaitForProcessExit(pid, timeoutMs) {
+    startTick := A_TickCount
+    while (ProcessExist(pid) && (A_TickCount - startTick) < timeoutMs)
+        Sleep(100)
+    return !ProcessExist(pid)
+}
+
+LaunchProxyServer(&launchedPid, &failureDetail := "", events := "") {
+    global serverScriptPath, proxyLastLaunchedPid
+    launchedPid := 0
+    failureDetail := ""
+
+    if !FileExist(serverScriptPath) {
+        failureDetail := "server script missing at " . serverScriptPath
+        PushProxyEvent(events, "Proxy launch failed (" . failureDetail . ")")
+        return false
+    }
+
+    try {
+        Run('"pythonw.exe" "' . serverScriptPath . '" --parent-pid ' . ProcessExist(), A_ScriptDir, "Hide", &launchedPid)
+        proxyLastLaunchedPid := launchedPid
+        PushProxyEvent(events, "Proxy launch spawned PID " . launchedPid)
+        return true
+    } catch Error as e {
+        failureDetail := FormatCaughtError(e)
+        PushProxyEvent(events, "Proxy launch failed (" . failureDetail . ")")
+        return false
+    }
+}
+
+StopProxyServer(candidatePid := 0, events := "") {
+    global proxyPidFilePath, proxyLastLaunchedPid
+    summaries := []
+    pids := []
+
+    if (candidatePid <= 0)
+        candidatePid := proxyLastLaunchedPid
+    if (candidatePid > 0)
+        pids.Push(candidatePid)
+
+    pidFileDetail := ""
+    pidFromFile := ReadProxyPidFile(&pidFileDetail)
+    if (pidFromFile > 0) {
+        if (candidatePid != pidFromFile)
+            pids.Push(pidFromFile)
+        PushProxyEvent(events, "Proxy stop check used PID from server.pid: " . pidFromFile)
+    } else if (pidFileDetail != "") {
+        PushProxyEvent(events, "Proxy stop check: " . pidFileDetail)
+    }
+
+    for , pid in pids {
+        if !ProcessExist(pid) {
+            summaries.Push("PID " . pid . " not running")
+            continue
+        }
+
+        try {
+            ProcessClose(pid)
+            if (WaitForProcessExit(pid, 2000))
+                summaries.Push("PID " . pid . " terminated")
+            else
+                summaries.Push("PID " . pid . " still running after close request")
+        } catch Error as e {
+            summaries.Push("PID " . pid . " close failed (" . FormatCaughtError(e) . ")")
+        }
+    }
+
+    if FileExist(proxyPidFilePath) {
+        try {
+            FileDelete(proxyPidFilePath)
+            summaries.Push("deleted stale server.pid")
+        } catch Error as e {
+            summaries.Push("server.pid delete failed (" . FormatCaughtError(e) . ")")
+        }
+    }
+
+    if (candidatePid = proxyLastLaunchedPid)
+        proxyLastLaunchedPid := 0
+
+    return JoinMessages(summaries)
+}
+
+; Auto-launch proxy server if not already running (per D-04, D-05)
+EnsureServerRunning(events := "", failureContext := "startup", &failureSummary := "") {
+    global proxyHealthUrl, proxyStartupBudgets
+
+    failureSummary := ""
+    initialProbeDetail := ""
+    if (IsProxyAvailable(true, &initialProbeDetail)) {
+        PushProxyEvent(events, "Proxy health check passed; server already available")
+        return true
+    }
+
+    attemptCount := proxyStartupBudgets.Length
+    attemptFailures := []
+    launchedPid := 0
+
+    Loop attemptCount {
+        attemptNumber := A_Index
+        timeoutMs := proxyStartupBudgets[attemptNumber]
+        PushProxyEvent(events, "Proxy startup attempt " . attemptNumber . "/" . attemptCount . " started (budget=" . timeoutMs . "ms)")
+
+        if (attemptNumber > 1) {
+            stopSummary := StopProxyServer(launchedPid, events)
+            if (stopSummary != "")
+                PushProxyEvent(events, "Proxy restart cleanup before attempt " . attemptNumber . ": " . stopSummary)
+        }
+
+        launchFailure := ""
+        if !LaunchProxyServer(&launchedPid, &launchFailure, events) {
+            attemptSummary := "Attempt " . attemptNumber . "/" . attemptCount . " launch failed (budget=" . timeoutMs . "ms, " . launchFailure . ")"
+            attemptFailures.Push(attemptSummary)
+            WriteInternalErrorLog("EnsureServerRunning", attemptSummary)
+            if (attemptNumber = 1)
+                ShowTemporaryToolTip("Spell check server is starting slowly. Retrying with a longer timeout...", 5000)
+            continue
+        }
+
+        PushProxyEvent(events, "Proxy startup attempt " . attemptNumber . "/" . attemptCount . " launched PID " . launchedPid)
+        waitStart := A_TickCount
+        lastProbeDetail := ""
+        if (WaitForProxyReady(timeoutMs, &lastProbeDetail)) {
+            readyMs := A_TickCount - waitStart
+            PushProxyEvent(events, "Proxy startup attempt " . attemptNumber . "/" . attemptCount . " succeeded in " . readyMs . "ms")
+            return true
+        }
+
+        elapsedMs := A_TickCount - waitStart
+        attemptSummary := "Attempt " . attemptNumber . "/" . attemptCount . " timed out after " . elapsedMs . "ms (budget=" . timeoutMs . "ms, launched_pid=" . launchedPid
+            . (lastProbeDetail != "" ? ", last_probe=" . lastProbeDetail : "")
+            . ")"
+        attemptFailures.Push(attemptSummary)
+        WriteInternalErrorLog("EnsureServerRunning", attemptSummary)
+        PushProxyEvent(events, "Proxy startup attempt " . attemptNumber . "/" . attemptCount . " timed out after " . elapsedMs . "ms")
+        if (attemptNumber = 1)
+            ShowTemporaryToolTip("Spell check server is starting slowly. Retrying with a longer timeout...", 5000)
+    }
+
+    finalStopSummary := StopProxyServer(launchedPid, events)
+    failureSummary := "Proxy failed to become ready at " . proxyHealthUrl . " after " . attemptCount . " attempts"
+    if (finalStopSummary != "")
+        failureSummary .= " (" . finalStopSummary . ")"
+    attemptFailureText := JoinMessages(attemptFailures)
+    if (attemptFailureText != "")
+        failureSummary .= "; attempts=" . attemptFailureText
+
+    WriteInternalErrorLog(failureContext = "startup" ? "Startup" : "ProxyRecovery", failureSummary)
+    PushProxyEvent(events, "Proxy startup exhausted after " . attemptCount . " attempts")
+    PushProxyEvent(events, "Proxy final exhaustion summary: " . failureSummary)
     return false
 }
 
@@ -443,9 +657,8 @@ RetryReplacementsReloadAfterPaste(events) {
 apiKey := LoadRequiredEnvValue(envPath, "OPENAI_API_KEY")
 
 ; Auto-launch proxy server on script startup (per D-04)
-if (!EnsureServerRunning()) {
-    WriteInternalErrorLog("Startup", "Proxy server failed to start or respond at " . proxyHealthUrl)
-    ShowTemporaryToolTip("Spell check proxy server failed to start.`nCheck logs/server.log for details.", 5000)
+if (!EnsureServerRunning("", "startup", &proxyFailureSummary)) {
+    ShowFatalTooltipAndExit("Spell check proxy server failed to start.`nCheck logs/server.log for details.", 5000)
 }
 
 ; Prime the replacements cache on startup. Later runs only reparse when metadata changes.
@@ -1313,7 +1526,12 @@ FinalizeRun(logData) {
 
 ^!u::                                  ; hotkey Ctrl+Alt+U
 {
+    global proxyFatalExitRequested
+    global proxyFatalExitMessage
+
     ; Initialize timing and logging data
+    proxyFatalExitRequested := false
+    proxyFatalExitMessage := ""
     startTime := A_TickCount
     logData := {
         original: "",
@@ -1463,6 +1681,22 @@ FinalizeRun(logData) {
         logData.diagnostics.payloadDebugMs := A_TickCount - payloadDebugStart
         logData.timings.payloadPrepared := A_TickCount
         logData.rawRequest := jsonPayload
+
+        preRequestProbeDetail := ""
+        if !IsProxyAvailable(true, &preRequestProbeDetail) {
+            logData.events.Push("Proxy unavailable before request; starting recovery sequence" . (preRequestProbeDetail != "" ? " (" . preRequestProbeDetail . ")" : ""))
+            proxyRecoverySummary := ""
+            if !EnsureServerRunning(logData.events, "request", &proxyRecoverySummary) {
+                logData.error := "Proxy server unavailable"
+                logData.pasteTime := A_TickCount
+                logData.events.Push("Proxy recovery exhausted before request (" . proxyRecoverySummary . ")")
+                proxyFatalExitRequested := true
+                proxyFatalExitMessage := "Spell check proxy server failed to start.`nCheck logs/server.log for details."
+                return
+            }
+        } else {
+            logData.events.Push("Proxy health check passed before request")
+        }
 
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.SetTimeouts(5000, 5000, 30000, 30000)  ; timeouts in milliseconds
@@ -1703,5 +1937,7 @@ FinalizeRun(logData) {
     } finally {
         FinalizeRun(logData)
     }
+    if (proxyFatalExitRequested)
+        ShowFatalTooltipAndExit(proxyFatalExitMessage != "" ? proxyFatalExitMessage : "Spell check proxy server failed to start.`nCheck logs/server.log for details.", 5000)
     return
 }
