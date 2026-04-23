@@ -143,7 +143,7 @@ def parse_args() -> argparse.Namespace:
         "--max-concurrency",
         dest="batch_size",
         type=int,
-        default=10,
+        default=20,
         help=(
             "Number of independent API calls to fire in one batch before waiting for all "
             "of them to finish."
