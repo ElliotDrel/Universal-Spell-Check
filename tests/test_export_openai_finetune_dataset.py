@@ -175,6 +175,280 @@ class ExportOpenAiFineTuneDatasetTests(unittest.TestCase):
             if runtime_dir.exists():
                 runtime_dir.rmdir()
 
+    def test_load_cases_from_logs_filters_and_dedupes(self):
+        runtime_dir = bench.SCRIPT_DIR / "tests" / "_runtime_log_export"
+        log_path = runtime_dir / "spellcheck-2026-04-20-to-2026-04-26.jsonl"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        canonical_prompt = bench.build_prompt("teh black cat")
+        bad_prompt = "instructions: older prompt\ntext input: teh black cat"
+
+        entries = [
+            {
+                "timestamp": "2026-04-20 10:00:00",
+                "status": "SUCCESS",
+                "model": "gpt-4.1",
+                "output_text": "the black cat",
+                "raw_request": json.dumps(
+                    {
+                        "model": "gpt-4.1",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": canonical_prompt}],
+                            }
+                        ],
+                        "store": True,
+                        "text": {"verbosity": "medium"},
+                        "temperature": 0.3,
+                    }
+                ),
+                "prompt_leak": {"triggered": False},
+            },
+            {
+                "timestamp": "2026-04-20 10:00:01",
+                "status": "SUCCESS",
+                "model": "gpt-4.1",
+                "output_text": "the black cat",
+                "raw_request": json.dumps(
+                    {
+                        "model": "gpt-4.1",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": canonical_prompt}],
+                            }
+                        ],
+                        "store": True,
+                        "text": {"verbosity": "medium"},
+                        "temperature": 0.3,
+                    }
+                ),
+                "prompt_leak": {"triggered": False},
+            },
+            {
+                "timestamp": "2026-04-20 10:00:02",
+                "status": "SUCCESS",
+                "model": "gpt-4.1",
+                "output_text": "the black cat",
+                "raw_request": json.dumps(
+                    {
+                        "model": "gpt-4.1",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": bad_prompt}],
+                            }
+                        ],
+                        "store": True,
+                        "text": {"verbosity": "medium"},
+                        "temperature": 0.3,
+                    }
+                ),
+                "prompt_leak": {"triggered": False},
+            },
+            {
+                "timestamp": "2026-04-20 10:00:03",
+                "status": "ERROR",
+                "model": "gpt-4.1",
+                "output_text": "",
+                "raw_request": "",
+                "prompt_leak": {"triggered": False},
+            },
+        ]
+
+        log_path.write_text(
+            "\n".join(json.dumps(entry) for entry in entries) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            cases, summary = exporter.load_cases_from_logs(
+                log_dir=runtime_dir,
+                weeks=1,
+                buckets=["small_change"],
+                include_unchanged=True,
+            )
+            self.assertEqual(len(cases), 1)
+            self.assertEqual(cases[0].source_text, "teh black cat")
+            self.assertEqual(cases[0].historical_final_output, "the black cat")
+            self.assertEqual(summary["skipped_non_canonical_prompt_cases"], 1)
+            self.assertEqual(summary["skipped_non_success_cases"], 1)
+        finally:
+            if log_path.exists():
+                log_path.unlink()
+            if runtime_dir.exists():
+                runtime_dir.rmdir()
+
+    def test_export_fine_tune_dataset_from_logs_writes_openai_jsonl_files(self):
+        runtime_dir = bench.SCRIPT_DIR / "tests" / "_runtime_log_export_files"
+        output_dir = runtime_dir / "exported"
+        log_path = runtime_dir / "spellcheck-2026-04-20-to-2026-04-26.jsonl"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+
+        def make_log_entry(timestamp: str, input_text: str, output_text: str) -> dict[str, object]:
+            return {
+                "timestamp": timestamp,
+                "status": "SUCCESS",
+                "model": "gpt-4.1",
+                "input_text": input_text,
+                "output_text": output_text,
+                "raw_request": json.dumps(
+                    {
+                        "model": "gpt-4.1",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": bench.build_prompt(input_text)}],
+                            }
+                        ],
+                        "store": True,
+                        "text": {"verbosity": "medium"},
+                        "temperature": 0.3,
+                    }
+                ),
+                "prompt_leak": {"triggered": False},
+            }
+
+        entries = [
+            make_log_entry("2026-04-20 10:00:00", "teh black cat", "the black cat"),
+            make_log_entry("2026-04-20 10:00:01", "i go store yesterday", "I went to the store yesterday."),
+            make_log_entry(
+                "2026-04-20 10:00:02",
+                "Meeting - LLC Formation Discussion - Keel",
+                "Meeting - LLC Formation Discussion - Keel",
+            ),
+        ]
+        log_path.write_text(
+            "\n".join(json.dumps(entry) for entry in entries) + "\n",
+            encoding="utf-8",
+        )
+
+        try:
+            result = exporter.export_fine_tune_dataset_from_logs(
+                log_dir=runtime_dir,
+                weeks=1,
+                output_dir=output_dir,
+                buckets=["unchanged", "small_change", "medium_change"],
+                validation_ratio=0.34,
+                seed=42,
+            )
+
+            train_path = Path(result["train_path"])
+            validation_path = Path(result["validation_path"])
+            summary_path = Path(result["summary_path"])
+
+            self.assertTrue(train_path.exists())
+            self.assertTrue(validation_path.exists())
+            self.assertTrue(summary_path.exists())
+
+            train_lines = train_path.read_text(encoding="utf-8").strip().splitlines()
+            validation_lines = validation_path.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(train_lines), 2)
+            self.assertEqual(len(validation_lines), 1)
+
+            written_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(written_summary["source"], "weekly_logs")
+            self.assertEqual(written_summary["source_dataset_summary"]["case_count"], 3)
+        finally:
+            for path in [
+                output_dir / "train.jsonl",
+                output_dir / "validation.jsonl",
+                output_dir / "summary.json",
+                log_path,
+            ]:
+                if path.exists():
+                    path.unlink()
+            if output_dir.exists():
+                output_dir.rmdir()
+            if runtime_dir.exists():
+                runtime_dir.rmdir()
+
+    def test_export_from_logs_excludes_previously_trained_pairs(self):
+        runtime_dir = bench.SCRIPT_DIR / "tests" / "_runtime_log_export_exclusions"
+        output_dir = runtime_dir / "exported"
+        previous_dir = runtime_dir / "previous"
+        log_path = runtime_dir / "spellcheck-2026-04-20-to-2026-04-26.jsonl"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        previous_dir.mkdir(parents=True, exist_ok=True)
+
+        prior_record = {
+            "messages": [
+                {"role": "user", "content": bench.build_prompt("teh black cat")},
+                {"role": "assistant", "content": "the black cat"},
+            ]
+        }
+        (previous_dir / "train.jsonl").write_text(
+            json.dumps(prior_record, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        def make_log_entry(timestamp: str, input_text: str, output_text: str) -> dict[str, object]:
+            return {
+                "timestamp": timestamp,
+                "status": "SUCCESS",
+                "model": "gpt-4.1",
+                "input_text": input_text,
+                "output_text": output_text,
+                "raw_request": json.dumps(
+                    {
+                        "model": "gpt-4.1",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": bench.build_prompt(input_text)}],
+                            }
+                        ],
+                        "store": True,
+                        "text": {"verbosity": "medium"},
+                        "temperature": 0.3,
+                    }
+                ),
+                "prompt_leak": {"triggered": False},
+            }
+
+        entries = [
+            make_log_entry("2026-04-20 10:00:00", "teh black cat", "the black cat"),
+            make_log_entry("2026-04-20 10:00:01", "i go store yesterday", "I went to the store yesterday."),
+            make_log_entry("2026-04-20 10:00:02", "i cant spel corectly", "I can't spell correctly."),
+        ]
+        log_path.write_text(
+            "\n".join(json.dumps(entry) for entry in entries) + "\n",
+            encoding="utf-8",
+        )
+
+        try:
+            result = exporter.export_fine_tune_dataset_from_logs(
+                log_dir=runtime_dir,
+                weeks=1,
+                output_dir=output_dir,
+                buckets=["small_change", "medium_change"],
+                validation_ratio=0.0,
+                seed=42,
+                previous_data_dir=previous_dir,
+            )
+
+            train_path = Path(result["train_path"])
+            train_lines = train_path.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(train_lines), 2)
+            contents = [json.loads(line)["messages"][1]["content"] for line in train_lines]
+            self.assertNotIn("the black cat", contents)
+            self.assertEqual(result["summary"]["excluded_previously_trained_pair_count"], 1)
+        finally:
+            for path in [
+                output_dir / "train.jsonl",
+                output_dir / "validation.jsonl",
+                output_dir / "summary.json",
+                previous_dir / "train.jsonl",
+                log_path,
+            ]:
+                if path.exists():
+                    path.unlink()
+            if output_dir.exists():
+                output_dir.rmdir()
+            if previous_dir.exists():
+                previous_dir.rmdir()
+            if runtime_dir.exists():
+                runtime_dir.rmdir()
+
 
 if __name__ == "__main__":
     unittest.main()

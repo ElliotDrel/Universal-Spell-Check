@@ -14,6 +14,19 @@ The project uses a single active script with a top-level model selector.
 - **Universal Spell Checker.ahk**: Primary/default script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`)
 - **replacements.json**: Post-processing replacement pairs - format: `{ "canonical": ["variant1", "variant2", ...] }`
 - **generate_log_viewer.py**: Reads `logs/*.jsonl` and generates `logs/viewer.html` - run `python generate_log_viewer.py` to view
+- **export_openai_finetune_dataset.py**: Builds fine-tune datasets from frozen benchmark data or live weekly logs
+
+### Training Data Layout
+- **`benchmark_data/`**: Frozen evaluation dataset used for repeatable model benchmarks
+- **`fine_tune_data/previous_batches/`**: Historical datasets that have already been trained on
+- **`fine_tune_data/latest_batch/`**: The current generated training batch; safe to overwrite on each refresh
+
+### Fine-Tune Refresh Command
+Run this from repo root to regenerate the latest training batch from recent logs while automatically excluding previously trained prompt/output pairs:
+
+```powershell
+python export_openai_finetune_dataset.py --source logs --weeks 8 --max-per-bucket 15
+```
 
 ### Legacy / Simple Variant
 - **Universal Spell Checker - SEND TEXT instead of ctr+v.ahk**: Minimal script that types output via `SendText()` instead of clipboard paste; no logging or post-processing - kept for reference/fallback

@@ -23,5 +23,8 @@ __pycache__/
 .env
 .env*
 
-Server Files
+# Generated fine-tune exports
+fine_tune_data/latest_batch/
+
+# Server files
 server.pid
