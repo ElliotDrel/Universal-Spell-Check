@@ -30,6 +30,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 LOGS_DIR = SCRIPT_DIR / "logs"
 BENCHMARKS_DIR = LOGS_DIR / "benchmarks"
 DATASET_DIR = SCRIPT_DIR / "benchmark_data"
+FINE_TUNE_DATA_DIR = SCRIPT_DIR / "fine_tune_data"
+PREVIOUS_BATCHES_DIR = FINE_TUNE_DATA_DIR / "previous_batches"
+LATEST_BATCH_DIR = FINE_TUNE_DATA_DIR / "latest_batch"
 DEFAULT_DATASET_PATH = DATASET_DIR / "stable_spellcheck_cases.json"
 REPLACEMENTS_PATH = SCRIPT_DIR / "replacements.json"
 ENV_PATH = SCRIPT_DIR / ".env"
@@ -82,6 +85,7 @@ class GoldCase:
     gold_raw_output: str
     historical_final_output: str | None
     request_metadata: RequestMetadata
+    dataset_name: str = "frozen_benchmark"
 
 
 @dataclass
@@ -683,6 +687,7 @@ def resolve_default_dataset_path() -> Path:
 def gold_case_to_record(case: GoldCase) -> dict[str, Any]:
     return {
         "case_id": case.case_id,
+        "dataset_name": case.dataset_name,
         "source_file": case.source_file,
         "source_line": case.source_line,
         "timestamp": case.timestamp,
@@ -706,6 +711,7 @@ def gold_case_from_record(record: dict[str, Any]) -> GoldCase:
     gold_raw_output = str(record.get("gold_raw_output", ""))
     return GoldCase(
         case_id=str(record.get("case_id", "")),
+        dataset_name=str(record.get("dataset_name", "frozen_benchmark")),
         source_file=str(record.get("source_file", "")),
         source_line=int(record.get("source_line", 0)),
         timestamp=str(record.get("timestamp", "")),
@@ -769,6 +775,105 @@ def load_stable_dataset(dataset_path: Path) -> tuple[list[GoldCase], dict[str, A
     dataset_summary["excluded_short_input_cases"] = len(all_cases) - len(cases)
     dataset_summary["min_source_words"] = MIN_SOURCE_WORDS
     return cases, dataset_summary
+
+
+def load_finetune_jsonl_pairs(path: Path) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    if not path.exists():
+        return pairs
+
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            messages = record.get("messages")
+            if not isinstance(messages, list) or len(messages) < 2:
+                continue
+            user = messages[0].get("content") if isinstance(messages[0], dict) else None
+            assistant = messages[1].get("content") if isinstance(messages[1], dict) else None
+            if isinstance(user, str) and isinstance(assistant, str):
+                pairs.append((user, assistant))
+    return pairs
+
+
+def load_finetune_eval_cases(dataset_dir: Path, dataset_name: str) -> tuple[list[GoldCase], dict[str, Any]]:
+    seen_pairs: set[tuple[str, str]] = set()
+    cases: list[GoldCase] = []
+    excluded_short_input_cases = 0
+    files_used = 0
+
+    for file_name in ("train.jsonl", "validation.jsonl"):
+        path = dataset_dir / file_name
+        if not path.exists():
+            continue
+        files_used += 1
+        for prompt_text, assistant_text in load_finetune_jsonl_pairs(path):
+            pair = (prompt_text, assistant_text)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            source_text = extract_source_text_from_prompt(prompt_text)
+            if not source_text:
+                continue
+            if source_word_count(source_text) < MIN_SOURCE_WORDS:
+                excluded_short_input_cases += 1
+                continue
+            cases.append(
+                GoldCase(
+                    case_id=f"{dataset_name}:{len(cases) + 1}",
+                    source_file=path.name,
+                    source_line=len(cases) + 1,
+                    timestamp="",
+                    bucket=classify_gold_bucket(source_text, assistant_text),
+                    source_text=source_text,
+                    ai_input_text=prompt_text,
+                    gold_raw_output=assistant_text,
+                    historical_final_output=assistant_text,
+                    request_metadata=RequestMetadata(
+                        prompt_text=prompt_text,
+                        store=True,
+                        text_config={"verbosity": "medium"},
+                        temperature=0.3,
+                    ),
+                    dataset_name=dataset_name,
+                )
+            )
+
+    summary = {
+        "dataset_name": dataset_name,
+        "source": str(dataset_dir),
+        "files_used": files_used,
+        "case_count": len(cases),
+        "selected_by_bucket": dict(Counter(case.bucket for case in cases)),
+        "excluded_short_input_cases": excluded_short_input_cases,
+    }
+    return cases, summary
+
+
+def load_all_eval_datasets() -> tuple[list[GoldCase], dict[str, dict[str, Any]]]:
+    cases: list[GoldCase] = []
+    summaries: dict[str, dict[str, Any]] = {}
+
+    if PREVIOUS_BATCHES_DIR.exists():
+        for dataset_dir in sorted(path for path in PREVIOUS_BATCHES_DIR.iterdir() if path.is_dir()):
+            dataset_name = f"previous_batches/{dataset_dir.name}"
+            dataset_cases, dataset_summary = load_finetune_eval_cases(dataset_dir, dataset_name)
+            if dataset_cases:
+                cases.extend(dataset_cases)
+                summaries[dataset_name] = dataset_summary
+
+    if LATEST_BATCH_DIR.exists():
+        dataset_cases, dataset_summary = load_finetune_eval_cases(LATEST_BATCH_DIR, "latest_batch")
+        if dataset_cases:
+            cases.extend(dataset_cases)
+            summaries["latest_batch"] = dataset_summary
+
+    return cases, summaries
 
 
 def select_cases_from_stable_dataset(
@@ -864,6 +969,7 @@ def build_gold_cases(
             gold_raw_output=raw_ai_output,
             historical_final_output=historical_final_output if isinstance(historical_final_output, str) else None,
             request_metadata=metadata,
+            dataset_name="frozen_benchmark",
         )
         deduped[key] = case
         bucket_pool[bucket].append(case)
@@ -1135,6 +1241,7 @@ def run_single_case(
 
     return {
         "case_id": case.case_id,
+        "dataset_name": case.dataset_name,
         "model": model,
         "gold_bucket": case.bucket,
         "source_file": case.source_file,
@@ -1226,42 +1333,69 @@ def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     return summary
 
 
+def summarize_records_by_dataset(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        grouped[record["dataset_name"]].append(record)
+    return {dataset_name: summarize_records(rows) for dataset_name, rows in grouped.items()}
+
+
 def render_summary_markdown(
     run_started_at: str,
     config: dict[str, Any],
-    dataset_summary: dict[str, Any],
+    frozen_dataset_summary: dict[str, Any],
+    eval_dataset_summaries: dict[str, dict[str, Any]],
     preflight: dict[str, Any],
     warmups: dict[str, Any],
     model_summary: dict[str, Any],
+    dataset_model_summaries: dict[str, dict[str, Any]],
 ) -> str:
     lines = [
         "# Spellcheck Benchmark Summary",
         "",
         f"- Run started: `{run_started_at}`",
         f"- Models: `{', '.join(config['models'])}`",
-        f"- Dataset: `{config['dataset_path']}`",
-        f"- Dataset refreshed this run: `{config['dataset_refreshed']}`",
+        f"- Frozen benchmark dataset: `{config['dataset_path']}`",
+        f"- Frozen dataset refreshed this run: `{config['dataset_refreshed']}`",
         f"- Weeks: `{config['weeks']}`",
         f"- Per bucket target: `{config['per_bucket']}`",
         f"- Seed: `{config['seed']}`",
         f"- Batch size: `{config['batch_size']}`",
         "",
-        "## Dataset",
+        "## Evaluation Sets",
         "",
-        f"- Gold files: `{len(dataset_summary['selected_files'])}`",
-        f"- Deduped cases considered: `{dataset_summary['deduped_case_count']}`",
-        f"- Minimum source words: `{dataset_summary.get('min_source_words', MIN_SOURCE_WORDS)}`",
-        f"- Excluded short-input cases: `{dataset_summary.get('excluded_short_input_cases', 0)}`",
-        f"- Selected cases: `{sum(dataset_summary['selected_by_bucket'].values())}`",
+        "### frozen_benchmark",
+        "",
+        f"- Gold files: `{len(frozen_dataset_summary['selected_files'])}`",
+        f"- Deduped cases considered: `{frozen_dataset_summary['deduped_case_count']}`",
+        f"- Minimum source words: `{frozen_dataset_summary.get('min_source_words', MIN_SOURCE_WORDS)}`",
+        f"- Excluded short-input cases: `{frozen_dataset_summary.get('excluded_short_input_cases', 0)}`",
+        f"- Selected cases: `{sum(frozen_dataset_summary['selected_by_bucket'].values())}`",
         "",
         "| Gold bucket | Available | Selected |",
         "| --- | ---: | ---: |",
     ]
     for bucket in config["buckets"]:
         lines.append(
-            f"| {bucket} | {dataset_summary['available_by_bucket'].get(bucket, 0)} | "
-            f"{dataset_summary['selected_by_bucket'].get(bucket, 0)} |"
+            f"| {bucket} | {frozen_dataset_summary['available_by_bucket'].get(bucket, 0)} | "
+            f"{frozen_dataset_summary['selected_by_bucket'].get(bucket, 0)} |"
         )
+
+    if eval_dataset_summaries:
+        lines.extend(
+            [
+                "",
+                "### Trained Datasets",
+                "",
+                "| Dataset | Cases | Excluded short | Files |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for dataset_name, info in eval_dataset_summaries.items():
+            lines.append(
+                f"| {dataset_name} | {info.get('case_count', 0)} | "
+                f"{info.get('excluded_short_input_cases', 0)} | {info.get('files_used', 0)} |"
+            )
 
     lines.extend(
         [
@@ -1319,6 +1453,28 @@ def render_summary_markdown(
             f"{info['total_ms']['median']} | {info['total_ms']['p90']} |"
         )
 
+    for dataset_name, per_model_summary in dataset_model_summaries.items():
+        lines.extend(
+            [
+                "",
+                f"## Dataset Results: {dataset_name}",
+                "",
+                "| Model | Cases | Raw exact | Raw exact % | RL seen | Retries | Median API ms | P90 API ms | Median total ms | P90 total ms |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for model in config["models"]:
+            info = per_model_summary.get(model)
+            if not info:
+                lines.append(f"| {model} | 0 | 0 | 0.0 | 0 | 0 |  |  |  |  |")
+                continue
+            lines.append(
+                f"| {model} | {info['cases']} | {info['exact_matches']} | {info['exact_match_rate']} | "
+                f"{info['rate_limit_observed_calls']} | {info['retry_count_total']} | "
+                f"{info['api_ms']['median']} | {info['api_ms']['p90']} | "
+                f"{info['total_ms']['median']} | {info['total_ms']['p90']} |"
+            )
+
     for model in config["models"]:
         info = model_summary.get(model)
         if not info:
@@ -1340,45 +1496,68 @@ def render_summary_markdown(
                 f"{counts.get('major_difference', 0)} | {counts.get('error_or_no_text', 0)} |"
             )
 
+    for dataset_name, per_model_summary in dataset_model_summaries.items():
+        for model in config["models"]:
+            info = per_model_summary.get(model)
+            if not info:
+                continue
+            lines.extend(
+                [
+                    "",
+                    f"### {dataset_name} :: {model}",
+                    "",
+                    "| Gold bucket | exact | punct_or_spacing_only | minor_wording | moderate_wording | major_difference | error_or_no_text |",
+                    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for bucket in config["buckets"]:
+                counts = info["gold_bucket_matrix"].get(bucket, {})
+                lines.append(
+                    f"| {bucket} | {counts.get('exact', 0)} | {counts.get('punct_or_spacing_only', 0)} | "
+                    f"{counts.get('minor_wording', 0)} | {counts.get('moderate_wording', 0)} | "
+                    f"{counts.get('major_difference', 0)} | {counts.get('error_or_no_text', 0)} |"
+                )
+
     return "\n".join(lines) + "\n"
 
 
 def write_artifacts(
     output_dir: Path,
     config: dict[str, Any],
-    dataset_summary: dict[str, Any],
+    frozen_dataset_summary: dict[str, Any],
+    eval_dataset_summaries: dict[str, dict[str, Any]],
     preflight: dict[str, Any],
     warmups: dict[str, Any],
-    records: list[dict[str, Any]],
     model_summary: dict[str, Any],
+    dataset_model_summaries: dict[str, dict[str, Any]],
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     summary_md = render_summary_markdown(
         config["run_started_at"],
         config,
-        dataset_summary,
+        frozen_dataset_summary,
+        eval_dataset_summaries,
         preflight,
         warmups,
         model_summary,
+        dataset_model_summaries,
     )
     (output_dir / "summary.md").write_text(summary_md, encoding="utf-8")
 
     results_payload = {
         "config": config,
-        "dataset_summary": dataset_summary,
+        "frozen_dataset_summary": frozen_dataset_summary,
+        "eval_dataset_summaries": eval_dataset_summaries,
         "preflight": preflight,
         "warmups": warmups,
         "model_summary": model_summary,
+        "dataset_model_summaries": dataset_model_summaries,
     }
     (output_dir / "results.json").write_text(
         json.dumps(results_payload, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-
-    with (output_dir / "cases.jsonl").open("w", encoding="utf-8", newline="\n") as handle:
-        for record in records:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def format_elapsed_seconds(started_at: float) -> str:
@@ -1491,17 +1670,22 @@ def main() -> int:
     else:
         cases, dataset_summary = load_stable_dataset(dataset_path)
 
-    cases, dataset_summary = select_cases_from_stable_dataset(
+    frozen_cases, dataset_summary = select_cases_from_stable_dataset(
         cases,
         seed=args.seed,
         per_bucket=args.per_bucket,
         requested_buckets=args.buckets,
         dataset_summary=dataset_summary,
     )
+    for case in frozen_cases:
+        case.dataset_name = "frozen_benchmark"
+
+    eval_cases, eval_dataset_summaries = load_all_eval_datasets()
+    all_cases = frozen_cases + eval_cases
 
     if args.build_dataset_only:
         print(f"Wrote stable dataset to {dataset_path}")
-        print(f"Cases: {len(cases)}")
+        print(f"Cases: {len(frozen_cases)}")
         return 0
 
     api_keys = load_api_keys(args.models)
@@ -1509,7 +1693,7 @@ def main() -> int:
     transport = MultiProviderTransport(api_keys, max_rate_limit_retries=args.max_rate_limit_retries)
     try:
         preflight, warmups, records = run_benchmark(
-            cases,
+            all_cases,
             args.models,
             transport,
             replacements,
@@ -1534,9 +1718,20 @@ def main() -> int:
         "api_url": API_URL,
         "prompt_instruction_text": PROMPT_INSTRUCTION_TEXT,
         "replacements_path": str(REPLACEMENTS_PATH),
+        "evaluation_sets": ["frozen_benchmark", *list(eval_dataset_summaries.keys())],
     }
     model_summary = summarize_records(records)
-    write_artifacts(output_dir, config, dataset_summary, preflight, warmups, records, model_summary)
+    dataset_model_summaries = summarize_records_by_dataset(records)
+    write_artifacts(
+        output_dir,
+        config,
+        dataset_summary,
+        eval_dataset_summaries,
+        preflight,
+        warmups,
+        model_summary,
+        dataset_model_summaries,
+    )
     print_console_summary(output_dir, model_summary)
     return 0
 

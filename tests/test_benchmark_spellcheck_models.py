@@ -178,6 +178,69 @@ class BenchmarkSpellcheckModelsTests(unittest.TestCase):
         self.assertEqual(summary_a["selected_by_bucket"]["small_change"], 2)
         self.assertEqual(summary_b["selected_by_bucket"]["small_change"], 2)
 
+    def test_load_finetune_eval_cases_reads_train_and_validation(self):
+        runtime_dir = bench.SCRIPT_DIR / "tests" / "_runtime_eval_cases"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        train_path = runtime_dir / "train.jsonl"
+        validation_path = runtime_dir / "validation.jsonl"
+        train_record = {
+            "messages": [
+                {"role": "user", "content": bench.build_prompt("teh black cat")},
+                {"role": "assistant", "content": "the black cat"},
+            ]
+        }
+        validation_record = {
+            "messages": [
+                {"role": "user", "content": bench.build_prompt("i go store yesterday")},
+                {"role": "assistant", "content": "I went to the store yesterday."},
+            ]
+        }
+        train_path.write_text(json.dumps(train_record) + "\n", encoding="utf-8")
+        validation_path.write_text(json.dumps(validation_record) + "\n", encoding="utf-8")
+
+        try:
+            cases, summary = bench.load_finetune_eval_cases(runtime_dir, "latest_batch")
+            self.assertEqual(len(cases), 2)
+            self.assertEqual(summary["case_count"], 2)
+            self.assertEqual(cases[0].dataset_name, "latest_batch")
+        finally:
+            if train_path.exists():
+                train_path.unlink()
+            if validation_path.exists():
+                validation_path.unlink()
+            if runtime_dir.exists():
+                runtime_dir.rmdir()
+
+    def test_summarize_records_by_dataset_groups_rows(self):
+        records = [
+            {
+                "dataset_name": "frozen_benchmark",
+                "model": "gpt-4.1",
+                "api_ms": 100.0,
+                "total_ms": 120.0,
+                "mismatch_bucket": "exact",
+                "gold_bucket": "small_change",
+                "rate_limit_observed": False,
+                "status_code": 200,
+                "retry_count": 0,
+            },
+            {
+                "dataset_name": "latest_batch",
+                "model": "gpt-4.1",
+                "api_ms": 90.0,
+                "total_ms": 110.0,
+                "mismatch_bucket": "moderate_wording",
+                "gold_bucket": "medium_change",
+                "rate_limit_observed": False,
+                "status_code": 200,
+                "retry_count": 0,
+            },
+        ]
+
+        grouped = bench.summarize_records_by_dataset(records)
+        self.assertEqual(grouped["frozen_benchmark"]["gpt-4.1"]["cases"], 1)
+        self.assertEqual(grouped["latest_batch"]["gpt-4.1"]["cases"], 1)
+
     def test_ahk_payload_builder_matches_model_branching(self):
         case = bench.GoldCase(
             case_id="case-1",
