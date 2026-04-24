@@ -26,7 +26,7 @@ from google import genai
 from google.genai import types as genai_types
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
 LOGS_DIR = SCRIPT_DIR / "logs"
 BENCHMARKS_DIR = LOGS_DIR / "benchmarks"
 DATASET_DIR = SCRIPT_DIR / "benchmark_data"

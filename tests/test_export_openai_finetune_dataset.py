@@ -1,8 +1,10 @@
 import json
+import sys
 import unittest
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent / ".claude/skills/finetune-cycle/scripts"))
 import benchmark_spellcheck_models as bench
 import export_openai_finetune_dataset as exporter
 

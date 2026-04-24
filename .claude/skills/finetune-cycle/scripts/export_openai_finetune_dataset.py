@@ -15,7 +15,7 @@ from typing import Any
 import benchmark_spellcheck_models as bench
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
 FINE_TUNE_DATA_DIR = SCRIPT_DIR / "fine_tune_data"
 PREVIOUS_BATCHES_DIR = FINE_TUNE_DATA_DIR / "previous_batches"
 LATEST_BATCH_DIR = FINE_TUNE_DATA_DIR / "latest_batch"
