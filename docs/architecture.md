@@ -5,12 +5,11 @@
 - **replacements.json**: Post-processing replacement pairs — `{ "canonical": ["variant1", ...] }`.
 - **spellcheck-server.pyw**: Local proxy. Required. Script hard-fails if it cannot be started or recovered.
 - **generate_log_viewer.py**: Reads `logs/*.jsonl` → `logs/viewer.html`. Run `python generate_log_viewer.py` (add `--open`).
-- **export_openai_finetune_dataset.py**: Builds fine-tune datasets from frozen benchmark data or live logs.
+- **export_openai_finetune_dataset.py**: Builds fine-tune datasets from live logs.
 
 ## Training data layout
-- `benchmark_data/` — frozen evaluation dataset for repeatable benchmarks.
-- `fine_tune_data/previous_batches/` — historical datasets already trained on.
-- `fine_tune_data/latest_batch/` — current generated training batch; safe to overwrite.
+- `fine_tune_runs/` — one dated folder per fine-tune run; contains train/val JSONL, finetune_job.json, benchmark.json, summary.md.
+- `benchmark_runs/` — one dated folder per standalone benchmark run.
 
 ## Fine-tune refresh
 ```powershell

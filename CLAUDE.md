@@ -31,7 +31,7 @@ Universal Spell Check/
 ├── logs/                            # JSONL runtime logs (weekly files, rotates at 5 MiB → -2/-3/…)
 │     └── viewer.html                # Generated log viewer (after running generate_log_viewer.py)
 │
-├── benchmark_data/                  # Frozen eval dataset — do not mutate casually
+├── benchmark_runs/                  # One dated folder per standalone benchmark run
 ├── fine_tune_runs/                  # One dated folder per fine-tune run (file presence = state)
 │
 ├── tests/                           # Pytest suites for the Python tooling

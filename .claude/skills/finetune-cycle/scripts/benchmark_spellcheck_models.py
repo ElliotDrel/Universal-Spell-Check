@@ -28,13 +28,7 @@ from google.genai import types as genai_types
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
 LOGS_DIR = SCRIPT_DIR / "logs"
-BENCHMARKS_DIR = LOGS_DIR / "benchmarks"
-DATASET_DIR = SCRIPT_DIR / "benchmark_data"
-FINE_TUNE_DATA_DIR = SCRIPT_DIR / "fine_tune_data"
-PREVIOUS_BATCHES_DIR = FINE_TUNE_DATA_DIR / "previous_batches"
-LATEST_BATCH_DIR = FINE_TUNE_DATA_DIR / "latest_batch"
 FINE_TUNE_RUNS_DIR = SCRIPT_DIR / "fine_tune_runs"
-DEFAULT_DATASET_PATH = DATASET_DIR / "stable_spellcheck_cases.json"
 REPLACEMENTS_PATH = SCRIPT_DIR / "replacements.json"
 ENV_PATH = SCRIPT_DIR / ".env"
 API_URL = "https://api.openai.com/v1/responses"
@@ -125,17 +119,6 @@ def parse_args() -> argparse.Namespace:
         description="Replay historical spell-check cases against multiple models."
     )
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
-    parser.add_argument("--dataset", type=Path, default=None)
-    parser.add_argument(
-        "--refresh-dataset",
-        action="store_true",
-        help="Rebuild the stable dataset file from logs before running the benchmark.",
-    )
-    parser.add_argument(
-        "--build-dataset-only",
-        action="store_true",
-        help="Rebuild the stable dataset file from logs and exit without calling any models.",
-    )
     parser.add_argument("--weeks", type=int, default=8)
     parser.add_argument("--per-bucket", type=int, default=30)
     parser.add_argument("--seed", type=int, default=42)
@@ -679,113 +662,6 @@ def iter_jsonl_entries(paths: list[Path]) -> list[tuple[Path, int, dict[str, Any
                     continue
                 entries.append((path, line_no, payload))
     return entries
-
-
-def build_versioned_dataset_path(now: datetime | None = None) -> Path:
-    stamp = (now or datetime.now()).strftime("%Y-%m-%d-%H%M%S")
-    return DATASET_DIR / f"stable_spellcheck_cases-{stamp}.json"
-
-
-def resolve_default_dataset_path() -> Path:
-    versioned = sorted(DATASET_DIR.glob("stable_spellcheck_cases-*.json"))
-    if versioned:
-        return versioned[-1]
-    if DEFAULT_DATASET_PATH.exists():
-        return DEFAULT_DATASET_PATH
-    return DEFAULT_DATASET_PATH
-
-
-def gold_case_to_record(case: GoldCase) -> dict[str, Any]:
-    return {
-        "case_id": case.case_id,
-        "dataset_name": case.dataset_name,
-        "source_file": case.source_file,
-        "source_line": case.source_line,
-        "timestamp": case.timestamp,
-        "bucket": case.bucket,
-        "source_text": case.source_text,
-        "ai_input_text": case.ai_input_text,
-        "gold_raw_output": case.gold_raw_output,
-        "historical_final_output": case.historical_final_output,
-        "request_metadata": {
-            "prompt_text": case.request_metadata.prompt_text,
-            "store": case.request_metadata.store,
-            "text_config": case.request_metadata.text_config,
-            "temperature": case.request_metadata.temperature,
-        },
-    }
-
-
-def gold_case_from_record(record: dict[str, Any]) -> GoldCase:
-    request_metadata = record.get("request_metadata") or {}
-    source_text = str(record.get("source_text", ""))
-    gold_raw_output = str(record.get("gold_raw_output", ""))
-    return GoldCase(
-        case_id=str(record.get("case_id", "")),
-        dataset_name=str(record.get("dataset_name", "frozen_benchmark")),
-        source_file=str(record.get("source_file", "")),
-        source_line=int(record.get("source_line", 0)),
-        timestamp=str(record.get("timestamp", "")),
-        bucket=classify_gold_bucket(source_text, gold_raw_output),
-        source_text=source_text,
-        ai_input_text=str(record.get("ai_input_text", "")),
-        gold_raw_output=gold_raw_output,
-        historical_final_output=(
-            str(record["historical_final_output"])
-            if record.get("historical_final_output") is not None
-            else None
-        ),
-        request_metadata=RequestMetadata(
-            prompt_text=request_metadata.get("prompt_text"),
-            store=request_metadata.get("store"),
-            text_config=request_metadata.get("text_config"),
-            temperature=request_metadata.get("temperature"),
-        ),
-    )
-
-
-def save_stable_dataset(
-    dataset_path: Path,
-    cases: list[GoldCase],
-    dataset_summary: dict[str, Any],
-) -> None:
-    dataset_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "dataset_path": str(dataset_path),
-        "case_count": len(cases),
-        "dataset_summary": dataset_summary,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "cases": [gold_case_to_record(case) for case in cases],
-    }
-    dataset_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def load_stable_dataset(dataset_path: Path) -> tuple[list[GoldCase], dict[str, Any]]:
-    if not dataset_path.exists():
-        raise RuntimeError(f"Stable dataset file not found: {dataset_path}")
-
-    payload = json.loads(dataset_path.read_text(encoding="utf-8", errors="replace"))
-    raw_cases = payload.get("cases") or []
-    all_cases = [gold_case_from_record(record) for record in raw_cases]
-    cases = [case for case in all_cases if is_case_eligible(case)]
-    dataset_summary: dict[str, Any] = {
-        "dataset_path": str(dataset_path),
-        "selected_by_bucket": dict(Counter(case.bucket for case in cases)),
-        "case_count": len(cases),
-        "source": "stable_dataset",
-        "excluded_short_input_cases": len(all_cases) - len(cases),
-        "min_source_words": MIN_SOURCE_WORDS,
-    }
-    if isinstance(payload, dict):
-        dataset_summary.update(payload.get("dataset_summary") or {})
-        dataset_summary["dataset_created_at"] = payload.get("created_at")
-    dataset_summary["dataset_path"] = str(dataset_path)
-    dataset_summary["source"] = "stable_dataset"
-    dataset_summary["case_count"] = len(cases)
-    dataset_summary["selected_by_bucket"] = dict(Counter(case.bucket for case in cases))
-    dataset_summary["excluded_short_input_cases"] = len(all_cases) - len(cases)
-    dataset_summary["min_source_words"] = MIN_SOURCE_WORDS
-    return cases, dataset_summary
 
 
 def load_finetune_jsonl_pairs(path: Path) -> list[tuple[str, str]]:
@@ -1366,8 +1242,6 @@ def render_summary_markdown(
         "",
         f"- Run started: `{run_started_at}`",
         f"- Models: `{', '.join(config['models'])}`",
-        f"- Frozen benchmark dataset: `{config['dataset_path']}`",
-        f"- Frozen dataset refreshed this run: `{config['dataset_refreshed']}`",
         f"- Weeks: `{config['weeks']}`",
         f"- Per bucket target: `{config['per_bucket']}`",
         f"- Seed: `{config['seed']}`",
@@ -1733,29 +1607,16 @@ def main() -> int:
     else:
         run_dir = None
 
-    output_dir = args.output_dir or (BENCHMARKS_DIR / datetime.now().strftime("%Y-%m-%d-%H%M%S"))
+    output_dir = args.output_dir or (SCRIPT_DIR / "benchmark_runs" / datetime.now().strftime("%Y-%m-%d-%H%M%S"))
 
     replacements = load_replacements(REPLACEMENTS_PATH)
-    dataset_path = args.dataset.resolve() if args.dataset else resolve_default_dataset_path().resolve()
-    dataset_refreshed = False
-    if args.refresh_dataset:
-        if args.dataset:
-            dataset_path = args.dataset.resolve()
-        else:
-            dataset_path = build_versioned_dataset_path()
-    if args.refresh_dataset or not dataset_path.exists():
-        cases, dataset_summary = build_gold_cases(
-            LOGS_DIR,
-            weeks=args.weeks,
-            seed=args.seed,
-            per_bucket=args.per_bucket,
-            requested_buckets=args.buckets,
-        )
-        dataset_summary["source"] = "rebuilt_from_logs"
-        save_stable_dataset(dataset_path, cases, dataset_summary)
-        dataset_refreshed = True
-    else:
-        cases, dataset_summary = load_stable_dataset(dataset_path)
+    cases, dataset_summary = build_gold_cases(
+        LOGS_DIR,
+        weeks=args.weeks,
+        seed=args.seed,
+        per_bucket=args.per_bucket,
+        requested_buckets=args.buckets,
+    )
 
     frozen_cases, dataset_summary = select_cases_from_stable_dataset(
         cases,
@@ -1769,11 +1630,6 @@ def main() -> int:
 
     eval_cases, eval_dataset_summaries = load_all_eval_datasets(exclude_run_dir=run_dir)
     all_cases = frozen_cases + eval_cases
-
-    if args.build_dataset_only:
-        print(f"Wrote stable dataset to {dataset_path}")
-        print(f"Cases: {len(frozen_cases)}")
-        return 0
 
     api_keys = load_api_keys(args.models)
 
@@ -1793,8 +1649,6 @@ def main() -> int:
     config = {
         "run_started_at": run_started_at,
         "models": args.models,
-        "dataset_path": str(dataset_path),
-        "dataset_refreshed": dataset_refreshed,
         "weeks": args.weeks,
         "per_bucket": args.per_bucket,
         "seed": args.seed,
