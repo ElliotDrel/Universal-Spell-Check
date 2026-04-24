@@ -28,3 +28,6 @@ fine_tune_data/latest_batch/
 
 # Server files
 server.pid
+
+# Git worktrees
+.worktrees/
