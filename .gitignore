@@ -28,3 +28,6 @@ server.pid
 
 # Git worktrees
 .worktrees/
+
+# Local scratchpad
+Untitled-*.md
