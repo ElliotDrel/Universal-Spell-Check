@@ -19,6 +19,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 FINE_TUNE_DATA_DIR = SCRIPT_DIR / "fine_tune_data"
 PREVIOUS_BATCHES_DIR = FINE_TUNE_DATA_DIR / "previous_batches"
 LATEST_BATCH_DIR = FINE_TUNE_DATA_DIR / "latest_batch"
+FINE_TUNE_RUNS_DIR = SCRIPT_DIR / "fine_tune_runs"
 DEFAULT_VALIDATION_RATIO = 0.15
 
 
@@ -99,6 +100,17 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PREVIOUS_BATCHES_DIR,
         help="Directory containing prior fine-tune train/validation JSONL files to exclude.",
+    )
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Fine-tune run directory (e.g. fine_tune_runs/2026-04-23-143000). "
+            "When set, writes train.jsonl/validation.jsonl/dataset_summary.json into this dir, "
+            "appends a dataset section to <run-dir>/summary.md, and deduplicates against "
+            "fine_tune_runs/*/train.jsonl and fine_tune_runs/*/validation.jsonl."
+        ),
     )
     return parser.parse_args()
 
@@ -522,31 +534,183 @@ def export_fine_tune_dataset_from_logs(
     }
 
 
+def load_existing_finetune_pairs_from_runs(
+    runs_dir: Path,
+    ignore_run_dir: Path | None = None,
+) -> set[tuple[str, str]]:
+    """Scan fine_tune_runs/*/train.jsonl and fine_tune_runs/*/validation.jsonl for dedup.
+
+    The ignore_run_dir is included in the scan intentionally — we want to exclude pairs
+    already written to the current run from being duplicated in a re-export.
+    """
+    pairs: set[tuple[str, str]] = set()
+    if not runs_dir.exists():
+        return pairs
+
+    for path in runs_dir.rglob("*.jsonl"):
+        if path.name not in {"train.jsonl", "validation.jsonl"}:
+            continue
+
+        with path.open(encoding="utf-8", errors="replace") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                messages = record.get("messages")
+                if not isinstance(messages, list) or len(messages) < 2:
+                    continue
+                user_content = messages[0].get("content") if isinstance(messages[0], dict) else None
+                assistant_content = messages[1].get("content") if isinstance(messages[1], dict) else None
+                if isinstance(user_content, str) and isinstance(assistant_content, str):
+                    pairs.add((user_content, assistant_content))
+    return pairs
+
+
+def append_dataset_section_to_summary_md(
+    run_dir: Path,
+    train_examples: list[FineTuneExample],
+    validation_examples: list[FineTuneExample],
+    excluded_count: int,
+) -> None:
+    """Append a ## 1. Dataset Export section to <run-dir>/summary.md (idempotent)."""
+    summary_md_path = run_dir / "summary.md"
+    existing_content = summary_md_path.read_text(encoding="utf-8") if summary_md_path.exists() else ""
+
+    if "## 1. Dataset Export" in existing_content:
+        return
+
+    now_str = datetime.now().strftime("%H:%M")
+    total_count = len(train_examples) + len(validation_examples)
+    train_count = len(train_examples)
+    val_count = len(validation_examples)
+
+    bucket_counts: Counter[str] = Counter(ex.bucket for ex in train_examples + validation_examples)
+    table_rows = "\n".join(
+        f"| {bucket} | {count} |"
+        for bucket, count in sorted(bucket_counts.items())
+        if count > 0
+    )
+    table = f"| Bucket | Count |\n|--------|-------|\n{table_rows}"
+
+    section = (
+        f"\n## 1. Dataset Export (completed {now_str})\n"
+        f"{total_count} examples ({train_count} train / {val_count} val)"
+        f" · {excluded_count} excluded as duplicates\n"
+        f"{table}\n"
+    )
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    with summary_md_path.open("a", encoding="utf-8") as fh:
+        fh.write(section)
+
+
 def main() -> None:
     args = parse_args()
-    output_dir = args.output_dir or resolve_default_output_dir(args.source)
-    if args.source == "logs":
-        result = export_fine_tune_dataset_from_logs(
-            log_dir=args.log_dir,
-            weeks=args.weeks,
-            output_dir=output_dir,
+
+    if args.run_dir is not None:
+        run_dir: Path = args.run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = run_dir
+
+        # Dedup against all fine_tune_runs/*/train.jsonl and validation.jsonl
+        # (including the current run dir so re-exports don't duplicate)
+        excluded_pairs = load_existing_finetune_pairs_from_runs(FINE_TUNE_RUNS_DIR)
+
+        if args.source == "logs":
+            cases, log_summary = load_cases_from_logs(
+                log_dir=args.log_dir,
+                weeks=args.weeks,
+                buckets=args.buckets,
+                include_unchanged=not args.exclude_unchanged,
+            )
+        else:
+            cases, dataset_summary = bench.load_stable_dataset(args.dataset)
+
+        examples = build_examples(
+            cases,
             buckets=args.buckets,
+            max_per_bucket=args.max_per_bucket,
+            excluded_pairs=excluded_pairs,
+        )
+        if len(examples) < 2:
+            raise RuntimeError("Need at least 2 examples to export train/validation files.")
+
+        train_examples, validation_examples = split_examples(
+            examples,
             validation_ratio=args.validation_ratio,
             seed=args.seed,
-            max_per_bucket=args.max_per_bucket,
-            include_unchanged=not args.exclude_unchanged,
-            previous_data_dir=args.previous_data_dir,
         )
+        if not train_examples:
+            raise RuntimeError("Training split is empty.")
+
+        train_path = output_dir / "train.jsonl"
+        validation_path = output_dir / "validation.jsonl"
+        summary_path = output_dir / "dataset_summary.json"
+
+        write_jsonl(train_path, train_examples)
+        write_jsonl(validation_path, validation_examples)
+
+        source_label = "weekly_logs" if args.source == "logs" else "stable_dataset"
+        summary = summarize_examples(
+            dataset_path=args.dataset if args.source == "stable" else None,
+            buckets=args.buckets,
+            max_per_bucket=args.max_per_bucket,
+            validation_ratio=args.validation_ratio,
+            seed=args.seed,
+            train_examples=train_examples,
+            validation_examples=validation_examples,
+            source=source_label,
+        )
+        if args.source == "logs":
+            summary["source_dataset_summary"] = log_summary
+        else:
+            summary["source_dataset_summary"] = dataset_summary
+        summary["excluded_previously_trained_pair_count"] = len(excluded_pairs)
+        summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        append_dataset_section_to_summary_md(
+            run_dir=run_dir,
+            train_examples=train_examples,
+            validation_examples=validation_examples,
+            excluded_count=len(excluded_pairs),
+        )
+
+        result = {
+            "train_path": str(train_path),
+            "validation_path": str(validation_path),
+            "summary_path": str(summary_path),
+            "summary": summary,
+        }
     else:
-        result = export_fine_tune_dataset(
-            dataset_path=args.dataset,
-            output_dir=output_dir,
-            buckets=args.buckets,
-            validation_ratio=args.validation_ratio,
-            seed=args.seed,
-            max_per_bucket=args.max_per_bucket,
-            previous_data_dir=args.previous_data_dir,
-        )
+        output_dir = args.output_dir or resolve_default_output_dir(args.source)
+        if args.source == "logs":
+            result = export_fine_tune_dataset_from_logs(
+                log_dir=args.log_dir,
+                weeks=args.weeks,
+                output_dir=output_dir,
+                buckets=args.buckets,
+                validation_ratio=args.validation_ratio,
+                seed=args.seed,
+                max_per_bucket=args.max_per_bucket,
+                include_unchanged=not args.exclude_unchanged,
+                previous_data_dir=args.previous_data_dir,
+            )
+        else:
+            result = export_fine_tune_dataset(
+                dataset_path=args.dataset,
+                output_dir=output_dir,
+                buckets=args.buckets,
+                validation_ratio=args.validation_ratio,
+                seed=args.seed,
+                max_per_bucket=args.max_per_bucket,
+                previous_data_dir=args.previous_data_dir,
+            )
+
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
