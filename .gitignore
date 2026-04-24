@@ -14,17 +14,14 @@ obj/
 *.log
 logs/*.jsonl
 logs/viewer.html
-logs/benchmarks/
 
 # Ignore Python cache
 __pycache__/
+.pytest_cache/
 
-# Environment variables 
+# Environment variables
 .env
 .env*
-
-# Generated fine-tune exports
-fine_tune_data/latest_batch/
 
 # Server files
 server.pid
