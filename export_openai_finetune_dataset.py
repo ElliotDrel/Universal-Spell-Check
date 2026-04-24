@@ -536,13 +536,8 @@ def export_fine_tune_dataset_from_logs(
 
 def load_existing_finetune_pairs_from_runs(
     runs_dir: Path,
-    ignore_run_dir: Path | None = None,
 ) -> set[tuple[str, str]]:
-    """Scan fine_tune_runs/*/train.jsonl and fine_tune_runs/*/validation.jsonl for dedup.
-
-    The ignore_run_dir is included in the scan intentionally — we want to exclude pairs
-    already written to the current run from being duplicated in a re-export.
-    """
+    """Scan fine_tune_runs/*/train.jsonl and fine_tune_runs/*/validation.jsonl for dedup."""
     pairs: set[tuple[str, str]] = set()
     if not runs_dir.exists():
         return pairs
@@ -592,8 +587,8 @@ def append_dataset_section_to_summary_md(
     bucket_counts: Counter[str] = Counter(ex.bucket for ex in train_examples + validation_examples)
     table_rows = "\n".join(
         f"| {bucket} | {count} |"
-        for bucket, count in sorted(bucket_counts.items())
-        if count > 0
+        for bucket in bench.DEFAULT_BUCKETS
+        if (count := bucket_counts.get(bucket, 0)) > 0
     )
     table = f"| Bucket | Count |\n|--------|-------|\n{table_rows}"
 
@@ -617,8 +612,13 @@ def main() -> None:
         run_dir.mkdir(parents=True, exist_ok=True)
         output_dir = run_dir
 
+        # Check if dataset already exported to this run directory (write-once semantics).
+        train_path = output_dir / "train.jsonl"
+        if train_path.exists():
+            print(f"Dataset already exported to {run_dir} — skipping.")
+            return
+
         # Dedup against all fine_tune_runs/*/train.jsonl and validation.jsonl
-        # (including the current run dir so re-exports don't duplicate)
         excluded_pairs = load_existing_finetune_pairs_from_runs(FINE_TUNE_RUNS_DIR)
 
         if args.source == "logs":
@@ -648,7 +648,6 @@ def main() -> None:
         if not train_examples:
             raise RuntimeError("Training split is empty.")
 
-        train_path = output_dir / "train.jsonl"
         validation_path = output_dir / "validation.jsonl"
         summary_path = output_dir / "dataset_summary.json"
 
