@@ -39,7 +39,7 @@ Find the most recent folder under `fine_tune_runs/` (by name — folders are dat
 | No folder, or all steps complete and deploy done | Start a new run — `mkdir fine_tune_runs/<timestamp>`, create blank `summary.md` |
 | `train.jsonl` missing | Go to Step 1 (export) |
 | `finetune_job.json` missing | Go to Step 2 (submit) |
-| `finetune_job.json` has `status: running` | Go to Step 2 (resume polling) |
+| `finetune_job.json` has `status: running` | Go to Step 2 (wait for completion) |
 | `benchmark.json` missing | Go to Step 3 (benchmark) |
 | All files present, no "## 4. Decision" in `summary.md` | Go to Step 4 (deploy gate) |
 
@@ -55,7 +55,7 @@ Base model: gpt-4.1-2025-04-14 · Started: YYYY-MM-DD HH:MM
 
 **Run:**
 ```
-python export_openai_finetune_dataset.py --run-dir <run-dir> --source logs
+python .claude/skills/finetune-cycle/scripts/export_openai_finetune_dataset.py --run-dir <run-dir> --source logs
 ```
 
 This writes `train.jsonl`, `validation.jsonl`, `dataset_summary.json`, and appends `## 1. Dataset Export` to `summary.md`. The `--source logs` flag ensures training data comes from runtime logs only — not from the frozen benchmark eval set.
@@ -79,7 +79,7 @@ Then ask: **"Upload and start fine-tune? (yes/no)"**
 python .claude/skills/finetune-cycle/scripts/submit_finetune.py --run-dir <run-dir>
 ```
 
-This uploads the files, creates the job, polls every 60s until complete, and appends `## 2. Fine-Tune Job` to `summary.md`. It may take 30–90 minutes. Print status to the user as the script logs it.
+Run this **in the background** — it uploads the files, creates the job, polls until complete, and appends `## 2. Fine-Tune Job` to `summary.md`. It may take 30–90 minutes. Tell the user the job is submitted and you'll notify them when it's done.
 
 On success: the `fine_tuned_model` field in `finetune_job.json` has the new model ID.
 On failure: the `error` field explains why. Surface the error to the user and stop.
@@ -94,7 +94,7 @@ Extract the value between the quotes.
 
 **Run:**
 ```
-python benchmark_spellcheck_models.py \
+python .claude/skills/finetune-cycle/scripts/benchmark_spellcheck_models.py \
   --run-dir <run-dir> \
   --models <fine_tuned_model> <current_deployed_model> gpt-4.1
 ```
@@ -149,7 +149,7 @@ benchmark_runs/
 2. Create the run folder: `mkdir benchmark_runs/<timestamp>`
 3. Run:
    ```
-   python benchmark_spellcheck_models.py \
+   python .claude/skills/finetune-cycle/scripts/benchmark_spellcheck_models.py \
      --run-dir benchmark_runs/<timestamp> \
      --models <model1> <model2> ...
    ```
