@@ -20,18 +20,42 @@ Primary outcomes:
 - Human curation of training data — all successful log entries are used, minus existing automatic filters (short text, prompt leaks)
 - Automated commit/push of deploy changes — agent edits the AHK file but user reviews and commits manually
 
-## User-facing flow
+## Modes
 
-User invokes the `finetune-cycle` skill. The agent walks through six stages, pausing at decision gates:
+The skill opens by asking which mode:
+
+> "What do you want to do?
+> 1. Full fine-tune run (export data → fine-tune → benchmark → deploy)
+> 2. Benchmark only (compare models against the existing dataset)"
+
+### Mode 1: Full fine-tune run
+
+Five stages with decision gates:
 
 | # | Stage | Decision gate |
 |---|-------|---------------|
-| 1 | Create run folder + benchmark baseline model | Show baseline scores → continue? |
-| 2 | Export fine-tune dataset from logs | Show example count + bucket distribution → upload? |
-| 3 | Submit fine-tune job to OpenAI + poll until complete | Automatic (may take 30+ min) |
-| 4 | Benchmark the fine-tuned model | Automatic |
-| 5 | Write before/after comparison to summary.md | Show delta → deploy? |
-| 6 | If deploying: update AHK `modelModule`, bump `scriptVersion` | Agent edits file; user commits manually |
+| 1 | Create run folder + export dataset from logs | Show example count + bucket distribution → upload? |
+| 2 | Submit fine-tune job to OpenAI + poll until complete | Automatic (may take 30+ min) |
+| 3 | Benchmark: current deployed model, new `ft:` model, `gpt-4.1` baseline, + any extras user adds | Automatic |
+| 4 | Write comparison to summary.md | Show side-by-side results → deploy? |
+| 5 | If deploying: update AHK `modelModule`, bump `scriptVersion` | Agent edits file; user commits manually |
+
+At stage 3, before running, the skill surfaces the default model list and asks: "Want to add any additional models (e.g. gpt-5-mini)?"
+
+### Mode 2: Benchmark only
+
+1. Ask which models to compare (defaults to current deployed model + `gpt-4.1`; user can add others)
+2. Run benchmark against all selected models
+3. Write results to a lightweight dated folder under `benchmark_runs/`
+
+```
+benchmark_runs/
+  2026-04-23-150000/
+    summary.md
+    benchmark.json
+```
+
+No `run.json` state machine needed — benchmark-only runs are one-shot and not resumable.
 
 ## Directory structure
 
@@ -42,12 +66,16 @@ fine_tune_runs/
   2026-04-23-143000/              # one folder per run, timestamp = run start
     summary.md                    # THE user-facing doc — appended at each stage
     run.json                      # state machine, machine-readable
-    pre_benchmark.json            # raw benchmark results (pre)
     train.jsonl                   # fine-tune training data
     validation.jsonl              # fine-tune validation data
     dataset_summary.json          # export metadata
     finetune_job.json             # OpenAI job_id, status, ft: model_id
-    post_benchmark.json           # raw benchmark results (post)
+    benchmark.json                # multi-model results (current, ft:, baseline, extras)
+
+benchmark_runs/
+  2026-04-23-150000/              # benchmark-only runs (mode 2)
+    summary.md
+    benchmark.json
 ```
 
 Rules:
@@ -61,15 +89,15 @@ Rules:
 {
   "run_id": "2026-04-23-143000",
   "base_model": "gpt-4.1",
+  "benchmark_models": ["gpt-4.1", "ft:gpt-4.1-...", "gpt-4.1-2025-04-14"],
   "started_at": "2026-04-23 14:30:00",
   "completed_at": null,
   "deployed_at": null,
   "fine_tuned_model": null,
   "stages": {
-    "pre_benchmark":  { "status": "pending|running|completed|failed", "started_at": null, "completed_at": null },
-    "export_dataset": { "status": "...", "started_at": null, "completed_at": null },
+    "export_dataset": { "status": "pending|running|completed|failed", "started_at": null, "completed_at": null },
     "finetune_job":   { "status": "...", "started_at": null, "completed_at": null, "job_id": null },
-    "post_benchmark": { "status": "...", "started_at": null, "completed_at": null },
+    "benchmark":      { "status": "...", "started_at": null, "completed_at": null },
     "comparison":     { "status": "...", "started_at": null, "completed_at": null }
   }
 }
@@ -87,28 +115,22 @@ The user's one document for the run. Sections appear as stages complete:
 # Fine-Tune Run 2026-04-23-143000
 Base model: gpt-4.1 · Started: 2026-04-23 14:30
 
-## 1. Pre-Benchmark (completed 14:32)
-Exact match rate: 67.3% · Median API: 420ms
-[bucket matrix table]
-
-## 2. Dataset Export (completed 14:33)
+## 1. Dataset Export (completed 14:33)
 120 examples (104 train / 16 val) · 151 excluded as duplicates of prior runs
+[bucket distribution table]
 
-## 3. Fine-Tune Job (completed 15:08)
+## 2. Fine-Tune Job (completed 15:08)
 Job ID: ftjob-abc123 · Model: ft:gpt-4.1-2025-04-14:...
 Training duration: 34 min · Final loss: 0.42
 
-## 4. Post-Benchmark (completed 15:10)
-Exact match rate: 71.8% (+4.5) · Median API: 410ms (-10)
-[bucket matrix table]
+## 3. Benchmark (completed 15:10)
+Models compared: ft:gpt-4.1-... · gpt-4.1 (current) · gpt-4.1-2025-04-14 (baseline)
+[side-by-side exact match % and median API ms per model]
+[per-bucket matrix per model]
 
-## 5. Comparison & Decision
-[side-by-side bucket matrix diff]
-Decision: deployed at 15:12
-
-## 6. Deploy
-Updated modelModule in Universal Spell Checker.ahk:
-  gpt-4.1 → ft:gpt-4.1-2025-04-14:...
+## 4. Decision
+Deployed at 15:12
+Updated modelModule: gpt-4.1 → ft:gpt-4.1-2025-04-14:...
 Bumped scriptVersion: 1.42 → 1.43
 ```
 
@@ -163,9 +185,10 @@ python submit_finetune.py --run-dir fine_tune_runs/2026-04-23-143000
 
 Both changes are additive — existing flags keep working.
 
-**`benchmark_spellcheck_models.py`:** add `--run-dir <path>` and `--stage <pre_benchmark|post_benchmark>`. When set:
-- Output file is `<run-dir>/<stage>.json` (instead of timestamped dir under `logs/benchmarks/`)
-- Appends the corresponding section to `<run-dir>/summary.md`
+**`benchmark_spellcheck_models.py`:** add `--run-dir <path>`. When set:
+- Output file is `<run-dir>/benchmark.json` (instead of timestamped dir under `logs/benchmarks/`)
+- Models to run come from `run.json.benchmark_models` (fine-tune mode) or are passed via `--models` (benchmark-only mode)
+- Appends the benchmark section to `<run-dir>/summary.md`
 - Updates `<run-dir>/run.json` stage status
 - Old `--output-dir` path still works for ad-hoc runs
 
@@ -200,11 +223,11 @@ One-time migration when the skill is first installed:
 
 | Situation | What the skill does |
 |---|---|
-| Fresh invocation, no in-progress run | Start a new run at stage 1 |
-| Pre-benchmark succeeded, user interrupted before stage 2 | Detect in-progress run, resume at stage 2 |
-| Fine-tune job running, user closed terminal | Detect `finetune_job.status == "running"` with `job_id`, resume polling |
-| Any stage failed (status == "failed") | Surface error from `summary.md`, ask user whether to retry the stage or abandon the run |
-| All stages completed but `deployed_at == null` | Jump to the deploy decision gate |
+| Fresh invocation, no in-progress run | Ask mode (fine-tune or benchmark-only), start at stage 1 |
+| Dataset exported, interrupted before stage 2 | Detect in-progress run, resume at fine-tune job submission |
+| Fine-tune job running, user closed terminal | Detect `finetune_job.status == "running"` with `job_id`, resume polling without re-upload |
+| Any stage failed | Surface error from `summary.md`, ask whether to retry or abandon |
+| All stages completed but `deployed_at == null` | Jump straight to the deploy decision gate |
 
 ## Open questions
 
