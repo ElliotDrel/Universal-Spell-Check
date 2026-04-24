@@ -47,12 +47,18 @@ Find the most recent folder under `fine_tune_runs/` (by name — folders are dat
 
 ### Step 1 — Export dataset
 
-**Run:**
+Initialize `summary.md` in the run folder with a header before running the script:
 ```
-python export_openai_finetune_dataset.py --run-dir <run-dir>
+# Fine-Tune Run <timestamp>
+Base model: gpt-4.1-2025-04-14 · Started: YYYY-MM-DD HH:MM
 ```
 
-This writes `train.jsonl`, `validation.jsonl`, `dataset_summary.json`, and appends `## 1. Dataset Export` to `summary.md`.
+**Run:**
+```
+python export_openai_finetune_dataset.py --run-dir <run-dir> --source logs
+```
+
+This writes `train.jsonl`, `validation.jsonl`, `dataset_summary.json`, and appends `## 1. Dataset Export` to `summary.md`. The `--source logs` flag ensures training data comes from runtime logs only — not from the frozen benchmark eval set.
 
 **Pre-upload gate — show the user before proceeding to Step 2:**
 
