@@ -874,20 +874,6 @@ def load_all_eval_datasets(
 
     exclude_resolved = exclude_run_dir.resolve() if exclude_run_dir is not None else None
 
-    if PREVIOUS_BATCHES_DIR.exists():
-        for dataset_dir in sorted(path for path in PREVIOUS_BATCHES_DIR.iterdir() if path.is_dir()):
-            dataset_name = f"previous_batches/{dataset_dir.name}"
-            dataset_cases, dataset_summary = load_finetune_eval_cases(dataset_dir, dataset_name)
-            if dataset_cases:
-                cases.extend(dataset_cases)
-                summaries[dataset_name] = dataset_summary
-
-    if LATEST_BATCH_DIR.exists():
-        dataset_cases, dataset_summary = load_finetune_eval_cases(LATEST_BATCH_DIR, "latest_batch")
-        if dataset_cases:
-            cases.extend(dataset_cases)
-            summaries["latest_batch"] = dataset_summary
-
     if FINE_TUNE_RUNS_DIR.exists():
         for run_dir in sorted(path for path in FINE_TUNE_RUNS_DIR.iterdir() if path.is_dir()):
             if exclude_resolved is not None and run_dir.resolve() == exclude_resolved:
@@ -1679,7 +1665,8 @@ def render_run_dir_benchmark_section(
             continue
         exact_pct = info.get("exact_match_rate", 0.0)
         median_ms = (info.get("api_ms") or {}).get("median")
-        lines.append(f"| {model} | {exact_pct} | {median_ms} |")
+        median_ms_str = f"{median_ms}" if median_ms is not None else "—"
+        lines.append(f"| {model} | {exact_pct} | {median_ms_str} |")
 
     # Per-bucket accuracy matrix (exact% per bucket per model)
     lines.extend(["", "| bucket | " + " | ".join(models) + " |"])
