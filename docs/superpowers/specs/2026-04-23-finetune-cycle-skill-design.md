@@ -34,13 +34,20 @@ Five stages with decision gates:
 
 | # | Stage | Decision gate |
 |---|-------|---------------|
-| 1 | Create run folder + export dataset from logs | Show example count + bucket distribution → upload? |
+| 1 | Create run folder + export dataset from logs | Show example count + bucket distribution + 3 random sample pairs + est. cost/time → upload? |
 | 2 | Submit fine-tune job to OpenAI + poll until complete | Automatic (may take 30+ min) |
 | 3 | Benchmark: current deployed model, new `ft:` model, `gpt-4.1` baseline, + any extras user adds | Automatic |
 | 4 | Write comparison to summary.md | Show side-by-side results → deploy? |
 | 5 | If deploying: update AHK `modelModule`, bump `scriptVersion` | Agent edits file; user commits manually |
 
 At stage 3, before running, the skill surfaces the default model list and asks: "Want to add any additional models (e.g. gpt-5-mini)?"
+
+**Current deployed model discovery:** the skill reads the line `modelModule := "<value>"` from `Universal Spell Checker.ahk` to determine which model is currently deployed. That model is automatically added to `benchmark_models` in `run.json`.
+
+**Pre-upload gate content:** before stage 2 kicks off, the skill shows:
+- total example count + per-bucket distribution
+- 3 random pairs from `train.jsonl` (user text → assistant text) so the user can eyeball quality
+- rough cost estimate (OpenAI's per-token fine-tune pricing × total tokens in train.jsonl) + rough wall-time estimate (~30–60 min typical)
 
 ### Mode 2: Benchmark only
 
@@ -93,6 +100,7 @@ Rules:
   "started_at": "2026-04-23 14:30:00",
   "completed_at": null,
   "deployed_at": null,
+  "abandoned_at": null,
   "fine_tuned_model": null,
   "stages": {
     "export_dataset": { "status": "pending|running|completed|failed", "started_at": null, "completed_at": null },
@@ -105,7 +113,12 @@ Rules:
 
 Stage status transitions: `pending → running → completed` (happy path) or `running → failed` (error path).
 
-A run is "in progress" if any stage is `running` or if all stages are `completed` but `deployed_at` is null. On skill invocation, the first thing checked is whether an in-progress run exists.
+A run is "in progress" if `abandoned_at` is null AND (any stage is `running` OR all stages are `completed` but `deployed_at` is null). On skill invocation, the first thing checked is whether an in-progress run exists.
+
+**Abandoning a run:** sets `abandoned_at` to the current timestamp and writes a note to `summary.md` explaining why. The folder is NOT deleted — it stays as evidence. Abandoned runs are skipped by:
+- "in progress" detection (next invocation can start fresh)
+- Dedup scans in future dataset exports (their train.jsonl/validation.jsonl pairs become available again)
+- "Current run" lookups (most-recent-non-abandoned wins)
 
 ## `summary.md` structure
 
@@ -192,20 +205,28 @@ Both changes are additive — existing flags keep working.
 - Updates `<run-dir>/run.json` stage status
 - Old `--output-dir` path still works for ad-hoc runs
 
+**Fix to prevent train/eval data leakage:** the existing `load_all_eval_datasets()` function pulls eval cases from `fine_tune_data/previous_batches/` and `latest_batch/` into the benchmark. Under the new design this becomes `fine_tune_runs/*/`, and a freshly-created `ft:` model would be evaluated partly on its own training data.
+
+The updated logic:
+- `load_all_eval_datasets()` scans `fine_tune_runs/*/` for completed, non-abandoned runs
+- When benchmarking inside a run folder, exclude that run's own `train.jsonl` and `validation.jsonl` pairs from the eval set
+- The frozen benchmark dataset (`benchmark_data/stable_spellcheck_cases-*.json`) is unaffected and remains the primary eval source
+
 **`export_openai_finetune_dataset.py`:** add `--run-dir <path>`. When set:
 - Writes `train.jsonl` / `validation.jsonl` / `dataset_summary.json` into run folder
 - Appends dataset section to `summary.md`
 - Updates `run.json` stage status
-- Deduplication scans `fine_tune_runs/*/train.jsonl` AND `fine_tune_runs/*/validation.jsonl` for previously-used pairs
 - Old `--output-dir` path still works
+
+**Deduplication scope:** dedup scans `fine_tune_runs/*/train.jsonl` and `fine_tune_runs/*/validation.jsonl`, but **only** from runs where `run.json.deployed_at != null` AND `abandoned_at == null`. Pairs from failed or abandoned runs remain available for future training.
 
 ## Deploy step
 
 After user approves at stage 5, the agent:
-1. Reads current `modelModule` from `Universal Spell Checker.ahk`
-2. Replaces it with the `ft:` model ID from `run.json.fine_tuned_model`
-3. Reads `scriptVersion` and bumps the minor version
-4. Writes the deploy section to `summary.md`
+1. Reads the line `modelModule := "<value>"` from `Universal Spell Checker.ahk`
+2. Replaces the value with the `ft:` model ID from `run.json.fine_tuned_model`
+3. Reads the line `scriptVersion := "<N>"` (integer-as-string, currently `"21"`) and increments the integer by 1
+4. Writes the deploy section to `summary.md` (including before/after values for both fields)
 5. Sets `run.json.deployed_at` to current timestamp
 6. Tells user: "Deployed. Review the diff and commit when ready."
 
