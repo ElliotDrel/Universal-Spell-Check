@@ -44,8 +44,8 @@ def save_job(run_dir: Path, data: dict) -> None:
         with os.fdopen(fd, "w") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, job_path)
-    except Exception:
-        # Clean up temp file on error
+    except BaseException:
+        # Clean up temp file on error (including Ctrl-C)
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -115,13 +115,7 @@ def append_summary_failure(run_dir: Path, job_id: str | None, error_msg: str) ->
 
 def extract_final_loss(job) -> object:
     """Extract final training loss from job result files metadata, if available."""
-    try:
-        if job.result_files:
-            # The loss is in training metrics; not directly on the job object
-            # in the standard API. Return None and let callers show N/A.
-            pass
-    except Exception:
-        pass
+    # Loss is not directly exposed in the standard API; callers show N/A
     return None
 
 
@@ -131,6 +125,10 @@ def extract_final_loss(job) -> object:
 
 def upload_files(client: OpenAI, run_dir: Path, job_data: dict) -> dict:
     """Upload train.jsonl and validation.jsonl; update job_data and persist."""
+    if job_data.get("training_file_id") and job_data.get("validation_file_id"):
+        print("File IDs already present — skipping upload.")
+        return job_data
+
     print("Uploading training file...")
     train_path = run_dir / "train.jsonl"
     with open(train_path, "rb") as f:
@@ -188,9 +186,6 @@ def poll_job(client: OpenAI, run_dir: Path, job_data: dict) -> None:
                 print(f"Network error ({exc}); retrying in {backoff:.0f}s (attempt {retry}/{max_retries})…")
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 300)
-            except APIError as exc:
-                # Non-transient API errors — re-raise immediately
-                raise
 
         # Persist current status
         job_data["status"] = job.status
