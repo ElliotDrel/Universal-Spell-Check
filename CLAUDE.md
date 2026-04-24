@@ -27,20 +27,25 @@ Universal Spell Check/
 ├── replacements.json                # Post-processing brand/casing replacements (hot-reloaded)
 │
 ├── generate_log_viewer.py           # Builds logs/viewer.html from JSONL logs
-├── benchmark_spellcheck_models.py   # Runs model comparisons against benchmark_data/
-├── export_openai_finetune_dataset.py# Generates fine-tune batches from logs or benchmark data
 │
 ├── logs/                            # JSONL runtime logs (weekly files, rotates at 5 MiB → -2/-3/…)
 │     └── viewer.html                # Generated log viewer (after running generate_log_viewer.py)
 │
 ├── benchmark_data/                  # Frozen eval dataset — do not mutate casually
-├── fine_tune_data/
-│     ├── latest_batch/              # Current generated training batch (safe to overwrite)
-│     └── previous_batches/          # Historical training sets already used
+├── fine_tune_runs/                  # One dated folder per fine-tune run (file presence = state)
 │
 ├── tests/                           # Pytest suites for the Python tooling
 │     ├── test_benchmark_spellcheck_models.py
 │     └── test_export_openai_finetune_dataset.py
+│
+├── .claude/skills/finetune-cycle/   # Fine-tune cycle skill + all scripts
+│     ├── SKILL.md                   # Agent-facing workflow (invoke via /finetune-cycle)
+│     ├── scripts/
+│     │     ├── submit_finetune.py   # Upload + create job + poll
+│     │     ├── benchmark_spellcheck_models.py
+│     │     └── export_openai_finetune_dataset.py
+│     └── references/
+│           └── openai_finetune_api.md
 │
 ├── docs/                            # Focused context docs — load via routing table below
 │     ├── architecture.md
