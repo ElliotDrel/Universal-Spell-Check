@@ -33,6 +33,7 @@ DATASET_DIR = SCRIPT_DIR / "benchmark_data"
 FINE_TUNE_DATA_DIR = SCRIPT_DIR / "fine_tune_data"
 PREVIOUS_BATCHES_DIR = FINE_TUNE_DATA_DIR / "previous_batches"
 LATEST_BATCH_DIR = FINE_TUNE_DATA_DIR / "latest_batch"
+FINE_TUNE_RUNS_DIR = SCRIPT_DIR / "fine_tune_runs"
 DEFAULT_DATASET_PATH = DATASET_DIR / "stable_spellcheck_cases.json"
 REPLACEMENTS_PATH = SCRIPT_DIR / "replacements.json"
 ENV_PATH = SCRIPT_DIR / ".env"
@@ -168,6 +169,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_BUCKETS,
     )
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a fine-tune run directory (e.g. fine_tune_runs/2026-04-23-143000). "
+            "When set, writes benchmark.json there, appends a section to summary.md, "
+            "and excludes that run's training pairs from the eval set."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -855,9 +866,13 @@ def load_finetune_eval_cases(dataset_dir: Path, dataset_name: str) -> tuple[list
     return cases, summary
 
 
-def load_all_eval_datasets() -> tuple[list[GoldCase], dict[str, dict[str, Any]]]:
+def load_all_eval_datasets(
+    exclude_run_dir: Path | None = None,
+) -> tuple[list[GoldCase], dict[str, dict[str, Any]]]:
     cases: list[GoldCase] = []
     summaries: dict[str, dict[str, Any]] = {}
+
+    exclude_resolved = exclude_run_dir.resolve() if exclude_run_dir is not None else None
 
     if PREVIOUS_BATCHES_DIR.exists():
         for dataset_dir in sorted(path for path in PREVIOUS_BATCHES_DIR.iterdir() if path.is_dir()):
@@ -872,6 +887,16 @@ def load_all_eval_datasets() -> tuple[list[GoldCase], dict[str, dict[str, Any]]]
         if dataset_cases:
             cases.extend(dataset_cases)
             summaries["latest_batch"] = dataset_summary
+
+    if FINE_TUNE_RUNS_DIR.exists():
+        for run_dir in sorted(path for path in FINE_TUNE_RUNS_DIR.iterdir() if path.is_dir()):
+            if exclude_resolved is not None and run_dir.resolve() == exclude_resolved:
+                continue
+            dataset_name = f"fine_tune_runs/{run_dir.name}"
+            dataset_cases, dataset_summary = load_finetune_eval_cases(run_dir, dataset_name)
+            if dataset_cases:
+                cases.extend(dataset_cases)
+                summaries[dataset_name] = dataset_summary
 
     return cases, summaries
 
@@ -1632,6 +1657,70 @@ def run_benchmark(
     return preflight, warmups, [record for record in records if record is not None]
 
 
+def render_run_dir_benchmark_section(
+    models: list[str],
+    model_summary: dict[str, Any],
+    buckets: list[str],
+) -> str:
+    completed_at = datetime.now().strftime("%H:%M")
+    model_labels = " · ".join(models)
+    lines = [
+        "",
+        f"## 3. Benchmark (completed {completed_at})",
+        f"Models: {model_labels}",
+        "",
+        "| model | exact_match% | median_ms |",
+        "| --- | ---: | ---: |",
+    ]
+    for model in models:
+        info = model_summary.get(model)
+        if not info:
+            lines.append(f"| {model} | — | — |")
+            continue
+        exact_pct = info.get("exact_match_rate", 0.0)
+        median_ms = (info.get("api_ms") or {}).get("median")
+        lines.append(f"| {model} | {exact_pct} | {median_ms} |")
+
+    # Per-bucket accuracy matrix (exact% per bucket per model)
+    lines.extend(["", "| bucket | " + " | ".join(models) + " |"])
+    lines.append("| --- | " + " | ".join("---:" for _ in models) + " |")
+    for bucket in buckets:
+        row = [bucket]
+        for model in models:
+            info = model_summary.get(model)
+            if not info:
+                row.append("—")
+                continue
+            bucket_counts = info.get("gold_bucket_matrix", {}).get(bucket, {})
+            total = sum(bucket_counts.values())
+            exact = bucket_counts.get("exact", 0)
+            if total:
+                pct = round(exact / total * 100, 1)
+                row.append(f"{pct}")
+            else:
+                row.append("—")
+        lines.append("| " + " | ".join(row) + " |")
+
+    return "\n".join(lines) + "\n"
+
+
+def append_benchmark_to_summary_md(
+    run_dir: Path,
+    models: list[str],
+    model_summary: dict[str, Any],
+    buckets: list[str],
+) -> None:
+    summary_path = run_dir / "summary.md"
+    existing = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
+    if "## 3. Benchmark" in existing:
+        print(f"[run-dir] summary.md already contains '## 3. Benchmark' — skipping append.")
+        return
+    section = render_run_dir_benchmark_section(models, model_summary, buckets)
+    with summary_path.open("a", encoding="utf-8") as fh:
+        fh.write(section)
+    print(f"[run-dir] Appended benchmark section to {summary_path}")
+
+
 def print_console_summary(output_dir: Path, model_summary: dict[str, Any]) -> None:
     print(f"Wrote benchmark artifacts to {output_dir}")
     for model, info in model_summary.items():
@@ -1646,6 +1735,17 @@ def print_console_summary(output_dir: Path, model_summary: dict[str, Any]) -> No
 def main() -> int:
     args = parse_args()
     run_started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # --run-dir write-once gate: skip early if benchmark.json already exists
+    if args.run_dir is not None:
+        run_dir = args.run_dir.resolve()
+        benchmark_json_path = run_dir / "benchmark.json"
+        if benchmark_json_path.exists():
+            print(f"[run-dir] {benchmark_json_path} already exists — skipping benchmark run.")
+            return 0
+    else:
+        run_dir = None
+
     output_dir = args.output_dir or (BENCHMARKS_DIR / datetime.now().strftime("%Y-%m-%d-%H%M%S"))
 
     replacements = load_replacements(REPLACEMENTS_PATH)
@@ -1680,7 +1780,7 @@ def main() -> int:
     for case in frozen_cases:
         case.dataset_name = "frozen_benchmark"
 
-    eval_cases, eval_dataset_summaries = load_all_eval_datasets()
+    eval_cases, eval_dataset_summaries = load_all_eval_datasets(exclude_run_dir=run_dir)
     all_cases = frozen_cases + eval_cases
 
     if args.build_dataset_only:
@@ -1719,20 +1819,43 @@ def main() -> int:
         "prompt_instruction_text": PROMPT_INSTRUCTION_TEXT,
         "replacements_path": str(REPLACEMENTS_PATH),
         "evaluation_sets": ["frozen_benchmark", *list(eval_dataset_summaries.keys())],
+        "run_dir": str(run_dir) if run_dir is not None else None,
     }
     model_summary = summarize_records(records)
     dataset_model_summaries = summarize_records_by_dataset(records)
-    write_artifacts(
-        output_dir,
-        config,
-        dataset_summary,
-        eval_dataset_summaries,
-        preflight,
-        warmups,
-        model_summary,
-        dataset_model_summaries,
-    )
-    print_console_summary(output_dir, model_summary)
+
+    if run_dir is not None:
+        # --run-dir mode: write benchmark.json into the run dir and append to summary.md
+        run_dir.mkdir(parents=True, exist_ok=True)
+        results_payload = {
+            "config": config,
+            "frozen_dataset_summary": dataset_summary,
+            "eval_dataset_summaries": eval_dataset_summaries,
+            "preflight": preflight,
+            "warmups": warmups,
+            "model_summary": model_summary,
+            "dataset_model_summaries": dataset_model_summaries,
+        }
+        benchmark_json_path = run_dir / "benchmark.json"
+        benchmark_json_path.write_text(
+            json.dumps(results_payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"[run-dir] Wrote {benchmark_json_path}")
+        append_benchmark_to_summary_md(run_dir, args.models, model_summary, args.buckets)
+        print_console_summary(run_dir, model_summary)
+    else:
+        write_artifacts(
+            output_dir,
+            config,
+            dataset_summary,
+            eval_dataset_summaries,
+            preflight,
+            warmups,
+            model_summary,
+            dataset_model_summaries,
+        )
+        print_console_summary(output_dir, model_summary)
     return 0
 
 
