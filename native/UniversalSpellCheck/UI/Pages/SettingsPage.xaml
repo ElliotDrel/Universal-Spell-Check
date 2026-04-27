@@ -1,0 +1,191 @@
+<Page x:Class="UniversalSpellCheck.UI.Pages.SettingsPage"
+      x:ClassModifier="internal"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{DynamicResource Canvas}">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles.xaml"/>
+                <ResourceDictionary Source="../Components.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32">
+
+            <TextBlock Style="{StaticResource DisplayHeader}"
+                       Text="Settings"
+                       Margin="0,0,0,24"/>
+
+            <!-- Hotkey -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Hotkey"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Spell check hotkey"/>
+                            <TextBlock Style="{StaticResource BodyMuted}"
+                                       Text="Press to capture and replace selected text"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <Border Style="{StaticResource KeyboardChip}">
+                                <TextBlock FontFamily="{StaticResource FontMono}" FontSize="11" Text="Ctrl"/>
+                            </Border>
+                            <TextBlock Text=" + " Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource KeyboardChip}">
+                                <TextBlock FontFamily="{StaticResource FontMono}" FontSize="11" Text="Alt"/>
+                            </Border>
+                            <TextBlock Text=" + " Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource KeyboardChip}">
+                                <TextBlock FontFamily="{StaticResource FontMono}" FontSize="11" Text="U"/>
+                            </Border>
+                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource PrimaryButton}"
+                                Content="Change"
+                                IsEnabled="False"
+                                ToolTip="Hotkey changes are not wired yet."/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Model -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Model"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Active model"/>
+                            <TextBlock Style="{StaticResource BodyMuted}"
+                                       Text="Used for spell-check requests"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  Width="160"
+                                  SelectedIndex="0"
+                                  IsEnabled="False"
+                                  ToolTip="Model selection is not wired yet. The native app currently uses gpt-4.1.">
+                            <ComboBoxItem Content="gpt-4.1"/>
+                            <ComboBoxItem Content="gpt-5.1"/>
+                            <ComboBoxItem Content="gpt-5-mini"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Replacements -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Replacements"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Custom replacements"/>
+                            <TextBlock Style="{StaticResource BodyMuted}"
+                                       Text="Brand names and casing fixes applied after the model returns"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource PrimaryButton}"
+                                Content="Edit list"
+                                Click="OnEditReplacementsClicked"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Startup -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Startup"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Start on login"/>
+                            <TextBlock Style="{StaticResource BodyMuted}"
+                                       Text="Run Universal Spell Check when Windows starts"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <CheckBox x:Name="StartupCheckBox"
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  IsEnabled="False"
+                                  ToolTip="Startup is controlled by the existing Windows Startup shortcut."/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- API key -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="API key"/>
+                    <TextBlock Style="{StaticResource BodyL}" Text="OpenAI API key" Margin="0,0,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <PasswordBox x:Name="ApiKeyBox"
+                                     Grid.Column="0"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,12,0"
+                                     Padding="8,6"/>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource PrimaryButton}"
+                                Content="Save"
+                                Click="OnSaveApiKeyClicked"/>
+                    </Grid>
+                    <TextBlock x:Name="ApiKeyStatus"
+                               Style="{StaticResource Caption}"
+                               Text="Stored encrypted for this Windows user with DPAPI"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Logs -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Logs"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Log location"/>
+                            <TextBlock FontFamily="{StaticResource FontMono}"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextMuted}"
+                                       Text="%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource GhostButton}"
+                                Content="Open folder"
+                                Click="OnOpenLogsClicked"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

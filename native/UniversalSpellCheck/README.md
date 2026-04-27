@@ -8,6 +8,7 @@ Phase 5 native Windows app for the replacement plan. The app now uses
 This intentionally does only:
 
 - run as a single-instance resident WinForms tray app
+- open a WPF dashboard from the tray menu
 - register `Ctrl+Alt+U` globally
 - copy selected plain text through the clipboard
 - wait for the test hotkey keys to be released before sending `Ctrl+C`
@@ -51,8 +52,8 @@ The native app is the startup spellchecker. Windows Startup contains:
 
 The old AHK startup shortcut was deleted.
 
-Use the tray icon menu to open logs or quit the app.
-Use `Open Settings` from the tray icon menu to save your OpenAI API key.
+Use the tray icon menu to open the dashboard, open logs, or quit the app.
+Use `Open Dashboard` from the tray icon menu to review recent activity and save your OpenAI API key.
 
 Logs are written to:
 

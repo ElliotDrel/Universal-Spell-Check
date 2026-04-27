@@ -1,0 +1,73 @@
+<Window x:Class="UniversalSpellCheck.UI.MainWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:pages="clr-namespace:UniversalSpellCheck.UI.Pages"
+        Title="Universal Spell Check"
+        Width="1100"
+        Height="720"
+        MinWidth="900"
+        MinHeight="600"
+        Background="{DynamicResource Canvas}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles.xaml"/>
+                <ResourceDictionary Source="Components.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Grid Grid.Column="0" Margin="20,24,0,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="UNIVERSAL SPELL CHECK"
+                       FontFamily="{StaticResource FontBody}"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}"
+                       Margin="12,0,0,28"/>
+
+            <StackPanel Grid.Row="1">
+                <RadioButton x:Name="HomeNav"
+                             Style="{StaticResource NavItem}"
+                             Content="Home"
+                             IsChecked="True"
+                             Checked="OnNavChecked"/>
+                <RadioButton x:Name="SettingsNav"
+                             Style="{StaticResource NavItem}"
+                             Content="Settings"
+                             Checked="OnNavChecked"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2">
+                <RadioButton x:Name="HelpNav"
+                             Style="{StaticResource NavItem}"
+                             Content="Help"/>
+                <TextBlock Style="{StaticResource Caption}"
+                           Text="Version 1.0"
+                           Margin="12,8,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Content host -->
+        <Frame x:Name="ContentFrame"
+               Grid.Column="1"
+               NavigationUIVisibility="Hidden"
+               Background="{DynamicResource Canvas}"/>
+    </Grid>
+</Window>

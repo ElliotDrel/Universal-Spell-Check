@@ -1,0 +1,132 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================
+         COMPONENTS — Card, Buttons, Keyboard chip, Diff row, Toggle, Nav item
+         Depends on Styles.xaml resources.
+         ============================================================ -->
+
+    <!-- Card: white rounded surface, hairline border, 24px padding default -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Surface}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Padding" Value="24"/>
+    </Style>
+
+    <!-- Primary button: solid black, white text -->
+    <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource ActionPrimary}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#2A2A2A"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Ghost button: transparent with hairline border -->
+    <Style x:Key="GhostButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource Border}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource HoverGhost}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Keyboard chip: for hotkey display, e.g. [Ctrl] -->
+    <Style x:Key="KeyboardChip" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Surface}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="8,2"/>
+    </Style>
+
+    <!-- Diff lines: red minus, green plus -->
+    <Style x:Key="DiffMinusLine" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource DiffMinusBg}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12,6"/>
+    </Style>
+
+    <Style x:Key="DiffPlusLine" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource DiffPlusBg}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Margin" Value="0,2,0,0"/>
+    </Style>
+
+    <!-- Sidebar nav item: pill highlight when active -->
+    <Style x:Key="NavItem" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Pill"
+                            Background="Transparent"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource HoverGhost}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource Surface}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

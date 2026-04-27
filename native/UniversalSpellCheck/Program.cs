@@ -10,15 +10,16 @@ static class Program
         using var appMutex = new Mutex(true, AppMutexName, out var createdNew);
         if (!createdNew)
         {
-            MessageBox.Show(
+            System.Windows.Forms.MessageBox.Show(
                 "Universal Spell Check native spike is already running.",
                 "Universal Spell Check",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+                System.Windows.Forms.MessageBoxButtons.OK,
+                System.Windows.Forms.MessageBoxIcon.Information);
             return;
         }
 
-        ApplicationConfiguration.Initialize();
-        Application.Run(new SpellCheckAppContext());
+        System.Windows.Forms.Application.EnableVisualStyles();
+        System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+        System.Windows.Forms.Application.Run(new SpellCheckAppContext());
     }
 }

@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using DashboardWindow = UniversalSpellCheck.UI.MainWindow;
+using Forms = System.Windows.Forms;
 
 namespace UniversalSpellCheck;
 
-internal sealed class SpellCheckAppContext : ApplicationContext
+internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 {
-    private readonly NotifyIcon _notifyIcon;
+    private readonly Forms.NotifyIcon _notifyIcon;
     private readonly HotkeyWindow _hotkeyWindow;
     private readonly DiagnosticsLogger _logger;
     private readonly SpellcheckCoordinator _coordinator;
@@ -12,7 +14,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
     private readonly LoadingOverlayForm _loadingOverlay = new();
-    private SettingsForm? _settingsForm;
+    private DashboardWindow? _dashboardWindow;
 
     public SpellCheckAppContext()
     {
@@ -28,9 +30,9 @@ internal sealed class SpellCheckAppContext : ApplicationContext
             SetBusy,
             ShowSettings);
 
-        _notifyIcon = new NotifyIcon
+        _notifyIcon = new Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = System.Drawing.SystemIcons.Application,
             Text = "Universal Spell Check Native Spike",
             Visible = true,
             ContextMenuStrip = BuildMenu()
@@ -43,10 +45,10 @@ internal sealed class SpellCheckAppContext : ApplicationContext
         _logger.Log("started hotkey=Ctrl+Alt+U model=gpt-4.1 phase=5");
     }
 
-    private ContextMenuStrip BuildMenu()
+    private Forms.ContextMenuStrip BuildMenu()
     {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Open Settings", null, (_, _) => ShowSettings());
+        var menu = new Forms.ContextMenuStrip();
+        menu.Items.Add("Open Dashboard", null, (_, _) => ShowSettings());
         menu.Items.Add("Open Logs Folder", null, (_, _) => OpenLogsFolder());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         return menu;
@@ -69,7 +71,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
 
     private void ShowTip(string title, string message)
     {
-        _notifyIcon.ShowBalloonTip(2500, title, message, ToolTipIcon.Info);
+        _notifyIcon.ShowBalloonTip(2500, title, message, Forms.ToolTipIcon.Info);
     }
 
     private void SetBusy(bool isBusy)
@@ -90,15 +92,26 @@ internal sealed class SpellCheckAppContext : ApplicationContext
 
     private void ShowSettings()
     {
-        if (_settingsForm is { IsDisposed: false })
+        if (_dashboardWindow is not null)
         {
-            _settingsForm.Activate();
+            if (!_dashboardWindow.IsVisible)
+            {
+                _dashboardWindow.Show();
+            }
+
+            if (_dashboardWindow.WindowState == System.Windows.WindowState.Minimized)
+            {
+                _dashboardWindow.WindowState = System.Windows.WindowState.Normal;
+            }
+
+            _dashboardWindow.Activate();
             return;
         }
 
-        _settingsForm = new SettingsForm(_settingsStore, _logger);
-        _settingsForm.Show();
-        _settingsForm.Activate();
+        _dashboardWindow = new DashboardWindow(_settingsStore, _logger);
+        _dashboardWindow.Closed += (_, _) => _dashboardWindow = null;
+        _dashboardWindow.Show();
+        _dashboardWindow.Activate();
     }
 
     protected override void ExitThreadCore()
@@ -108,6 +121,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _dashboardWindow?.Close();
         _loadingOverlay.Dispose();
         _coordinator.Dispose();
         _spellcheckService.Dispose();

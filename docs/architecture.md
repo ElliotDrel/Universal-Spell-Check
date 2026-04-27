@@ -17,7 +17,8 @@
 - `native/UniversalSpellCheck/SpellcheckCoordinator.cs`: Serialized pipeline: capture -> request -> post-process -> paste. Uses non-queueing `SemaphoreSlim(1, 1)`.
 - `native/UniversalSpellCheck/OpenAiSpellcheckService.cs`: App-lifetime `HttpClient`, fixed `gpt-4.1` request, request retry, response parsing, and failure categories.
 - `native/UniversalSpellCheck/TextPostProcessor.cs`: Native `replacements.json` port plus prompt-leak guard.
-- `native/UniversalSpellCheck/SettingsStore.cs` / `SettingsForm.cs`: DPAPI current-user API-key storage and tray settings UI.
+- `native/UniversalSpellCheck/SettingsStore.cs`: DPAPI current-user API-key storage used by the dashboard and request path.
+- `native/UniversalSpellCheck/UI/`: WPF dashboard opened from the tray. Shows recent successful native spell-checks from `spellcheck_detail` logs and provides API-key/log/replacements controls.
 - `native/UniversalSpellCheck/LoadingOverlayForm.cs`: Borderless topmost bottom-center `Spell check loading...` progress bar shown without activation while the API request is running.
 - `native/UniversalSpellCheck/README.md`: Native run/publish/manual-test instructions.
 - `native/UniversalSpellCheck/CUTOVER.md`: Native-vs-AHK comparison, test evidence, missing features, and rollback path.
@@ -74,6 +75,13 @@ python export_openai_finetune_dataset.py --source logs --weeks 8 --max-per-bucke
 10. `ClipboardLoop` writes the final replacement to the clipboard and sends `Ctrl+V`.
 11. Logs capture timing, request timing, post-process timing, paste timing, attempts, active app, paste target app, failure category, and a detail record with raw/base data to `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
 12. Loading overlay hides in `finally`, even on request/paste failure.
+
+### Native dashboard flow
+1. User opens the tray menu and selects `Open Dashboard`.
+2. `SpellCheckAppContext` opens the in-process WPF `UI/MainWindow`.
+3. Home reads the current native log file and renders successful `spellcheck_detail` entries as diff rows.
+4. Settings saves the OpenAI API key through `SettingsStore`, opens the log folder, and opens `replacements.json`.
+5. Hotkey capture, model switching, startup toggling, and a full replacements editor are deferred and must not be fake-wired.
 
 ## Design principles
 - Speed first — every op optimized for latency.

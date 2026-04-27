@@ -1,0 +1,96 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================
+         DESIGN TOKENS — see DESIGN.md for rationale
+         Editorial Light. Warm cream, mixed serif + sans, hairline borders.
+         ============================================================ -->
+
+    <!-- Colors -->
+    <Color x:Key="CanvasColor">#F5F1EA</Color>
+    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+    <Color x:Key="BorderColor">#E8E2D6</Color>
+    <Color x:Key="TextPrimaryColor">#1A1A1A</Color>
+    <Color x:Key="TextMutedColor">#7B7268</Color>
+    <Color x:Key="ActionPrimaryColor">#1A1A1A</Color>
+    <Color x:Key="AccentColor">#C4623E</Color>
+    <Color x:Key="DiffMinusBgColor">#FBE9E5</Color>
+    <Color x:Key="DiffMinusTextColor">#B8453B</Color>
+    <Color x:Key="DiffPlusBgColor">#E8F0E0</Color>
+    <Color x:Key="DiffPlusTextColor">#3F6B26</Color>
+    <Color x:Key="HoverGhostColor">#EFEAE0</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="Canvas" Color="{StaticResource CanvasColor}"/>
+    <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="Border" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextMuted" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="ActionPrimary" Color="{StaticResource ActionPrimaryColor}"/>
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="DiffMinusBg" Color="{StaticResource DiffMinusBgColor}"/>
+    <SolidColorBrush x:Key="DiffMinusText" Color="{StaticResource DiffMinusTextColor}"/>
+    <SolidColorBrush x:Key="DiffPlusBg" Color="{StaticResource DiffPlusBgColor}"/>
+    <SolidColorBrush x:Key="DiffPlusText" Color="{StaticResource DiffPlusTextColor}"/>
+    <SolidColorBrush x:Key="HoverGhost" Color="{StaticResource HoverGhostColor}"/>
+
+    <!-- Font families.
+         Bundle Instrument Serif, Instrument Sans, JetBrains Mono under UI/Fonts/.
+         See UI/Fonts/README.md for bundling steps.
+         Falls back to system fonts if bundled font not found. -->
+    <FontFamily x:Key="FontDisplay">pack://application:,,,/UI/Fonts/#Instrument Serif, Cambria, Georgia, serif</FontFamily>
+    <FontFamily x:Key="FontBody">pack://application:,,,/UI/Fonts/#Instrument Sans, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="FontMono">pack://application:,,,/UI/Fonts/#JetBrains Mono, Consolas, monospace</FontFamily>
+
+    <!-- Typography styles -->
+    <Style x:Key="DisplayHeader" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/>
+        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="DisplayStat" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/>
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="SectionHeader" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontDisplay}"/>
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <Style x:Key="BodyL" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="Body" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="BodyMuted" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+    </Style>
+
+    <Style x:Key="Caption" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+    </Style>
+
+    <Style x:Key="MonoSmall" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+    </Style>
+
+</ResourceDictionary>
