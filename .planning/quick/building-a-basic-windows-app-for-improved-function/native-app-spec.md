@@ -525,84 +525,219 @@ Goals:
 
 AOT compilation is out of scope for v1 (WinForms + DPAPI + dynamic JSON serialization makes AOT painful). Self-contained single-file is enough.
 
-## Phased Roadmap
+## Build Plan
 
-### Phase 1: Native MVP Replacement
+This plan intentionally starts with the riskiest truth: can a native app own the Windows selection loop better than the AHK script? The first milestone is a hard-loop spike, not a polished app. It proves hotkey activation, selected-text capture, and replacement with a local dummy transform before any OpenAI, settings, DPAPI, detailed logging, or service-interface polish.
+
+### Phase 0: Hard-Loop Spike
 
 Goal:
 
-Replace the AHK app's core behavior for normal plain-text cases.
+Answer the core technical question as fast as possible:
+
+Can a C# app reliably run `Ctrl+Alt+U -> copy selection -> replace selection` in Notepad and one browser textarea?
 
 Deliverables:
 
-- WinForms tray app scaffold
-- hotkey registration via `RegisterHotKey` + message-only window
-- clipboard capture
-- persistent OpenAI client
-- text replacement
-- settings for API key (DPAPI-protected)
-- basic local logging
-- self-contained single-file publish
+- minimal C# WinForms project in a clearly named repo subfolder, such as `native/UniversalSpellCheck`
+- minimal resident process, tray icon, or hidden form; whichever gets a message loop working fastest
+- `Ctrl+Alt+U` registration through `RegisterHotKey`
+- selected plain-text capture through the clipboard
+- selection replacement through the clipboard
+- local dummy transform only, such as appending `[checked]` or replacing with a known string
+- minimal console/debug/file logging only where needed to debug the spike
 
 Acceptance:
 
-- Notepad end-to-end flow works
-- one browser textarea end-to-end flow works
-- app runs as a background utility
+- Notepad selected text is captured and replaced by the dummy transform
+- one browser textarea is captured and replaced by the dummy transform
+- pressing the hotkey with no selected text does not paste stale clipboard contents
+- pressing the hotkey twice rapidly does not run overlapping replacement attempts
+- app can be exited cleanly enough for repeated manual testing
 
-### Phase 2: Reliability Hardening
+Stop conditions:
+
+- do not add OpenAI
+- do not add settings UI
+- do not add DPAPI
+- do not add detailed JSONL diagnostics
+- do not add broad service-interface scaffolding unless the spike code is already becoming hard to reason about
+- do not chase app-specific behavior beyond Notepad and one browser textarea
+
+Decision after Phase 0:
+
+- If the hard loop is reliable enough, keep the code and evolve it.
+- If the hard loop is unreliable, stop and diagnose the Windows input problem before building any app surface.
+- If C# does not materially improve the loop over AHK, reconsider whether a rewrite is worth it.
+
+### Phase 1: Minimal App Shape
 
 Goal:
 
-Make the native app good enough for daily-driver use.
+Turn the successful spike into a small maintainable tray app without changing the proven capture/replace behavior.
 
 Deliverables:
 
-- re-entry guard improvements
-- clipboard timing stabilization
-- better failure messaging
-- request timeout and cancellation behavior
-- retry policy for transient failures
-- startup and recovery robustness
+- hidden startup using `ApplicationContext`
+- tray icon with `Open Logs Folder` and `Quit`
+- explicit hotkey unregister on shutdown
+- small coordinator around the proven hard-loop code
+- non-queueing re-entry guard if the spike used an ad hoc guard
+- simple local log file for hotkey, capture, paste, and guard failures
+- project README or build notes with the run command
 
 Acceptance:
 
-- low-frequency paste/capture failures are understood and reduced
-- common apps behave consistently enough for repeated real use
+- Phase 0 behavior still passes unchanged
+- app launches without showing a main window
+- tray `Quit` exits cleanly
+- logs are available when capture or paste fails
+- the app can be run repeatedly during development without stale background processes
 
-### Phase 3: Selective Parity Porting
+Stop conditions:
+
+- do not add OpenAI until the refactored app still passes the hard-loop tests
+- do not add settings UI yet
+- do not port AHK parity features
+
+### Phase 2: OpenAI Request Path And Secret Storage
 
 Goal:
 
-Port only the AHK-era features that still solve real problems.
+Replace the local dummy transform with the real spellcheck request while keeping the process single, resident, and observable.
 
-Potential candidates:
+Deliverables:
+
+- API key settings UI
+- API key stored separately with DPAPI `CurrentUser` protection
+- single app-lifetime `HttpClient`
+- request timeout and cancellation path
+- current-default-model request builder
+- response parser that returns a direct replacement string
+- clear user notification for missing key, invalid key, timeout, and request failure
+- logs for model, input length, output length, request duration, and failure category
+
+Acceptance:
+
+- missing API key does not crash the app and gives a clear failure
+- invalid API key does not paste over the original selection
+- valid key spellchecks selected Notepad text in place
+- valid key spellchecks one browser textarea in place
+- a request failure leaves the user's original selected text unchanged
+- repeated requests reuse the same running app process and do not start a helper process
+
+Stop conditions:
+
+- do not add model selection UI in this phase
+- do not port replacements, prompt-leak guard, HTML handling, or rich logs yet
+
+### Phase 3: Daily-Driver Reliability Pass
+
+Goal:
+
+Turn the MVP into something that can replace the AHK app for normal daily plain-text use by addressing only observed capture, paste, timeout, and feedback failures.
+
+Deliverables:
+
+- clipboard timing stabilization based on Phase 1 and Phase 2 logs
+- active process/app name capture where practical
+- bounded retry policy for transient network failures
+- clearer in-progress and failure notifications
+- startup recovery behavior for bad settings and failed hotkey registration
+- diagnostics that distinguish capture failure, request failure, parse failure, and paste failure
+- manual regression checklist covering the acceptance apps
+
+Acceptance:
+
+- Notepad passes repeated spellcheck attempts without menu/keytip interference
+- browser textarea passes repeated spellcheck attempts
+- no-selection hotkey remains non-destructive
+- rapid double invocation remains non-queueing
+- timeout and network failure paths are logged and do not paste stale output
+- the app can be quit and relaunched without losing settings
+
+Stop conditions:
+
+- do not chase Google Docs or rich-content parity here unless plain text daily use is already stable
+- do not introduce a second process unless a measured reliability problem requires isolation
+
+### Phase 4: Replacement Candidate And Cutover Decision
+
+Goal:
+
+Decide whether the native app can become the primary daily app, and identify the smallest set of AHK-era features that must be ported before cutover.
+
+Deliverables:
+
+- side-by-side comparison against the current AHK flow
+- latency comparison for common text lengths
+- failure-mode comparison from logs
+- list of AHK features still missing, grouped as required-before-cutover or defer
+- user-facing run instructions for the native app
+- rollback path to the AHK script
+
+Acceptance:
+
+- common Notepad and browser textarea use is at least as reliable as the AHK app
+- latency is acceptable enough that the app still feels invisible
+- no required daily workflow depends on a deferred feature
+- the user can switch back to the AHK app if the native app fails
+
+Stop conditions:
+
+- do not delete or deprecate the AHK script during this phase
+- do not claim parity unless the missing-feature list is empty or explicitly accepted
+
+### Phase 5: Selective Parity Porting
+
+Goal:
+
+Port only the existing features that prove necessary after the native plain-text app is usable.
+
+Candidate work, in likely order:
 
 - replacements engine
 - prompt leak guard
-- richer logs
+- richer logs or viewer export compatibility
 - model selection UI
-- active-app-specific behavior
-- better capture diagnostics
+- app-specific capture/paste rules
+- start-on-login preference
 
 Acceptance:
 
-- every parity feature added must be justified by real user need or a proven regression
+- every ported feature has a concrete reason: observed regression, required workflow, or measurable support/debugging value
+- each feature has its own rollback path and focused test case
+- baseline hotkey/capture/request/paste behavior remains unchanged
 
-### Phase 4: Richer Text Handling
+Stop conditions:
+
+- do not port a feature solely because the AHK app has it
+- do not expand settings UI beyond features that are actually used
+
+### Phase 6: Rich Text And App-Specific Compatibility
 
 Goal:
 
-Improve the app where plain text is insufficient.
+Handle important apps or content types where plain text is not enough.
 
-Potential candidates:
+Candidate work:
 
 - richer clipboard formats
 - HTML-aware reinsertion
-- contenteditable-specific handling
-- targeted compatibility work for Google Docs or other important apps
+- contenteditable-specific behavior
+- Google Docs or other targeted compatibility work
+- app-specific paste method selection
 
-This phase should only begin after the plain-text native app is already stable.
+Acceptance:
+
+- each compatibility target is named before implementation
+- the failure is reproduced and logged before a fix is added
+- the fix does not degrade plain-text Notepad and browser textarea behavior
+
+Stop conditions:
+
+- do not start this phase before the native plain-text app is stable
+- do not make rich text the default path until it is proven safer than plain text
 
 ## Risks And Tradeoffs
 
