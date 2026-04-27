@@ -18,6 +18,17 @@
 ## Python (log viewer)
 - PEP 8, 4-space indent. No type hints. Stdlib only. Docstrings for public funcs.
 
+## C# / Native WinForms
+- Project lives under `native/UniversalSpellCheck`.
+- Use file-scoped namespace `namespace UniversalSpellCheck;`.
+- Use PascalCase for types and public members; use `_camelCase` for private readonly fields.
+- Keep the app single-process and resident; do not introduce helper processes without measured need.
+- UI should stay minimal: tray menu, small settings form, and the bottom-center loading overlay.
+- Keep capture/request/paste serialized through the coordinator; do not queue hotkey presses.
+- Use `try/finally` around busy state so the loading overlay always hides.
+- Keep `HttpClient` app-lifetime, not per request.
+- Store API keys only through DPAPI current-user storage; never write them to `settings.json`.
+
 ## Error handling
 - `try { ... } catch Error as e { ... }` wraps fallible ops.
 - Silent failures for optional paths (logging, replacements, clipboard history policy).
@@ -25,6 +36,7 @@
 - HTTP timeouts: 5s connect / 5s response / 30s total.
 - On 4xx/5xx, capture raw error body for root-cause analysis.
 - User-facing tooltip for critical failures: `ToolTip("API Error: " . status)`.
+- Native user-facing failures use `NotifyIcon.ShowBalloonTip`; request failures must not paste over the selection.
 
 ## Comments
 Write only for: complex algorithms, non-obvious performance decisions, workarounds/known limits, critical state transitions, per-app behavior. Otherwise skip.
@@ -35,3 +47,4 @@ Write only for: complex algorithms, non-obvious performance decisions, workaroun
 - URL placeholders extracted before replacements, restored after.
 - Every major stage timestamped with `A_TickCount`; deltas logged as integer ms.
 - Primary + fallback parsing paths, both instrumented.
+- Native logs should include enough timing to distinguish capture, request, post-processing, and paste costs.

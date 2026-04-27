@@ -21,6 +21,7 @@ Implemented:
 - one retry for transient request failures
 - replacements engine with URL protection
 - prompt leak guard for echoed instruction text
+- bottom-center `Spell check loading...` overlay while requests are in progress
 - rollback by quitting the native app and continuing to use the AHK script
 
 Not implemented:
@@ -45,6 +46,7 @@ Not implemented:
 | API key | `.env` / environment loaded by AHK | DPAPI encrypted `apikey.dat` |
 | Replacement | clipboard paste, with existing AHK edge-case logic | clipboard paste only |
 | Diagnostics | rich JSONL logs and viewer | focused native spike log |
+| In-progress feedback | AHK tooltip behavior | tray busy text plus bottom-center loading overlay |
 | Feature parity | current production behavior | plain-text MVP only |
 
 ## Native Test Evidence
@@ -78,6 +80,8 @@ The native app has proven the core plain-text loop and is good enough for more d
 Required before real cutover:
 
 - test repeated Notepad use, Chrome/Edge textareas, VS Code/editor fields, and at least one app the user commonly writes in
+- confirm the loading overlay appears during requests and hides on success, capture failure, and request failure
+- confirm replacements actively fire with a targeted replacement test
 - decide whether `Ctrl+Alt+U` should move to the native app
 - decide whether AHK-style JSONL compatibility matters for log viewer/workflow continuity
 

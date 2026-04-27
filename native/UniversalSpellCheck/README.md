@@ -18,7 +18,7 @@ This intentionally does only:
 - store the API key encrypted with Windows DPAPI current-user protection
 - log active app, capture timing, request timing, paste timing, copy attempts, request attempts, and failure categories
 - retry one transient OpenAI failure before failing without pasting
-- show a minimal tray busy state while a request is running
+- show a minimal tray busy state and bottom-center loading overlay while a request is running
 - apply `replacements.json` post-processing with URL protection
 - strip leaked instruction prompt text before paste
 
@@ -69,9 +69,11 @@ plain text.
 2. Save a valid API key in Settings.
 3. Select misspelled text in Notepad, press `Ctrl+Alt+Y`, and verify corrected text replaces the selection.
 4. Select misspelled text in one browser textarea, press `Ctrl+Alt+Y`, and verify corrected text replaces the selection.
-5. Press `Ctrl+Alt+Y` with no selected text and verify stale clipboard text is not pasted.
-6. Press `Ctrl+Alt+Y` twice rapidly and verify only one replacement attempt runs.
-7. Quit from the tray menu and verify the hotkey stops firing.
+5. During a request, verify the bottom-center `Spell check loading...` overlay appears and disappears after replacement or failure.
+6. Press `Ctrl+Alt+Y` with no selected text and verify stale clipboard text is not pasted.
+7. Press `Ctrl+Alt+Y` twice rapidly and verify only one replacement attempt runs.
+8. Select `open ai and github`, press `Ctrl+Alt+Y`, and verify replacements produce `OpenAI` / `GitHub`; confirm `replacements_count` in the native log.
+9. Quit from the tray menu and verify the hotkey stops firing.
 
 ## Cutover
 

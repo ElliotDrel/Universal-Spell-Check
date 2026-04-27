@@ -134,6 +134,7 @@ Completed:
   - `prompt_leak_triggered`
   - `prompt_leak_removed_chars`
 - publish output now contains only `UniversalSpellCheck.exe`, with `.pdb` excluded
+- added a bottom-center `Spell check loading...` overlay that appears while the coordinator is busy and hides after success or failure
 
 Observed proof from `phase5-2026-04-27.log`:
 
@@ -144,6 +145,7 @@ Observed proof from `phase5-2026-04-27.log`:
 Remaining verification gap:
 
 - the app loaded replacements, but the latest manual run logged `replacements_count=0`; a targeted replacement test such as `open ai and github` still needs to prove the replacement pass actively changes output.
+- the loading overlay was manually approved visually, but should remain part of future regression checks for success, capture failure, and request failure paths.
 
 ### Current Run And Build Commands
 

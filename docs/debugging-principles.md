@@ -25,16 +25,16 @@ When speed matters, prefer regex-based parsing over object-model parsing. The cu
 **Use regex when:** structure predictable, need one field, performance critical.
 **Use full JSON parse when:** many nested fields, structure varies, need to rebuild JSON.
 
-This project: regex is correct — only one text field, speed critical. Keep regex primary + full parser fallback with verbose logging.
+This project: regex is correct - only one text field, speed critical. Keep regex primary + full parser fallback with verbose logging.
 
 ## 4. AutoHotkey v2 compatibility gotchas
 
 **Number conversion:**
-- WRONG: `return numberText + 0` — throws "Expected a Number but got a String".
+- WRONG: `return numberText + 0` - throws "Expected a Number but got a String".
 - RIGHT: `Integer(numberText)` or `Float(numberText)`.
 
 **Object types:**
-- `{}` → basic Object. `Map()` → Map (better for dynamic keys).
+- `{}` -> basic Object. `Map()` -> Map (better for dynamic keys).
 
 **Property access:**
 - `obj.property`, `obj.%varName%`, `map[key]` (bracket may not work on Object in some versions).
@@ -46,7 +46,27 @@ This project: regex is correct — only one text field, speed critical. Keep reg
 Keep a primary (fast) path and a fallback (safe) path, both instrumented. Current code: regex primary + Map-based fallback with debug logs on every branch.
 
 ## 6. Verification standards
-- SPEED IS PARAMOUNT — user has emphasized repeatedly.
+- SPEED IS PARAMOUNT - user has emphasized repeatedly.
 - Official docs only when user emphasizes them; be strategic when direct access fails.
 - Temporary debug logging is acceptable for troubleshooting even in otherwise minimal scripts.
-- Proxy startup is a required dependency path — preserve the 5s/30s/60s attempt ladder and `ExitApp` on exhaustion.
+- Proxy startup is a required dependency path for AHK - preserve the 5s/30s/60s attempt ladder and `ExitApp` on exhaustion.
+
+## 7. Native app debugging standards
+
+The native app is a replacement candidate, not the production hotkey owner.
+
+When debugging native behavior:
+1. Confirm whether the running process is the dev build or published EXE.
+2. Check `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\phase*-YYYY-MM-DD.log` before changing code.
+3. Preserve `Ctrl+Alt+Y` unless the user explicitly approves cutover to `Ctrl+Alt+U`.
+4. Do not change the AHK proxy/retry ladder while debugging native failures; native does not use the Python proxy.
+5. Reproduce capture/paste failures with active app name and log timing before adding app-specific rules.
+6. Keep request failures non-destructive: restore original clipboard and do not paste.
+7. Keep the loading overlay tied to the coordinator busy state and hidden in `finally`.
+
+Native success criteria for manual testing:
+- selected text is captured with `copy_attempts=1` or a clearly explained retry
+- request succeeds with `request_attempts=1` unless a transient retry is logged
+- `replace_succeeded` includes capture/request/postprocess/paste timing
+- no-selection logs `capture_failed` and does not paste stale clipboard text
+- rapid double-press logs `guard_rejected reason=already_running`

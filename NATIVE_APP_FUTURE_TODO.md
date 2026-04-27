@@ -8,6 +8,7 @@ Current status as of 2026-04-27: the native app is a working plain-text replacem
 
 - Prove replacements actively fire with a targeted test such as `open ai and github`.
 - Check the Phase 5 log and confirm `replacements_count` is greater than `0`.
+- Confirm the loading overlay appears during requests and disappears after success/failure.
 - Test daily writing apps beyond VS Code and Chrome.
 - Keep collecting failure logs before adding app-specific behavior.
 
@@ -28,6 +29,7 @@ Current status as of 2026-04-27: the native app is a working plain-text replacem
 - Add app-specific capture/paste rules only after a named app failure is reproduced.
 - Track target-window changes between capture and paste if wrong-window paste is observed.
 - Add clearer user notification for invalid key, timeout, rate limit, and server failure.
+- If the loading overlay ever gets stuck, verify coordinator `finally` path and `SetBusy(false)` first.
 - Consider using the OpenAI `Retry-After` header for rate limits instead of a fixed retry delay.
 - Add a small diagnostics command or log summary view if raw logs become hard to inspect.
 
