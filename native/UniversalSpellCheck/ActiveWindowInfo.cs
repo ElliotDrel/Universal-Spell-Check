@@ -9,6 +9,11 @@ internal sealed class ActiveWindowInfo
     public string ProcessName { get; init; } = "unknown";
     public string WindowTitle { get; init; } = "";
 
+    public bool HasSameProcess(ActiveWindowInfo other)
+    {
+        return string.Equals(ProcessName, other.ProcessName, StringComparison.OrdinalIgnoreCase);
+    }
+
     public static ActiveWindowInfo Capture()
     {
         try

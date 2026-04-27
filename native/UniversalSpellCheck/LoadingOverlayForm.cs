@@ -2,6 +2,13 @@ namespace UniversalSpellCheck;
 
 internal sealed class LoadingOverlayForm : Form
 {
+    private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int SW_SHOWNOACTIVATE = 4;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+
+    private static readonly IntPtr HwndTopmost = new(-1);
     private readonly ProgressBar _progressBar = new();
 
     public LoadingOverlayForm()
@@ -43,6 +50,16 @@ internal sealed class LoadingOverlayForm : Form
         Controls.Add(layout);
     }
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var createParams = base.CreateParams;
+            createParams.ExStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+            return createParams;
+        }
+    }
+
     public void ShowNearTaskbar()
     {
         var ownerScreen = Screen.FromControl(this);
@@ -53,9 +70,29 @@ internal sealed class LoadingOverlayForm : Form
 
         if (!Visible)
         {
-            Show();
+            ShowWindow(Handle, SW_SHOWNOACTIVATE);
         }
 
-        BringToFront();
+        SetWindowPos(
+            Handle,
+            HwndTopmost,
+            Location.X,
+            Location.Y,
+            Width,
+            Height,
+            SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags);
 }

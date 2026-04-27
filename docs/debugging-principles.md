@@ -53,20 +53,22 @@ Keep a primary (fast) path and a fallback (safe) path, both instrumented. Curren
 
 ## 7. Native app debugging standards
 
-The native app is a replacement candidate, not the production hotkey owner.
+The native app is now the production hotkey owner.
 
 When debugging native behavior:
 1. Confirm whether the running process is the dev build or published EXE.
 2. Check `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\phase*-YYYY-MM-DD.log` before changing code.
-3. Preserve `Ctrl+Alt+Y` unless the user explicitly approves cutover to `Ctrl+Alt+U`.
+3. Preserve `Ctrl+Alt+U` unless the user explicitly asks for a temporary test hotkey.
 4. Do not change the AHK proxy/retry ladder while debugging native failures; native does not use the Python proxy.
 5. Reproduce capture/paste failures with active app name and log timing before adding app-specific rules.
 6. Keep request failures non-destructive: restore original clipboard and do not paste.
-7. Keep the loading overlay tied to the coordinator busy state and hidden in `finally`.
+7. Keep the loading overlay tied to post-capture request/paste work, shown without activation, and hidden in `finally`.
+8. If paste fails after a successful request, compare the logged original target app with `paste_target_exe` / `paste_target_app` before changing timing or app-specific behavior.
 
 Native success criteria for manual testing:
 - selected text is captured with `copy_attempts=1` or a clearly explained retry
 - request succeeds with `request_attempts=1` unless a transient retry is logged
 - `replace_succeeded` includes capture/request/postprocess/paste timing
+- `replace_succeeded` keeps the same foreground process from capture through paste
 - no-selection logs `capture_failed` and does not paste stale clipboard text
 - rapid double-press logs `guard_rejected reason=already_running`

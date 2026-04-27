@@ -10,7 +10,7 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
     private const uint ModNoRepeat = 0x4000;
-    private const uint VkY = 0x59;
+    private const uint VkU = 0x55;
 
     private bool _registered;
 
@@ -31,9 +31,9 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
             return;
         }
 
-        if (!RegisterHotKey(Handle, HotkeyId, ModControl | ModAlt | ModNoRepeat, VkY))
+        if (!RegisterHotKey(Handle, HotkeyId, ModControl | ModAlt | ModNoRepeat, VkU))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to register Ctrl+Alt+Y.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to register Ctrl+Alt+U.");
         }
 
         _registered = true;

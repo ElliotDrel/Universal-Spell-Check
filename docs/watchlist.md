@@ -22,7 +22,7 @@ Watch for `Ctrl+Alt+U` being physically down when the script tries follow-up `Ct
 
 ## Native clipboard / hotkey timing
 
-The native app uses `Ctrl+Alt+Y` for testing and has its own hotkey-release wait before sending `Ctrl+C`.
+The native app uses `Ctrl+Alt+U` and has its own hotkey-release wait before sending `Ctrl+C`.
 
 Watch for:
 - `capture_failed ... reason="Clipboard did not change after Ctrl+C."`
@@ -32,9 +32,10 @@ Watch for:
 - app focus changing between selection and paste
 
 Known behavior:
-- `Ctrl+Alt+U` is still owned by the AHK app until cutover.
+- `Ctrl+Alt+U` should be owned by the native app. If registration fails, check for a running legacy AHK spell checker.
 - Native overlapping invocations should log `guard_rejected reason=already_running`.
-- The loading overlay should show during request processing and disappear after success or failure.
+- The loading overlay should show only after text capture succeeds, should not activate/focus itself, and should disappear after success or failure.
+- `paste_failed` with different expected/actual processes means the target app lost focus before paste; do not treat that as a no-selection failure.
 
 Candidate mitigations if native capture regresses:
 - verify the app was relaunched from the newly published EXE, not an older process

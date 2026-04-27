@@ -1,10 +1,10 @@
 # Phase 4 Cutover Evaluation
 
-Status as of 2026-04-27: candidate for continued daily-driver testing, not a full AHK replacement yet.
+Status as of 2026-04-27: native app is the main hotkey owner; AHK remains a fallback/reference path.
 
 ## Current Native App State
 
-The native app is a single-process C#/.NET WinForms tray utility. It uses `Ctrl+Alt+Y` for testing so it can run beside the current AHK app on `Ctrl+Alt+U`.
+The native app is a single-process C#/.NET WinForms tray utility. It now uses `Ctrl+Alt+U`.
 
 Implemented:
 
@@ -21,12 +21,11 @@ Implemented:
 - one retry for transient request failures
 - replacements engine with URL protection
 - prompt leak guard for echoed instruction text
-- bottom-center `Spell check loading...` overlay while requests are in progress
+- non-activating bottom-center `Spell check loading...` overlay while requests are in progress
+- paste-target foreground-process check before sending `Ctrl+V`
 - rollback by quitting the native app and continuing to use the AHK script
 
 Not implemented:
-
-- `Ctrl+Alt+U` cutover hotkey
 - HTML/rich-text capture or reinsertion
 - Google Docs/contenteditable compatibility work
 - model selection UI
@@ -36,17 +35,17 @@ Not implemented:
 
 ## Side-By-Side Behavior
 
-| Area | Current AHK app | Native Phase 4 candidate |
+| Area | Current AHK app | Native main app |
 |---|---|---|
 | Process model | AHK script plus required Python proxy | one WinForms process plus .NET runtime |
-| Hotkey | `Ctrl+Alt+U` | `Ctrl+Alt+Y` for testing |
+| Hotkey | `Ctrl+Alt+U` | `Ctrl+Alt+U` |
 | Selection capture | clipboard-first, with app-specific timing workarounds | clipboard-first, with hotkey-release wait and bounded copy retry |
 | Request path | local proxy forwards to OpenAI | in-process persistent `HttpClient` calls OpenAI |
 | Model | configurable selector, default `gpt-4.1` | fixed `gpt-4.1` |
 | API key | `.env` / environment loaded by AHK | DPAPI encrypted `apikey.dat` |
 | Replacement | clipboard paste, with existing AHK edge-case logic | clipboard paste only |
 | Diagnostics | rich JSONL logs and viewer | focused native spike log |
-| In-progress feedback | AHK tooltip behavior | tray busy text plus bottom-center loading overlay |
+| In-progress feedback | AHK tooltip behavior | tray busy text plus non-activating bottom-center loading overlay |
 | Feature parity | current production behavior | plain-text MVP only |
 
 ## Native Test Evidence
@@ -75,14 +74,13 @@ Observed failure-handling runs:
 
 Do not replace the AHK app yet.
 
-The native app has proven the core plain-text loop and is good enough for more daily-driver testing. It has not yet proven feature parity or enough app coverage to take over `Ctrl+Alt+U`.
+The native app has proven the core plain-text loop and now owns `Ctrl+Alt+U`. It still has not proven full feature parity or broad app coverage.
 
 Required before real cutover:
 
 - test repeated Notepad use, Chrome/Edge textareas, VS Code/editor fields, and at least one app the user commonly writes in
-- confirm the loading overlay appears during requests and hides on success, capture failure, and request failure
+- confirm the loading overlay appears after copy succeeds, does not steal focus, and hides on success or failure
 - confirm replacements actively fire with a targeted replacement test
-- decide whether `Ctrl+Alt+U` should move to the native app
 - decide whether AHK-style JSONL compatibility matters for log viewer/workflow continuity
 
 Defer until after cutover decision:
@@ -111,7 +109,7 @@ Use the tray menu:
 
 - `Open Settings` to save or replace the OpenAI API key
 - `Open Logs Folder` to inspect native logs
-- `Quit` to stop the native app and unregister `Ctrl+Alt+Y`
+- `Quit` to stop the native app and unregister `Ctrl+Alt+U`
 
 ## Rollback
 

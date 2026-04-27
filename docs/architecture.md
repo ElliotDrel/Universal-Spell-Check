@@ -1,26 +1,37 @@
 # Architecture & File Layout
 
 ## Active files
-- **Universal Spell Checker.ahk**: Primary script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`). `scriptVersion` is a manual integer-like string near the top; bump before any commit that touches this file and before asking the user to reload/retest.
+- **native/UniversalSpellCheck/**: C#/.NET WinForms main app. Uses `Ctrl+Alt+U`.
+- **Universal Spell Checker.ahk**: Legacy/fallback AHK script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`). `scriptVersion` is a manual integer-like string near the top; bump before any commit that touches this file and before asking the user to reload/retest.
 - **replacements.json**: Post-processing replacement pairs — `{ "canonical": ["variant1", ...] }`.
 - **spellcheck-server.pyw**: Local proxy. Required. Script hard-fails if it cannot be started or recovered.
 - **generate_log_viewer.py**: Reads `logs/*.jsonl` → `logs/viewer.html`. Run `python generate_log_viewer.py` (add `--open`).
 - **export_openai_finetune_dataset.py**: Builds fine-tune datasets from live logs.
-- **native/UniversalSpellCheck/**: C#/.NET WinForms replacement candidate. Runs beside AHK on `Ctrl+Alt+Y`; not yet the primary `Ctrl+Alt+U` app.
 - **NATIVE_APP_FUTURE_TODO.md**: Root-level future work list for native cutover, reliability, parity, packaging, and rich-text/app-specific work.
 
 ## Native app layout
 - `native/UniversalSpellCheck/Program.cs`: Single-instance app entrypoint; duplicate launches show a message and exit.
 - `native/UniversalSpellCheck/SpellCheckAppContext.cs`: Tray lifetime, menu, settings window, busy text, and loading overlay ownership.
-- `native/UniversalSpellCheck/HotkeyWindow.cs`: Win32 `RegisterHotKey` wrapper for the test hotkey `Ctrl+Alt+Y`.
+- `native/UniversalSpellCheck/HotkeyWindow.cs`: Win32 `RegisterHotKey` wrapper for `Ctrl+Alt+U`.
 - `native/UniversalSpellCheck/ClipboardLoop.cs`: Clipboard-first capture/paste with hotkey-release wait, copy sentinel, bounded copy retry, and clipboard restore on failure.
 - `native/UniversalSpellCheck/SpellcheckCoordinator.cs`: Serialized pipeline: capture -> request -> post-process -> paste. Uses non-queueing `SemaphoreSlim(1, 1)`.
 - `native/UniversalSpellCheck/OpenAiSpellcheckService.cs`: App-lifetime `HttpClient`, fixed `gpt-4.1` request, request retry, response parsing, and failure categories.
 - `native/UniversalSpellCheck/TextPostProcessor.cs`: Native `replacements.json` port plus prompt-leak guard.
 - `native/UniversalSpellCheck/SettingsStore.cs` / `SettingsForm.cs`: DPAPI current-user API-key storage and tray settings UI.
-- `native/UniversalSpellCheck/LoadingOverlayForm.cs`: Borderless topmost bottom-center `Spell check loading...` progress bar shown while the coordinator is busy.
+- `native/UniversalSpellCheck/LoadingOverlayForm.cs`: Borderless topmost bottom-center `Spell check loading...` progress bar shown without activation while the API request is running.
 - `native/UniversalSpellCheck/README.md`: Native run/publish/manual-test instructions.
 - `native/UniversalSpellCheck/CUTOVER.md`: Native-vs-AHK comparison, test evidence, missing features, and rollback path.
+
+## Startup behavior
+- AHK no longer has a Windows Startup shortcut.
+- Native has a Windows Startup shortcut at:
+```text
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Universal Spell Check Native.lnk
+```
+- The shortcut points to the published native executable:
+```text
+native\UniversalSpellCheck\publish\UniversalSpellCheck.exe
+```
 
 ## Training data layout
 - `fine_tune_runs/` — one dated folder per fine-tune run; contains train/val JSONL, finetune_job.json, benchmark.json, summary.md.
@@ -50,25 +61,26 @@ python export_openai_finetune_dataset.py --source logs --weeks 8 --max-per-bucke
 10. `StripPromptLeak()` strips echoed instruction blocks.
 11. Paste via Ctrl+V or `SendText()` depending on `sendTextApps`.
 
-### Native candidate flow
-1. User selects text, presses Ctrl+Alt+Y.
+### Native main-app flow
+1. User selects text, presses Ctrl+Alt+U.
 2. `HotkeyWindow` raises the app-level event from Win32 `WM_HOTKEY`.
 3. `SpellcheckCoordinator` tries `SemaphoreSlim.WaitAsync(0)`; overlapping requests are rejected, not queued.
-4. Tray text changes to checking state and `LoadingOverlayForm` shows the bottom-center loading bar.
-5. `ClipboardLoop` waits for hotkey keys to release, writes a sentinel to the clipboard, sends `Ctrl+C`, and polls for selected Unicode text.
+4. `ClipboardLoop` waits for hotkey keys to release, writes a sentinel to the clipboard, sends `Ctrl+C`, and polls for selected Unicode text.
+5. After capture succeeds, tray text changes to checking state and `LoadingOverlayForm` shows the bottom-center loading bar without stealing foreground focus.
 6. If capture fails, original clipboard data is restored and no paste occurs.
 7. `OpenAiSpellcheckService` sends the fixed `gpt-4.1` Responses API request through a persistent `HttpClient`.
 8. `TextPostProcessor` applies `replacements.json` with URL protection and strips leaked `instructions:` / `text input:` prompt text.
-9. `ClipboardLoop` writes the final replacement to the clipboard and sends `Ctrl+V`.
-10. Logs capture timing, request timing, post-process timing, paste timing, attempts, active app, and failure category to `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
-11. Loading overlay hides in `finally`, even on capture/request/paste failure.
+9. Before paste, the coordinator verifies the foreground process still matches the original target app. If focus moved, it restores the clipboard, logs `paste_failed`, and does not paste into the wrong app.
+10. `ClipboardLoop` writes the final replacement to the clipboard and sends `Ctrl+V`.
+11. Logs capture timing, request timing, post-process timing, paste timing, attempts, active app, paste target app, failure category, and a detail record with raw/base data to `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
+12. Loading overlay hides in `finally`, even on request/paste failure.
 
 ## Design principles
 - Speed first — every op optimized for latency.
 - Self-contained .ahk files; only external dep is `replacements.json`.
 - Direct clipboard manipulation for instant replacement.
 - One file supports all target models via top-level selector.
-- Native app remains a replacement candidate until cutover is explicitly accepted.
+- Native app is the main hotkey owner; AHK remains a fallback/reference path.
 - Native feature work should preserve the proven plain-text loop before adding richer compatibility.
 
 ## Constraints

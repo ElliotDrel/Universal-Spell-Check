@@ -6,7 +6,7 @@ internal static class KeyboardState
 {
     private const int VkControl = 0x11;
     private const int VkMenu = 0x12;
-    private const int VkY = 0x59;
+    private const int VkU = 0x55;
 
     public static async Task<bool> WaitForHotkeyReleaseAsync(TimeSpan timeout)
     {
@@ -26,7 +26,7 @@ internal static class KeyboardState
 
     private static bool IsHotkeyDown()
     {
-        return IsDown(VkControl) || IsDown(VkMenu) || IsDown(VkY);
+        return IsDown(VkControl) || IsDown(VkMenu) || IsDown(VkU);
     }
 
     private static bool IsDown(int virtualKey)

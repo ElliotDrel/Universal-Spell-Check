@@ -3,13 +3,14 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace UniversalSpellCheck;
 
 internal sealed class OpenAiSpellcheckService : IDisposable
 {
     private const string Endpoint = "https://api.openai.com/v1/responses";
-    private const string Model = "gpt-4.1";
+    public const string Model = "gpt-4.1";
     public const string PromptInstruction =
         "Correct spelling and grammar in the selected text. Preserve the user's wording, line breaks, and formatting as much as possible. Return only the corrected replacement text. Do not explain the changes.";
 
@@ -31,7 +32,16 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         var apiKey = _settingsStore.LoadApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            return SpellcheckResult.Fail(SpellcheckErrorCodes.MissingApiKey, "Missing OpenAI API key.", 0, 0, null);
+            var payload = BuildPayload(inputText);
+            return SpellcheckResult.Fail(
+                SpellcheckErrorCodes.MissingApiKey,
+                "Missing OpenAI API key.",
+                0,
+                0,
+                null,
+                null,
+                null,
+                payload);
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -64,6 +74,9 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             "OpenAI request failed.",
             stopwatch.ElapsedMilliseconds,
             maxAttempts,
+            null,
+            null,
+            null,
             null);
     }
 
@@ -75,9 +88,10 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     {
         try
         {
+            var payload = BuildPayload(inputText);
             using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            request.Content = new StringContent(BuildPayload(inputText), Encoding.UTF8, "application/json");
+            request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(request);
             var body = await response.Content.ReadAsStringAsync();
@@ -92,7 +106,10 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                     error,
                     stopwatch.ElapsedMilliseconds,
                     attempt,
-                    (int)response.StatusCode);
+                    (int)response.StatusCode,
+                    body,
+                    null,
+                    payload);
             }
 
             var output = ExtractOutputText(body);
@@ -104,10 +121,21 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                     "OpenAI returned no replacement text.",
                     stopwatch.ElapsedMilliseconds,
                     attempt,
-                    (int)response.StatusCode);
+                    (int)response.StatusCode,
+                    body,
+                    null,
+                    payload);
             }
 
-            return SpellcheckResult.Ok(output, stopwatch.ElapsedMilliseconds, attempt, (int)response.StatusCode);
+            return SpellcheckResult.Ok(
+                output,
+                stopwatch.ElapsedMilliseconds,
+                attempt,
+                (int)response.StatusCode,
+                body,
+                output,
+                payload,
+                ExtractTokenUsage(body));
         }
         catch (TaskCanceledException ex)
         {
@@ -116,6 +144,9 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                 ex.Message,
                 stopwatch.ElapsedMilliseconds,
                 attempt,
+                null,
+                null,
+                null,
                 null);
         }
         catch (Exception ex)
@@ -125,6 +156,9 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                 ex.Message,
                 stopwatch.ElapsedMilliseconds,
                 attempt,
+                null,
+                null,
+                null,
                 null);
         }
     }
@@ -240,6 +274,24 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         return null;
     }
 
+    private static TokenUsage ExtractTokenUsage(string responseBody)
+    {
+        return new TokenUsage
+        {
+            Input = ExtractInt(responseBody, "input_tokens"),
+            Output = ExtractInt(responseBody, "output_tokens"),
+            Total = ExtractInt(responseBody, "total_tokens"),
+            Cached = ExtractInt(responseBody, "cached_tokens"),
+            Reasoning = ExtractInt(responseBody, "reasoning_tokens")
+        };
+    }
+
+    private static int ExtractInt(string text, string propertyName)
+    {
+        var match = Regex.Match(text, $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*(\\d+)");
+        return match.Success && int.TryParse(match.Groups[1].Value, out var value) ? value : 0;
+    }
+
     public void Dispose()
     {
         _httpClient.Dispose();
@@ -264,14 +316,30 @@ internal sealed class SpellcheckResult
     public long DurationMs { get; init; }
     public int Attempts { get; init; }
     public int? StatusCode { get; init; }
+    public string? RawResponse { get; init; }
+    public string? RawOutputText { get; init; }
+    public string? RequestPayload { get; init; }
+    public TokenUsage Tokens { get; init; } = new();
 
-    public static SpellcheckResult Ok(string outputText, long durationMs, int attempts, int? statusCode) => new()
+    public static SpellcheckResult Ok(
+        string outputText,
+        long durationMs,
+        int attempts,
+        int? statusCode,
+        string? rawResponse,
+        string? rawOutputText,
+        string? requestPayload,
+        TokenUsage tokens) => new()
     {
         Success = true,
         OutputText = outputText,
         DurationMs = durationMs,
         Attempts = attempts,
-        StatusCode = statusCode
+        StatusCode = statusCode,
+        RawResponse = rawResponse,
+        RawOutputText = rawOutputText,
+        RequestPayload = requestPayload,
+        Tokens = tokens
     };
 
     public static SpellcheckResult Fail(
@@ -279,13 +347,28 @@ internal sealed class SpellcheckResult
         string errorMessage,
         long durationMs,
         int attempts,
-        int? statusCode) => new()
+        int? statusCode,
+        string? rawResponse,
+        string? rawOutputText,
+        string? requestPayload) => new()
     {
         Success = false,
         ErrorCode = errorCode,
         ErrorMessage = errorMessage,
         DurationMs = durationMs,
         Attempts = attempts,
-        StatusCode = statusCode
+        StatusCode = statusCode,
+        RawResponse = rawResponse,
+        RawOutputText = rawOutputText,
+        RequestPayload = requestPayload
     };
+}
+
+internal sealed class TokenUsage
+{
+    public int Input { get; init; }
+    public int Output { get; init; }
+    public int Total { get; init; }
+    public int Cached { get; init; }
+    public int Reasoning { get; init; }
 }

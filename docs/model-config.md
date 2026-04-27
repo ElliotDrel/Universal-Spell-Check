@@ -6,7 +6,7 @@
 ## Current callers
 
 - **AHK production app:** `Universal Spell Checker.ahk` sends requests through the required local Python proxy at `http://127.0.0.1:48080/v1/responses`; the proxy forwards to the Responses API.
-- **Native candidate:** `native/UniversalSpellCheck/OpenAiSpellcheckService.cs` sends directly to `https://api.openai.com/v1/responses` with one app-lifetime `HttpClient`. It currently uses fixed `gpt-4.1` only; no native model-selection UI exists yet.
+- **Native main app:** `native/UniversalSpellCheck/OpenAiSpellcheckService.cs` sends directly to `https://api.openai.com/v1/responses` with one app-lifetime `HttpClient`. It currently uses fixed `gpt-4.1` only; no native model-selection UI exists yet.
 
 ## API key storage
 

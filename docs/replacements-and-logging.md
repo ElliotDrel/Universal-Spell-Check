@@ -21,7 +21,7 @@ Timing captured in `timings.replacementsApplied` and `timings.promptGuardApplied
 
 ## Native replacements and prompt guard
 
-The native candidate ports the same core behavior in `native/UniversalSpellCheck/TextPostProcessor.cs`.
+The native app ports the same core behavior in `native/UniversalSpellCheck/TextPostProcessor.cs`.
 
 Native behavior:
 - Reads `replacements.json` via `AppPaths.ReplacementsPath`; when run from the repo/publish folder, it walks parent directories until it finds the repo file.
@@ -69,7 +69,7 @@ Native logs live outside the repo:
 ```
 
 Current native events include:
-- `started hotkey=Ctrl+Alt+Y model=gpt-4.1 phase=5`
+- `started hotkey=Ctrl+Alt+U model=gpt-4.1 phase=5`
 - `replacements_reloaded`
 - `hotkey_pressed`
 - `run_started`
@@ -98,3 +98,9 @@ Current native timing/log fields include:
 - `error_code`
 
 Native logs are intentionally not viewer-compatible yet. Do not claim AHK JSONL parity until that is explicitly implemented.
+
+Native detail records:
+- Each run should emit a `spellcheck_detail` line.
+- The detail line is JSON appended after the event name.
+- It preserves base data for later backfill/reformatting, including `input_text`, `output_text`, `raw_ai_output`, `raw_response`, `request_payload`, token counts, timings, active app/window, replacement details, prompt-leak details, status, error fields, and event names.
+- It is intentionally not polished for human viewing; the goal is to preserve data.

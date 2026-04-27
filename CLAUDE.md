@@ -6,13 +6,13 @@
 
 ## Project Overview
 
-**Universal Spell Checker** - a Windows-wide AI spell checker. The primary production app is still the AutoHotkey v2 script: select text, press **Ctrl+Alt+U**, corrected text replaces the selection in place. A native C#/.NET WinForms replacement candidate lives under `native/UniversalSpellCheck` and uses **Ctrl+Alt+Y** for side-by-side testing.
+**Universal Spell Checker** - a Windows-wide AI spell checker. The native C#/.NET WinForms app under `native/UniversalSpellCheck` is now the main app: select text, press **Ctrl+Alt+U**, corrected text replaces the selection in place. The AutoHotkey script remains in the repo as a fallback/reference path, but its Startup shortcut has been removed.
 
 **Core value:** spell checking must feel instant and invisible - select, hotkey, done. Speed is the product.
 
-**Stack:** AutoHotkey v2.0 (production script), Python 3 (log viewer + dataset tools), local `spellcheck-server.pyw` proxy (required for AHK), OpenAI Responses API, plus a native C#/.NET WinForms tray-app candidate. Windows only. AHK has no build step; native app builds with `dotnet`.
+**Stack:** Native C#/.NET WinForms tray app (main), AutoHotkey v2.0 (legacy fallback script), Python 3 (log viewer + dataset tools), local `spellcheck-server.pyw` proxy (required for AHK only), OpenAI Responses API. Windows only. AHK has no build step; native app builds with `dotnet`.
 
-**Primary files:** `Universal Spell Checker.ahk` is the production AHK app with top-level `modelModule` selector supporting `gpt-4.1`, `gpt-5.1`, `gpt-5-mini`. `native/UniversalSpellCheck/Program.cs` is the native candidate entrypoint. Configuration lives in `replacements.json`. AHK structured JSONL logs land in `logs/`; native spike logs land under `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
+**Primary files:** `native/UniversalSpellCheck/Program.cs` is the native app entrypoint. `Universal Spell Checker.ahk` is the legacy AHK fallback with top-level `modelModule` selector supporting `gpt-4.1`, `gpt-5.1`, `gpt-5-mini`. Configuration lives in `replacements.json`. AHK structured JSONL logs land in `logs/`; native logs land under `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
 
 **Tone when collaborating:** speed first, simplicity second, minimal UI/overhead third. Treat every added abstraction or fallback as a cost.
 
@@ -29,7 +29,7 @@ Universal Spell Check/
 |-- NATIVE_APP_FUTURE_TODO.md        # Root native follow-up work list
 |
 |-- native/
-|   `-- UniversalSpellCheck/         # C#/.NET WinForms replacement candidate (Ctrl+Alt+Y)
+|   `-- UniversalSpellCheck/         # C#/.NET WinForms main app (Ctrl+Alt+U)
 |       |-- Program.cs               # Single-instance native app entrypoint
 |       |-- SpellCheckAppContext.cs  # Tray lifetime, menu, settings, busy overlay ownership
 |       |-- SpellcheckCoordinator.cs # Serialized capture/request/post-process/paste pipeline
@@ -70,6 +70,7 @@ Universal Spell Check/
 | Clipboard/hotkey issues, native loading overlay checks, cache edge cases, stale-reload checks | `docs/watchlist.md` |
 | Naming, style, error-handling patterns, comments, AHK/Python/C# conventions | `docs/conventions.md` |
 | Native future work, cutover blockers, rich-text/app-specific ideas | `NATIVE_APP_FUTURE_TODO.md` |
+| Native dashboard UI / WPF / visual design / colors / fonts / mockups | `DESIGN.md` (always read before any visual change) |
 
 If the task spans multiple areas, load each relevant doc before writing code.
 
@@ -83,7 +84,7 @@ If the task spans multiple areas, load each relevant doc before writing code.
 4. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
 5. **Simplest solution first** when performance matters. Regex > object parsing for single-field extraction.
 6. **Verify every parameter** (not just model name/endpoint) when changing model configs.
-7. **Do not move native to `Ctrl+Alt+U` casually.** Native uses `Ctrl+Alt+Y` until cutover is explicitly accepted; AHK still owns production `Ctrl+Alt+U`.
+7. **Native owns `Ctrl+Alt+U`.** Do not restart the legacy AHK spell checker unless the user explicitly wants to use the fallback path, because it can conflict with the native hotkey.
 8. **Native retests require rebuild/publish/relaunch.** A code change under `native/UniversalSpellCheck` is not running until the process is stopped, rebuilt/published, and relaunched.
 
 ---

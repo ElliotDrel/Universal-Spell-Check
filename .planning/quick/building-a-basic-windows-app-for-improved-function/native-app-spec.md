@@ -8,9 +8,9 @@ The document is detailed enough to hand to another engineer for implementation. 
 
 ## Implementation Status As Of 2026-04-27
 
-The native app has been implemented through the Phase 5 selective-parity pass in [native/UniversalSpellCheck](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck>). It is still a replacement candidate, not the primary app. The current AutoHotkey app remains intact and should not be deleted or deprecated yet.
+The native app has been implemented through the Phase 5 selective-parity pass in [native/UniversalSpellCheck](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck>). It is now the main spell-check app on `Ctrl+Alt+U`. The current AutoHotkey app remains in the repo as a fallback/reference path, but its Windows Startup shortcut has been deleted.
 
-The native app currently uses `Ctrl+Alt+Y` for testing so it can run beside the existing AutoHotkey app on `Ctrl+Alt+U`.
+The native app originally used `Ctrl+Alt+Y` for side-by-side testing. It now uses `Ctrl+Alt+U`.
 
 ### Completed
 
@@ -23,11 +23,11 @@ Completed:
 - proved selected plain text can be copied from the active app through the clipboard
 - proved selected text can be replaced in place through clipboard paste
 - used a dummy local transform first, before adding OpenAI
-- verified the loop manually with `Ctrl+Alt+Y`
+- verified the loop manually with a temporary `Ctrl+Alt+Y` test hotkey before cutover
 
 Important finding:
 
-- `Ctrl+Alt+U` was already owned by the AutoHotkey app, so the native test hotkey was changed to `Ctrl+Alt+Y`.
+- `Ctrl+Alt+U` was already owned by the AutoHotkey app during early testing, so the native spike temporarily used `Ctrl+Alt+Y`.
 
 #### Phase 1: minimal tray app shape
 
@@ -111,8 +111,8 @@ Completed:
 Decision:
 
 - do not replace the AHK app yet
-- continue daily-driver testing on `Ctrl+Alt+Y`
-- rollback remains immediate: quit the native tray app and continue using AHK on `Ctrl+Alt+U`
+- continue daily-driver testing on `Ctrl+Alt+U`
+- rollback remains possible by quitting the native tray app and manually launching the AHK fallback
 
 #### Phase 5: selective parity porting
 
@@ -185,7 +185,7 @@ The native app has proven the core plain-text flow:
 5. post-process output
 6. paste replacement text back into the original app
 
-It is ready for continued daily-driver testing. It is not yet approved to take over `Ctrl+Alt+U` or replace the AHK app.
+It is ready for continued daily-driver testing and now owns `Ctrl+Alt+U`; the AHK app remains available only as a fallback/reference path.
 
 ## Current State And Learnings
 

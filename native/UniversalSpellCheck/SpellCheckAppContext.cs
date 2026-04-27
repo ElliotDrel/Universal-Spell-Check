@@ -40,7 +40,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
         _hotkeyWindow.Register();
 
-        _logger.Log("started hotkey=Ctrl+Alt+Y model=gpt-4.1 phase=5");
+        _logger.Log("started hotkey=Ctrl+Alt+U model=gpt-4.1 phase=5");
     }
 
     private ContextMenuStrip BuildMenu()

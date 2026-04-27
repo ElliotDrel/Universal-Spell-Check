@@ -127,4 +127,11 @@ internal sealed class ReplaceResult
         Success = true,
         DurationMs = durationMs
     };
+
+    public static ReplaceResult Fail(string reason, long durationMs) => new()
+    {
+        Success = false,
+        FailureReason = reason,
+        DurationMs = durationMs
+    };
 }

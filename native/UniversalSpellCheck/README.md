@@ -1,15 +1,14 @@
 # Universal Spell Check Native Spike
 
-Phase 5 native Windows spike for the replacement plan. The core loop was proven
-manually with `Ctrl+Alt+Y`; this pass hardens the Phase 2 OpenAI path for
-daily-driver plain-text testing and ports selected AHK parity features.
+Phase 5 native Windows app for the replacement plan. The app now uses
+`Ctrl+Alt+U` as the main spell-check hotkey.
 
 ## Scope
 
 This intentionally does only:
 
 - run as a single-instance resident WinForms tray app
-- register `Ctrl+Alt+Y` globally
+- register `Ctrl+Alt+U` globally
 - copy selected plain text through the clipboard
 - wait for the test hotkey keys to be released before sending `Ctrl+C`
 - spellcheck captured text through OpenAI `gpt-4.1`
@@ -18,7 +17,7 @@ This intentionally does only:
 - store the API key encrypted with Windows DPAPI current-user protection
 - log active app, capture timing, request timing, paste timing, copy attempts, request attempts, and failure categories
 - retry one transient OpenAI failure before failing without pasting
-- show a minimal tray busy state and bottom-center loading overlay while a request is running
+- show a minimal tray busy state and non-activating bottom-center loading overlay while a request is running
 - apply `replacements.json` post-processing with URL protection
 - strip leaked instruction prompt text before paste
 
@@ -42,6 +41,16 @@ Run the published executable:
 native\UniversalSpellCheck\publish\UniversalSpellCheck.exe
 ```
 
+## Startup
+
+The native app is the startup spellchecker. Windows Startup contains:
+
+```text
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Universal Spell Check Native.lnk
+```
+
+The old AHK startup shortcut was deleted.
+
 Use the tray icon menu to open logs or quit the app.
 Use `Open Settings` from the tray icon menu to save your OpenAI API key.
 
@@ -50,6 +59,8 @@ Logs are written to:
 ```text
 %LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\
 ```
+
+Each run writes concise event lines plus a `spellcheck_detail` line containing the base data needed for later backfill/reformatting: input text, output text, raw model output, raw response, request payload, token counts, timings, active app/window, paste target app/window, replacements, prompt-leak details, status, and errors.
 
 The app exits duplicate launches instead of starting a second hotkey owner.
 
@@ -65,14 +76,14 @@ plain text.
 
 ## Manual Acceptance Checks
 
-1. Launch the app with no saved API key, trigger `Ctrl+Alt+Y`, and verify Settings opens without replacing the selected text.
+1. Launch the app with no saved API key, trigger `Ctrl+Alt+U`, and verify Settings opens without replacing the selected text.
 2. Save a valid API key in Settings.
-3. Select misspelled text in Notepad, press `Ctrl+Alt+Y`, and verify corrected text replaces the selection.
-4. Select misspelled text in one browser textarea, press `Ctrl+Alt+Y`, and verify corrected text replaces the selection.
-5. During a request, verify the bottom-center `Spell check loading...` overlay appears and disappears after replacement or failure.
-6. Press `Ctrl+Alt+Y` with no selected text and verify stale clipboard text is not pasted.
-7. Press `Ctrl+Alt+Y` twice rapidly and verify only one replacement attempt runs.
-8. Select `open ai and github`, press `Ctrl+Alt+Y`, and verify replacements produce `OpenAI` / `GitHub`; confirm `replacements_count` in the native log.
+3. Select misspelled text in Notepad, press `Ctrl+Alt+U`, and verify corrected text replaces the selection.
+4. Select misspelled text in one browser textarea, press `Ctrl+Alt+U`, and verify corrected text replaces the selection.
+5. During a request, verify the bottom-center `Spell check loading...` overlay appears after copy succeeds, does not steal focus, and disappears after replacement or failure.
+6. Press `Ctrl+Alt+U` with no selected text and verify stale clipboard text is not pasted.
+7. Press `Ctrl+Alt+U` twice rapidly and verify only one replacement attempt runs.
+8. Select `open ai and github`, press `Ctrl+Alt+U`, and verify replacements produce `OpenAI` / `GitHub`; confirm `replacements_count` in the native log.
 9. Quit from the tray menu and verify the hotkey stops firing.
 
 ## Cutover

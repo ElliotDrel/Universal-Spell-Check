@@ -2,7 +2,7 @@
 
 This is the future work list for the C#/.NET WinForms native replacement in `native/UniversalSpellCheck`.
 
-Current status as of 2026-04-27: the native app is a working plain-text replacement candidate on `Ctrl+Alt+Y`. The AutoHotkey app remains the primary app on `Ctrl+Alt+U`.
+Current status as of 2026-04-27: the native app is the main plain-text spell checker on `Ctrl+Alt+U`. The AutoHotkey app remains in the repo as a fallback/reference path, but its Windows Startup shortcut has been deleted.
 
 ## Immediate Verification
 
@@ -12,15 +12,14 @@ Current status as of 2026-04-27: the native app is a working plain-text replacem
 - Test daily writing apps beyond VS Code and Chrome.
 - Keep collecting failure logs before adding app-specific behavior.
 
-## Before Cutover To Ctrl+Alt+U
+## After Cutover To Ctrl+Alt+U
 
-- Daily-drive the native app on `Ctrl+Alt+Y` long enough to catch real failures.
+- Daily-drive the native app on `Ctrl+Alt+U` long enough to catch real failures.
 - Test repeated Notepad usage.
 - Test Chrome and Edge textareas.
 - Test VS Code/editor fields.
 - Test the main apps where text is actually written day to day.
 - Confirm no required workflow depends on rich text preservation.
-- Decide whether the native app should take over `Ctrl+Alt+U`.
 - Decide whether the AHK app should remain available as a fallback after hotkey cutover.
 
 ## Reliability Work
@@ -38,7 +37,7 @@ Current status as of 2026-04-27: the native app is a working plain-text replacem
 - Model selection UI for `gpt-4.1`, `gpt-5.1`, and `gpt-5-mini`.
 - AHK-style JSONL log schema compatibility.
 - Log viewer integration or native log viewer.
-- Start-on-login preference.
+- Start-on-login preference UI for toggling the existing Startup shortcut.
 - Hotkey configuration UI.
 - More complete settings persistence.
 - Optional update/version display.
@@ -58,6 +57,7 @@ Current status as of 2026-04-27: the native app is a working plain-text replacem
 - Add version display and release notes before handing the app to anyone else.
 - Consider signing the executable if it becomes a real daily app.
 - Decide whether settings/log folders should move from `native-spike-logs` to a production path.
+- Decide whether the current `spellcheck_detail` raw/base-data line should be converted into AHK-style JSONL.
 
 ## Cleanup And Documentation
 
