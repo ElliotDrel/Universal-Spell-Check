@@ -11,6 +11,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
     private readonly SettingsStore _settingsStore;
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
+    private readonly LoadingOverlayForm _loadingOverlay = new();
     private SettingsForm? _settingsForm;
 
     public SpellCheckAppContext()
@@ -76,6 +77,15 @@ internal sealed class SpellCheckAppContext : ApplicationContext
         _notifyIcon.Text = isBusy
             ? "Universal Spell Check - checking"
             : "Universal Spell Check Native Spike";
+
+        if (isBusy)
+        {
+            _loadingOverlay.ShowNearTaskbar();
+        }
+        else
+        {
+            _loadingOverlay.Hide();
+        }
     }
 
     private void ShowSettings()
@@ -98,6 +108,7 @@ internal sealed class SpellCheckAppContext : ApplicationContext
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _loadingOverlay.Dispose();
         _coordinator.Dispose();
         _spellcheckService.Dispose();
         base.ExitThreadCore();
