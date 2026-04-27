@@ -6,6 +6,185 @@ This document defines the recommended replacement for the current AutoHotkey-bas
 
 The document is detailed enough to hand to another engineer for implementation. It includes the reasoning behind the recommendation, the architectural model, the MVP behavior, the phased path to later parity, the interfaces to introduce, and the expected test scenarios.
 
+## Implementation Status As Of 2026-04-27
+
+The native app has been implemented through the Phase 5 selective-parity pass in [native/UniversalSpellCheck](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck>). It is still a replacement candidate, not the primary app. The current AutoHotkey app remains intact and should not be deleted or deprecated yet.
+
+The native app currently uses `Ctrl+Alt+Y` for testing so it can run beside the existing AutoHotkey app on `Ctrl+Alt+U`.
+
+### Completed
+
+#### Phase 0: hard-loop spike
+
+Completed:
+
+- created a C#/.NET WinForms project at [native/UniversalSpellCheck](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck>)
+- proved the resident native process can receive a global hotkey
+- proved selected plain text can be copied from the active app through the clipboard
+- proved selected text can be replaced in place through clipboard paste
+- used a dummy local transform first, before adding OpenAI
+- verified the loop manually with `Ctrl+Alt+Y`
+
+Important finding:
+
+- `Ctrl+Alt+U` was already owned by the AutoHotkey app, so the native test hotkey was changed to `Ctrl+Alt+Y`.
+
+#### Phase 1: minimal tray app shape
+
+Completed:
+
+- hidden WinForms startup through `ApplicationContext`
+- tray icon with `Open Settings`, `Open Logs Folder`, and `Quit`
+- explicit hotkey unregister on shutdown
+- single-instance guard so duplicate launches do not create competing hotkey owners
+- coordinator-owned pipeline with a non-queueing `SemaphoreSlim(1, 1)` guard
+- minimal local file logging under `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`
+
+Important finding:
+
+- the first refactor regressed capture because `Ctrl+C` was sent while the test hotkey keys were still physically down
+- adding a hotkey-release wait before copy fixed the issue
+
+#### Phase 2: OpenAI request path and secret storage
+
+Completed:
+
+- settings window for entering an OpenAI API key
+- DPAPI current-user encrypted API key storage at `%LOCALAPPDATA%\UniversalSpellCheck\apikey.dat`
+- app-lifetime `HttpClient`
+- OpenAI Responses API request path
+- fixed default model: `gpt-4.1`
+- no model-selection UI
+- request failure paths restore the original clipboard and do not paste over the selected text
+- missing-key path opens Settings instead of crashing
+
+Observed proof:
+
+- missing-key attempt logged `error_code=missing_api_key`
+- API key save logged `apikey_saved`
+- successful request logged `replace_succeeded`
+
+#### Phase 3: daily-driver reliability pass
+
+Completed:
+
+- active foreground app/window diagnostics
+- capture timing
+- request timing
+- paste timing
+- copy-attempt count
+- request-attempt count
+- HTTP status code logging on request failures
+- one retry for transient OpenAI failures
+- minimal tray busy state while a request is running
+- no-selection behavior confirmed non-destructive
+- rapid repeated hotkeys confirmed non-queueing
+
+Observed proof from `phase3-2026-04-27.log`:
+
+- VS Code selected text corrected successfully
+- Chrome text field corrected successfully
+- no-selection test logged `capture_failed` with `reason="Copied selection was empty."`
+- rapid repeated hotkeys logged multiple `guard_rejected reason=already_running` events and only one replacement
+
+Representative timings:
+
+| App | Input length | Output length | Total duration | Capture | Request | Paste |
+|---|---:|---:|---:|---:|---:|---:|
+| VS Code | 118 | 114 | 2820 ms | 344 ms | 2313 ms | 125 ms |
+| Chrome | 22 | 27 | 1229 ms | 297 ms | 791 ms | 157 ms |
+| VS Code | 115 | 114 | 2072 ms | 344 ms | 1572 ms | 140 ms |
+| VS Code | 114 | 114 | 1972 ms | 860 ms | 969 ms | 141 ms |
+
+#### Phase 4: replacement candidate and cutover decision
+
+Completed:
+
+- created [native/UniversalSpellCheck/CUTOVER.md](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck/CUTOVER.md>)
+- documented native-vs-AHK behavior comparison
+- documented current native test evidence
+- documented missing features
+- documented run instructions
+- documented rollback path
+- published a self-contained Windows executable at [native/UniversalSpellCheck/publish/UniversalSpellCheck.exe](</C:/Users/2supe/All Coding/Universal Spell Check/native/UniversalSpellCheck/publish/UniversalSpellCheck.exe>)
+
+Decision:
+
+- do not replace the AHK app yet
+- continue daily-driver testing on `Ctrl+Alt+Y`
+- rollback remains immediate: quit the native tray app and continue using AHK on `Ctrl+Alt+U`
+
+#### Phase 5: selective parity porting
+
+Completed:
+
+- ported `replacements.json` post-processing
+- replacements are flattened from canonical-to-variants into variant-to-canonical pairs
+- replacements are sorted longest-first
+- replacements are case-sensitive
+- `https?://...` URLs are protected before replacement and restored afterward
+- replacements reload when file metadata changes
+- ported prompt-leak guard for echoed `instructions: ...`
+- prompt-leak guard strips leading `text input:` after removing leaked instructions
+- updated OpenAI prompt shape to match the AHK-style `instructions:` / `text input:` pattern
+- added post-processing diagnostics:
+  - `postprocess_duration_ms`
+  - `replacements_count`
+  - `urls_protected`
+  - `prompt_leak_triggered`
+  - `prompt_leak_removed_chars`
+- publish output now contains only `UniversalSpellCheck.exe`, with `.pdb` excluded
+
+Observed proof from `phase5-2026-04-27.log`:
+
+- replacements loaded successfully: `replacements_reloaded count=103`
+- normal request path still succeeds after adding post-processing
+- prompt-leak guard did not trigger on normal runs, as expected
+
+Remaining verification gap:
+
+- the app loaded replacements, but the latest manual run logged `replacements_count=0`; a targeted replacement test such as `open ai and github` still needs to prove the replacement pass actively changes output.
+
+### Current Run And Build Commands
+
+Development run:
+
+```powershell
+dotnet run --project native\UniversalSpellCheck\UniversalSpellCheck.csproj
+```
+
+Publish:
+
+```powershell
+dotnet publish native\UniversalSpellCheck\UniversalSpellCheck.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o native\UniversalSpellCheck\publish
+```
+
+Published executable:
+
+```powershell
+native\UniversalSpellCheck\publish\UniversalSpellCheck.exe
+```
+
+Current local app data paths:
+
+```text
+%LOCALAPPDATA%\UniversalSpellCheck\apikey.dat
+%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\
+```
+
+### Current Status Summary
+
+The native app has proven the core plain-text flow:
+
+1. select text
+2. press global hotkey
+3. copy selected text
+4. call OpenAI with a persistent in-process client
+5. post-process output
+6. paste replacement text back into the original app
+
+It is ready for continued daily-driver testing. It is not yet approved to take over `Ctrl+Alt+U` or replace the AHK app.
+
 ## Current State And Learnings
 
 ### What the current app actually is
