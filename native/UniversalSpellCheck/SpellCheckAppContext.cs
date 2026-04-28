@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Windows.Threading;
 using DashboardWindow = UniversalSpellCheck.UI.MainWindow;
 using Forms = System.Windows.Forms;
 
@@ -19,6 +20,10 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     public SpellCheckAppContext()
     {
         _logger = new DiagnosticsLogger(AppPaths.LogPath);
+        // Force the overlay handle to be created on this (UI) thread so
+        // InvokeRequired in SetBusy is meaningful and BeginInvoke works.
+        _ = _loadingOverlay.Handle;
+        Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
         _settingsStore = new SettingsStore(_logger);
         _spellcheckService = new OpenAiSpellcheckService(_settingsStore, _logger);
         _postProcessor = new TextPostProcessor(_logger);
@@ -43,6 +48,18 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _hotkeyWindow.Register();
 
         _logger.Log("started hotkey=Ctrl+Alt+U model=gpt-4.1 phase=5");
+
+        // Auto-open the dashboard on startup so the user can see UI errors
+        // immediately instead of having to go discover them via the tray menu.
+        // Posted to the UI thread so it runs after the message loop is up.
+        System.Windows.Forms.Application.Idle += AutoOpenDashboardOnce;
+    }
+
+    private void AutoOpenDashboardOnce(object? sender, EventArgs e)
+    {
+        System.Windows.Forms.Application.Idle -= AutoOpenDashboardOnce;
+        _logger.Log("dashboard_auto_open_attempt");
+        ShowSettings();
     }
 
     private Forms.ContextMenuStrip BuildMenu()
@@ -80,43 +97,105 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             ? "Universal Spell Check - checking"
             : "Universal Spell Check Native Spike";
 
+        // Marshal to the WinForms UI thread — SetBusy is invoked from the
+        // coordinator's async pipeline. ProgressBar marquee animation and
+        // window show/hide must run on the form's owning thread, otherwise
+        // the overlay can fail to paint.
+        try
+        {
+            if (_loadingOverlay.IsHandleCreated && _loadingOverlay.InvokeRequired)
+            {
+                _loadingOverlay.BeginInvoke(new Action(() => ApplyBusy(isBusy)));
+            }
+            else
+            {
+                ApplyBusy(isBusy);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"loading_overlay_failed is_busy={isBusy} error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\"");
+        }
+    }
+
+    private void ApplyBusy(bool isBusy)
+    {
         if (isBusy)
         {
+            _logger.Log("loading_overlay_show");
             _loadingOverlay.ShowNearTaskbar();
         }
         else
         {
+            _logger.Log("loading_overlay_hide");
             _loadingOverlay.Hide();
         }
     }
 
     private void ShowSettings()
     {
-        if (_dashboardWindow is not null)
+        try
         {
-            if (!_dashboardWindow.IsVisible)
+            if (_dashboardWindow is not null)
             {
-                _dashboardWindow.Show();
+                _logger.Log("dashboard_open step=reuse_existing");
+                if (!_dashboardWindow.IsVisible)
+                {
+                    _dashboardWindow.Show();
+                }
+
+                if (_dashboardWindow.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    _dashboardWindow.WindowState = System.Windows.WindowState.Normal;
+                }
+
+                _dashboardWindow.Activate();
+                return;
             }
 
-            if (_dashboardWindow.WindowState == System.Windows.WindowState.Minimized)
-            {
-                _dashboardWindow.WindowState = System.Windows.WindowState.Normal;
-            }
-
+            _logger.Log("dashboard_open step=construct");
+            _dashboardWindow = new DashboardWindow(_settingsStore, _logger);
+            _dashboardWindow.Closed += (_, _) => _dashboardWindow = null;
+            _logger.Log("dashboard_open step=show");
+            _dashboardWindow.Show();
+            _logger.Log("dashboard_open step=activate");
             _dashboardWindow.Activate();
-            return;
+            _logger.Log("dashboard_open step=done");
         }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"dashboard_open_failed error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\" " +
+                $"stack=\"{Escape(ex.ToString())}\"");
+            ShowTip("Dashboard failed", "The dashboard could not be opened. Details were written to the native log.");
+            _dashboardWindow = null;
+        }
+    }
 
-        _dashboardWindow = new DashboardWindow(_settingsStore, _logger);
-        _dashboardWindow.Closed += (_, _) => _dashboardWindow = null;
-        _dashboardWindow.Show();
-        _dashboardWindow.Activate();
+    private static string Escape(string? value)
+    {
+        return (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        _logger.Log(
+            $"ui_dispatcher_unhandled error_type={e.Exception.GetType().Name} " +
+            $"error=\"{Escape(e.Exception.Message)}\" " +
+            $"stack=\"{Escape(e.Exception.ToString())}\"");
+        _dashboardWindow?.Close();
+        _dashboardWindow = null;
+        ShowTip("Dashboard failed", "The dashboard hit a UI error. Details were written to the native log.");
+        e.Handled = true;
     }
 
     protected override void ExitThreadCore()
     {
         _logger.Log("stopping");
+        Dispatcher.CurrentDispatcher.UnhandledException -= OnDispatcherUnhandledException;
         _hotkeyWindow.HotkeyPressed -= OnHotkeyPressed;
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
