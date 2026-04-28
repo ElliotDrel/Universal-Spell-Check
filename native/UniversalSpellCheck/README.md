@@ -52,8 +52,7 @@ The native app is the startup spellchecker. Windows Startup contains:
 
 The old AHK startup shortcut was deleted.
 
-Use the tray icon menu to open the dashboard, open logs, or quit the app.
-Use `Open Dashboard` from the tray icon menu to review recent activity and save your OpenAI API key.
+The dashboard auto-opens once on startup so any UI errors are visible immediately. After that, use the tray icon menu to reopen the dashboard, open the logs folder, or quit the app.
 
 Logs are written to:
 

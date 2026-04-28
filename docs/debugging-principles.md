@@ -65,6 +65,19 @@ When debugging native behavior:
 7. Keep the loading overlay tied to post-capture request/paste work, shown without activation, and hidden in `finally`.
 8. If paste fails after a successful request, compare the logged original target app with `paste_target_exe` / `paste_target_app` before changing timing or app-specific behavior.
 
+### WPF-in-WinForms gotchas
+
+The native app hosts WPF (the dashboard) inside a WinForms tray. Two sharp edges burned us:
+
+1. **No `System.Windows.Application` = broken resource lookup.** A WinForms `Application.Run` does NOT create `Application.Current` for WPF. `DynamicResource` walks the visual/logical tree and finally `Application.Current.Resources`; with `Application.Current == null`, lookups for things like `Background={DynamicResource Canvas}` resolved to `DependencyProperty.UnsetValue` and crashed at layout time. The `pack://` scheme is also wired up by the Application instance. **Fix:** instantiate `new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }` once before `Application.Run`, and merge global `ResourceDictionary`s into `app.Resources`.
+2. **WPF smoke tests must pump the Dispatcher.** A test that does `window.Show(); window.Close();` returns 0 even when the window would crash on first render — layout, template expansion, and resource resolution don't run synchronously. The `--dashboard-smoke` mode now pumps `DispatcherFrame`s for several seconds and hooks `Dispatcher.UnhandledException`. If a smoke test "passes" but the user still sees the bug, distrust the test before distrusting the report.
+
+When you see `'{DependencyProperty.UnsetValue}' is not a valid value for property 'Background'/'Foreground'`, do not chase template-binding rewrites. The most likely root cause is missing `Application.Current` or a missing resource key, not the templates themselves.
+
+### Diagnosing native UI failures
+
+The dashboard is auto-opened on startup so failures are visible without spelunking. Both `dashboard_open_failed` and `ui_dispatcher_unhandled` log `error_type`, `error`, AND full `ex.ToString()` stack — always grep the latest `phase*-YYYY-MM-DD.log` for `dashboard_open step=` to see how far construction got, then read the stack on the failing line. Step values: `construct` → `show` → `activate` → `done`.
+
 Native success criteria for manual testing:
 - selected text is captured with `copy_attempts=1` or a clearly explained retry
 - request succeeds with `request_attempts=1` unless a transient retry is logged

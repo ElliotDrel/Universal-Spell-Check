@@ -10,8 +10,8 @@
 - **NATIVE_APP_FUTURE_TODO.md**: Root-level future work list for native cutover, reliability, parity, packaging, and rich-text/app-specific work.
 
 ## Native app layout
-- `native/UniversalSpellCheck/Program.cs`: Single-instance app entrypoint; duplicate launches show a message and exit.
-- `native/UniversalSpellCheck/SpellCheckAppContext.cs`: Tray lifetime, menu, settings window, busy text, and loading overlay ownership.
+- `native/UniversalSpellCheck/Program.cs`: Single-instance app entrypoint; duplicate launches show a message and exit. Also bootstraps a `System.Windows.Application` (`ShutdownMode.OnExplicitShutdown`) and merges `UI/Styles.xaml` + `UI/Components.xaml` into `Application.Resources` before `Application.Run` so all WPF resource lookups have a top-level fallback. Hosts `--dashboard-smoke` mode which constructs the dashboard, pumps `DispatcherFrame`s, and fails on any `Dispatcher.UnhandledException`.
+- `native/UniversalSpellCheck/SpellCheckAppContext.cs`: Tray lifetime, menu, settings window, busy text, and loading overlay ownership. Auto-opens the dashboard once on startup via `Application.Idle` so UI failures surface immediately rather than only when the user pulls the tray menu.
 - `native/UniversalSpellCheck/HotkeyWindow.cs`: Win32 `RegisterHotKey` wrapper for `Ctrl+Alt+U`.
 - `native/UniversalSpellCheck/ClipboardLoop.cs`: Clipboard-first capture/paste with hotkey-release wait, copy sentinel, bounded copy retry, and clipboard restore on failure.
 - `native/UniversalSpellCheck/SpellcheckCoordinator.cs`: Serialized pipeline: capture -> request -> post-process -> paste. Uses non-queueing `SemaphoreSlim(1, 1)`.
@@ -77,8 +77,8 @@ python export_openai_finetune_dataset.py --source logs --weeks 8 --max-per-bucke
 12. Loading overlay hides in `finally`, even on request/paste failure.
 
 ### Native dashboard flow
-1. User opens the tray menu and selects `Open Dashboard`.
-2. `SpellCheckAppContext` opens the in-process WPF `UI/MainWindow`.
+1. App startup auto-opens the dashboard once (via `Application.Idle`); the user can also reopen it from the tray menu's `Open Dashboard`.
+2. `SpellCheckAppContext` opens the in-process WPF `UI/MainWindow`. Resources (`Styles.xaml`, `Components.xaml`) resolve through the `System.Windows.Application` instance created at startup; without that anchor `DynamicResource` lookups crashed with `'{DependencyProperty.UnsetValue}' is not a valid value for property ...'`.
 3. Home reads the current native log file and renders successful `spellcheck_detail` entries as diff rows.
 4. Settings saves the OpenAI API key through `SettingsStore`, opens the log folder, and opens `replacements.json`.
 5. Hotkey capture, model switching, startup toggling, and a full replacements editor are deferred and must not be fake-wired.

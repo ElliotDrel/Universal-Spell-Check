@@ -43,6 +43,16 @@ Candidate mitigations if native capture regresses:
 - add app-specific capture/paste behavior only after a named target app reproduces the failure
 - keep Notepad/browser textarea as baseline regression tests
 
+## Native dashboard (WPF)
+
+Watch for:
+- `dashboard_open_failed` or `ui_dispatcher_unhandled` with `error="'{DependencyProperty.UnsetValue}' is not a valid value for property '...'"` — almost always a regression in the WPF bootstrap (no `System.Windows.Application` instance, missing resource key, or merged dictionaries not loaded into `Application.Resources`).
+- `wpf_resources_failed` at startup — `Styles.xaml` / `Components.xaml` did not load via the pack URI; the dashboard will not work until this is fixed.
+- A `dashboard-smoke-*.log` that says `dashboard_smoke_ok` while the user still sees a crash — confirm the smoke mode is actually pumping `DispatcherFrame`s, not just `Show()`+`Close()`.
+- `loading_overlay_failed` — the busy overlay couldn't show/hide. Check that `_loadingOverlay.Handle` is force-created on the main thread so `InvokeRequired` is meaningful.
+
+The dashboard is auto-opened on startup; if it does not appear within a few seconds of launch, check the latest `phase*-YYYY-MM-DD.log` for `dashboard_open step=` and `dashboard_auto_open_attempt`.
+
 ## Replacement cache
 See `replacements-and-logging.md` watchlist section (repeated reload failures, same-size fast-edit edge case, read-while-writing risk).
 
