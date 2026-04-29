@@ -21,13 +21,43 @@
     </Window.Resources>
 
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="240"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
+        <!-- Update banner (hidden unless an update is ready) -->
+        <Border x:Name="UpdateBanner"
+                Grid.Row="0"
+                Grid.ColumnSpan="2"
+                Background="#FFF59E0B"
+                Padding="20,10"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="UpdateBannerText"
+                           Grid.Column="0"
+                           VerticalAlignment="Center"
+                           Foreground="#FF1F2937"
+                           FontWeight="SemiBold"
+                           Text="Update available"/>
+                <Button x:Name="UpdateNowButton"
+                        Grid.Column="1"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="Update Now"
+                        Click="OnUpdateNowClicked"/>
+            </Grid>
+        </Border>
+
         <!-- Sidebar -->
-        <Grid Grid.Column="0" Margin="20,24,0,20">
+        <Grid Grid.Row="1" Grid.Column="0" Margin="20,24,0,20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -58,14 +88,16 @@
                 <RadioButton x:Name="HelpNav"
                              Style="{StaticResource NavItem}"
                              Content="Help"/>
-                <TextBlock Style="{StaticResource Caption}"
-                           Text="Version 1.0"
+                <TextBlock x:Name="VersionLabel"
+                           Style="{StaticResource Caption}"
+                           Text="Version"
                            Margin="12,8,0,0"/>
             </StackPanel>
         </Grid>
 
         <!-- Content host -->
         <Frame x:Name="ContentFrame"
+               Grid.Row="1"
                Grid.Column="1"
                NavigationUIVisibility="Hidden"
                Background="{DynamicResource Canvas}"/>

@@ -2,17 +2,23 @@ namespace UniversalSpellCheck;
 
 internal static class AppPaths
 {
+    // Settings + API key are isolated per channel so Dev experiments cannot
+    // corrupt Prod state.
     public static string AppDataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "UniversalSpellCheck");
+        BuildChannel.AppDataFolder);
 
+    // Logs are intentionally shared across channels — both Prod and Dev write
+    // into the same daily JSONL file so the corpus stays unified for future
+    // fine-tune dataset use. Each line is stamped with channel + app_version.
     public static string LogDirectory { get; } = Path.Combine(
-        AppDataDirectory,
-        "native-spike-logs");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "UniversalSpellCheck",
+        "logs");
 
     public static string LogPath { get; } = Path.Combine(
         LogDirectory,
-        $"phase5-{DateTime.Now:yyyy-MM-dd}.log");
+        $"spellcheck-{DateTime.Now:yyyy-MM-dd}.jsonl");
 
     public static string SettingsPath { get; } = Path.Combine(
         AppDataDirectory,

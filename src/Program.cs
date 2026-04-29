@@ -1,15 +1,19 @@
 using System.Windows;
 using System.Windows.Threading;
+using Velopack;
 
 namespace UniversalSpellCheck;
 
 static class Program
 {
-    private const string AppMutexName = "UniversalSpellCheck.NativeSpike";
-
     [STAThread]
     static int Main(string[] args)
     {
+        // Velopack's first-run / restart-after-update hooks must execute
+        // before any other startup code. This is a no-op outside an installed
+        // build, so it is safe for Dev / dotnet-run.
+        VelopackApp.Build().Run();
+
         if (args.Contains("--dashboard-smoke", StringComparer.OrdinalIgnoreCase))
         {
             return RunDashboardSmoke();
@@ -34,12 +38,12 @@ static class Program
             }
         };
 
-        using var appMutex = new Mutex(true, AppMutexName, out var createdNew);
+        using var appMutex = new Mutex(true, BuildChannel.MutexName, out var createdNew);
         if (!createdNew)
         {
             System.Windows.Forms.MessageBox.Show(
-                "Universal Spell Check native spike is already running.",
-                "Universal Spell Check",
+                $"{BuildChannel.DisplayName} is already running.",
+                BuildChannel.DisplayName,
                 System.Windows.Forms.MessageBoxButtons.OK,
                 System.Windows.Forms.MessageBoxIcon.Information);
             return 0;

@@ -7,10 +7,6 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
 {
     private const int HotkeyId = 1;
     private const int WmHotkey = 0x0312;
-    private const uint ModAlt = 0x0001;
-    private const uint ModControl = 0x0002;
-    private const uint ModNoRepeat = 0x4000;
-    private const uint VkU = 0x55;
 
     private bool _registered;
 
@@ -31,9 +27,11 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
             return;
         }
 
-        if (!RegisterHotKey(Handle, HotkeyId, ModControl | ModAlt | ModNoRepeat, VkU))
+        if (!RegisterHotKey(Handle, HotkeyId, BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to register Ctrl+Alt+U.");
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                $"Failed to register hotkey for {BuildChannel.DisplayName}.");
         }
 
         _registered = true;

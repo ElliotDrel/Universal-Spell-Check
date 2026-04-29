@@ -15,7 +15,11 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
     private readonly LoadingOverlayForm _loadingOverlay = new();
+    private readonly UpdateService _updateService;
     private DashboardWindow? _dashboardWindow;
+    private Forms.ToolStripMenuItem _versionItem = null!;
+    private Forms.ToolStripMenuItem _checkForUpdatesItem = null!;
+    private Forms.ToolStripMenuItem _updateNowItem = null!;
 
     public SpellCheckAppContext()
     {
@@ -37,8 +41,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         _notifyIcon = new Forms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
-            Text = "Universal Spell Check Native Spike",
+            Icon = BuildTrayIcon(),
+            Text = TruncateTooltip(BuildChannel.TrayTooltip),
             Visible = true,
             ContextMenuStrip = BuildMenu()
         };
@@ -47,7 +51,14 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
         _hotkeyWindow.Register();
 
-        _logger.Log("started hotkey=Ctrl+Alt+U model=gpt-4.1 phase=5");
+        _updateService = new UpdateService(_logger);
+        _updateService.StateChanged += OnUpdateStateChanged;
+        OnUpdateStateChanged(_updateService, _updateService.State);
+        _ = _updateService.CheckAsync(UpdateTrigger.Launch);
+
+        _logger.Log(
+            $"started channel={BuildChannel.ChannelName} version={BuildChannel.AppVersion} " +
+            $"hotkey_vk=0x{BuildChannel.HotkeyVk:X2}");
 
         // Auto-open the dashboard on startup so the user can see UI errors
         // immediately instead of having to go discover them via the tray menu.
@@ -65,10 +76,97 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private Forms.ContextMenuStrip BuildMenu()
     {
         var menu = new Forms.ContextMenuStrip();
+        _versionItem = new Forms.ToolStripMenuItem($"v{BuildChannel.AppVersion}") { Enabled = false };
+        _checkForUpdatesItem = new Forms.ToolStripMenuItem(
+            "Check for Updates",
+            null,
+            (_, _) => _ = _updateService.CheckAsync(UpdateTrigger.ManualTray));
+        _updateNowItem = new Forms.ToolStripMenuItem(
+            "Update Now",
+            null,
+            (_, _) => _ = _updateService.ApplyUpdatesAndRestartAsync()) { Visible = false };
+
+        menu.Items.Add(_versionItem);
+        menu.Items.Add(_checkForUpdatesItem);
+        menu.Items.Add(_updateNowItem);
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Open Dashboard", null, (_, _) => ShowSettings());
         menu.Items.Add("Open Logs Folder", null, (_, _) => OpenLogsFolder());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         return menu;
+    }
+
+    private void OnUpdateStateChanged(object? sender, UpdateState state)
+    {
+        // UpdateService may raise from a background thread; marshal to UI thread.
+        if (_notifyIcon.ContextMenuStrip is { } menu && menu.InvokeRequired)
+        {
+            menu.BeginInvoke(new Action(() => OnUpdateStateChanged(sender, state)));
+            return;
+        }
+
+        switch (state)
+        {
+            case UpdateState.UpdateReady ready:
+                _versionItem.Text = $"v{BuildChannel.AppVersion} — Update available ({ready.Version})";
+                _updateNowItem.Visible = true;
+                _checkForUpdatesItem.Enabled = true;
+                break;
+            case UpdateState.Checking:
+                _versionItem.Text = $"v{BuildChannel.AppVersion} — Checking…";
+                _updateNowItem.Visible = false;
+                _checkForUpdatesItem.Enabled = false;
+                break;
+            case UpdateState.Downloading dl:
+                _versionItem.Text = $"v{BuildChannel.AppVersion} — Downloading {dl.Version}…";
+                _updateNowItem.Visible = false;
+                _checkForUpdatesItem.Enabled = false;
+                break;
+            case UpdateState.Failed:
+            case UpdateState.UpToDate:
+            case UpdateState.Idle:
+            default:
+                _versionItem.Text = $"v{BuildChannel.AppVersion}";
+                _updateNowItem.Visible = false;
+                _checkForUpdatesItem.Enabled = true;
+                break;
+        }
+    }
+
+    private static System.Drawing.Icon BuildTrayIcon()
+    {
+        var baseIcon = System.Drawing.SystemIcons.Application;
+        if (!BuildChannel.IsDev)
+        {
+            return baseIcon;
+        }
+
+        // Tint the Dev icon orange so it is visually distinct from Prod when
+        // both run side-by-side in the tray.
+        try
+        {
+            using var bmp = baseIcon.ToBitmap();
+            using var tinted = new System.Drawing.Bitmap(bmp.Width, bmp.Height);
+            using (var g = System.Drawing.Graphics.FromImage(tinted))
+            {
+                g.DrawImage(bmp, 0, 0);
+                using var overlay = new System.Drawing.SolidBrush(
+                    System.Drawing.Color.FromArgb(120, 255, 140, 0));
+                g.FillRectangle(overlay, 0, 0, bmp.Width, bmp.Height);
+            }
+            var hIcon = tinted.GetHicon();
+            return System.Drawing.Icon.FromHandle(hIcon);
+        }
+        catch
+        {
+            return baseIcon;
+        }
+    }
+
+    private static string TruncateTooltip(string text)
+    {
+        // NotifyIcon.Text has a 63-char limit before .NET throws.
+        return text.Length > 63 ? text[..63] : text;
     }
 
     private void OnHotkeyPressed(object? sender, EventArgs e)
@@ -93,9 +191,9 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     private void SetBusy(bool isBusy)
     {
-        _notifyIcon.Text = isBusy
-            ? "Universal Spell Check - checking"
-            : "Universal Spell Check Native Spike";
+        _notifyIcon.Text = TruncateTooltip(isBusy
+            ? $"{BuildChannel.TrayTooltip} — checking"
+            : BuildChannel.TrayTooltip);
 
         // Marshal to the WinForms UI thread — SetBusy is invoked from the
         // coordinator's async pipeline. ProgressBar marquee animation and
@@ -156,7 +254,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             }
 
             _logger.Log("dashboard_open step=construct");
-            _dashboardWindow = new DashboardWindow(_settingsStore, _logger);
+            _dashboardWindow = new DashboardWindow(_settingsStore, _logger, _updateService);
             _dashboardWindow.Closed += (_, _) => _dashboardWindow = null;
             _logger.Log("dashboard_open step=show");
             _dashboardWindow.Show();
@@ -192,6 +290,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         e.Handled = true;
     }
 
+    internal UpdateService UpdateService => _updateService;
+
     protected override void ExitThreadCore()
     {
         _logger.Log("stopping");
@@ -204,6 +304,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _loadingOverlay.Dispose();
         _coordinator.Dispose();
         _spellcheckService.Dispose();
+        _updateService.StateChanged -= OnUpdateStateChanged;
+        _updateService.Dispose();
         base.ExitThreadCore();
     }
 }

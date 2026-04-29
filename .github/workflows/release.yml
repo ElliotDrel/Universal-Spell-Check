@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $semver = $tag.TrimStart('v')
+          "semver=$semver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore
+        run: dotnet restore src/UniversalSpellCheck.csproj
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src/UniversalSpellCheck.csproj `
+            -c Release -r win-x64 --self-contained false `
+            /p:Version=${{ steps.ver.outputs.semver }} `
+            /p:AssemblyVersion=${{ steps.ver.outputs.semver }}.0 `
+            /p:FileVersion=${{ steps.ver.outputs.semver }}.0 `
+            -o publish
+
+      - name: Install vpk
+        run: dotnet tool install --global vpk
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          vpk pack `
+            --packId UniversalSpellCheck `
+            --packVersion ${{ steps.ver.outputs.semver }} `
+            --packDir publish `
+            --mainExe UniversalSpellCheck.exe `
+            --packTitle "Universal Spell Check"
+
+      - name: Upload to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          vpk upload github `
+            --repoUrl ${{ github.server_url }}/${{ github.repository }} `
+            --token $env:GITHUB_TOKEN `
+            --tag ${{ github.ref_name }} `
+            --releaseName "Universal Spell Check ${{ github.ref_name }}" `
+            --publish

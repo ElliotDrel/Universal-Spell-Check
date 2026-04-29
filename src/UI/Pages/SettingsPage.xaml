@@ -175,7 +175,7 @@
                             <TextBlock FontFamily="{StaticResource FontMono}"
                                        FontSize="11"
                                        Foreground="{StaticResource TextMuted}"
-                                       Text="%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\"
+                                       Text="%LOCALAPPDATA%\UniversalSpellCheck\logs\"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                         <Button Grid.Column="1"

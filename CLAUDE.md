@@ -6,13 +6,19 @@
 
 ## Project Overview
 
-**Universal Spell Checker** - a Windows-wide AI spell checker. The native C#/.NET WinForms app under `native/UniversalSpellCheck` is now the main app: select text, press **Ctrl+Alt+U**, corrected text replaces the selection in place. The AutoHotkey script remains in the repo as a fallback/reference path, but its Startup shortcut has been removed.
+**Universal Spell Check** - a Windows-wide AI spell checker. The C#/.NET WinForms tray app under `src/` is the product: select text, press the hotkey, corrected text replaces the selection in place. The legacy AutoHotkey path is archived under `.archive/ahk-legacy/` for history only.
 
 **Core value:** spell checking must feel instant and invisible - select, hotkey, done. Speed is the product.
 
-**Stack:** Native C#/.NET WinForms tray app (main), AutoHotkey v2.0 (legacy fallback script), Python 3 (log viewer + dataset tools), local `spellcheck-server.pyw` proxy (required for AHK only), OpenAI Responses API. Windows only. AHK has no build step; native app builds with `dotnet`.
+**Stack:** C#/.NET 10 WinForms tray app + WPF dashboard (`src/`). Velopack for auto-update + GitHub Releases for distribution. OpenAI Responses API. Windows only. Python 3 used only for fine-tune dataset tooling under `tests/`. Builds with `dotnet build src/UniversalSpellCheck.csproj`.
 
-**Primary files:** `native/UniversalSpellCheck/Program.cs` is the native app entrypoint. `Universal Spell Checker.ahk` is the legacy AHK fallback with top-level `modelModule` selector supporting `gpt-4.1`, `gpt-5.1`, `gpt-5-mini`. Configuration lives in `replacements.json`. AHK structured JSONL logs land in `logs/`; native logs land under `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
+**Channels:**
+- **Prod** (`Release` config) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck\`. Auto-updates from GitHub Releases.
+- **Dev** (`Dev` config, `DEV` compile constant) — Ctrl+Alt+D, mutex `UniversalSpellCheck.Dev`, settings under `%LocalAppData%\UniversalSpellCheck.Dev\`, tray icon orange-tinted. Never auto-updates; updated via `git pull` + `dotnet run -c Dev`.
+
+**Logs are unified across channels:** both write to `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{date}.jsonl`. Every line is stamped with `channel`, `app_version`, and `pid` so downstream tooling can filter while keeping the corpus together for fine-tune use.
+
+**Primary files:** `src/Program.cs` is the entrypoint. `src/BuildChannel.cs` holds all channel-conditional constants. `src/UpdateService.cs` is the single unified update flow used by every UI surface (launch / periodic timer / tray / dashboard). `replacements.json` at repo root is copied next to the exe at publish time.
 
 **Tone when collaborating:** speed first, simplicity second, minimal UI/overhead third. Treat every added abstraction or fallback as a cost.
 
@@ -22,38 +28,30 @@
 
 ```text
 Universal Spell Check/
-|-- Universal Spell Checker.ahk      # PRIMARY AHK script - hotkey handler, model selector, pipeline
-|-- spellcheck-server.pyw            # Required AHK local proxy (OpenAI Responses API forwarder)
-|-- replacements.json                # Post-processing brand/casing replacements
-|-- generate_log_viewer.py           # Builds logs/viewer.html from JSONL logs
-|-- NATIVE_APP_FUTURE_TODO.md        # Root native follow-up work list
+|-- src/                              # C#/.NET WinForms + WPF app (the product)
+|   |-- UniversalSpellCheck.csproj    # Configurations: Debug | Release | Dev (DEV constant)
+|   |-- Program.cs                    # VelopackApp.Run() first, then mutex + tray bootstrap
+|   |-- BuildChannel.cs               # Prod/Dev constants: hotkey, mutex, paths, version
+|   |-- AppPaths.cs                   # Settings/API isolated per channel; LOGS shared
+|   |-- DiagnosticsLogger.cs          # JSONL append with channel/app_version/pid stamping
+|   |-- HotkeyWindow.cs               # Win32 RegisterHotKey, hotkey from BuildChannel
+|   |-- SpellCheckAppContext.cs       # Tray lifetime, menu (version + Check/Update Now)
+|   |-- UpdateService.cs              # Unified update flow (Launch/Periodic/ManualTray/ManualDashboard)
+|   |-- SpellcheckCoordinator.cs      # Capture/request/post-process/paste pipeline
+|   |-- OpenAiSpellcheckService.cs    # Persistent HttpClient + Responses API
+|   |-- TextPostProcessor.cs          # replacements.json + prompt-leak guard
+|   |-- LoadingOverlayForm.cs         # Bottom-center loading progress bar
+|   `-- UI/                           # WPF dashboard (MainWindow + Pages + Styles/Components)
 |
-|-- native/
-|   `-- UniversalSpellCheck/         # C#/.NET WinForms main app (Ctrl+Alt+U)
-|       |-- Program.cs               # Single-instance native app entrypoint
-|       |-- SpellCheckAppContext.cs  # Tray lifetime, menu, settings, busy overlay ownership
-|       |-- SpellcheckCoordinator.cs # Serialized capture/request/post-process/paste pipeline
-|       |-- OpenAiSpellcheckService.cs # Persistent HttpClient + Responses API request
-|       |-- TextPostProcessor.cs     # replacements.json + prompt-leak guard
-|       |-- LoadingOverlayForm.cs    # Bottom-center "Spell check loading..." progress bar
-|       |-- README.md                # Native run/publish/manual-test notes
-|       `-- CUTOVER.md               # Native-vs-AHK comparison and rollback notes
-|
-|-- logs/                            # AHK JSONL runtime logs; viewer.html is generated
-|-- benchmark_runs/                  # One dated folder per standalone benchmark run
-|-- fine_tune_runs/                  # One dated folder per fine-tune run
-|-- tests/                           # Pytest suites for Python tooling
-|-- docs/                            # Focused context docs - load via routing table below
-|   |-- architecture.md
-|   |-- model-config.md
-|   |-- replacements-and-logging.md
-|   |-- debugging-principles.md
-|   |-- watchlist.md
-|   `-- conventions.md
-|-- Old Spell Check Version Files/   # Legacy variants - reference only, do NOT use as templates
-|-- .githooks/                       # Pre-commit hook for AHK scriptVersion bumps
-|-- .planning/                       # Planning artifacts
-`-- CLAUDE.md                        # This file - routing table, not an encyclopedia
+|-- .github/workflows/release.yml     # Tag v*.*.* → publish + vpk pack + GitHub Release
+|-- replacements.json                 # Post-processing brand/casing replacements (copied to publish)
+|-- .archive/ahk-legacy/              # AHK + Python proxy + old version files (history only)
+|-- logs/                             # Legacy AHK logs (no longer written to)
+|-- benchmark_runs/, fine_tune_runs/  # Dated dataset/eval runs
+|-- tests/                            # Pytest suites for Python fine-tune tooling
+|-- docs/                             # Focused context docs - load via routing table below
+|-- DESIGN.md                         # WPF dashboard visual design — read before visual changes
+`-- CLAUDE.md                         # This file - routing table, not an encyclopedia
 ```
 
 ---
@@ -63,13 +61,14 @@ Universal Spell Check/
 | Intent | Read this first |
 |---|---|
 | Editing API payloads, switching models, anything about temperature/reasoning/verbosity | `docs/model-config.md` |
-| AHK file layout, processing flow, proxy recovery ladder, legacy files | `docs/architecture.md` |
-| Native app architecture, tray lifetime, hotkey, loading overlay, cutover state | `docs/architecture.md`, then `native/UniversalSpellCheck/README.md` and `native/UniversalSpellCheck/CUTOVER.md` |
-| Replacements system, `replacements.json` cache, prompt-leak guard, logging/JSONL/native log fields | `docs/replacements-and-logging.md` |
-| Debugging a bug, verification standards, AHK v2 gotchas, native runtime diagnostics | `docs/debugging-principles.md` |
-| Clipboard/hotkey issues, native loading overlay checks, cache edge cases, stale-reload checks | `docs/watchlist.md` |
-| Naming, style, error-handling patterns, comments, AHK/Python/C# conventions | `docs/conventions.md` |
-| Native future work, cutover blockers, rich-text/app-specific ideas | `NATIVE_APP_FUTURE_TODO.md` |
+| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md`, then `src/README.md` |
+| Channel separation, hotkey mapping, app-data isolation, version stamping | `src/BuildChannel.cs` (canonical source) |
+| Auto-update flow, Velopack, release pipeline | `src/UpdateService.cs`, `.github/workflows/release.yml` |
+| Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
+| Debugging a bug, verification standards, runtime diagnostics | `docs/debugging-principles.md` |
+| Clipboard/hotkey issues, loading overlay checks, cache edge cases | `docs/watchlist.md` |
+| Naming, style, error-handling patterns, comments, C#/Python conventions | `docs/conventions.md` |
+| Legacy AHK script behavior (only when reviving the fallback) | `.archive/ahk-legacy/` |
 | Native dashboard UI / WPF / visual design / colors / fonts / mockups | `DESIGN.md` (always read before any visual change) |
 
 If the task spans multiple areas, load each relevant doc before writing code.
@@ -78,14 +77,13 @@ If the task spans multiple areas, load each relevant doc before writing code.
 
 ## 2. Hard Rules (non-negotiable)
 
-1. **Bump `scriptVersion`** before any commit that modifies `Universal Spell Checker.ahk` AND before asking the user to reload/retest. Treat mismatched `script_version` in logs as proof the user is running an older AHK build.
-2. **Proxy is mandatory for AHK.** Preserve the 5s / 30s / 60s recovery ladder with a full restart between attempts 2 and 3, then `ExitApp` on exhaustion. The native app does not use the Python proxy.
-3. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
-4. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
-5. **Simplest solution first** when performance matters. Regex > object parsing for single-field extraction.
-6. **Verify every parameter** (not just model name/endpoint) when changing model configs.
-7. **Native owns `Ctrl+Alt+U`.** Do not restart the legacy AHK spell checker unless the user explicitly wants to use the fallback path, because it can conflict with the native hotkey.
-8. **Native retests require rebuild/publish/relaunch.** A code change under `native/UniversalSpellCheck` is not running until the process is stopped, rebuilt/published, and relaunched.
+1. **Channels are owned by `BuildChannel`.** Never hardcode a hotkey, mutex name, app-data folder, or display string. Add the constant to `BuildChannel.cs` and consume it.
+2. **Logs are shared, settings are isolated.** `AppPaths.LogDirectory` always returns the shared path; `AppDataDirectory` always uses `BuildChannel.AppDataFolder`. Do not split logs by channel — the unified corpus is required for fine-tune work, and per-line `channel`/`app_version` stamps are the filter.
+3. **One update flow.** Every update entry point (launch, periodic, tray, dashboard) calls `UpdateService.CheckAsync(UpdateTrigger)`. Do not add parallel update code paths.
+4. **Releases ship via tag.** A semver `v*.*.*` tag triggers `.github/workflows/release.yml`. Do not run `vpk` manually for production releases.
+5. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
+6. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
+7. **Native retests require rebuild/relaunch.** A code change is not running until the process is stopped and rebuilt. Prod owns Ctrl+Alt+U; Dev owns Ctrl+Alt+D — they can run side by side.
 
 ---
 
@@ -93,4 +91,4 @@ If the task spans multiple areas, load each relevant doc before writing code.
 
 - After changes, review diffs for bugs without waiting for the user to ask.
 - When file structure, flow, or config changes, update the relevant `docs/*.md` immediately - do not bloat this file.
-- Ask clarifying questions up front when intent or scope is ambiguous (which app path? which script variant? which model? which commit?).
+- Ask clarifying questions up front when intent or scope is ambiguous (which channel? which model? which commit?).
