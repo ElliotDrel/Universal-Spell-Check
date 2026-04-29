@@ -4,54 +4,107 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace UniversalSpellCheck;
 
 internal sealed class OpenAiSpellcheckService : IDisposable
 {
     private const string Endpoint = "https://api.openai.com/v1/responses";
+    private const string ModelsEndpoint = "https://api.openai.com/v1/models";
     public const string Model = "gpt-4.1";
+
+    // AHK-canonical instruction text — keep byte-for-byte identical to legacy.
     public const string PromptInstruction =
-        "Correct spelling and grammar in the selected text. Preserve the user's wording, line breaks, and formatting as much as possible. Return only the corrected replacement text. Do not explain the changes.";
+        "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.";
 
-    private readonly SettingsStore _settingsStore;
+    // Pre-built UTF-8 byte slabs around the JSON-escaped user text. Built once
+    // at type init so the hot path only allocates one byte[] per request.
+    private static readonly byte[] PrefixBytes = Encoding.UTF8.GetBytes(
+        "{\"model\":\"" + Model + "\"," +
+        "\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"" +
+        "instructions: " + JsonEscape(PromptInstruction) + "\\n" +
+        "text input: ");
+    private static readonly byte[] SuffixBytes = Encoding.UTF8.GetBytes(
+        "\"}]}],\"store\":true,\"text\":{\"verbosity\":\"medium\"},\"temperature\":0.3}");
+
+    private static readonly MediaTypeHeaderValue JsonMediaType =
+        new("application/json") { CharSet = "utf-8" };
+
+    private readonly CachedSettings _cachedSettings;
     private readonly DiagnosticsLogger _logger;
-    private readonly HttpClient _httpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
+    private readonly SocketsHttpHandler _handler;
+    private readonly HttpClient _httpClient;
+    private System.Threading.Timer? _rewarmTimer;
 
-    public OpenAiSpellcheckService(SettingsStore settingsStore, DiagnosticsLogger logger)
+    public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger)
     {
-        _settingsStore = settingsStore;
+        _cachedSettings = cachedSettings;
         _logger = logger;
+        _handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+            EnableMultipleHttp2Connections = true,
+            AutomaticDecompression = DecompressionMethods.All
+        };
+        _httpClient = new HttpClient(_handler, disposeHandler: true)
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+            DefaultRequestVersion = HttpVersion.Version20,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
+        };
     }
 
-    public async Task<SpellcheckResult> SpellcheckAsync(string inputText)
+    // One-time + periodic background warm-up. Forces DNS+TCP+TLS+H2 negotiation
+    // so the first hotkey doesn't pay handshake cost.
+    public void StartConnectionWarmer()
     {
-        var apiKey = _settingsStore.LoadApiKey();
+        _ = WarmConnectionAsync();
+        _rewarmTimer = new System.Threading.Timer(
+            _ => _ = WarmConnectionAsync(),
+            null,
+            TimeSpan.FromMinutes(4),
+            TimeSpan.FromMinutes(4));
+    }
+
+    private async Task WarmConnectionAsync()
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, ModelsEndpoint);
+            req.Version = HttpVersion.Version20;
+            req.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+            // Status doesn't matter — we only want the live socket in the pool.
+        }
+        catch (Exception ex)
+        {
+            _logger.Log($"connection_warm_failed error=\"{Escape(ex.Message)}\"");
+        }
+    }
+
+    public async Task<HotPathSpellcheckResult> SpellcheckAsync(string inputText, RunRecord record)
+    {
+        var apiKey = _cachedSettings.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             var payload = BuildPayload(inputText);
-            return SpellcheckResult.Fail(
-                SpellcheckErrorCodes.MissingApiKey,
-                "Missing OpenAI API key.",
-                0,
-                0,
-                null,
-                null,
-                null,
-                payload);
+            return new HotPathSpellcheckResult
+            {
+                Success = false,
+                ErrorCode = SpellcheckErrorCodes.MissingApiKey,
+                ErrorMessage = "Missing OpenAI API key.",
+                Attempts = 0,
+                RequestPayloadBytes = payload
+            };
         }
 
-        var stopwatch = Stopwatch.StartNew();
         const int maxAttempts = 2;
-        SpellcheckResult? lastFailure = null;
+        HotPathSpellcheckResult? lastFailure = null;
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var result = await TrySpellcheckOnceAsync(inputText, apiKey, stopwatch, attempt);
+            var result = await TrySpellcheckOnceAsync(inputText, apiKey, attempt, record);
             if (result.Success)
             {
                 return result;
@@ -70,97 +123,117 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             await Task.Delay(500);
         }
 
-        return lastFailure ?? SpellcheckResult.Fail(
-            SpellcheckErrorCodes.RequestFailed,
-            "OpenAI request failed.",
-            stopwatch.ElapsedMilliseconds,
-            maxAttempts,
-            null,
-            null,
-            null,
-            null);
+        return lastFailure ?? new HotPathSpellcheckResult
+        {
+            Success = false,
+            ErrorCode = SpellcheckErrorCodes.RequestFailed,
+            ErrorMessage = "OpenAI request failed.",
+            Attempts = maxAttempts
+        };
     }
 
-    private async Task<SpellcheckResult> TrySpellcheckOnceAsync(
+    private async Task<HotPathSpellcheckResult> TrySpellcheckOnceAsync(
         string inputText,
         string apiKey,
-        Stopwatch stopwatch,
-        int attempt)
+        int attempt,
+        RunRecord record)
     {
+        byte[]? payload = null;
         try
         {
-            var payload = BuildPayload(inputText);
+            payload = BuildPayload(inputText);
             using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+            var content = new ByteArrayContent(payload);
+            content.Headers.ContentType = JsonMediaType;
+            request.Content = content;
+            request.Version = HttpVersion.Version20;
+            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
 
-            using var response = await _httpClient.SendAsync(request);
-            var body = await response.Content.ReadAsStringAsync();
+            if (attempt == 1)
+            {
+                record.T_RequestSendStart = Stopwatch.GetTimestamp();
+            }
+
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead);
+
+            record.T_ResponseFirstByte = Stopwatch.GetTimestamp();
+            if (record.T_RequestSendEnd == 0)
+            {
+                record.T_RequestSendEnd = record.T_ResponseFirstByte;
+            }
+
+            var bodyBytes = await response.Content.ReadAsByteArrayAsync();
+            record.T_ResponseEnd = Stopwatch.GetTimestamp();
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = ExtractErrorMessage(body) ?? response.ReasonPhrase ?? "OpenAI request failed.";
-                return SpellcheckResult.Fail(
-                    response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                var error = ExtractErrorMessage(bodyBytes) ?? response.ReasonPhrase ?? "OpenAI request failed.";
+                return new HotPathSpellcheckResult
+                {
+                    Success = false,
+                    ErrorCode = response.StatusCode == HttpStatusCode.Unauthorized
                         ? SpellcheckErrorCodes.InvalidApiKey
                         : SpellcheckErrorCodes.RequestFailed,
-                    error,
-                    stopwatch.ElapsedMilliseconds,
-                    attempt,
-                    (int)response.StatusCode,
-                    body,
-                    null,
-                    payload);
+                    ErrorMessage = error,
+                    Attempts = attempt,
+                    StatusCode = (int)response.StatusCode,
+                    RawResponseBytes = bodyBytes,
+                    RequestPayloadBytes = payload
+                };
             }
 
-            var output = ExtractOutputText(body);
+            var (output, tokens) = ExtractOutputAndTokens(bodyBytes);
             if (string.IsNullOrWhiteSpace(output))
             {
                 _logger.Log("parse_failed empty_output_text");
-                return SpellcheckResult.Fail(
-                    SpellcheckErrorCodes.ParseFailed,
-                    "OpenAI returned no replacement text.",
-                    stopwatch.ElapsedMilliseconds,
-                    attempt,
-                    (int)response.StatusCode,
-                    body,
-                    null,
-                    payload);
+                return new HotPathSpellcheckResult
+                {
+                    Success = false,
+                    ErrorCode = SpellcheckErrorCodes.ParseFailed,
+                    ErrorMessage = "OpenAI returned no replacement text.",
+                    Attempts = attempt,
+                    StatusCode = (int)response.StatusCode,
+                    RawResponseBytes = bodyBytes,
+                    RequestPayloadBytes = payload,
+                    Tokens = tokens
+                };
             }
 
-            return SpellcheckResult.Ok(
-                output,
-                stopwatch.ElapsedMilliseconds,
-                attempt,
-                (int)response.StatusCode,
-                body,
-                output,
-                payload,
-                ExtractTokenUsage(body));
+            return new HotPathSpellcheckResult
+            {
+                Success = true,
+                OutputText = output,
+                Attempts = attempt,
+                StatusCode = (int)response.StatusCode,
+                RawResponseBytes = bodyBytes,
+                RequestPayloadBytes = payload,
+                Tokens = tokens
+            };
         }
         catch (TaskCanceledException ex)
         {
-            return SpellcheckResult.Fail(
-                SpellcheckErrorCodes.Timeout,
-                ex.Message,
-                stopwatch.ElapsedMilliseconds,
-                attempt,
-                null,
-                null,
-                null,
-                null);
+            return new HotPathSpellcheckResult
+            {
+                Success = false,
+                ErrorCode = SpellcheckErrorCodes.Timeout,
+                ErrorMessage = ex.Message,
+                Attempts = attempt,
+                RequestPayloadBytes = payload
+            };
         }
         catch (Exception ex)
         {
-            return SpellcheckResult.Fail(
-                SpellcheckErrorCodes.RequestFailed,
-                ex.Message,
-                stopwatch.ElapsedMilliseconds,
-                attempt,
-                null,
-                null,
-                null,
-                null);
+            return new HotPathSpellcheckResult
+            {
+                Success = false,
+                ErrorCode = SpellcheckErrorCodes.RequestFailed,
+                ErrorMessage = ex.Message,
+                Attempts = attempt,
+                RequestPayloadBytes = payload
+            };
         }
     }
 
@@ -176,92 +249,122 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             || statusCode >= 500;
     }
 
-    private static string BuildPayload(string inputText)
+    // Build the request payload by sandwiching the JSON-escaped user text
+    // between two pre-built UTF-8 slabs. No anonymous-object serialize, no
+    // string allocations beyond the escape step.
+    private static byte[] BuildPayload(string inputText)
     {
-        var prompt =
-            "instructions: " + PromptInstruction + "\n" +
-            "text input: " +
-            inputText;
-
-        var payload = new
-        {
-            model = Model,
-            input = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new[]
-                    {
-                        new
-                        {
-                            type = "input_text",
-                            text = prompt
-                        }
-                    }
-                }
-            },
-            store = true,
-            text = new
-            {
-                verbosity = "medium"
-            },
-            temperature = 0.3
-        };
-
-        return JsonSerializer.Serialize(payload);
+        var escaped = JsonEncodedText.Encode(inputText).EncodedUtf8Bytes;
+        var buffer = new byte[PrefixBytes.Length + escaped.Length + SuffixBytes.Length];
+        var span = buffer.AsSpan();
+        PrefixBytes.AsSpan().CopyTo(span);
+        escaped.CopyTo(span[PrefixBytes.Length..]);
+        SuffixBytes.AsSpan().CopyTo(span[(PrefixBytes.Length + escaped.Length)..]);
+        return buffer;
     }
 
-    private static string? ExtractOutputText(string responseBody)
+    // JSON-escape a constant string at type-init time. Returns the escaped
+    // representation without surrounding quotes.
+    private static string JsonEscape(string value)
     {
-        using var document = JsonDocument.Parse(responseBody);
-        var root = document.RootElement;
-
-        if (root.TryGetProperty("output_text", out var outputText)
-            && outputText.ValueKind == JsonValueKind.String)
-        {
-            return outputText.GetString();
-        }
-
-        if (!root.TryGetProperty("output", out var output)
-            || output.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        foreach (var item in output.EnumerateArray())
-        {
-            if (!item.TryGetProperty("content", out var content)
-                || content.ValueKind != JsonValueKind.Array)
-            {
-                continue;
-            }
-
-            foreach (var part in content.EnumerateArray())
-            {
-                if (part.TryGetProperty("type", out var type)
-                    && type.GetString() != "output_text")
-                {
-                    continue;
-                }
-
-                if (part.TryGetProperty("text", out var text)
-                    && text.ValueKind == JsonValueKind.String)
-                {
-                    return text.GetString();
-                }
-            }
-        }
-
-        return null;
+        return Encoding.UTF8.GetString(JsonEncodedText.Encode(value).EncodedUtf8Bytes);
     }
 
-    private static string? ExtractErrorMessage(string responseBody)
+    // Single-pass walk: extract output text and token usage in one go.
+    private static (string? output, TokenUsage tokens) ExtractOutputAndTokens(ReadOnlyMemory<byte> body)
     {
         try
         {
-            using var document = JsonDocument.Parse(responseBody);
-            if (document.RootElement.TryGetProperty("error", out var error)
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            string? output = null;
+            var tokens = new TokenUsage();
+
+            if (root.TryGetProperty("output_text", out var outputText)
+                && outputText.ValueKind == JsonValueKind.String)
+            {
+                output = outputText.GetString();
+            }
+
+            if (output is null
+                && root.TryGetProperty("output", out var outputArr)
+                && outputArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in outputArr.EnumerateArray())
+                {
+                    if (!item.TryGetProperty("content", out var content)
+                        || content.ValueKind != JsonValueKind.Array)
+                    {
+                        continue;
+                    }
+
+                    foreach (var part in content.EnumerateArray())
+                    {
+                        if (part.TryGetProperty("type", out var type)
+                            && type.GetString() != "output_text")
+                        {
+                            continue;
+                        }
+
+                        if (part.TryGetProperty("text", out var text)
+                            && text.ValueKind == JsonValueKind.String)
+                        {
+                            output = text.GetString();
+                            break;
+                        }
+                    }
+
+                    if (output is not null) break;
+                }
+            }
+
+            if (root.TryGetProperty("usage", out var usage)
+                && usage.ValueKind == JsonValueKind.Object)
+            {
+                tokens = new TokenUsage
+                {
+                    Input = ReadInt(usage, "input_tokens"),
+                    Output = ReadInt(usage, "output_tokens"),
+                    Total = ReadInt(usage, "total_tokens"),
+                    Cached = ReadNestedInt(usage, "input_tokens_details", "cached_tokens"),
+                    Reasoning = ReadNestedInt(usage, "output_tokens_details", "reasoning_tokens")
+                };
+            }
+
+            return (output, tokens);
+        }
+        catch
+        {
+            return (null, new TokenUsage());
+        }
+    }
+
+    private static int ReadInt(JsonElement parent, string name)
+    {
+        return parent.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number
+            && v.TryGetInt32(out var i)
+            ? i
+            : 0;
+    }
+
+    private static int ReadNestedInt(JsonElement parent, string nested, string name)
+    {
+        if (!parent.TryGetProperty(nested, out var details)
+            || details.ValueKind != JsonValueKind.Object)
+        {
+            // Fall back to a flat lookup in case the schema flattens.
+            return ReadInt(parent, name);
+        }
+
+        return ReadInt(details, name);
+    }
+
+    private static string? ExtractErrorMessage(ReadOnlyMemory<byte> body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var error)
                 && error.TryGetProperty("message", out var message))
             {
                 return message.GetString();
@@ -275,26 +378,14 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         return null;
     }
 
-    private static TokenUsage ExtractTokenUsage(string responseBody)
+    private static string Escape(string? value)
     {
-        return new TokenUsage
-        {
-            Input = ExtractInt(responseBody, "input_tokens"),
-            Output = ExtractInt(responseBody, "output_tokens"),
-            Total = ExtractInt(responseBody, "total_tokens"),
-            Cached = ExtractInt(responseBody, "cached_tokens"),
-            Reasoning = ExtractInt(responseBody, "reasoning_tokens")
-        };
-    }
-
-    private static int ExtractInt(string text, string propertyName)
-    {
-        var match = Regex.Match(text, $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*(\\d+)");
-        return match.Success && int.TryParse(match.Groups[1].Value, out var value) ? value : 0;
+        return (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
     public void Dispose()
     {
+        _rewarmTimer?.Dispose();
         _httpClient.Dispose();
     }
 }
@@ -308,61 +399,17 @@ internal static class SpellcheckErrorCodes
     public const string ParseFailed = "parse_failed";
 }
 
-internal sealed class SpellcheckResult
+internal sealed class HotPathSpellcheckResult
 {
     public bool Success { get; init; }
     public string? OutputText { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
-    public long DurationMs { get; init; }
     public int Attempts { get; init; }
     public int? StatusCode { get; init; }
-    public string? RawResponse { get; init; }
-    public string? RawOutputText { get; init; }
-    public string? RequestPayload { get; init; }
+    public byte[]? RawResponseBytes { get; init; }
+    public byte[]? RequestPayloadBytes { get; init; }
     public TokenUsage Tokens { get; init; } = new();
-
-    public static SpellcheckResult Ok(
-        string outputText,
-        long durationMs,
-        int attempts,
-        int? statusCode,
-        string? rawResponse,
-        string? rawOutputText,
-        string? requestPayload,
-        TokenUsage tokens) => new()
-    {
-        Success = true,
-        OutputText = outputText,
-        DurationMs = durationMs,
-        Attempts = attempts,
-        StatusCode = statusCode,
-        RawResponse = rawResponse,
-        RawOutputText = rawOutputText,
-        RequestPayload = requestPayload,
-        Tokens = tokens
-    };
-
-    public static SpellcheckResult Fail(
-        string errorCode,
-        string errorMessage,
-        long durationMs,
-        int attempts,
-        int? statusCode,
-        string? rawResponse,
-        string? rawOutputText,
-        string? requestPayload) => new()
-    {
-        Success = false,
-        ErrorCode = errorCode,
-        ErrorMessage = errorMessage,
-        DurationMs = durationMs,
-        Attempts = attempts,
-        StatusCode = statusCode,
-        RawResponse = rawResponse,
-        RawOutputText = rawOutputText,
-        RequestPayload = requestPayload
-    };
 }
 
 internal sealed class TokenUsage

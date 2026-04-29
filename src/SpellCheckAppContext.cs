@@ -12,9 +12,10 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly DiagnosticsLogger _logger;
     private readonly SpellcheckCoordinator _coordinator;
     private readonly SettingsStore _settingsStore;
+    private readonly CachedSettings _cachedSettings;
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
-    private readonly LoadingOverlayForm _loadingOverlay = new();
+    private readonly OverlayHost _overlayHost = new();
     private readonly UpdateService _updateService;
     private DashboardWindow? _dashboardWindow;
     private Forms.ToolStripMenuItem _versionItem = null!;
@@ -25,13 +26,14 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     public SpellCheckAppContext()
     {
         _logger = new DiagnosticsLogger(AppPaths.LogPath);
-        // Force the overlay handle to be created on this (UI) thread so
-        // InvokeRequired in SetBusy is meaningful and BeginInvoke works.
-        _ = _loadingOverlay.Handle;
         Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
         _settingsStore = new SettingsStore(_logger);
-        _spellcheckService = new OpenAiSpellcheckService(_settingsStore, _logger);
+        _cachedSettings = new CachedSettings(_settingsStore);
+        _spellcheckService = new OpenAiSpellcheckService(_cachedSettings, _logger);
         _postProcessor = new TextPostProcessor(_logger);
+        // Pre-warm the HTTPS connection (DNS+TCP+TLS+H2) off-thread so the
+        // first hotkey press doesn't pay handshake cost. Re-warms every 4 min.
+        _spellcheckService.StartConnectionWarmer();
         _coordinator = new SpellcheckCoordinator(
             _logger,
             _spellcheckService,
@@ -269,44 +271,20 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     private void SetBusy(bool isBusy)
     {
-        _notifyIcon.Text = TruncateTooltip(isBusy
+        try { _notifyIcon.Text = TruncateTooltip(isBusy
             ? $"{BuildChannel.TrayTooltip} — checking"
-            : BuildChannel.TrayTooltip);
+            : BuildChannel.TrayTooltip); } catch { /* tooltip is cosmetic */ }
 
-        // Marshal to the WinForms UI thread — SetBusy is invoked from the
-        // coordinator's async pipeline. ProgressBar marquee animation and
-        // window show/hide must run on the form's owning thread, otherwise
-        // the overlay can fail to paint.
-        try
-        {
-            if (_loadingOverlay.IsHandleCreated && _loadingOverlay.InvokeRequired)
-            {
-                _loadingOverlay.BeginInvoke(new Action(() => ApplyBusy(isBusy)));
-            }
-            else
-            {
-                ApplyBusy(isBusy);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Log(
-                $"loading_overlay_failed is_busy={isBusy} error_type={ex.GetType().Name} " +
-                $"error=\"{Escape(ex.Message)}\"");
-        }
-    }
-
-    private void ApplyBusy(bool isBusy)
-    {
+        // OverlayHost owns its own STA background thread, so Show/Hide just
+        // enqueue onto that thread's message loop and return immediately —
+        // never blocks the spellcheck hot path.
         if (isBusy)
         {
-            _logger.Log("loading_overlay_show");
-            _loadingOverlay.ShowNearTaskbar();
+            _overlayHost.Show();
         }
         else
         {
-            _logger.Log("loading_overlay_hide");
-            _loadingOverlay.Hide();
+            _overlayHost.Hide();
         }
     }
 
@@ -379,7 +357,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _dashboardWindow?.Close();
-        _loadingOverlay.Dispose();
+        _overlayHost.Dispose();
         _coordinator.Dispose();
         _spellcheckService.Dispose();
         _updateService.StateChanged -= OnUpdateStateChanged;

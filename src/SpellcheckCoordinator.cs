@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace UniversalSpellCheck;
 
@@ -30,319 +31,297 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
     public async Task RunAsync()
     {
+        var hotkeyTicks = Stopwatch.GetTimestamp();
         if (!await _spellcheckGate.WaitAsync(0))
         {
             _logger.Log("guard_rejected reason=already_running");
             return;
         }
 
-        var stopwatch = Stopwatch.StartNew();
-        IDataObject? originalClipboard = null;
-        var activeWindow = ActiveWindowInfo.Capture();
+        RunRecord record;
+        try
+        {
+            record = await ExecuteHotPathAsync(hotkeyTicks);
+        }
+        finally
+        {
+            _spellcheckGate.Release();
+        }
+
+        // Fire-and-forget: every non-paste-critical step (logging serialization,
+        // clipboard restore, replacements refresh, overlay hide) runs after the
+        // hot path returns so the next hotkey can fire without waiting.
+        _ = Task.Run(() => FinalizeAsync(record));
+    }
+
+    private async Task<RunRecord> ExecuteHotPathAsync(long hotkeyTicks)
+    {
+        var record = new RunRecord
+        {
+            T_HotkeyReceived = hotkeyTicks,
+            Model = OpenAiSpellcheckService.Model
+        };
 
         try
         {
-            _logger.Log(
-                "run_started " +
-                $"active_process=\"{Escape(activeWindow.ProcessName)}\" " +
-                $"window_title=\"{Escape(activeWindow.WindowTitle)}\"");
+            // Clipboard backup must come before Ctrl+C so we can restore later.
+            try { record.OriginalClipboard = Clipboard.GetDataObject(); } catch { /* best-effort */ }
+            record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
+            record.Events.Add("run_started");
+            _setBusy(true);
 
-            originalClipboard = Clipboard.GetDataObject();
-
+            // Capture
+            record.T_CaptureStart = Stopwatch.GetTimestamp();
             var capture = await ClipboardLoop.CaptureSelectionAsync();
+            record.T_CaptureEnd = Stopwatch.GetTimestamp();
+            record.CopyAttempts = capture.Attempts;
+
             if (!capture.Success)
             {
-                ClipboardLoop.RestoreClipboard(originalClipboard);
+                record.Status = RunStatus.CaptureFailed;
+                record.ErrorMessage = capture.FailureReason;
+                record.Events.Add("capture_failed");
                 _notify(
                     CaptureFailureTitle(capture.FailureReason),
                     capture.FailureReason ?? "The selected app did not copy text.");
-                _logger.Log(
-                    $"capture_failed duration_ms={stopwatch.ElapsedMilliseconds} " +
-                    $"capture_duration_ms={capture.DurationMs} " +
-                    $"copy_attempts={capture.Attempts} " +
-                    $"active_process=\"{Escape(activeWindow.ProcessName)}\" " +
-                    $"reason=\"{capture.FailureReason}\"");
-                _logger.LogData("spellcheck_detail", new
-                {
-                    status = "capture_failed",
-                    error = capture.FailureReason,
-                    model = OpenAiSpellcheckService.Model,
-                    active_app = activeWindow.WindowTitle,
-                    active_exe = activeWindow.ProcessName,
-                    paste_method = "ctrl_v",
-                    text_changed = false,
-                    input_text = "",
-                    input_chars = 0,
-                    output_text = "",
-                    output_chars = 0,
-                    raw_ai_output = "",
-                    raw_response = "",
-                    tokens = EmptyTokens(),
-                    timings = new
-                    {
-                        clipboard_ms = capture.DurationMs,
-                        payload_ms = 0,
-                        request_ms = 0,
-                        api_ms = 0,
-                        parse_ms = 0,
-                        replacements_ms = 0,
-                        prompt_guard_ms = 0,
-                        paste_ms = 0,
-                        total_ms = stopwatch.ElapsedMilliseconds
-                    },
-                    replacements = EmptyReplacements(),
-                    prompt_leak = EmptyPromptLeak(),
-                    events = new[] { "capture_failed" }
-                });
-                return;
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
             }
 
-            _setBusy(true);
-            _logger.Log(
-                "capture_succeeded " +
-                $"input_len={capture.Text!.Length} " +
-                $"capture_duration_ms={capture.DurationMs} " +
-                $"copy_attempts={capture.Attempts} " +
-                $"active_process=\"{Escape(activeWindow.ProcessName)}\"");
+            record.InputText = capture.Text;
+            record.Events.Add("capture_succeeded");
 
-            var spellcheck = await _spellcheckService.SpellcheckAsync(capture.Text!);
-            if (!spellcheck.Success)
+            // Spellcheck request — timings filled inside the service via record.
+            var spell = await _spellcheckService.SpellcheckAsync(capture.Text!, record);
+            record.RequestAttempts = spell.Attempts;
+            record.StatusCode = spell.StatusCode;
+            record.RawResponseBytes = spell.RawResponseBytes;
+            record.RequestPayloadBytes = spell.RequestPayloadBytes;
+            record.TokenUsage = spell.Tokens;
+            record.RawAiOutput = spell.OutputText;
+
+            if (!spell.Success)
             {
-                ClipboardLoop.RestoreClipboard(originalClipboard);
-                if (spellcheck.ErrorCode == SpellcheckErrorCodes.MissingApiKey)
+                record.Status = RunStatus.RequestFailed;
+                record.ErrorCode = spell.ErrorCode;
+                record.ErrorMessage = spell.ErrorMessage;
+                record.Events.Add("request_failed");
+                if (spell.ErrorCode == SpellcheckErrorCodes.MissingApiKey)
                 {
                     _notify("API key needed", "Enter your OpenAI API key in Settings.");
                     _showSettings();
                 }
                 else
                 {
-                    _notify("Spell check failed", spellcheck.ErrorMessage ?? "The request failed.");
+                    _notify("Spell check failed", spell.ErrorMessage ?? "The request failed.");
                 }
-
-                _logger.Log(
-                    "request_failed " +
-                    $"input_len={capture.Text!.Length} " +
-                    $"duration_ms={stopwatch.ElapsedMilliseconds} " +
-                    $"request_duration_ms={spellcheck.DurationMs} " +
-                    $"request_attempts={spellcheck.Attempts} " +
-                    $"status_code={spellcheck.StatusCode ?? 0} " +
-                    $"active_process=\"{Escape(activeWindow.ProcessName)}\" " +
-                    $"error_code={spellcheck.ErrorCode} " +
-                    $"error=\"{Escape(spellcheck.ErrorMessage)}\"");
-                _logger.LogData("spellcheck_detail", new
-                {
-                    status = "request_failed",
-                    error = spellcheck.ErrorMessage,
-                    error_code = spellcheck.ErrorCode,
-                    status_code = spellcheck.StatusCode,
-                    model = OpenAiSpellcheckService.Model,
-                    active_app = activeWindow.WindowTitle,
-                    active_exe = activeWindow.ProcessName,
-                    paste_method = "ctrl_v",
-                    text_changed = false,
-                    input_text = capture.Text,
-                    input_chars = capture.Text!.Length,
-                    output_text = "",
-                    output_chars = 0,
-                    raw_ai_output = spellcheck.RawOutputText ?? "",
-                    raw_response = spellcheck.RawResponse ?? "",
-                    request_payload = spellcheck.RequestPayload ?? "",
-                    tokens = spellcheck.Tokens,
-                    timings = new
-                    {
-                        clipboard_ms = capture.DurationMs,
-                        payload_ms = 0,
-                        request_ms = spellcheck.DurationMs,
-                        api_ms = spellcheck.DurationMs,
-                        parse_ms = 0,
-                        replacements_ms = 0,
-                        prompt_guard_ms = 0,
-                        paste_ms = 0,
-                        total_ms = stopwatch.ElapsedMilliseconds
-                    },
-                    replacements = EmptyReplacements(),
-                    prompt_leak = EmptyPromptLeak(),
-                    events = new[] { "capture_succeeded", "request_failed" }
-                });
-                return;
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
             }
 
-            var postProcessStarted = Environment.TickCount64;
-            var postProcess = _postProcessor.Process(
-                spellcheck.OutputText!,
-                OpenAiSpellcheckService.PromptInstruction);
-            var postProcessDuration = Environment.TickCount64 - postProcessStarted;
-            var replacement = postProcess.Text;
-            var promptGuardMs = postProcess.PromptLeak.Triggered ? postProcessDuration : 0;
-            var replacementsMs = Math.Max(0, postProcessDuration - promptGuardMs);
+            record.Events.Add("request_succeeded");
+
+            // Post-process (replacements + prompt-leak guard)
+            record.T_PostProcessStart = Stopwatch.GetTimestamp();
+            var pp = _postProcessor.Process(spell.OutputText!);
+            record.T_PostProcessEnd = Stopwatch.GetTimestamp();
+            if (pp.PromptLeak.Triggered)
+            {
+                record.T_PromptGuardStart = record.T_PostProcessStart;
+                record.T_PromptGuardEnd = record.T_PostProcessEnd;
+            }
+            record.OutputText = pp.Text;
+            record.ReplacementsApplied = pp.ReplacementsApplied;
+            record.UrlsProtected = pp.UrlsProtected;
+            record.PromptLeak = pp.PromptLeak;
+            record.Events.Add("postprocess_applied");
+
+            // Paste-target check
+            record.T_PasteTargetCheck = Stopwatch.GetTimestamp();
             var pasteTarget = ActiveWindowInfo.Capture();
-            if (!activeWindow.HasSameProcess(pasteTarget))
+            record.ActiveWindowAtPaste = pasteTarget;
+
+            if (!record.ActiveWindowAtStart.HasSameProcess(pasteTarget))
             {
-                ClipboardLoop.RestoreClipboard(originalClipboard);
-                var reason = "Target app changed before paste.";
-                _notify("Paste failed", $"{activeWindow.ProcessName} lost focus before the corrected text could be pasted.");
-                _logger.Log(
-                    "paste_failed " +
-                    $"reason=\"{Escape(reason)}\" " +
-                    $"input_len={capture.Text!.Length} " +
-                    $"output_len={replacement.Length} " +
-                    $"duration_ms={stopwatch.ElapsedMilliseconds} " +
-                    $"capture_duration_ms={capture.DurationMs} " +
-                    $"request_duration_ms={spellcheck.DurationMs} " +
-                    $"postprocess_duration_ms={postProcessDuration} " +
-                    $"expected_process=\"{Escape(activeWindow.ProcessName)}\" " +
-                    $"expected_window=\"{Escape(activeWindow.WindowTitle)}\" " +
-                    $"actual_process=\"{Escape(pasteTarget.ProcessName)}\" " +
-                    $"actual_window=\"{Escape(pasteTarget.WindowTitle)}\"");
-                _logger.LogData("spellcheck_detail", new
-                {
-                    status = "paste_failed",
-                    error = reason,
-                    model = OpenAiSpellcheckService.Model,
-                    active_app = activeWindow.WindowTitle,
-                    active_exe = activeWindow.ProcessName,
-                    paste_target_app = pasteTarget.WindowTitle,
-                    paste_target_exe = pasteTarget.ProcessName,
-                    paste_method = "ctrl_v",
-                    text_changed = false,
-                    input_text = capture.Text,
-                    input_chars = capture.Text!.Length,
-                    output_text = replacement,
-                    output_chars = replacement.Length,
-                    raw_ai_output = spellcheck.RawOutputText ?? "",
-                    raw_response = spellcheck.RawResponse ?? "",
-                    request_payload = spellcheck.RequestPayload ?? "",
-                    tokens = spellcheck.Tokens,
-                    timings = new
-                    {
-                        clipboard_ms = capture.DurationMs,
-                        payload_ms = 0,
-                        request_ms = spellcheck.DurationMs,
-                        api_ms = spellcheck.DurationMs,
-                        parse_ms = 0,
-                        replacements_ms = replacementsMs,
-                        prompt_guard_ms = promptGuardMs,
-                        paste_ms = 0,
-                        total_ms = stopwatch.ElapsedMilliseconds
-                    },
-                    replacements = new
-                    {
-                        count = postProcess.ReplacementsApplied.Count,
-                        applied = postProcess.ReplacementsApplied,
-                        urls_protected = postProcess.UrlsProtected
-                    },
-                    prompt_leak = new
-                    {
-                        triggered = postProcess.PromptLeak.Triggered,
-                        occurrences = postProcess.PromptLeak.Occurrences,
-                        text_input_removed = postProcess.PromptLeak.TextInputRemoved,
-                        removed_chars = postProcess.PromptLeak.RemovedChars,
-                        before_length = postProcess.PromptLeak.BeforeLength,
-                        after_length = postProcess.PromptLeak.AfterLength
-                    },
-                    events = new[] { "capture_succeeded", "request_succeeded", "postprocess_applied", "paste_failed" }
-                });
-                return;
+                record.Status = RunStatus.PasteFailed;
+                record.ErrorMessage = "Target app changed before paste.";
+                record.Events.Add("paste_failed");
+                _notify(
+                    "Paste failed",
+                    $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
             }
 
-            var replace = await ClipboardLoop.ReplaceSelectionAsync(replacement);
-            if (!replace.Success)
+            // Paste — set clipboard + Ctrl+V only. Restore is moved to finalize.
+            record.T_PasteIssued = Stopwatch.GetTimestamp();
+            try
             {
-                ClipboardLoop.RestoreClipboard(originalClipboard);
-                _notify("Paste failed", replace.FailureReason ?? "The corrected text could not be pasted.");
-                _logger.Log(
-                    "paste_failed " +
-                    $"reason=\"{Escape(replace.FailureReason)}\" " +
-                    $"input_len={capture.Text!.Length} " +
-                    $"output_len={replacement.Length} " +
-                    $"duration_ms={stopwatch.ElapsedMilliseconds} " +
-                    $"capture_duration_ms={capture.DurationMs} " +
-                    $"request_duration_ms={spellcheck.DurationMs} " +
-                    $"postprocess_duration_ms={postProcessDuration} " +
-                    $"paste_duration_ms={replace.DurationMs} " +
-                    $"active_process=\"{Escape(activeWindow.ProcessName)}\"");
-                return;
+                Clipboard.SetText(pp.Text, TextDataFormat.UnicodeText);
+                await Task.Delay(50);
+                SendKeys.SendWait("^v");
             }
-
-            _logger.Log(
-                "replace_succeeded " +
-                $"input_len={capture.Text!.Length} " +
-                $"output_len={replacement.Length} " +
-                $"duration_ms={stopwatch.ElapsedMilliseconds} " +
-                $"capture_duration_ms={capture.DurationMs} " +
-                $"request_duration_ms={spellcheck.DurationMs} " +
-                $"postprocess_duration_ms={postProcessDuration} " +
-                $"paste_duration_ms={replace.DurationMs} " +
-                $"copy_attempts={capture.Attempts} " +
-                $"request_attempts={spellcheck.Attempts} " +
-                $"replacements_count={postProcess.ReplacementsApplied.Count} " +
-                $"urls_protected={postProcess.UrlsProtected} " +
-                $"prompt_leak_triggered={postProcess.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
-                $"prompt_leak_removed_chars={postProcess.PromptLeak.RemovedChars} " +
-                $"active_process=\"{Escape(activeWindow.ProcessName)}\"");
-            _logger.LogData("spellcheck_detail", new
+            catch (Exception ex)
             {
-                status = "success",
-                error = "",
-                model = OpenAiSpellcheckService.Model,
-                active_app = activeWindow.WindowTitle,
-                active_exe = activeWindow.ProcessName,
-                paste_target_app = pasteTarget.WindowTitle,
-                paste_target_exe = pasteTarget.ProcessName,
-                paste_method = "ctrl_v",
-                text_changed = !string.Equals(capture.Text, replacement, StringComparison.Ordinal),
-                input_text = capture.Text,
-                input_chars = capture.Text!.Length,
-                output_text = replacement,
-                output_chars = replacement.Length,
-                raw_ai_output = spellcheck.RawOutputText ?? "",
-                raw_response = spellcheck.RawResponse ?? "",
-                request_payload = spellcheck.RequestPayload ?? "",
-                tokens = spellcheck.Tokens,
-                timings = new
-                {
-                    clipboard_ms = capture.DurationMs,
-                    payload_ms = 0,
-                    request_ms = spellcheck.DurationMs,
-                    api_ms = spellcheck.DurationMs,
-                    parse_ms = 0,
-                    replacements_ms = replacementsMs,
-                    prompt_guard_ms = promptGuardMs,
-                    paste_ms = replace.DurationMs,
-                    total_ms = stopwatch.ElapsedMilliseconds
-                },
-                replacements = new
-                {
-                    count = postProcess.ReplacementsApplied.Count,
-                    applied = postProcess.ReplacementsApplied,
-                    urls_protected = postProcess.UrlsProtected
-                },
-                prompt_leak = new
-                {
-                    triggered = postProcess.PromptLeak.Triggered,
-                    occurrences = postProcess.PromptLeak.Occurrences,
-                    text_input_removed = postProcess.PromptLeak.TextInputRemoved,
-                    removed_chars = postProcess.PromptLeak.RemovedChars,
-                    before_length = postProcess.PromptLeak.BeforeLength,
-                    after_length = postProcess.PromptLeak.AfterLength
-                },
-                events = new[] { "capture_succeeded", "request_succeeded", "postprocess_applied", "replace_succeeded" }
-            });
+                record.Status = RunStatus.PasteFailed;
+                record.ErrorMessage = ex.Message;
+                record.Events.Add("paste_failed");
+                _notify("Paste failed", "The corrected text could not be pasted.");
+                record.T_PasteAck = Stopwatch.GetTimestamp();
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
+            record.T_PasteAck = Stopwatch.GetTimestamp();
+
+            record.TextChanged = !string.Equals(capture.Text, pp.Text, StringComparison.Ordinal);
+            record.Status = RunStatus.Success;
+            record.Events.Add("replace_succeeded");
+            record.T_HotPathReturned = Stopwatch.GetTimestamp();
+            return record;
         }
         catch (Exception ex)
         {
-            ClipboardLoop.RestoreClipboard(originalClipboard);
-            _notify("Spell check failed", ex.Message);
-            _logger.Log(
-                $"run_failed duration_ms={stopwatch.ElapsedMilliseconds} " +
-                $"active_process=\"{Escape(activeWindow.ProcessName)}\" " +
-                $"error_type={ex.GetType().Name} error=\"{Escape(ex.Message)}\"");
+            record.Status = RunStatus.RunFailed;
+            record.ErrorCode = ex.GetType().Name;
+            record.ErrorMessage = ex.Message;
+            record.Events.Add("run_failed");
+            try { _notify("Spell check failed", ex.Message); } catch { /* best-effort */ }
+            record.T_HotPathReturned = Stopwatch.GetTimestamp();
+            return record;
         }
-        finally
+    }
+
+    private void FinalizeAsync(RunRecord r)
+    {
+        try
         {
             _setBusy(false);
-            _spellcheckGate.Release();
+
+            // Single point of clipboard restore — covers every status path.
+            ClipboardLoop.RestoreClipboard(r.OriginalClipboard);
+
+            var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
+            var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
+            var apiMs = requestMs;
+            var ppMs = TicksToMs(r.T_PostProcessStart, r.T_PostProcessEnd);
+            var promptGuardMs = r.PromptLeak.Triggered ? ppMs : 0;
+            var replacementsMs = Math.Max(0, ppMs - promptGuardMs);
+            var pasteMs = TicksToMs(r.T_PasteIssued, r.T_PasteAck);
+            var totalMs = TicksToMs(r.T_HotkeyReceived, r.T_HotPathReturned);
+
+            var rawResponse = r.RawResponseBytes is null
+                ? ""
+                : Encoding.UTF8.GetString(r.RawResponseBytes);
+            var requestPayload = r.RequestPayloadBytes is null
+                ? ""
+                : Encoding.UTF8.GetString(r.RequestPayloadBytes);
+
+            var statusName = r.Status switch
+            {
+                RunStatus.Success => "success",
+                RunStatus.CaptureFailed => "capture_failed",
+                RunStatus.RequestFailed => "request_failed",
+                RunStatus.PasteFailed => "paste_failed",
+                _ => "run_failed"
+            };
+
+            // Human-readable line
+            _logger.Log(
+                $"run_completed status={statusName} " +
+                $"input_len={r.InputText?.Length ?? 0} " +
+                $"output_len={r.OutputText?.Length ?? 0} " +
+                $"total_ms={totalMs} " +
+                $"clipboard_ms={clipboardMs} " +
+                $"request_ms={requestMs} " +
+                $"postprocess_ms={ppMs} " +
+                $"paste_ms={pasteMs} " +
+                $"copy_attempts={r.CopyAttempts} " +
+                $"request_attempts={r.RequestAttempts} " +
+                $"replacements_count={r.ReplacementsApplied.Count} " +
+                $"urls_protected={r.UrlsProtected} " +
+                $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
+                $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
+                $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
+                (r.ErrorMessage is null ? "" : $"error=\"{Escape(r.ErrorMessage)}\" ") +
+                (r.ErrorCode is null ? "" : $"error_code={r.ErrorCode}"));
+
+            _logger.LogData("spellcheck_detail", new
+            {
+                status = statusName,
+                error = r.ErrorMessage ?? "",
+                error_code = r.ErrorCode,
+                status_code = r.StatusCode,
+                model = r.Model,
+                active_app = r.ActiveWindowAtStart.WindowTitle,
+                active_exe = r.ActiveWindowAtStart.ProcessName,
+                paste_target_app = r.ActiveWindowAtPaste?.WindowTitle ?? "",
+                paste_target_exe = r.ActiveWindowAtPaste?.ProcessName ?? "",
+                paste_method = r.PasteMethod,
+                text_changed = r.TextChanged,
+                input_text = r.InputText ?? "",
+                input_chars = r.InputText?.Length ?? 0,
+                output_text = r.OutputText ?? "",
+                output_chars = r.OutputText?.Length ?? 0,
+                raw_ai_output = r.RawAiOutput ?? "",
+                raw_response = rawResponse,
+                request_payload = requestPayload,
+                tokens = new
+                {
+                    input = r.TokenUsage.Input,
+                    output = r.TokenUsage.Output,
+                    total = r.TokenUsage.Total,
+                    cached = r.TokenUsage.Cached,
+                    reasoning = r.TokenUsage.Reasoning
+                },
+                timings = new
+                {
+                    clipboard_ms = clipboardMs,
+                    payload_ms = 0,
+                    request_ms = requestMs,
+                    api_ms = apiMs,
+                    parse_ms = 0,
+                    replacements_ms = replacementsMs,
+                    prompt_guard_ms = promptGuardMs,
+                    paste_ms = pasteMs,
+                    total_ms = totalMs
+                },
+                replacements = new
+                {
+                    count = r.ReplacementsApplied.Count,
+                    applied = r.ReplacementsApplied,
+                    urls_protected = r.UrlsProtected
+                },
+                prompt_leak = new
+                {
+                    triggered = r.PromptLeak.Triggered,
+                    occurrences = r.PromptLeak.Occurrences,
+                    text_input_removed = r.PromptLeak.TextInputRemoved,
+                    removed_chars = r.PromptLeak.RemovedChars,
+                    before_length = r.PromptLeak.BeforeLength,
+                    after_length = r.PromptLeak.AfterLength
+                },
+                events = r.Events.ToArray()
+            });
+
+            // Mtime/size-aware refresh — no-op in steady state.
+            _postProcessor.RefreshIfChanged();
         }
+        catch (Exception ex)
+        {
+            try
+            {
+                _logger.Log(
+                    $"finalize_failed error_type={ex.GetType().Name} " +
+                    $"error=\"{Escape(ex.Message)}\"");
+            }
+            catch { /* swallow — finalize must never affect the next hotkey */ }
+        }
+    }
+
+    private static long TicksToMs(long start, long end)
+    {
+        if (start == 0 || end == 0 || end <= start) return 0;
+        return (long)((end - start) * 1000.0 / Stopwatch.Frequency);
     }
 
     public void Dispose()
@@ -361,30 +340,4 @@ internal sealed class SpellcheckCoordinator : IDisposable
             ? "No selected text"
             : "Copy failed";
     }
-
-    private static object EmptyTokens() => new
-    {
-        input = 0,
-        output = 0,
-        total = 0,
-        cached = 0,
-        reasoning = 0
-    };
-
-    private static object EmptyReplacements() => new
-    {
-        count = 0,
-        applied = Array.Empty<string>(),
-        urls_protected = 0
-    };
-
-    private static object EmptyPromptLeak() => new
-    {
-        triggered = false,
-        occurrences = 0,
-        text_input_removed = false,
-        removed_chars = 0,
-        before_length = 0,
-        after_length = 0
-    };
 }

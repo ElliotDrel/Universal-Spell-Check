@@ -6,97 +6,104 @@ namespace UniversalSpellCheck;
 internal sealed class TextPostProcessor
 {
     private static readonly Regex UrlRegex = new(@"https?://\S+", RegexOptions.Compiled);
+    private static readonly string LeakedPromptLine =
+        "instructions: " + OpenAiSpellcheckService.PromptInstruction;
 
     private readonly DiagnosticsLogger _logger;
-    private readonly List<ReplacementPair> _pairs = [];
+    private readonly object _reloadLock = new();
+    private volatile IReadOnlyList<ReplacementPair> _pairs = Array.Empty<ReplacementPair>();
     private DateTime _lastModifiedUtc = DateTime.MinValue;
     private long _lastFileSize = -1;
 
     public TextPostProcessor(DiagnosticsLogger logger)
     {
         _logger = logger;
-        ReloadIfChanged();
+        RefreshIfChanged();
     }
 
-    public PostProcessResult Process(string outputText, string promptInstruction)
+    // Hot-path: no file I/O, just snapshot + apply.
+    public PostProcessResult Process(string outputText)
     {
-        var replacementsReloaded = ReloadIfChanged();
-        var replacements = ApplyReplacements(outputText);
-        var promptGuard = StripPromptLeak(replacements.Text, promptInstruction);
+        var pairs = _pairs;
+        var replacements = ApplyReplacements(outputText, pairs);
+        var promptGuard = StripPromptLeak(replacements.Text);
 
         return new PostProcessResult
         {
             Text = promptGuard.Text,
-            ReplacementsReloaded = replacementsReloaded,
             ReplacementsApplied = replacements.Applied,
             UrlsProtected = replacements.UrlsProtected,
             PromptLeak = promptGuard
         };
     }
 
-    private bool ReloadIfChanged()
+    // Off-hot-path refresh: called from FinalizeAsync after the paste lands.
+    public bool RefreshIfChanged()
     {
-        try
+        lock (_reloadLock)
         {
-            if (!File.Exists(AppPaths.ReplacementsPath))
+            try
             {
-                if (_pairs.Count > 0 || _lastFileSize != -1)
+                if (!File.Exists(AppPaths.ReplacementsPath))
                 {
-                    _pairs.Clear();
-                    _lastModifiedUtc = DateTime.MinValue;
-                    _lastFileSize = -1;
-                    _logger.Log("replacements_missing cache_cleared=true");
+                    if (_pairs.Count > 0 || _lastFileSize != -1)
+                    {
+                        _pairs = Array.Empty<ReplacementPair>();
+                        _lastModifiedUtc = DateTime.MinValue;
+                        _lastFileSize = -1;
+                        _logger.Log("replacements_missing cache_cleared=true");
+                    }
+
+                    return false;
                 }
 
-                return false;
-            }
-
-            var info = new FileInfo(AppPaths.ReplacementsPath);
-            if (info.LastWriteTimeUtc == _lastModifiedUtc && info.Length == _lastFileSize)
-            {
-                return false;
-            }
-
-            var rawJson = File.ReadAllText(AppPaths.ReplacementsPath);
-            if (rawJson.Length > 0 && rawJson[0] == '\uFEFF')
-            {
-                rawJson = rawJson[1..];
-            }
-
-            var parsed = JsonSerializer.Deserialize<Dictionary<string, string[]>>(rawJson)
-                ?? new Dictionary<string, string[]>();
-
-            var nextPairs = new List<ReplacementPair>();
-            foreach (var (canonical, variants) in parsed)
-            {
-                foreach (var variant in variants)
+                var info = new FileInfo(AppPaths.ReplacementsPath);
+                if (info.LastWriteTimeUtc == _lastModifiedUtc && info.Length == _lastFileSize)
                 {
-                    if (!string.IsNullOrEmpty(variant)
-                        && !string.Equals(variant, canonical, StringComparison.Ordinal))
+                    return false;
+                }
+
+                var rawJson = File.ReadAllText(AppPaths.ReplacementsPath);
+                if (rawJson.Length > 0 && rawJson[0] == '﻿')
+                {
+                    rawJson = rawJson[1..];
+                }
+
+                var parsed = JsonSerializer.Deserialize<Dictionary<string, string[]>>(rawJson)
+                    ?? new Dictionary<string, string[]>();
+
+                var nextPairs = new List<ReplacementPair>();
+                foreach (var (canonical, variants) in parsed)
+                {
+                    foreach (var variant in variants)
                     {
-                        nextPairs.Add(new ReplacementPair(variant, canonical));
+                        if (!string.IsNullOrEmpty(variant)
+                            && !string.Equals(variant, canonical, StringComparison.Ordinal))
+                        {
+                            nextPairs.Add(new ReplacementPair(variant, canonical));
+                        }
                     }
                 }
+
+                nextPairs.Sort((a, b) => b.Variant.Length.CompareTo(a.Variant.Length));
+
+                // Atomic swap so a concurrent Process() either sees the old or new list.
+                _pairs = nextPairs;
+                _lastModifiedUtc = info.LastWriteTimeUtc;
+                _lastFileSize = info.Length;
+
+                _logger.Log($"replacements_reloaded count={nextPairs.Count} path=\"{Escape(AppPaths.ReplacementsPath)}\"");
+                return true;
             }
-
-            nextPairs.Sort((a, b) => b.Variant.Length.CompareTo(a.Variant.Length));
-
-            _pairs.Clear();
-            _pairs.AddRange(nextPairs);
-            _lastModifiedUtc = info.LastWriteTimeUtc;
-            _lastFileSize = info.Length;
-
-            _logger.Log($"replacements_reloaded count={_pairs.Count} path=\"{Escape(AppPaths.ReplacementsPath)}\"");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.Log($"replacements_reload_failed error=\"{Escape(ex.Message)}\"");
-            return false;
+            catch (Exception ex)
+            {
+                _logger.Log($"replacements_reload_failed error=\"{Escape(ex.Message)}\"");
+                return false;
+            }
         }
     }
 
-    private ReplacementResult ApplyReplacements(string text)
+    private static ReplacementResult ApplyReplacements(string text, IReadOnlyList<ReplacementPair> pairs)
     {
         var urls = new List<string>();
         text = UrlRegex.Replace(text, match =>
@@ -106,7 +113,7 @@ internal sealed class TextPostProcessor
         });
 
         var applied = new List<string>();
-        foreach (var pair in _pairs)
+        foreach (var pair in pairs)
         {
             if (!text.Contains(pair.Variant, StringComparison.Ordinal))
             {
@@ -129,22 +136,16 @@ internal sealed class TextPostProcessor
         return new ReplacementResult(text, applied, urls.Count);
     }
 
-    private static PromptLeakResult StripPromptLeak(string text, string promptInstruction)
+    private static PromptLeakResult StripPromptLeak(string text)
     {
         var beforeLength = text.Length;
-        if (string.IsNullOrEmpty(promptInstruction))
+        if (!text.Contains(LeakedPromptLine, StringComparison.Ordinal))
         {
             return PromptLeakResult.NotTriggered(text);
         }
 
-        var leakedPromptLine = $"instructions: {promptInstruction}";
-        if (!text.Contains(leakedPromptLine, StringComparison.Ordinal))
-        {
-            return PromptLeakResult.NotTriggered(text);
-        }
-
-        var occurrences = CountOccurrences(text, leakedPromptLine);
-        var textAfter = text.Replace(leakedPromptLine, "", StringComparison.Ordinal).TrimStart();
+        var occurrences = CountOccurrences(text, LeakedPromptLine);
+        var textAfter = text.Replace(LeakedPromptLine, "", StringComparison.Ordinal).TrimStart();
         var textInputRemoved = false;
 
         const string textInputLabel = "text input:";
@@ -191,7 +192,6 @@ internal sealed class TextPostProcessor
 internal sealed class PostProcessResult
 {
     public string Text { get; init; } = "";
-    public bool ReplacementsReloaded { get; init; }
     public List<string> ReplacementsApplied { get; init; } = [];
     public int UrlsProtected { get; init; }
     public PromptLeakResult PromptLeak { get; init; } = PromptLeakResult.NotTriggered("");

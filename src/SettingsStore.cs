@@ -8,6 +8,8 @@ internal sealed class SettingsStore
 {
     private readonly DiagnosticsLogger _logger;
 
+    public event Action? ApiKeyChanged;
+
     public SettingsStore(DiagnosticsLogger logger)
     {
         _logger = logger;
@@ -69,6 +71,7 @@ internal sealed class SettingsStore
         var plaintext = Encoding.UTF8.GetBytes(apiKey.Trim());
         var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
         File.WriteAllBytes(AppPaths.ApiKeyPath, encrypted);
+        ApiKeyChanged?.Invoke();
     }
 
     public bool HasApiKey()
