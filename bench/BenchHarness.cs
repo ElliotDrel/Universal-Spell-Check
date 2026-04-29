@@ -29,11 +29,12 @@ internal sealed class InputResult
 
 internal sealed class BenchHarness
 {
-    private readonly BenchTargetForm _form;
+    private readonly BenchTargetForm? _form;
     private readonly SpellcheckCoordinator _coordinator;
     private readonly DiagnosticsLogger _logger;
     private readonly int _runs;
     private readonly int _warmup;
+    private readonly bool _e2eMode;
 
     // RunRecord captured by the coordinator's logger sink. The coordinator only
     // exposes timings via its FinalizeAsync log; the cleanest seam is to wrap
@@ -43,17 +44,19 @@ internal sealed class BenchHarness
     private long _t1Ticks;
 
     public BenchHarness(
-        BenchTargetForm form,
+        BenchTargetForm? form,
         SpellcheckCoordinator coordinator,
         DiagnosticsLogger logger,
         int runs,
-        int warmup)
+        int warmup,
+        bool e2eMode)
     {
         _form = form;
         _coordinator = coordinator;
         _logger = logger;
         _runs = runs;
         _warmup = warmup;
+        _e2eMode = e2eMode;
     }
 
     /// <summary>Set by Program.cs after each Coordinator.RunAsync completes.</summary>
@@ -95,10 +98,17 @@ internal sealed class BenchHarness
 
     private async Task<TrialResult> RunOneTrialAsync(string name, string text, int trialIndex)
     {
+        if (_e2eMode) return await E2eTrialAsync(name, text, trialIndex);
+        return await HeadlessTrialAsync(name, text, trialIndex);
+    }
+
+    private async Task<TrialResult> E2eTrialAsync(string name, string text, int trialIndex)
+    {
         _lastTrialTimings = null;
         _pasteExpected = false;
         _t1Ticks = 0;
         var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var form = _form ?? throw new InvalidOperationException("E2E mode requires a bench target form.");
 
         // Subscribe ONCE per trial to the textbox change event.
         void OnChanged(object? _, EventArgs __)
@@ -108,11 +118,11 @@ internal sealed class BenchHarness
             ready.TrySetResult(true);
         }
 
-        _form.TargetTextChanged += OnChanged;
+        form.TargetTextChanged += OnChanged;
         try
         {
             // Load text + focus. Pump messages so focus actually lands.
-            _form.Invoke(() => _form.LoadAndSelect(text));
+            form.Invoke(() => form.LoadAndSelect(text));
             Application.DoEvents();
             await Task.Delay(50);  // give Windows a tick to settle focus
 
@@ -175,8 +185,58 @@ internal sealed class BenchHarness
         }
         finally
         {
-            _form.TargetTextChanged -= OnChanged;
+            form.TargetTextChanged -= OnChanged;
         }
+    }
+
+    private async Task<TrialResult> HeadlessTrialAsync(string name, string text, int trialIndex)
+    {
+        _lastTrialTimings = null;
+        await _coordinator.RunHeadlessAsync(text);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (_lastTrialTimings is null && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        if (_lastTrialTimings is null)
+        {
+            return new TrialResult
+            {
+                InputName = name,
+                TrialIndex = trialIndex,
+                Success = false,
+                TotalMs = 0,
+                CoordinatorTotalMs = 0,
+                CaptureMs = 0,
+                RequestMs = 0,
+                PostProcessMs = 0,
+                PasteMs = 0,
+                InputTokens = 0,
+                OutputTokens = 0,
+                CachedTokens = 0,
+                Error = "Timed out waiting for headless timings.",
+            };
+        }
+
+        var t = _lastTrialTimings;
+        return new TrialResult
+        {
+            InputName = name,
+            TrialIndex = trialIndex,
+            Success = t.Status == "success",
+            TotalMs = t.TotalMs,
+            CoordinatorTotalMs = t.TotalMs,
+            CaptureMs = 0,
+            RequestMs = t.RequestMs,
+            PostProcessMs = t.ReplacementsMs + t.PromptGuardMs,
+            PasteMs = 0,
+            InputTokens = t.InputTokens,
+            OutputTokens = t.OutputTokens,
+            CachedTokens = t.CachedTokens,
+            Error = t.ErrorMessage,
+        };
     }
 
     private static long TicksToMs(long start, long end)

@@ -54,6 +54,79 @@ internal sealed class SpellcheckCoordinator : IDisposable
         _ = Task.Run(() => FinalizeAsync(record));
     }
 
+    public async Task<string?> RunHeadlessAsync(string inputText)
+    {
+        if (!await _spellcheckGate.WaitAsync(0)) return null;
+
+        RunRecord record;
+        try
+        {
+            record = await ExecuteHeadlessAsync(inputText);
+        }
+        finally
+        {
+            _spellcheckGate.Release();
+        }
+
+        _ = Task.Run(() => FinalizeAsync(record));
+        return record.OutputText;
+    }
+
+    private async Task<RunRecord> ExecuteHeadlessAsync(string inputText)
+    {
+        var record = new RunRecord
+        {
+            T_HotkeyReceived = Stopwatch.GetTimestamp(),
+            Model = _spellcheckService.ModelName
+        };
+
+        try
+        {
+            _setBusy(true);
+            record.InputText = inputText;
+
+            var spell = await _spellcheckService.SpellcheckAsync(inputText, record);
+            record.RequestAttempts = spell.Attempts;
+            record.StatusCode = spell.StatusCode;
+            record.RawResponseBytes = spell.RawResponseBytes;
+            record.RequestPayloadBytes = spell.RequestPayloadBytes;
+            record.TokenUsage = spell.Tokens;
+            record.RawAiOutput = spell.OutputText;
+
+            if (!spell.Success)
+            {
+                record.Status = RunStatus.RequestFailed;
+                record.ErrorCode = spell.ErrorCode;
+                record.ErrorMessage = spell.ErrorMessage;
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
+
+            record.T_PostProcessStart = Stopwatch.GetTimestamp();
+            var pp = _postProcessor.Process(spell.OutputText!);
+            record.T_PostProcessEnd = Stopwatch.GetTimestamp();
+            if (pp.PromptLeak.Triggered)
+            {
+                record.T_PromptGuardStart = record.T_PostProcessStart;
+                record.T_PromptGuardEnd = record.T_PostProcessEnd;
+            }
+            record.OutputText = pp.Text;
+            record.ReplacementsApplied = pp.ReplacementsApplied;
+            record.UrlsProtected = pp.UrlsProtected;
+            record.PromptLeak = pp.PromptLeak;
+            record.Status = RunStatus.Success;
+            record.T_HotPathReturned = Stopwatch.GetTimestamp();
+            return record;
+        }
+        catch (Exception ex)
+        {
+            record.Status = RunStatus.RunFailed;
+            record.ErrorMessage = ex.Message;
+            record.T_HotPathReturned = Stopwatch.GetTimestamp();
+            return record;
+        }
+    }
+
     private async Task<RunRecord> ExecuteHotPathAsync(long hotkeyTicks)
     {
         var record = new RunRecord

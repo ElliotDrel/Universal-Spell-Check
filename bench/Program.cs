@@ -23,7 +23,7 @@ internal static class Program
     private static int Run(string[] args)
     {
         var opts = ParseArgs(args);
-        Console.WriteLine($"bench starting variant={opts.Variant} model={opts.Model} runs={opts.Runs} warmup={opts.Warmup}");
+        Console.WriteLine($"bench starting mode={(opts.E2e ? "e2e" : "headless")} variant={opts.Variant} model={opts.Model} runs={opts.Runs} warmup={opts.Warmup}");
 
         // Load inputs from bench/inputs.json
         var inputsJsonPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "inputs.json");
@@ -69,18 +69,24 @@ internal static class Program
             setBusy: _ => { },
             showSettings: () => { });
 
-        // Hidden form on the UI thread.
         Application.EnableVisualStyles();
-        var form = new BenchTargetForm();
-        form.Show();
-        Application.DoEvents();
+        BenchTargetForm? form = null;
+        HotkeyWindow? hotkey = null;
 
-        // Hotkey window registers Ctrl+Alt+B — distinct from prod (Ctrl+Alt+U) and dev (Ctrl+Alt+D).
-        using var hotkey = new HotkeyWindow();
-        hotkey.HotkeyPressed += (_, _) => _ = coordinator.RunAsync();
-        hotkey.Register(HotkeyInjector.HotkeyModifiers, HotkeyInjector.HotkeyVk);
+        if (opts.E2e)
+        {
+            // Hidden form on the UI thread.
+            form = new BenchTargetForm();
+            form.Show();
+            Application.DoEvents();
 
-        var harness = new BenchHarness(form, coordinator, capturingLogger, opts.Runs, opts.Warmup);
+            // Hotkey window registers Ctrl+Alt+B — distinct from prod (Ctrl+Alt+U) and dev (Ctrl+Alt+D).
+            hotkey = new HotkeyWindow();
+            hotkey.HotkeyPressed += (_, _) => _ = coordinator.RunAsync();
+            hotkey.Register(HotkeyInjector.HotkeyModifiers, HotkeyInjector.HotkeyVk);
+        }
+
+        var harness = new BenchHarness(form, coordinator, capturingLogger, opts.Runs, opts.Warmup, opts.E2e);
         capturingLogger.OnSpellcheckDetail = harness.RecordCoordinatorTimings;
 
         // Drive async bench while pumping the WinForms message loop.
@@ -93,7 +99,8 @@ internal static class Program
 
         var results = task.GetAwaiter().GetResult();
 
-        form.Close();
+        form?.Close();
+        hotkey?.Dispose();
 
         var resultsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "results");
         Directory.CreateDirectory(resultsDir);
@@ -118,12 +125,14 @@ internal static class Program
         public int Warmup { get; init; } = 2;
         public string Model { get; init; } = "gpt-4.1-nano";
         public string Variant { get; init; } = "baseline";
+        public bool E2e { get; init; } = false;
     }
 
     private static BenchOptions ParseArgs(string[] args)
     {
         int runs = 10, warmup = 2;
         string model = "gpt-4.1-nano", variant = "baseline";
+        var e2e = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -132,10 +141,11 @@ internal static class Program
                 case "--warmup": warmup = int.Parse(args[++i]); break;
                 case "--model": model = args[++i]; break;
                 case "--variant": variant = args[++i]; break;
+                case "--e2e": e2e = true; break;
                 default: throw new ArgumentException($"Unknown arg: {args[i]}");
             }
         }
-        return new BenchOptions { Runs = runs, Warmup = warmup, Model = model, Variant = variant };
+        return new BenchOptions { Runs = runs, Warmup = warmup, Model = model, Variant = variant, E2e = e2e };
     }
 
     private static string TryGitSha()
