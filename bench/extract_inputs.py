@@ -1,4 +1,4 @@
-"""Extract 10 length-stratified spellcheck inputs from JSONL logs into bench/inputs/."""
+"""Extract length-stratified spellcheck inputs from JSONL logs into bench/inputs.json."""
 
 from __future__ import annotations
 
@@ -77,10 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory containing spellcheck-*.jsonl files.",
     )
     parser.add_argument(
-        "--out-dir",
+        "--out",
         type=Path,
-        default=Path(__file__).parent / "inputs",
-        help="Directory to write inputs into.",
+        default=Path(__file__).parent / "inputs.json",
+        help="Output JSON file path.",
     )
     parser.add_argument("--count", type=int, default=10)
     args = parser.parse_args(argv)
@@ -90,20 +90,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No spellcheck-*.jsonl files found in {args.log_dir}", file=sys.stderr)
         return 1
 
-    inputs = extract_inputs(log_files, args.count)
-    if not inputs:
+    texts = extract_inputs(log_files, args.count)
+    if not texts:
         print("No successful inputs found in logs.", file=sys.stderr)
         return 1
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    # Wipe any prior inputs so we don't mix old + new sets.
-    for old in args.out_dir.glob("[0-9][0-9].txt"):
-        old.unlink()
+    entries = [{"id": f"{i:02d}", "text": t} for i, t in enumerate(texts, start=1)]
+    args.out.write_text(json.dumps(entries, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    for i, text in enumerate(inputs, start=1):
-        (args.out_dir / f"{i:02d}.txt").write_text(text, encoding="utf-8")
-
-    print(f"Wrote {len(inputs)} input file(s) to {args.out_dir}")
+    print(f"Wrote {len(entries)} input(s) to {args.out}")
     return 0
 
 

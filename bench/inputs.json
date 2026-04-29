@@ -1,0 +1,82 @@
+[
+  {
+    "id": "01",
+    "text": "Consistency: It keeps the \"Source of Truth\" firmly centered on your uploaded materials for every educational claim made."
+  },
+  {
+    "id": "02",
+    "text": "Update Native App Publishing Flow to be form githb"
+  },
+  {
+    "id": "03",
+    "text": "Update Native App Publishing Flow to auto update and fierntatn form dev version of app"
+  },
+  {
+    "id": "04",
+    "text": "Good morning Molly,\n\n\n\nFirst of all, I just wanted to say I'm really excited for the founder meet up tomorrow. Thank you so much for putting it together. \n\n\n\nI am the president of the entrepreneurship community at Purdue University (buildpurdue). My goal is to connect Purdue students with the best opportunities happening around them, and events like these are at the top of that list.\n\n\n\nWould you be against finding some time within the next few weeks to talk about how to get more young and ambitious founders involed with your future evnts?"
+  },
+  {
+    "id": "05",
+    "text": "Elliot - buildpurdue (website - linkedln)"
+  },
+  {
+    "id": "06",
+    "text": "Elliot: Website - Linkdln"
+  },
+  {
+    "id": "07",
+    "text": "might be a good idea to reach out to these guys. They sponsed the High Alpha event tomororw. Plus thier calendre page is just on thier webiste sooo."
+  },
+  {
+    "id": "08",
+    "text": "use your compacttool to clear you cntexte window"
+  },
+  {
+    "id": "09",
+    "text": "A zero-coupon bond pays nothing until maturity — no coupons, just a lump sum at the end. Its yield is clean and unambiguous: you know exactly what you paid and exactly what you'll receive."
+  },
+  {
+    "id": "10",
+    "text": "I was using open ai and github to build a new featur. The repositry is on Github and I used chatgpt to help write some of the boilerplat code. You can also find it on linkedin."
+  },
+  {
+    "id": "11",
+    "text": "Check out this articel at https://www.example.com/blog/post-1 for more detials. Also see https://docs.openai.com/api-reference for the open ai documentation. The buildpurdue team announceed their latest project on linkedin."
+  },
+  {
+    "id": "12",
+    "text": "Our teem uses clickup for task managment, akiflow for schedulng, and supabase for the databse. We also have a discord server and a notebooklm for meeting summaries. The espressos and entrepreneurs event is next Wednesdey at 16 tech."
+  },
+  {
+    "id": "13",
+    "text": "Hi team,\n\nI wanted to give everyone an update on our progres with the buildpurdue initiativ. Over the past few weeks, we have been working closely with the Purdue Innovates offise to finalize our appication for the Burton Morgan Competition. The deadline is comming up fast so pleese make sure you have submited your secions by Thursdey.\n\nFor thoes who havent already, please join our discord server — the link is in the clickup task. We will be using it for realtime coordination during the hackaton. Also, if you havent connected on linkedin yet, send me a requst so I can add you to the group.\n\nLooking foward to a great event!\n\nElliot"
+  },
+  {
+    "id": "14",
+    "text": "Meeting Notes — Night Shift Sprint Retrospective\n\nAtendees: Elliot, Maya, Carlos, Priya\n\nSummary: The team reviued progres on the current sprint and identificed three blocers that are slowing down delivry. First, the supabase migratoin has been delayed becase the schema changse were not reviued before merging. Second, the open ai integraton is returning unexpectd formating in the responces, which breaks our TextPostProcesor logic. Third, the claude code refacor introduced a regresson in the github actions workflo that we havent debuged yet.\n\nAction items:\n- Carlos: fix the supabase schema and re-run migratoin by Wednesdey\n- Maya: investigat the open ai response formating isue and open a Github isue\n- Priya: reviue the claude code PR and leave commnts before the retro\n- Elliot: scedule a sync with the 16tech partnr team regardng the Espressos & EntrePers event sposnorship\n\nNext meeting is Mondy at 10am. Notes wil be shared in notebooklm."
+  },
+  {
+    "id": "15",
+    "text": "Technical Spesification: Universal Spellcheck Integraton with Open AI Responces API\n\nOverviuw: This documnet desribes the archetecture for intergrating the spellcheck featur into the Windows tray applicaton. The applicaton uses the open ai responces endpont (https://api.openai.com/v1/responses) to correkt selected text in any Windows applicaton.\n\nHotkey Flow:\n1. Usr selects text and presses the hotkey (Ctrl+Alt+U for prod, Ctrl+Alt+D for dev)\n2. The HotkeyWindow receves a WM_HOTKEY mesage and invokes SpellcheckCoordinator.RunAsync()\n3. The coordinatr copies the selecton to clipbord, sends to open ai, post-procesess with replacemnts (open ai → OpenAI, github → GitHub, buildpurdue → buildPurdue, linkedin → LinkedIn, chatgpt → ChatGPT), and pastes back\n\nTechnicl Stack:\n- C# .NET 10 WinForms for the tray app and overlya\n- openai responces API for the LLM call\n- supabase not used (logging is loccal JSONL to %LOCALAPPDATA%)\n- github actions for CI/CD and releses via velopak\n- clickup for project managment, notebooklm for meeting notes\n\nPerfomance Target: end-to-end from hotkey to paste in under 1.5 secods at mediun input lenght. See bench/ diretory for the determanistic speed harnes."
+  },
+  {
+    "id": "16",
+    "text": "Hey Molly,\n\nJust circleing back on the contet you asked about. I've been reviwing the resouces at https://buildpurdue.com/events and https://purdueinnovates.org/programs and I think we have a strong case for the Burton Morgan Competiton.\n\nFor the open ai integraton we're building, the documetation is at https://platform.openai.com/docs/api-reference/responses and the github repo is at https://github.com/buildpurdue/spellcheck-tool. I've been using claude code to help refactor some of the more complecated sections.\n\nThe linkedin post I mentioned is at https://www.linkedin.com/posts/elliot-drel — it got alot of engagment from the purdue innovates community. We also got a shoutout from the 16tech team which was really exiting.\n\nLet me no if you need anyting else before the Burton Morgan deadline.\n\nBest,\nElliot"
+  },
+  {
+    "id": "17",
+    "text": "Project Update: buildPurdue Hackaton Platform\n\nWe've been making great progres on the platform this week. Here's a summery of what was acomplished:\n\nBackend:\n- Supabase schema migraton is compleet. The tables for users, teams, and submmisions are all set up corectly. You can see the schema at https://supabase.com/dashboard/project/xyzabc/editor if you have acces.\n- The open ai integraton is now stable. We're using the responces API endpont at https://api.openai.com/v1/responses with model gpt-4.1-nano for spellchecking. Response times are generaly under 1 secund for short inputs.\n- GitHub Actions workflo is fixed — the CI pipeline at https://github.com/buildpurdue/platform/actions is now pasing all checks.\n\nFrontend:\n- The registraton form has been updated with propper validaton. See the desing mockup at https://www.figma.com/file/xyzabc/hackaton-platform for refernce.\n- Discord bot integraton is working — the bot now posts to the #anouncements channel whenevr a new team regisers.\n- Notebooklm summaries are being generated automaticaly after each standup.\n\nNext Steps:\n- Finalize the Espressos & EntrePers sponsership agreement with the 16tech team\n- Get Night Shift mentors onboarded to clickup before the sprint kicks off\n- Schedule a demo with Purdue Innovates stakholders for review\n\nLet us no if you have questions. Full details are tracked in clickup at https://app.clickup.com/t/xyzabc."
+  },
+  {
+    "id": "18",
+    "text": "Pleese review the pull requst at https://github.com/org/repo/pull/42 before the end of the day. The main changse are in the auth modul."
+  },
+  {
+    "id": "19",
+    "text": "I found a great articel on performence optmization at https://blog.nelhage.com/post/three-kinds-of-leaks/ — it explains memmory leeaks realy well. Also check https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_management for the MDN refernce. These are esential reads for anyone working on systmes programing."
+  },
+  {
+    "id": "20",
+    "text": "Hi Sarah,\n\nThanks for shering the open ai announcment. I reviued the blog post at https://openai.com/blog/gpt-4-1 and the full technicle report at https://cdn.openai.com/papers/gpt-4-1.pdf. The main improvments are in code generaton and instruction folowing.\n\nI also looked at the github repo for the evaluaton harnes at https://github.com/openai/evals — it's usefull for understanding how they mesure performence. I'll set up a discord thread to discus how we can use this for our buildpurdue projets.\n\nLet me know what you think after you've had a chanse to look at it.\n\nBest"
+  }
+]

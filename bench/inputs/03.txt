@@ -1,1 +1,0 @@
-Update Native App Publishing Flow to auto update and fierntatn form dev version of app

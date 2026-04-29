@@ -1,9 +1,0 @@
-Hi Sarah,
-
-Thanks for shering the open ai announcment. I reviued the blog post at https://openai.com/blog/gpt-4-1 and the full technicle report at https://cdn.openai.com/papers/gpt-4-1.pdf. The main improvments are in code generaton and instruction folowing.
-
-I also looked at the github repo for the evaluaton harnes at https://github.com/openai/evals — it's usefull for understanding how they mesure performence. I'll set up a discord thread to discus how we can use this for our buildpurdue projets.
-
-Let me know what you think after you've had a chanse to look at it.
-
-Best

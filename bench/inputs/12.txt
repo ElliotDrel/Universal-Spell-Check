@@ -1,1 +1,0 @@
-Our teem uses clickup for task managment, akiflow for schedulng, and supabase for the databse. We also have a discord server and a notebooklm for meeting summaries. The espressos and entrepreneurs event is next Wednesdey at 16 tech.

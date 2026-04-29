@@ -1,1 +1,0 @@
-Pleese review the pull requst at https://github.com/org/repo/pull/42 before the end of the day. The main changse are in the auth modul.
