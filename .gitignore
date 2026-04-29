@@ -31,3 +31,13 @@ server.pid
 
 # Local scratchpad
 Untitled-*.md
+
+# Local tooling state
+.gstack/
+.claude/settings.local.json
+
+# Generated runs and datasets (kept local, never committed)
+benchmark_runs/
+benchmark_data/
+fine_tune_runs/
+fine_tune_data/
