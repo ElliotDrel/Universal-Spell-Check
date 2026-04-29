@@ -18,6 +18,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly UpdateService _updateService;
     private DashboardWindow? _dashboardWindow;
     private Forms.ToolStripMenuItem _versionItem = null!;
+    private Forms.ToolStripMenuItem _lastCheckedItem = null!;
     private Forms.ToolStripMenuItem _checkForUpdatesItem = null!;
     private Forms.ToolStripMenuItem _updateNowItem = null!;
 
@@ -53,6 +54,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         _updateService = new UpdateService(_logger);
         _updateService.StateChanged += OnUpdateStateChanged;
+        _updateService.CheckCompleted += OnUpdateCheckCompleted;
         OnUpdateStateChanged(_updateService, _updateService.State);
         _ = _updateService.CheckAsync(UpdateTrigger.Launch);
 
@@ -79,6 +81,11 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     {
         var menu = new Forms.ContextMenuStrip();
         _versionItem = new Forms.ToolStripMenuItem($"v{BuildChannel.AppVersion}") { Enabled = false };
+        _lastCheckedItem = new Forms.ToolStripMenuItem("Last checked: never")
+        {
+            Enabled = false,
+            Visible = !BuildChannel.IsDev,
+        };
         _checkForUpdatesItem = new Forms.ToolStripMenuItem(
             "Check for Updates",
             null,
@@ -89,13 +96,80 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             (_, _) => _ = _updateService.ApplyUpdatesAndRestartAsync()) { Visible = false };
 
         menu.Items.Add(_versionItem);
+        menu.Items.Add(_lastCheckedItem);
         menu.Items.Add(_checkForUpdatesItem);
         menu.Items.Add(_updateNowItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Open Dashboard", null, (_, _) => ShowSettings());
         menu.Items.Add("Open Logs Folder", null, (_, _) => OpenLogsFolder());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
+
+        // Refresh the relative timestamp each time the menu opens so it does
+        // not look stale after the app has been idle.
+        menu.Opening += (_, _) => RefreshLastCheckedLabel();
         return menu;
+    }
+
+    private void RefreshLastCheckedLabel()
+    {
+        if (_updateService.State is UpdateState.Checking)
+        {
+            _lastCheckedItem.Text = "Checking for updates…";
+            return;
+        }
+
+        _lastCheckedItem.Text = "Last checked: " + FormatLastChecked(_updateService.LastCheckedAt);
+    }
+
+    private static string FormatLastChecked(DateTimeOffset? when)
+    {
+        if (when is null) return "never";
+        var delta = DateTimeOffset.Now - when.Value;
+        if (delta.TotalSeconds < 60) return "just now";
+        if (delta.TotalMinutes < 60)
+        {
+            var m = (int)delta.TotalMinutes;
+            return $"{m} minute{(m == 1 ? "" : "s")} ago";
+        }
+        if (delta.TotalHours < 24)
+        {
+            var h = (int)delta.TotalHours;
+            return $"{h} hour{(h == 1 ? "" : "s")} ago";
+        }
+        if (delta.TotalDays < 7)
+        {
+            var d = (int)delta.TotalDays;
+            return $"{d} day{(d == 1 ? "" : "s")} ago";
+        }
+        return when.Value.LocalDateTime.ToString("yyyy-MM-dd");
+    }
+
+    private void OnUpdateCheckCompleted(object? sender, CheckCompletedEventArgs e)
+    {
+        // Marshal to UI thread for ShowBalloonTip.
+        if (_notifyIcon.ContextMenuStrip is { } menu && menu.InvokeRequired)
+        {
+            menu.BeginInvoke(new Action(() => OnUpdateCheckCompleted(sender, e)));
+            return;
+        }
+
+        if (e.Trigger != UpdateTrigger.ManualTray) return;
+
+        switch (e.Result)
+        {
+            case UpdateState.UpToDate:
+                ShowTip("Up to date", $"You're on the latest version (v{BuildChannel.AppVersion}).");
+                break;
+            case UpdateState.UpdateReady ready:
+                ShowTip("Update available", $"v{ready.Version} is ready. Click 'Update Now' in the tray menu to install.");
+                break;
+            case UpdateState.Downloading dl:
+                ShowTip("Downloading update", $"Fetching v{dl.Version}…");
+                break;
+            case UpdateState.Failed failed:
+                ShowTip("Update check failed", failed.Reason);
+                break;
+        }
     }
 
     private void OnUpdateStateChanged(object? sender, UpdateState state)
@@ -133,6 +207,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
                 _checkForUpdatesItem.Enabled = true;
                 break;
         }
+
+        RefreshLastCheckedLabel();
     }
 
     private static System.Drawing.Icon BuildTrayIcon()
@@ -307,6 +383,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _coordinator.Dispose();
         _spellcheckService.Dispose();
         _updateService.StateChanged -= OnUpdateStateChanged;
+        _updateService.CheckCompleted -= OnUpdateCheckCompleted;
         _updateService.Dispose();
         base.ExitThreadCore();
     }

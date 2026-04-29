@@ -12,6 +12,8 @@ internal enum UpdateTrigger
     ManualDashboardButton,
 }
 
+internal sealed record CheckCompletedEventArgs(UpdateTrigger Trigger, UpdateState Result);
+
 internal abstract record UpdateState
 {
     public sealed record Idle : UpdateState;
@@ -42,6 +44,11 @@ internal sealed class UpdateService : IDisposable
     private UpdateState _state = new UpdateState.Idle();
 
     public event EventHandler<UpdateState>? StateChanged;
+    public event EventHandler<CheckCompletedEventArgs>? CheckCompleted;
+
+    public DateTimeOffset? LastCheckedAt { get; private set; }
+
+    private static string LastCheckedPath => Path.Combine(AppPaths.AppDataDirectory, "last-update-check.txt");
 
     public UpdateService(DiagnosticsLogger logger)
     {
@@ -53,6 +60,8 @@ internal sealed class UpdateService : IDisposable
             _state = new UpdateState.UpToDate();
             return;
         }
+
+        LastCheckedAt = LoadLastCheckedAt();
 
         try
         {
@@ -144,7 +153,51 @@ internal sealed class UpdateService : IDisposable
         }
         finally
         {
+            LastCheckedAt = DateTimeOffset.Now;
+            SaveLastCheckedAt(LastCheckedAt.Value);
+            try
+            {
+                CheckCompleted?.Invoke(this, new CheckCompletedEventArgs(trigger, _state));
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(
+                    $"update_check_completed_subscriber_failed error_type={ex.GetType().Name} " +
+                    $"error=\"{Escape(ex.Message)}\"");
+            }
             _gate.Release();
+        }
+    }
+
+    private DateTimeOffset? LoadLastCheckedAt()
+    {
+        try
+        {
+            if (!File.Exists(LastCheckedPath)) return null;
+            var raw = File.ReadAllText(LastCheckedPath).Trim();
+            return DateTimeOffset.TryParse(raw, out var parsed) ? parsed : (DateTimeOffset?)null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"update_last_checked_load_failed error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\"");
+            return null;
+        }
+    }
+
+    private void SaveLastCheckedAt(DateTimeOffset value)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.AppDataDirectory);
+            File.WriteAllText(LastCheckedPath, value.ToString("O"));
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"update_last_checked_save_failed error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\"");
         }
     }
 
