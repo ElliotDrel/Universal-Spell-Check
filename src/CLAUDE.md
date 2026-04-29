@@ -1,6 +1,12 @@
-# Universal Spell Check — src/
+# src/ — Native App (the product)
 
-C#/.NET 10 WinForms + WPF tray app. This is the product.
+## Grounding
+
+This is **the product**: a C#/.NET 10 WinForms tray app + WPF dashboard. Select text → press hotkey → AI corrects it in place. **Speed is the product** — every ms and every added abstraction is a cost. Two channels (Prod = Ctrl+Alt+U, Dev = Ctrl+Alt+D) run side-by-side; all channel constants live in `BuildChannel.cs`.
+
+## Read first
+
+> Before editing code here, read root `CLAUDE.md` for routing + hard rules. For architecture (tray lifetime, hotkey, pipeline, overlay), read `docs/architecture.md`. For visual/WPF dashboard work, read `DESIGN.md` and `src/UI/CLAUDE.md`.
 
 ## Run (Dev channel)
 
@@ -8,7 +14,7 @@ C#/.NET 10 WinForms + WPF tray app. This is the product.
 dotnet run --project src/UniversalSpellCheck.csproj -c Dev
 ```
 
-Hotkey: Ctrl+Alt+D. Settings isolated to `%LocalAppData%\UniversalSpellCheck.Dev\`. Logs shared at `%LocalAppData%\UniversalSpellCheck\logs\`.
+Hotkey: Ctrl+Alt+D. Settings: `%LocalAppData%\UniversalSpellCheck.Dev\`. Logs (shared): `%LocalAppData%\UniversalSpellCheck\logs\`.
 
 ## Run (Release / Prod-like local build)
 
@@ -17,11 +23,7 @@ dotnet publish src/UniversalSpellCheck.csproj -c Release -r win-x64 --self-conta
 publish\UniversalSpellCheck.exe
 ```
 
-Hotkey: Ctrl+Alt+U. Settings at `%LocalAppData%\UniversalSpellCheck\`.
-
-## Channels
-
-Prod and Dev can run side-by-side. They use distinct hotkeys, mutex names, and AppData folders. Both write logs to the same shared directory. See `src/BuildChannel.cs` for all channel constants.
+Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck\`.
 
 ## Manual Acceptance Checks
 
@@ -35,3 +37,15 @@ Prod and Dev can run side-by-side. They use distinct hotkeys, mutex names, and A
 8. Select `open ai and github`, press the hotkey, verify output contains `OpenAI` and `GitHub`; confirm `replacements_count > 0` in log.
 9. Quit from the tray menu; verify the hotkey stops firing.
 10. Run Prod and Dev simultaneously; verify both appear in the tray with distinct icons and hotkeys, and both write entries to the same daily log file with correct `channel=` stamps.
+
+## Top-of-mind reminders
+
+- A code change is not running until the process is stopped and rebuilt. **Always rebuild + relaunch before retesting.**
+- Never hardcode hotkey/mutex/path/version strings. Add the constant to `BuildChannel.cs`.
+- All update entry points must call `UpdateService.CheckAsync(UpdateTrigger)` — no parallel update paths.
+
+---
+
+## Keeping this file current
+
+If the run commands, channel constants, manual checks, or Top-of-mind reminders drift from the code, fix this file in the same change. **If you notice drift while doing other work — stale step, removed file, wrong hotkey — flag it to the user and propose the fix.** Do not silently work around it.
