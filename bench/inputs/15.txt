@@ -1,0 +1,17 @@
+Technical Spesification: Universal Spellcheck Integraton with Open AI Responces API
+
+Overviuw: This documnet desribes the archetecture for intergrating the spellcheck featur into the Windows tray applicaton. The applicaton uses the open ai responces endpont (https://api.openai.com/v1/responses) to correkt selected text in any Windows applicaton.
+
+Hotkey Flow:
+1. Usr selects text and presses the hotkey (Ctrl+Alt+U for prod, Ctrl+Alt+D for dev)
+2. The HotkeyWindow receves a WM_HOTKEY mesage and invokes SpellcheckCoordinator.RunAsync()
+3. The coordinatr copies the selecton to clipbord, sends to open ai, post-procesess with replacemnts (open ai → OpenAI, github → GitHub, buildpurdue → buildPurdue, linkedin → LinkedIn, chatgpt → ChatGPT), and pastes back
+
+Technicl Stack:
+- C# .NET 10 WinForms for the tray app and overlya
+- openai responces API for the LLM call
+- supabase not used (logging is loccal JSONL to %LOCALAPPDATA%)
+- github actions for CI/CD and releses via velopak
+- clickup for project managment, notebooklm for meeting notes
+
+Perfomance Target: end-to-end from hotkey to paste in under 1.5 secods at mediun input lenght. See bench/ diretory for the determanistic speed harnes.

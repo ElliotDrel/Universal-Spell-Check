@@ -1,0 +1,20 @@
+Project Update: buildPurdue Hackaton Platform
+
+We've been making great progres on the platform this week. Here's a summery of what was acomplished:
+
+Backend:
+- Supabase schema migraton is compleet. The tables for users, teams, and submmisions are all set up corectly. You can see the schema at https://supabase.com/dashboard/project/xyzabc/editor if you have acces.
+- The open ai integraton is now stable. We're using the responces API endpont at https://api.openai.com/v1/responses with model gpt-4.1-nano for spellchecking. Response times are generaly under 1 secund for short inputs.
+- GitHub Actions workflo is fixed — the CI pipeline at https://github.com/buildpurdue/platform/actions is now pasing all checks.
+
+Frontend:
+- The registraton form has been updated with propper validaton. See the desing mockup at https://www.figma.com/file/xyzabc/hackaton-platform for refernce.
+- Discord bot integraton is working — the bot now posts to the #anouncements channel whenevr a new team regisers.
+- Notebooklm summaries are being generated automaticaly after each standup.
+
+Next Steps:
+- Finalize the Espressos & EntrePers sponsership agreement with the 16tech team
+- Get Night Shift mentors onboarded to clickup before the sprint kicks off
+- Schedule a demo with Purdue Innovates stakholders for review
+
+Let us no if you have questions. Full details are tracked in clickup at https://app.clickup.com/t/xyzabc.

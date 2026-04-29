@@ -1,0 +1,1 @@
+I found a great articel on performence optmization at https://blog.nelhage.com/post/three-kinds-of-leaks/ — it explains memmory leeaks realy well. Also check https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_management for the MDN refernce. These are esential reads for anyone working on systmes programing.

@@ -1,0 +1,1 @@
+Check out this articel at https://www.example.com/blog/post-1 for more detials. Also see https://docs.openai.com/api-reference for the open ai documentation. The buildpurdue team announceed their latest project on linkedin.
