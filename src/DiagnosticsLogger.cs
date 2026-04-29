@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
-internal sealed class DiagnosticsLogger
+internal class DiagnosticsLogger
 {
     private static readonly int Pid = Process.GetCurrentProcess().Id;
 
@@ -29,7 +29,7 @@ internal sealed class DiagnosticsLogger
         AppendWithRetry(line);
     }
 
-    public void LogData(string eventName, object data)
+    public virtual void LogData(string eventName, object data)
     {
         try
         {
