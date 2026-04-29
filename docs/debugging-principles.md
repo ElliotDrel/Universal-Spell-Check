@@ -1,87 +1,83 @@
-# Critical Debugging Principles
+# Debugging Principles
 
-## 1. Complete verification before declaring success
-Never declare work complete without verifying ALL aspects, not just structure. For API/model work:
+## 1. Log first, fix second
+
+When root cause is unclear, add logging first, analyze the output, then fix. No guessing patches.
+
+1. Add targeted log lines around the suspected failure point.
+2. Rebuild and relaunch — a code change is not running until the process is stopped and rebuilt (`dotnet run -c Dev` or publish+install for Prod).
+3. Reproduce the failure and read the log.
+4. Implement a fix based on data, not assumptions.
+
+Logs live at `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{yyyy-MM-dd}.jsonl`. Both channels write here; filter by `channel=prod` or `channel=dev`. Filter by `pid` to isolate a single run when both are running simultaneously.
+
+---
+
+## 2. Complete verification before declaring done
+
+Never declare work complete without verifying ALL aspects, not just structure.
+
+For API/model work:
 1. Model name correct.
 2. Endpoint correct.
-3. Request structure matches docs.
-4. **Every parameter supported by this specific model type** (most-missed step).
-5. Response format compatible.
-6. Error handling captures raw error body on 4xx/5xx.
+3. Request structure matches current API docs.
+4. **Every parameter supported by this specific model type** — most commonly missed. Standard models use `temperature`; reasoning models reject it and require `reasoning.effort`. See `docs/model-config.md`.
+5. Response shape compatible with `OpenAiSpellcheckService.ExtractOutputText`.
+6. Error handling captures raw response body on 4xx/5xx.
 
-Real example: migrating to GPT-5.1 passed name/endpoint checks but missed that reasoning models reject `temperature`. See `model-config.md`.
+Real example: migrating to a reasoning model passed name/endpoint checks but missed that `temperature` causes an API error on reasoning models.
 
-## 2. Debug first, fix second
-Never guess fixes when root cause is unclear.
-1. Add comprehensive debug logging to identify failure point.
-2. Analyze the debug output.
-3. Implement a targeted fix based on data, not assumptions.
+---
 
-Past examples: regex "returned empty" logs revealed overly-strict pattern; AHK v2 "Expected a Number but got a String" revealed number-parse syntax bug.
+## 3. Native app debugging workflow
 
-## 3. Simplest solution first (performance priority)
-When speed matters, prefer regex-based parsing over object-model parsing. The current regex extractor is ~10x faster than the Map-based JSON parser and ~25 lines vs ~200.
+1. Confirm which process is running — dev checkout (`dotnet run -c Dev`) or installed Prod. They use different hotkeys and data folders. Check `channel=` and `app_version=` on the first `started` log line.
+2. Read `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{today}.jsonl` before changing code.
+3. For a capture or paste failure: find the `run_started` → `capture_*` → `replace_succeeded`/`paste_failed` sequence and read `capture_duration_ms`, `copy_attempts`, `request_duration_ms`, `postprocess_duration_ms`, `paste_duration_ms`.
+4. For a request failure: read `status_code`, `error_code`, and the raw response body logged with `request_failed`.
+5. For a dashboard failure: grep for `dashboard_open step=` to see how far construction got, then read the `error` and `stack` fields on the failing line.
 
-**Use regex when:** structure predictable, need one field, performance critical.
-**Use full JSON parse when:** many nested fields, structure varies, need to rebuild JSON.
+---
 
-This project: regex is correct - only one text field, speed critical. Keep regex primary + full parser fallback with verbose logging.
+## 4. Success criteria for manual testing
 
-## 4. AutoHotkey v2 compatibility gotchas
+A spell-check run is clean when:
 
-**Number conversion:**
-- WRONG: `return numberText + 0` - throws "Expected a Number but got a String".
-- RIGHT: `Integer(numberText)` or `Float(numberText)`.
+- `capture_succeeded` with `copy_attempts=1` (or a clearly logged retry reason).
+- `request_succeeded` implied by `replace_succeeded` appearing with `request_attempts=1`.
+- `replace_succeeded` shows matching `active_process` from capture through paste.
+- No-selection produces `capture_failed` and no paste occurs.
+- Rapid double-press produces `guard_rejected reason=already_running` for the second press.
 
-**Object types:**
-- `{}` -> basic Object. `Map()` -> Map (better for dynamic keys).
+---
 
-**Property access:**
-- `obj.property`, `obj.%varName%`, `map[key]` (bracket may not work on Object in some versions).
+## 5. Dashboard / WPF failures
 
-**Method names:**
-- Object: `obj.HasOwnProp(key)`. Map: `map.Has(key)`. Array: `arr.Length`.
+`dashboard_open_failed` and `ui_dispatcher_unhandled` both log `error_type`, `error`, and full `stack`. Always check:
 
-## 5. Multiple solutions strategy
-Keep a primary (fast) path and a fallback (safe) path, both instrumented. Current code: regex primary + Map-based fallback with debug logs on every branch.
+1. `wpf_resources_failed` at startup — `Styles.xaml`/`Components.xaml` didn't load. Dashboard cannot work until fixed.
+2. `'{DependencyProperty.UnsetValue}' is not a valid value for property '...'` — almost always missing `System.Windows.Application` instance or a missing resource key. Do not chase template rewrites first. See `docs/watchlist.md`.
+3. `loading_overlay_failed` — overlay handle not created on UI thread, or marshal path broken.
 
-## 6. Verification standards
-- SPEED IS PARAMOUNT - user has emphasized repeatedly.
-- Official docs only when user emphasizes them; be strategic when direct access fails.
-- Temporary debug logging is acceptable for troubleshooting even in otherwise minimal scripts.
-- Proxy startup is a required dependency path for AHK - preserve the 5s/30s/60s attempt ladder and `ExitApp` on exhaustion.
+The `--dashboard-smoke` mode (`dotnet run -- --dashboard-smoke`) pumps `DispatcherFrame`s and hooks `Dispatcher.UnhandledException`. A smoke log that says `dashboard_smoke_ok` while the user still sees a crash means the pump duration is too short, not that the code is correct.
 
-## 7. Native app debugging standards
+---
 
-The native app is now the production hotkey owner.
+## 6. Simplest solution first (performance priority)
 
-When debugging native behavior:
-1. Confirm whether the running process is the dev build or published EXE.
-2. Check `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\phase*-YYYY-MM-DD.log` before changing code.
-3. Preserve `Ctrl+Alt+U` unless the user explicitly asks for a temporary test hotkey.
-4. Do not change the AHK proxy/retry ladder while debugging native failures; native does not use the Python proxy.
-5. Reproduce capture/paste failures with active app name and log timing before adding app-specific rules.
-6. Keep request failures non-destructive: restore original clipboard and do not paste.
-7. Keep the loading overlay tied to post-capture request/paste work, shown without activation, and hidden in `finally`.
-8. If paste fails after a successful request, compare the logged original target app with `paste_target_exe` / `paste_target_app` before changing timing or app-specific behavior.
+Speed is the product. When parsing API responses, regex over JSON object model when:
+- Only one field is needed.
+- Response structure is predictable.
+- Performance matters (regex is ~10x faster for this case).
 
-### WPF-in-WinForms gotchas
+Use full JSON parse when many nested fields are needed or structure varies. Keep primary path fast; add a fallback with verbose logging on both branches.
 
-The native app hosts WPF (the dashboard) inside a WinForms tray. Two sharp edges burned us:
+---
 
-1. **No `System.Windows.Application` = broken resource lookup.** A WinForms `Application.Run` does NOT create `Application.Current` for WPF. `DynamicResource` walks the visual/logical tree and finally `Application.Current.Resources`; with `Application.Current == null`, lookups for things like `Background={DynamicResource Canvas}` resolved to `DependencyProperty.UnsetValue` and crashed at layout time. The `pack://` scheme is also wired up by the Application instance. **Fix:** instantiate `new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }` once before `Application.Run`, and merge global `ResourceDictionary`s into `app.Resources`.
-2. **WPF smoke tests must pump the Dispatcher.** A test that does `window.Show(); window.Close();` returns 0 even when the window would crash on first render — layout, template expansion, and resource resolution don't run synchronously. The `--dashboard-smoke` mode now pumps `DispatcherFrame`s for several seconds and hooks `Dispatcher.UnhandledException`. If a smoke test "passes" but the user still sees the bug, distrust the test before distrusting the report.
+## 7. Update service debugging
 
-When you see `'{DependencyProperty.UnsetValue}' is not a valid value for property 'Background'/'Foreground'`, do not chase template-binding rewrites. The most likely root cause is missing `Application.Current` or a missing resource key, not the templates themselves.
-
-### Diagnosing native UI failures
-
-The dashboard is auto-opened on startup so failures are visible without spelunking. Both `dashboard_open_failed` and `ui_dispatcher_unhandled` log `error_type`, `error`, AND full `ex.ToString()` stack — always grep the latest `phase*-YYYY-MM-DD.log` for `dashboard_open step=` to see how far construction got, then read the stack on the failing line. Step values: `construct` → `show` → `activate` → `done`.
-
-Native success criteria for manual testing:
-- selected text is captured with `copy_attempts=1` or a clearly explained retry
-- request succeeds with `request_attempts=1` unless a transient retry is logged
-- `replace_succeeded` includes capture/request/postprocess/paste timing
-- `replace_succeeded` keeps the same foreground process from capture through paste
-- no-selection logs `capture_failed` and does not paste stale clipboard text
-- rapid double-press logs `guard_rejected reason=already_running`
+- `update_check_skipped reason=dev_or_uninstalled` — correct behavior when running `dotnet run`.
+- `update_check_skipped reason=not_installed` — Velopack not installed; only relevant for Prod builds run outside the installer.
+- `update_check_skipped reason=in_progress` — concurrent check already running; not an error.
+- `update_check_failed` — network issue or GitHub API error; check `error` field.
+- `update_apply_failed` — Velopack couldn't apply the downloaded update; check `error` field and whether the download actually completed (`update_download_done` present).

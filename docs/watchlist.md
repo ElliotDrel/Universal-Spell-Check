@@ -1,64 +1,87 @@
 # Runtime Watchlist
 
-## Clipboard / hotkey timing (Notepad and similar apps)
-Watch for `Ctrl+Alt+U` being physically down when the script tries follow-up `Ctrl+C` / `Ctrl+V`.
+Items that have historically broken or have non-obvious behavior worth re-reading before touching.
 
-**Symptoms:**
-- Notepad menu/keytip overlays appearing.
-- Clipboard wait timeouts.
-- Copy succeeding only on attempt 2 or 3.
-- Paste aborted because hotkey never fully released.
+---
 
-**Log signals to check:**
-- `Clipboard copy attempt ... hotkey keys still physically down before Ctrl+C`
-- `... released before Ctrl+C`
-- `... still down after release wait`
-- `Paste hotkey-release wait ...`
-- Current `script_version` - mismatched `script_version` is the first stale-reload check before assuming runtime is current.
+## Velopack bootstrap order
 
-**Affects more than Notepad.** Any app with repeated copy timeouts, menu activation, dropped pastes, or clipboard weirdness may need per-app handling.
+`VelopackApp.Build().Run()` must be the **very first line of `Main`**, before mutex acquisition, WPF initialization, or any other startup code. Velopack installs first-run hooks and restart-after-update logic that must fire before the app does anything else. Moving it down breaks silent updates and first-run setup. This is a hard constraint, not a style preference.
 
-**Candidate mitigations if it recurs:** send `{Esc}` before retries to clear menu state; increase Notepad retry spacing; use app-specific `SendEvent "^c"` / `SendEvent "^v"` for Notepad.
+---
 
-## Native clipboard / hotkey timing
+## Clipboard / hotkey timing in `SpellcheckCoordinator`
 
-The native app uses `Ctrl+Alt+U` and has its own hotkey-release wait before sending `Ctrl+C`.
+`ClipboardLoop.CaptureSelectionAsync()` waits for hotkey keys to physically release before sending Ctrl+C. Watch for:
 
-Watch for:
-- `capture_failed ... reason="Clipboard did not change after Ctrl+C."`
-- `capture_failed ... reason="Copied selection was empty."` when text was actually selected
-- unexpectedly high `capture_duration_ms`
-- repeated `copy_attempts=2`
-- app focus changing between selection and paste
+- `capture_failed reason="Clipboard did not change after Ctrl+C."` — the key-release wait may have been too short, or the target app didn't respond to Ctrl+C.
+- `capture_failed reason="Copied selection was empty."` when text was actually selected — same timing issue, or the app uses a non-clipboard copy path.
+- Unexpectedly high `capture_duration_ms`.
+- Repeated `copy_attempts=2`.
+- `paste_failed` with `expected_process` ≠ `actual_process` — the target app lost focus during the API request; this is not a capture failure, do not treat it as one.
 
-Known behavior:
-- `Ctrl+Alt+U` should be owned by the native app. If registration fails, check for a running legacy AHK spell checker.
-- Native overlapping invocations should log `guard_rejected reason=already_running`.
-- The loading overlay should show only after text capture succeeds, should not activate/focus itself, and should disappear after success or failure.
-- `paste_failed` with different expected/actual processes means the target app lost focus before paste; do not treat that as a no-selection failure.
+Before adding app-specific timing rules: reproduce with a named target app and inspect the log timing fields. Don't adjust constants blindly.
 
-Candidate mitigations if native capture regresses:
-- verify the app was relaunched from the newly published EXE, not an older process
-- inspect the latest native log before changing timing constants
-- add app-specific capture/paste behavior only after a named target app reproduces the failure
-- keep Notepad/browser textarea as baseline regression tests
+---
 
-## Native dashboard (WPF)
+## Loading overlay UI-thread marshalling
 
-Watch for:
-- `dashboard_open_failed` or `ui_dispatcher_unhandled` with `error="'{DependencyProperty.UnsetValue}' is not a valid value for property '...'"` — almost always a regression in the WPF bootstrap (no `System.Windows.Application` instance, missing resource key, or merged dictionaries not loaded into `Application.Resources`).
-- `wpf_resources_failed` at startup — `Styles.xaml` / `Components.xaml` did not load via the pack URI; the dashboard will not work until this is fixed.
-- A `dashboard-smoke-*.log` that says `dashboard_smoke_ok` while the user still sees a crash — confirm the smoke mode is actually pumping `DispatcherFrame`s, not just `Show()`+`Close()`.
-- `loading_overlay_failed` — the busy overlay couldn't show/hide. Check that `_loadingOverlay.Handle` is force-created on the main thread so `InvokeRequired` is meaningful.
+`SetBusy` is called from the async spell-check pipeline (not the UI thread). `LoadingOverlayForm.Handle` is force-created on the UI thread in `SpellCheckAppContext`'s constructor so `InvokeRequired` is meaningful. If you move or defer handle creation, `InvokeRequired` may return `false` on a background thread and crash.
 
-The dashboard is auto-opened on startup; if it does not appear within a few seconds of launch, check the latest `phase*-YYYY-MM-DD.log` for `dashboard_open step=` and `dashboard_auto_open_attempt`.
+`loading_overlay_failed` in logs means `ShowNearTaskbar()` or `Hide()` threw — check that handle creation is still happening before `Application.Run`.
 
-## Replacement cache
-See `replacements-and-logging.md` watchlist section (repeated reload failures, same-size fast-edit edge case, read-while-writing risk).
+See commits 52b5e27 and 77239cc for the specific WPF-in-WinForms crash sequence this fixed.
 
-For native replacements, also watch `replacements_reloaded`, `replacements_reload_failed`, `replacements_count`, and `urls_protected` in `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
+---
 
-## Script version verification
-Bump `scriptVersion` before any commit touching `Universal Spell Checker.ahk` AND before asking for a reload/manual retest - the next log entry proves which build ran. Pre-commit must reject commits that include this file when the staged `scriptVersion` is not a numeric string or does not increase relative to `HEAD`.
+## WPF-in-WinForms: `System.Windows.Application` must exist
 
-Native changes do not require `scriptVersion` bumps, but they do require rebuilding/publishing and relaunching the native EXE before manual retest.
+WinForms `Application.Run` does not create `Application.Current` for WPF. Without a `System.Windows.Application` instance:
+- `DynamicResource` lookups walk the visual/logical tree and find nothing at the root, resolving to `DependencyProperty.UnsetValue`.
+- This crashes at layout time: `'{DependencyProperty.UnsetValue}' is not a valid value for property 'Background'`.
+- The `pack://application:,,,/` scheme is also only registered by the Application instance.
+
+**Fix:** `new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }` instantiated before `Application.Run`, with `Styles.xaml` and `Components.xaml` merged into `app.Resources`.
+
+If you see `wpf_resources_failed` in logs at startup, the dashboard will not work at all. If you see `dashboard_open_failed` or `ui_dispatcher_unhandled` with `DependencyProperty.UnsetValue`, check this anchor before chasing template or binding rewrites.
+
+---
+
+## WPF smoke tests must pump the Dispatcher
+
+`window.Show(); window.Close();` returns before layout, template expansion, and resource resolution run. A smoke test that does only this is a false positive. The `--dashboard-smoke` mode pumps `DispatcherFrame`s for several seconds and hooks `Dispatcher.UnhandledException`. If a smoke test "passes" but the user still sees a crash, distrust the test first.
+
+---
+
+## Hotkey re-registration
+
+`HotkeyWindow.Register()` calls `RegisterHotKey` with `BuildChannel.HotkeyModifiers` and `BuildChannel.HotkeyVk`. If registration fails (throws `Win32Exception`), another process already owns that hotkey combination. Prod owns Ctrl+Alt+U (`0x55`); Dev owns Ctrl+Alt+D (`0x44`). They can coexist. If registration fails for Prod, check whether a legacy AHK instance is still running. Dev failure means another Dev process is already up (check mutex first — that should have caught it).
+
+---
+
+## Mutex collision between channels
+
+`BuildChannel.MutexName` is `"UniversalSpellCheck"` for Prod and `"UniversalSpellCheck.Dev"` for Dev. The mutex is acquired before `SpellCheckAppContext` is created. A second launch of the same channel shows a message box and exits 0 — it cannot get to hotkey registration. Distinct mutex names are what allow Prod and Dev to run side-by-side.
+
+---
+
+## Replacement cache edge cases
+
+- **Same-size fast-edit** — cache key is `mtime + size`. A very fast edit that doesn't change file size can be missed until a subsequent save with a changed size.
+- **Read-while-writing** — if the editor writes in two flushes, `TextPostProcessor` may read a partial file and cache it under the final metadata. Potential fix: capture metadata before and after the read, only accept if both match.
+
+Watch `replacements_reload_failed` and `replacements_missing` in logs.
+
+---
+
+## UpdateService skips non-installed builds
+
+`UpdateService.CheckAsync` returns early in two cases — both are correct, neither is a bug:
+- Dev channel: `update_check_skipped reason=dev_or_uninstalled` (the entire update flow is disabled in Dev).
+- Prod build run via `dotnet run` (no Velopack install metadata): `update_check_skipped reason=not_installed`.
+
+---
+
+## Dashboard auto-open on startup
+
+`SpellCheckAppContext` hooks `Application.Idle` to auto-open the dashboard once on startup. This surfaces WPF failures immediately rather than requiring the user to find the tray menu. Check `dashboard_auto_open_attempt` and subsequent `dashboard_open step=` entries in the log if the dashboard doesn't appear. Step values: `construct` → `show` → `activate` → `done`. A missing `done` with an error after `construct` means the `MainWindow` constructor or XAML initialization threw.

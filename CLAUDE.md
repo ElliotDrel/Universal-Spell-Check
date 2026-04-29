@@ -61,7 +61,7 @@ Universal Spell Check/
 | Intent | Read this first |
 |---|---|
 | Editing API payloads, switching models, anything about temperature/reasoning/verbosity | `docs/model-config.md` |
-| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md`, then `src/README.md` |
+| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md` |
 | Channel separation, hotkey mapping, app-data isolation, version stamping | `src/BuildChannel.cs` (canonical source) |
 | Auto-update flow, Velopack, release pipeline | `src/UpdateService.cs`, `.github/workflows/release.yml` |
 | Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |

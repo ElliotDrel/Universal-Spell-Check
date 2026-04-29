@@ -1,101 +1,139 @@
 # Architecture & File Layout
 
-## Active files
-- **native/UniversalSpellCheck/**: C#/.NET WinForms main app. Uses `Ctrl+Alt+U`.
-- **Universal Spell Checker.ahk**: Legacy/fallback AHK script with `modelModule` selector (`gpt-4.1`, `gpt-5.1`, `gpt-5-mini`). `scriptVersion` is a manual integer-like string near the top; bump before any commit that touches this file and before asking the user to reload/retest.
-- **replacements.json**: Post-processing replacement pairs — `{ "canonical": ["variant1", ...] }`.
-- **spellcheck-server.pyw**: Local proxy. Required. Script hard-fails if it cannot be started or recovered.
-- **generate_log_viewer.py**: Reads `logs/*.jsonl` → `logs/viewer.html`. Run `python generate_log_viewer.py` (add `--open`).
-- **export_openai_finetune_dataset.py**: Builds fine-tune datasets from live logs.
-- **NATIVE_APP_FUTURE_TODO.md**: Root-level future work list for native cutover, reliability, parity, packaging, and rich-text/app-specific work.
+## Overview
 
-## Native app layout
-- `native/UniversalSpellCheck/Program.cs`: Single-instance app entrypoint; duplicate launches show a message and exit. Also bootstraps a `System.Windows.Application` (`ShutdownMode.OnExplicitShutdown`) and merges `UI/Styles.xaml` + `UI/Components.xaml` into `Application.Resources` before `Application.Run` so all WPF resource lookups have a top-level fallback. Hosts `--dashboard-smoke` mode which constructs the dashboard, pumps `DispatcherFrame`s, and fails on any `Dispatcher.UnhandledException`.
-- `native/UniversalSpellCheck/SpellCheckAppContext.cs`: Tray lifetime, menu, settings window, busy text, and loading overlay ownership. Auto-opens the dashboard once on startup via `Application.Idle` so UI failures surface immediately rather than only when the user pulls the tray menu.
-- `native/UniversalSpellCheck/HotkeyWindow.cs`: Win32 `RegisterHotKey` wrapper for `Ctrl+Alt+U`.
-- `native/UniversalSpellCheck/ClipboardLoop.cs`: Clipboard-first capture/paste with hotkey-release wait, copy sentinel, bounded copy retry, and clipboard restore on failure.
-- `native/UniversalSpellCheck/SpellcheckCoordinator.cs`: Serialized pipeline: capture -> request -> post-process -> paste. Uses non-queueing `SemaphoreSlim(1, 1)`.
-- `native/UniversalSpellCheck/OpenAiSpellcheckService.cs`: App-lifetime `HttpClient`, fixed `gpt-4.1` request, request retry, response parsing, and failure categories.
-- `native/UniversalSpellCheck/TextPostProcessor.cs`: Native `replacements.json` port plus prompt-leak guard.
-- `native/UniversalSpellCheck/SettingsStore.cs`: DPAPI current-user API-key storage used by the dashboard and request path.
-- `native/UniversalSpellCheck/UI/`: WPF dashboard opened from the tray. Shows recent successful native spell-checks from `spellcheck_detail` logs and provides API-key/log/replacements controls.
-- `native/UniversalSpellCheck/LoadingOverlayForm.cs`: Borderless topmost bottom-center `Spell check loading...` progress bar shown without activation while the API request is running.
-- `native/UniversalSpellCheck/README.md`: Native run/publish/manual-test instructions.
-- `native/UniversalSpellCheck/CUTOVER.md`: Native-vs-AHK comparison, test evidence, missing features, and rollback path.
+The product is a C#/.NET 10 WinForms tray app with an embedded WPF dashboard, living under `src/`. It bootstraps via Velopack, registers a global hotkey, and runs a clipboard-capture → API-request → post-process → paste pipeline. AHK is archived at `.archive/ahk-legacy/` and is not part of the active system.
 
-## Startup behavior
-- AHK no longer has a Windows Startup shortcut.
-- Native has a Windows Startup shortcut at:
-```text
-%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Universal Spell Check Native.lnk
-```
-- The shortcut points to the published native executable:
-```text
-native\UniversalSpellCheck\publish\UniversalSpellCheck.exe
-```
+---
+
+## Startup sequence (`src/Program.cs`)
+
+1. `VelopackApp.Build().Run()` — **must be the very first line of `Main`**. Handles first-run hooks and restart-after-update. Safe no-op when running via `dotnet run`.
+2. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0.
+3. Instantiate `System.Windows.Application` with `ShutdownMode.OnExplicitShutdown`. Merge `UI/Styles.xaml` and `UI/Components.xaml` into `app.Resources`. **Without this step**, WPF `DynamicResource` lookups crash (see watchlist).
+4. `Application.Run(new SpellCheckAppContext())` — starts the WinForms message loop.
+
+`--dashboard-smoke` mode can be passed to run a headless WPF layout pump and exit 0/1. Used for CI regression detection.
+
+---
+
+## Channel split (`src/BuildChannel.cs`)
+
+All channel-specific values live in `BuildChannel` as `const` or static-read-only members. Never hardcode a hotkey, mutex name, data folder, or display string anywhere else.
+
+| Member | Prod (`Release`) | Dev (`Dev` / `DEV` defined) |
+|---|---|---|
+| `IsDev` | `false` | `true` |
+| `DisplayName` | `Universal Spell Check` | `Universal Spell Check (Dev)` |
+| `ChannelName` | `prod` | `dev` |
+| `AppDataFolder` | `UniversalSpellCheck` | `UniversalSpellCheck.Dev` |
+| `MutexName` | `UniversalSpellCheck` | `UniversalSpellCheck.Dev` |
+| `TrayTooltip` | `Universal Spell Check` | `Universal Spell Check (Dev)` |
+| `HotkeyVk` | `0x55` (U) | `0x44` (D) |
+| `AppVersion` | from `AssemblyInformationalVersion` (injected at build time from tag) | `0.0.0-dev` |
+
+`IsDev` is a `const bool`, which means the compiler eliminates dead code at build time. CS0162 "unreachable code" warnings in channel-conditional blocks are expected and intentional.
+
+---
+
+## Settings isolation vs. unified logs (`src/AppPaths.cs`)
+
+- `AppDataDirectory` — `%LocalAppData%\{BuildChannel.AppDataFolder}`. Prod and Dev are fully isolated (settings, API key, Velopack staging).
+- `LogDirectory` — always `%LocalAppData%\UniversalSpellCheck\logs\` regardless of channel. Both channels append to the same daily file `spellcheck-{yyyy-MM-dd}.jsonl`. Every line carries `channel`, `app_version`, and `pid`.
+- `ReplacementsPath` — walks up from `AppContext.BaseDirectory` until `replacements.json` is found. Works for both dev checkout (`src/bin/...`) and Velopack-installed prod (file is copied next to the exe at publish time).
+
+---
+
+## Tray lifetime (`src/SpellCheckAppContext.cs`)
+
+Owns all long-lived objects: `NotifyIcon`, `HotkeyWindow`, `SpellcheckCoordinator`, `UpdateService`, `LoadingOverlayForm`, and the WPF `MainWindow` reference.
+
+Tray menu items:
+1. Version label (disabled) — shows `v{version}` or `v{version} — Update available ({new})` / `— Downloading {ver}…` / `— Checking…`
+2. Check for Updates → `UpdateService.CheckAsync(ManualTray)`
+3. Update Now (hidden until `UpdateState.UpdateReady`) → `UpdateService.ApplyUpdatesAndRestartAsync()`
+4. Separator
+5. Open Dashboard → `ShowSettings()` (reuses existing window if open)
+6. Open Logs Folder → `Process.Start(AppPaths.LogDirectory)`
+7. Quit
+
+Dev tray icon is orange-tinted at runtime (draws a semi-transparent orange overlay onto `SystemIcons.Application`).
+
+The dashboard auto-opens once on startup via `Application.Idle` so WPF resource failures surface immediately.
+
+---
+
+## Hotkey window (`src/HotkeyWindow.cs`)
+
+Thin `NativeWindow` subclass. Calls `RegisterHotKey` with `BuildChannel.HotkeyModifiers` and `BuildChannel.HotkeyVk`. Raises `HotkeyPressed` on `WM_HOTKEY`. Prod: Ctrl+Alt+U. Dev: Ctrl+Alt+D. Both channels can run side-by-side without collision.
+
+---
+
+## Spell-check pipeline (`src/SpellcheckCoordinator.cs`)
+
+Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`guard_rejected reason=already_running`), never queued.
+
+1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, writes a sentinel to clipboard, sends Ctrl+C, polls for changed Unicode text.
+2. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
+3. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
+4. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
+5. On request failure: restore clipboard, notify user, log `request_failed`, return.
+6. **Post-process** — `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
+7. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
+8. **Paste** — `ClipboardLoop.ReplaceSelectionAsync(replacement)`. Writes corrected text to clipboard, sends Ctrl+V.
+9. Log `replace_succeeded` with full timing breakdown.
+10. `SetBusy(false)` in `finally` — loading overlay hides even on failure.
+
+---
+
+## Loading overlay (`src/LoadingOverlayForm.cs`)
+
+Borderless, topmost WinForms form. Uses `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` to avoid stealing focus. Positioned at bottom-center of the primary screen's working area. Its Win32 handle is force-created on the UI thread at startup so `InvokeRequired` is meaningful when `SetBusy` is called from the async pipeline.
+
+---
+
+## Update service (`src/UpdateService.cs`)
+
+Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboardButton }`.
+
+State machine: `Idle | Checking | Downloading(version) | UpdateReady(version) | UpToDate | Failed(reason)`.
+
+Flow:
+1. If `BuildChannel.IsDev` or not installed via Velopack: log skip, return.
+2. Check for concurrent call via `SemaphoreSlim(1,1)`.
+3. Query GitHub Releases via `GithubSource` + `UpdateManager.CheckForUpdatesAsync()`.
+4. If no update: set `UpToDate`, return.
+5. If stale pending download exists for a different version: evict it.
+6. Download via `DownloadUpdatesAsync`. Set `UpdateReady`.
+7. If `trigger == ManualDashboardButton`: call `ApplyUpdatesAndRestart` immediately.
+8. Otherwise leave pending; Velopack applies it silently on next launch.
+
+Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev channel skips all update activity.
+
+---
+
+## WPF dashboard (`src/UI/`)
+
+`MainWindow` hosts two pages in a `Frame`: `ActivityPage` (recent spell-check history from `spellcheck_detail` log entries) and `SettingsPage` (API key, log folder, replacements file). Receives `UpdateService` reference; shows an update banner when state is `UpdateReady`.
+
+`SettingsPage` handles API-key save/clear, opens log folder, and opens `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
+
+---
+
+## Auto-start (`src/StartupRegistration.cs`)
+
+Writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\{BuildChannel.MutexName}` pointing at the running exe. Dev skips auto-start registration. Prod registers on first launch only (guarded by a flag file in `AppDataDirectory`). Can be toggled from `SettingsPage`.
+
+---
+
+## Release pipeline (`.github/workflows/release.yml`)
+
+Triggered by `v*.*.*` tags. Steps: checkout → dotnet publish Release win-x64 → `vpk pack` → `vpk upload github`. Version is injected from the tag; the csproj has no hardcoded `<Version>`. Delta packages and `RELEASES` manifest land as GitHub Release assets so installed copies pick them up on the next periodic check or launch.
+
+---
 
 ## Training data layout
-- `fine_tune_runs/` — one dated folder per fine-tune run; contains train/val JSONL, finetune_job.json, benchmark.json, summary.md.
+
+- `fine_tune_runs/` — one dated folder per fine-tune run: train/val JSONL, finetune_job.json, benchmark.json, summary.md.
 - `benchmark_runs/` — one dated folder per standalone benchmark run.
-
-## Fine-tune refresh
-```powershell
-python export_openai_finetune_dataset.py --source logs --weeks 8 --max-per-bucket 15
-```
-
-## Legacy (reference only, do not use as template)
-- `Universal Spell Checker - SEND TEXT instead of ctr+v.ahk` — minimal `SendText()` variant, no logging/post-processing.
-- `Universal Spell Checker App/`, `Universal Spell Check - V1/V2/V3/V3.5.ahk`, `spellcheck*.js` — abandoned.
-
-## Text processing flow
-
-### AHK production flow
-1. User selects text, presses Ctrl+Alt+U.
-2. Replacements loaded once at startup; reparsed only when `replacements.json` modified-time or size changes.
-3. At startup, script requires healthy proxy. Recovery ladder: 3 attempts with 5s / 30s / 60s readiness budgets; full shutdown+restart between attempts 2 and 3; `ExitApp` on exhaustion.
-4. Default apps use the fast single-copy path. `notepad.exe` waits for hotkey release, retries `Ctrl+C` up to 3 times, and aborts paste if `Ctrl+Alt+U` never fully releases.
-5. `GetClipboardText()` reads clipboard, preferring HTML (strips formatting) → Unicode → ANSI.
-6. Pre-request proxy health check; reruns recovery ladder if proxy died mid-session.
-7. Sends to local proxy → OpenAI Responses API via warm connection pool.
-8. Parse: regex primary → Map-based fallback.
-9. `ApplyReplacements()` fixes brand/term casing.
-10. `StripPromptLeak()` strips echoed instruction blocks.
-11. Paste via Ctrl+V or `SendText()` depending on `sendTextApps`.
-
-### Native main-app flow
-1. User selects text, presses Ctrl+Alt+U.
-2. `HotkeyWindow` raises the app-level event from Win32 `WM_HOTKEY`.
-3. `SpellcheckCoordinator` tries `SemaphoreSlim.WaitAsync(0)`; overlapping requests are rejected, not queued.
-4. `ClipboardLoop` waits for hotkey keys to release, writes a sentinel to the clipboard, sends `Ctrl+C`, and polls for selected Unicode text.
-5. After capture succeeds, tray text changes to checking state and `LoadingOverlayForm` shows the bottom-center loading bar without stealing foreground focus.
-6. If capture fails, original clipboard data is restored and no paste occurs.
-7. `OpenAiSpellcheckService` sends the fixed `gpt-4.1` Responses API request through a persistent `HttpClient`.
-8. `TextPostProcessor` applies `replacements.json` with URL protection and strips leaked `instructions:` / `text input:` prompt text.
-9. Before paste, the coordinator verifies the foreground process still matches the original target app. If focus moved, it restores the clipboard, logs `paste_failed`, and does not paste into the wrong app.
-10. `ClipboardLoop` writes the final replacement to the clipboard and sends `Ctrl+V`.
-11. Logs capture timing, request timing, post-process timing, paste timing, attempts, active app, paste target app, failure category, and a detail record with raw/base data to `%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\`.
-12. Loading overlay hides in `finally`, even on request/paste failure.
-
-### Native dashboard flow
-1. App startup auto-opens the dashboard once (via `Application.Idle`); the user can also reopen it from the tray menu's `Open Dashboard`.
-2. `SpellCheckAppContext` opens the in-process WPF `UI/MainWindow`. Resources (`Styles.xaml`, `Components.xaml`) resolve through the `System.Windows.Application` instance created at startup; without that anchor `DynamicResource` lookups crashed with `'{DependencyProperty.UnsetValue}' is not a valid value for property ...'`.
-3. Home reads the current native log file and renders successful `spellcheck_detail` entries as diff rows.
-4. Settings saves the OpenAI API key through `SettingsStore`, opens the log folder, and opens `replacements.json`.
-5. Hotkey capture, model switching, startup toggling, and a full replacements editor are deferred and must not be fake-wired.
-
-## Design principles
-- Speed first — every op optimized for latency.
-- Self-contained .ahk files; only external dep is `replacements.json`.
-- Direct clipboard manipulation for instant replacement.
-- One file supports all target models via top-level selector.
-- Native app is the main hotkey owner; AHK remains a fallback/reference path.
-- Native feature work should preserve the proven plain-text loop before adding richer compatibility.
-
-## Constraints
-- Windows only, AutoHotkey v2.0 required.
-- OpenAI API key with Responses API access.
-- AHK has no build step.
-- Native app requires .NET SDK for development; publish as self-contained single-file EXE:
-```powershell
-dotnet publish native\UniversalSpellCheck\UniversalSpellCheck.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o native\UniversalSpellCheck\publish
-```
+- `tests/` — pytest suites for Python fine-tune dataset tooling. Reference `replacements.json` at repo root.
