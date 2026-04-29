@@ -1,0 +1,1913 @@
+{
+  "generated_at_utc": "2026-04-29T15:20:40.8838765Z",
+  "options": {
+    "Runs": 2,
+    "Warmup": 1,
+    "Model": "gpt-4.1-nano",
+    "Variant": "smoke"
+  },
+  "inputs": [
+    {
+      "name": "01",
+      "input_chars": 120,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2401,
+        "median": 2401,
+        "p95": 2716.9,
+        "min": 2050,
+        "max": 2752,
+        "stddev": 496.38896039295633
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2387,
+        "median": 2387,
+        "p95": 2702.9,
+        "min": 2036,
+        "max": 2738,
+        "stddev": 496.38896039295633
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 126.5,
+        "median": 126.5,
+        "p95": 126.95,
+        "min": 126,
+        "max": 127,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 2096,
+        "median": 2096,
+        "p95": 2413.7,
+        "min": 1743,
+        "max": 2449,
+        "stddev": 499.21738751770255
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 162.5,
+        "median": 162.5,
+        "p95": 163.85,
+        "min": 161,
+        "max": 164,
+        "stddev": 2.1213203435596424
+      },
+      "tokens": {
+        "input_avg": 70,
+        "output_avg": 23,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "02",
+      "input_chars": 50,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2059,
+        "median": 2059,
+        "p95": 2164.3,
+        "min": 1942,
+        "max": 2176,
+        "stddev": 165.46298679765212
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2048.5,
+        "median": 2048.5,
+        "p95": 2153.35,
+        "min": 1932,
+        "max": 2165,
+        "stddev": 164.75588001646557
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125.5,
+        "median": 125.5,
+        "p95": 125.95,
+        "min": 125,
+        "max": 126,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1765.5,
+        "median": 1765.5,
+        "p95": 1879.35,
+        "min": 1639,
+        "max": 1892,
+        "stddev": 178.89801564019652
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 155.5,
+        "median": 155.5,
+        "p95": 163.15,
+        "min": 147,
+        "max": 164,
+        "stddev": 12.020815280171307
+      },
+      "tokens": {
+        "input_avg": 58,
+        "output_avg": 11,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "03",
+      "input_chars": 86,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2175.5,
+        "median": 2175.5,
+        "p95": 2996.75,
+        "min": 1263,
+        "max": 3088,
+        "stddev": 1290.4698756654493
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2165,
+        "median": 2165,
+        "p95": 2987.6,
+        "min": 1251,
+        "max": 3079,
+        "stddev": 1292.5911960090089
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125.5,
+        "median": 125.5,
+        "p95": 125.95,
+        "min": 125,
+        "max": 126,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1872,
+        "median": 1872,
+        "p95": 2692.8,
+        "min": 960,
+        "max": 2784,
+        "stddev": 1289.7627688842626
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 165,
+        "median": 165,
+        "p95": 166.8,
+        "min": 163,
+        "max": 167,
+        "stddev": 2.8284271247461903
+      },
+      "tokens": {
+        "input_avg": 65,
+        "output_avg": 22,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "04",
+      "input_chars": 545,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2226.5,
+        "median": 2226.5,
+        "p95": 2252.15,
+        "min": 2198,
+        "max": 2255,
+        "stddev": 40.30508652763321
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2211.5,
+        "median": 2211.5,
+        "p95": 2238.05,
+        "min": 2182,
+        "max": 2241,
+        "stddev": 41.71930009000631
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125,
+        "median": 125,
+        "p95": 125,
+        "min": 125,
+        "max": 125,
+        "stddev": 0
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1915,
+        "median": 1915,
+        "p95": 1941.1,
+        "min": 1886,
+        "max": 1944,
+        "stddev": 41.012193308819754
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 169.5,
+        "median": 169.5,
+        "p95": 169.95,
+        "min": 169,
+        "max": 170,
+        "stddev": 0.7071067811865476
+      },
+      "tokens": {
+        "input_avg": 155,
+        "output_avg": 105,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "05",
+      "input_chars": 41,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1126,
+        "median": 1126,
+        "p95": 1143.1,
+        "min": 1107,
+        "max": 1145,
+        "stddev": 26.870057685088806
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1118.5,
+        "median": 1118.5,
+        "p95": 1134.25,
+        "min": 1101,
+        "max": 1136,
+        "stddev": 24.748737341529164
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 118.5,
+        "median": 118.5,
+        "p95": 126.15,
+        "min": 110,
+        "max": 127,
+        "stddev": 12.020815280171307
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 836.5,
+        "median": 836.5,
+        "p95": 837.85,
+        "min": 835,
+        "max": 838,
+        "stddev": 2.1213203435596424
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 161.5,
+        "median": 161.5,
+        "p95": 168.25,
+        "min": 154,
+        "max": 169,
+        "stddev": 10.606601717798213
+      },
+      "tokens": {
+        "input_avg": 58,
+        "output_avg": 14,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "06",
+      "input_chars": 25,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1365.5,
+        "median": 1365.5,
+        "p95": 1570.25,
+        "min": 1138,
+        "max": 1593,
+        "stddev": 321.7335854398791
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1357.5,
+        "median": 1357.5,
+        "p95": 1563.15,
+        "min": 1129,
+        "max": 1586,
+        "stddev": 323.1477990022522
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 126.5,
+        "median": 126.5,
+        "p95": 127.85,
+        "min": 125,
+        "max": 128,
+        "stddev": 2.1213203435596424
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1061.5,
+        "median": 1061.5,
+        "p95": 1265.35,
+        "min": 835,
+        "max": 1288,
+        "stddev": 320.319371877506
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 167.5,
+        "median": 167.5,
+        "p95": 168.85,
+        "min": 166,
+        "max": 169,
+        "stddev": 2.1213203435596424
+      },
+      "tokens": {
+        "input_avg": 54,
+        "output_avg": 9,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "07",
+      "input_chars": 148,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2006,
+        "median": 2006,
+        "p95": 2370.5,
+        "min": 1601,
+        "max": 2411,
+        "stddev": 572.7564927611035
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1998.5,
+        "median": 1998.5,
+        "p95": 2362.55,
+        "min": 1594,
+        "max": 2403,
+        "stddev": 572.0493859799169
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125.5,
+        "median": 125.5,
+        "p95": 126.85,
+        "min": 124,
+        "max": 127,
+        "stddev": 2.1213203435596424
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1701,
+        "median": 1701,
+        "p95": 2066.4,
+        "min": 1295,
+        "max": 2107,
+        "stddev": 574.1707063234766
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 169.5,
+        "median": 169.5,
+        "p95": 169.95,
+        "min": 169,
+        "max": 170,
+        "stddev": 0.7071067811865476
+      },
+      "tokens": {
+        "input_avg": 86,
+        "output_avg": 35,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "08",
+      "input_chars": 48,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1297.5,
+        "median": 1297.5,
+        "p95": 1307.85,
+        "min": 1286,
+        "max": 1309,
+        "stddev": 16.263455967290593
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1295,
+        "median": 1295,
+        "p95": 1310.3,
+        "min": 1278,
+        "max": 1312,
+        "stddev": 24.041630560342615
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 124.5,
+        "median": 124.5,
+        "p95": 124.95,
+        "min": 124,
+        "max": 125,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 992.5,
+        "median": 992.5,
+        "p95": 1000.15,
+        "min": 984,
+        "max": 1001,
+        "stddev": 12.020815280171307
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 174.5,
+        "median": 174.5,
+        "p95": 181.25,
+        "min": 167,
+        "max": 182,
+        "stddev": 10.606601717798213
+      },
+      "tokens": {
+        "input_avg": 57,
+        "output_avg": 11,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "09",
+      "input_chars": 188,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2286,
+        "median": 2286,
+        "p95": 3251.7,
+        "min": 1213,
+        "max": 3359,
+        "stddev": 1517.451152426331
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2277.5,
+        "median": 2277.5,
+        "p95": 3243.6499999999996,
+        "min": 1204,
+        "max": 3351,
+        "stddev": 1518.1582592075176
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125,
+        "median": 125,
+        "p95": 125,
+        "min": 125,
+        "max": 125,
+        "stddev": 0
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1982.5,
+        "median": 1982.5,
+        "p95": 2948.6499999999996,
+        "min": 909,
+        "max": 3056,
+        "stddev": 1518.1582592075176
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 168,
+        "median": 168,
+        "p95": 168,
+        "min": 168,
+        "max": 168,
+        "stddev": 0
+      },
+      "tokens": {
+        "input_avg": 89,
+        "output_avg": 43,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "10",
+      "input_chars": 176,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1526.5,
+        "median": 1526.5,
+        "p95": 1560.25,
+        "min": 1489,
+        "max": 1564,
+        "stddev": 53.033008588991066
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1518.5,
+        "median": 1518.5,
+        "p95": 1552.25,
+        "min": 1481,
+        "max": 1556,
+        "stddev": 53.033008588991066
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 124,
+        "median": 124,
+        "p95": 124,
+        "min": 124,
+        "max": 124,
+        "stddev": 0
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1222,
+        "median": 1222,
+        "p95": 1257.1,
+        "min": 1183,
+        "max": 1261,
+        "stddev": 55.154328932550705
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 170.5,
+        "median": 170.5,
+        "p95": 171.85,
+        "min": 169,
+        "max": 172,
+        "stddev": 2.1213203435596424
+      },
+      "tokens": {
+        "input_avg": 92,
+        "output_avg": 46,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "11",
+      "input_chars": 223,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2201,
+        "median": 2201,
+        "p95": 2484.5,
+        "min": 1886,
+        "max": 2516,
+        "stddev": 445.47727214752496
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2193,
+        "median": 2193,
+        "p95": 2475.6,
+        "min": 1879,
+        "max": 2507,
+        "stddev": 444.06305858515185
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 126,
+        "median": 126,
+        "p95": 126,
+        "min": 126,
+        "max": 126,
+        "stddev": 0
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1896.5,
+        "median": 1896.5,
+        "p95": 2178.65,
+        "min": 1583,
+        "max": 2210,
+        "stddev": 443.3559518039653
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 168.5,
+        "median": 168.5,
+        "p95": 168.95,
+        "min": 168,
+        "max": 169,
+        "stddev": 0.7071067811865476
+      },
+      "tokens": {
+        "input_avg": 96,
+        "output_avg": 48,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "12",
+      "input_chars": 232,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1442,
+        "median": 1442,
+        "p95": 1604,
+        "min": 1262,
+        "max": 1622,
+        "stddev": 254.55844122715712
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1432,
+        "median": 1432,
+        "p95": 1594,
+        "min": 1252,
+        "max": 1612,
+        "stddev": 254.55844122715712
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 125,
+        "median": 125,
+        "p95": 125.9,
+        "min": 124,
+        "max": 126,
+        "stddev": 1.4142135623730951
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1140.5,
+        "median": 1140.5,
+        "p95": 1303.85,
+        "min": 959,
+        "max": 1322,
+        "stddev": 256.6797615707168
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 164.5,
+        "median": 164.5,
+        "p95": 164.95,
+        "min": 164,
+        "max": 165,
+        "stddev": 0.7071067811865476
+      },
+      "tokens": {
+        "input_avg": 105,
+        "output_avg": 55,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "13",
+      "input_chars": 638,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2662,
+        "median": 2662,
+        "p95": 2817.7,
+        "min": 2489,
+        "max": 2835,
+        "stddev": 244.65894629054543
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2647.5,
+        "median": 2647.5,
+        "p95": 2803.65,
+        "min": 2474,
+        "max": 2821,
+        "stddev": 245.36605307173198
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 123.5,
+        "median": 123.5,
+        "p95": 123.95,
+        "min": 123,
+        "max": 124,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 2355,
+        "median": 2355,
+        "p95": 2510.7,
+        "min": 2182,
+        "max": 2528,
+        "stddev": 244.65894629054543
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 167,
+        "median": 167,
+        "p95": 167.9,
+        "min": 166,
+        "max": 168,
+        "stddev": 1.4142135623730951
+      },
+      "tokens": {
+        "input_avg": 193,
+        "output_avg": 136,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "14",
+      "input_chars": 950,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 3810,
+        "median": 3810,
+        "p95": 4440.9,
+        "min": 3109,
+        "max": 4511,
+        "stddev": 991.3637072235397
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 3795,
+        "median": 3795,
+        "p95": 4425.9,
+        "min": 3094,
+        "max": 4496,
+        "stddev": 991.3637072235397
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 126.5,
+        "median": 126.5,
+        "p95": 126.95,
+        "min": 126,
+        "max": 127,
+        "stddev": 0.7071067811865476
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 3498.5,
+        "median": 3498.5,
+        "p95": 4128.95,
+        "min": 2798,
+        "max": 4199,
+        "stddev": 990.6566004423531
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 167.5,
+        "median": 167.5,
+        "p95": 168.85,
+        "min": 166,
+        "max": 169,
+        "stddev": 2.1213203435596424
+      },
+      "tokens": {
+        "input_avg": 281,
+        "output_avg": 198,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "15",
+      "input_chars": 1196,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 4656,
+        "median": 4656,
+        "p95": 5663.1,
+        "min": 3537,
+        "max": 5775,
+        "stddev": 1582.5049762954934
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 4636.5,
+        "median": 4636.5,
+        "p95": 5647.65,
+        "min": 3513,
+        "max": 5760,
+        "stddev": 1588.8689373261723
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 120,
+        "median": 120,
+        "p95": 125.4,
+        "min": 114,
+        "max": 126,
+        "stddev": 8.48528137423857
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 4213.5,
+        "median": 4213.5,
+        "p95": 5097.75,
+        "min": 3231,
+        "max": 5196,
+        "stddev": 1389.4648250315659
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 246,
+        "median": 246,
+        "p95": 318,
+        "min": 166,
+        "max": 326,
+        "stddev": 113.13708498984761
+      },
+      "tokens": {
+        "input_avg": 368,
+        "output_avg": 278,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "16",
+      "input_chars": 818,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2830,
+        "median": 2830,
+        "p95": 2836.3,
+        "min": 2823,
+        "max": 2837,
+        "stddev": 9.899494936611665
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2814.5,
+        "median": 2814.5,
+        "p95": 2821.25,
+        "min": 2807,
+        "max": 2822,
+        "stddev": 10.606601717798213
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 120,
+        "median": 120,
+        "p95": 120.9,
+        "min": 119,
+        "max": 121,
+        "stddev": 1.4142135623730951
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 2507,
+        "median": 2507,
+        "p95": 2507.9,
+        "min": 2506,
+        "max": 2508,
+        "stddev": 1.4142135623730951
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 183.5,
+        "median": 183.5,
+        "p95": 190.25,
+        "min": 176,
+        "max": 191,
+        "stddev": 10.606601717798213
+      },
+      "tokens": {
+        "input_avg": 237,
+        "output_avg": 183,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "17",
+      "input_chars": 1409,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 4065.5,
+        "median": 4065.5,
+        "p95": 4167.65,
+        "min": 3952,
+        "max": 4179,
+        "stddev": 160.51323932934628
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 4050.5,
+        "median": 4050.5,
+        "p95": 4152.65,
+        "min": 3937,
+        "max": 4164,
+        "stddev": 160.51323932934628
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 120.5,
+        "median": 120.5,
+        "p95": 124.55,
+        "min": 116,
+        "max": 125,
+        "stddev": 6.363961030678928
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 3763.5,
+        "median": 3763.5,
+        "p95": 3869.25,
+        "min": 3646,
+        "max": 3881,
+        "stddev": 166.17009357883867
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 163.5,
+        "median": 163.5,
+        "p95": 171.15,
+        "min": 155,
+        "max": 172,
+        "stddev": 12.020815280171307
+      },
+      "tokens": {
+        "input_avg": 380,
+        "output_avg": 304,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "18",
+      "input_chars": 135,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 1786,
+        "median": 1786,
+        "p95": 1933.6,
+        "min": 1622,
+        "max": 1950,
+        "stddev": 231.93102422918759
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 1778.5,
+        "median": 1778.5,
+        "p95": 1926.55,
+        "min": 1614,
+        "max": 1943,
+        "stddev": 232.63813101037414
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 114.5,
+        "median": 114.5,
+        "p95": 121.25,
+        "min": 107,
+        "max": 122,
+        "stddev": 10.606601717798213
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 1507,
+        "median": 1507,
+        "p95": 1647.4,
+        "min": 1351,
+        "max": 1663,
+        "stddev": 220.61731573020282
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 155,
+        "median": 155,
+        "p95": 155.9,
+        "min": 154,
+        "max": 156,
+        "stddev": 1.4142135623730951
+      },
+      "tokens": {
+        "input_avg": 83,
+        "output_avg": 34,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "19",
+      "input_chars": 320,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 2779.5,
+        "median": 2779.5,
+        "p95": 3403.6499999999996,
+        "min": 2086,
+        "max": 3473,
+        "stddev": 980.7571055057414
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 2768.5,
+        "median": 2768.5,
+        "p95": 3385.45,
+        "min": 2083,
+        "max": 3454,
+        "stddev": 969.4433970067566
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 137.5,
+        "median": 137.5,
+        "p95": 143.35,
+        "min": 131,
+        "max": 144,
+        "stddev": 9.192388155425117
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 2463.5,
+        "median": 2463.5,
+        "p95": 3086.75,
+        "min": 1771,
+        "max": 3156,
+        "stddev": 979.3428919433683
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 165,
+        "median": 165,
+        "p95": 165,
+        "min": 165,
+        "max": 165,
+        "stddev": 0
+      },
+      "tokens": {
+        "input_avg": 127,
+        "output_avg": 68,
+        "cached_avg": 0
+      }
+    },
+    {
+      "name": "20",
+      "input_chars": 577,
+      "trial_count": 2,
+      "success_count": 2,
+      "total_ms": {
+        "count": 2,
+        "mean": 3374,
+        "median": 3374,
+        "p95": 3749.3,
+        "min": 2957,
+        "max": 3791,
+        "stddev": 589.7270555095806
+      },
+      "coordinator_total_ms": {
+        "count": 2,
+        "mean": 3358.5,
+        "median": 3358.5,
+        "p95": 3741.45,
+        "min": 2933,
+        "max": 3784,
+        "stddev": 601.7478707897519
+      },
+      "capture_ms": {
+        "count": 2,
+        "mean": 116,
+        "median": 116,
+        "p95": 122.3,
+        "min": 109,
+        "max": 123,
+        "stddev": 9.899494936611665
+      },
+      "request_ms": {
+        "count": 2,
+        "mean": 3085,
+        "median": 3085,
+        "p95": 3463.9,
+        "min": 2664,
+        "max": 3506,
+        "stddev": 595.383909759073
+      },
+      "post_process_ms": {
+        "count": 0,
+        "mean": 0,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0,
+        "stddev": 0
+      },
+      "paste_ms": {
+        "count": 2,
+        "mean": 154.5,
+        "median": 154.5,
+        "p95": 156.75,
+        "min": 152,
+        "max": 157,
+        "stddev": 3.5355339059327378
+      },
+      "tokens": {
+        "input_avg": 190,
+        "output_avg": 131,
+        "cached_avg": 0
+      }
+    }
+  ],
+  "trials": [
+    {
+      "InputName": "01",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2752,
+      "CoordinatorTotalMs": 2738,
+      "CaptureMs": 126,
+      "RequestMs": 2449,
+      "PostProcessMs": 0,
+      "PasteMs": 161,
+      "InputTokens": 70,
+      "OutputTokens": 23,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "01",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2050,
+      "CoordinatorTotalMs": 2036,
+      "CaptureMs": 127,
+      "RequestMs": 1743,
+      "PostProcessMs": 0,
+      "PasteMs": 164,
+      "InputTokens": 70,
+      "OutputTokens": 23,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "02",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1942,
+      "CoordinatorTotalMs": 1932,
+      "CaptureMs": 126,
+      "RequestMs": 1639,
+      "PostProcessMs": 0,
+      "PasteMs": 164,
+      "InputTokens": 58,
+      "OutputTokens": 11,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "02",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2176,
+      "CoordinatorTotalMs": 2165,
+      "CaptureMs": 125,
+      "RequestMs": 1892,
+      "PostProcessMs": 0,
+      "PasteMs": 147,
+      "InputTokens": 58,
+      "OutputTokens": 11,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "03",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 3088,
+      "CoordinatorTotalMs": 3079,
+      "CaptureMs": 125,
+      "RequestMs": 2784,
+      "PostProcessMs": 0,
+      "PasteMs": 167,
+      "InputTokens": 65,
+      "OutputTokens": 22,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "03",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1263,
+      "CoordinatorTotalMs": 1251,
+      "CaptureMs": 126,
+      "RequestMs": 960,
+      "PostProcessMs": 0,
+      "PasteMs": 163,
+      "InputTokens": 65,
+      "OutputTokens": 22,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "04",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2198,
+      "CoordinatorTotalMs": 2182,
+      "CaptureMs": 125,
+      "RequestMs": 1886,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 155,
+      "OutputTokens": 105,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "04",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2255,
+      "CoordinatorTotalMs": 2241,
+      "CaptureMs": 125,
+      "RequestMs": 1944,
+      "PostProcessMs": 0,
+      "PasteMs": 170,
+      "InputTokens": 155,
+      "OutputTokens": 105,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "05",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1107,
+      "CoordinatorTotalMs": 1101,
+      "CaptureMs": 110,
+      "RequestMs": 835,
+      "PostProcessMs": 0,
+      "PasteMs": 154,
+      "InputTokens": 58,
+      "OutputTokens": 14,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "05",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1145,
+      "CoordinatorTotalMs": 1136,
+      "CaptureMs": 127,
+      "RequestMs": 838,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 58,
+      "OutputTokens": 14,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "06",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1138,
+      "CoordinatorTotalMs": 1129,
+      "CaptureMs": 125,
+      "RequestMs": 835,
+      "PostProcessMs": 0,
+      "PasteMs": 166,
+      "InputTokens": 54,
+      "OutputTokens": 9,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "06",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1593,
+      "CoordinatorTotalMs": 1586,
+      "CaptureMs": 128,
+      "RequestMs": 1288,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 54,
+      "OutputTokens": 9,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "07",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2411,
+      "CoordinatorTotalMs": 2403,
+      "CaptureMs": 124,
+      "RequestMs": 2107,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 86,
+      "OutputTokens": 35,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "07",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1601,
+      "CoordinatorTotalMs": 1594,
+      "CaptureMs": 127,
+      "RequestMs": 1295,
+      "PostProcessMs": 0,
+      "PasteMs": 170,
+      "InputTokens": 86,
+      "OutputTokens": 35,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "08",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1286,
+      "CoordinatorTotalMs": 1278,
+      "CaptureMs": 124,
+      "RequestMs": 984,
+      "PostProcessMs": 0,
+      "PasteMs": 167,
+      "InputTokens": 57,
+      "OutputTokens": 11,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "08",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1309,
+      "CoordinatorTotalMs": 1312,
+      "CaptureMs": 125,
+      "RequestMs": 1001,
+      "PostProcessMs": 0,
+      "PasteMs": 182,
+      "InputTokens": 57,
+      "OutputTokens": 11,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "09",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 3359,
+      "CoordinatorTotalMs": 3351,
+      "CaptureMs": 125,
+      "RequestMs": 3056,
+      "PostProcessMs": 0,
+      "PasteMs": 168,
+      "InputTokens": 89,
+      "OutputTokens": 43,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "09",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1213,
+      "CoordinatorTotalMs": 1204,
+      "CaptureMs": 125,
+      "RequestMs": 909,
+      "PostProcessMs": 0,
+      "PasteMs": 168,
+      "InputTokens": 89,
+      "OutputTokens": 43,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "10",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1489,
+      "CoordinatorTotalMs": 1481,
+      "CaptureMs": 124,
+      "RequestMs": 1183,
+      "PostProcessMs": 0,
+      "PasteMs": 172,
+      "InputTokens": 92,
+      "OutputTokens": 46,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "10",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1564,
+      "CoordinatorTotalMs": 1556,
+      "CaptureMs": 124,
+      "RequestMs": 1261,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 92,
+      "OutputTokens": 46,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "11",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1886,
+      "CoordinatorTotalMs": 1879,
+      "CaptureMs": 126,
+      "RequestMs": 1583,
+      "PostProcessMs": 0,
+      "PasteMs": 168,
+      "InputTokens": 96,
+      "OutputTokens": 48,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "11",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2516,
+      "CoordinatorTotalMs": 2507,
+      "CaptureMs": 126,
+      "RequestMs": 2210,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 96,
+      "OutputTokens": 48,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "12",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1622,
+      "CoordinatorTotalMs": 1612,
+      "CaptureMs": 124,
+      "RequestMs": 1322,
+      "PostProcessMs": 0,
+      "PasteMs": 164,
+      "InputTokens": 105,
+      "OutputTokens": 55,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "12",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1262,
+      "CoordinatorTotalMs": 1252,
+      "CaptureMs": 126,
+      "RequestMs": 959,
+      "PostProcessMs": 0,
+      "PasteMs": 165,
+      "InputTokens": 105,
+      "OutputTokens": 55,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "13",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2489,
+      "CoordinatorTotalMs": 2474,
+      "CaptureMs": 124,
+      "RequestMs": 2182,
+      "PostProcessMs": 0,
+      "PasteMs": 166,
+      "InputTokens": 193,
+      "OutputTokens": 136,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "13",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2835,
+      "CoordinatorTotalMs": 2821,
+      "CaptureMs": 123,
+      "RequestMs": 2528,
+      "PostProcessMs": 0,
+      "PasteMs": 168,
+      "InputTokens": 193,
+      "OutputTokens": 136,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "14",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 4511,
+      "CoordinatorTotalMs": 4496,
+      "CaptureMs": 126,
+      "RequestMs": 4199,
+      "PostProcessMs": 0,
+      "PasteMs": 169,
+      "InputTokens": 281,
+      "OutputTokens": 198,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "14",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 3109,
+      "CoordinatorTotalMs": 3094,
+      "CaptureMs": 127,
+      "RequestMs": 2798,
+      "PostProcessMs": 0,
+      "PasteMs": 166,
+      "InputTokens": 281,
+      "OutputTokens": 198,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "15",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 5775,
+      "CoordinatorTotalMs": 5760,
+      "CaptureMs": 126,
+      "RequestMs": 5196,
+      "PostProcessMs": 0,
+      "PasteMs": 326,
+      "InputTokens": 368,
+      "OutputTokens": 277,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "15",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 3537,
+      "CoordinatorTotalMs": 3513,
+      "CaptureMs": 114,
+      "RequestMs": 3231,
+      "PostProcessMs": 0,
+      "PasteMs": 166,
+      "InputTokens": 368,
+      "OutputTokens": 279,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "16",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2837,
+      "CoordinatorTotalMs": 2822,
+      "CaptureMs": 121,
+      "RequestMs": 2508,
+      "PostProcessMs": 0,
+      "PasteMs": 191,
+      "InputTokens": 237,
+      "OutputTokens": 183,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "16",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 2823,
+      "CoordinatorTotalMs": 2807,
+      "CaptureMs": 119,
+      "RequestMs": 2506,
+      "PostProcessMs": 0,
+      "PasteMs": 176,
+      "InputTokens": 237,
+      "OutputTokens": 183,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "17",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 4179,
+      "CoordinatorTotalMs": 4164,
+      "CaptureMs": 125,
+      "RequestMs": 3881,
+      "PostProcessMs": 0,
+      "PasteMs": 155,
+      "InputTokens": 380,
+      "OutputTokens": 304,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "17",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 3952,
+      "CoordinatorTotalMs": 3937,
+      "CaptureMs": 116,
+      "RequestMs": 3646,
+      "PostProcessMs": 0,
+      "PasteMs": 172,
+      "InputTokens": 380,
+      "OutputTokens": 304,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "18",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 1622,
+      "CoordinatorTotalMs": 1614,
+      "CaptureMs": 107,
+      "RequestMs": 1351,
+      "PostProcessMs": 0,
+      "PasteMs": 154,
+      "InputTokens": 83,
+      "OutputTokens": 34,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "18",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 1950,
+      "CoordinatorTotalMs": 1943,
+      "CaptureMs": 122,
+      "RequestMs": 1663,
+      "PostProcessMs": 0,
+      "PasteMs": 156,
+      "InputTokens": 83,
+      "OutputTokens": 34,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "19",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2086,
+      "CoordinatorTotalMs": 2083,
+      "CaptureMs": 144,
+      "RequestMs": 1771,
+      "PostProcessMs": 0,
+      "PasteMs": 165,
+      "InputTokens": 127,
+      "OutputTokens": 68,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "19",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 3473,
+      "CoordinatorTotalMs": 3454,
+      "CaptureMs": 131,
+      "RequestMs": 3156,
+      "PostProcessMs": 0,
+      "PasteMs": 165,
+      "InputTokens": 127,
+      "OutputTokens": 68,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "20",
+      "TrialIndex": 1,
+      "Success": true,
+      "TotalMs": 2957,
+      "CoordinatorTotalMs": 2933,
+      "CaptureMs": 109,
+      "RequestMs": 2664,
+      "PostProcessMs": 0,
+      "PasteMs": 157,
+      "InputTokens": 190,
+      "OutputTokens": 131,
+      "CachedTokens": 0,
+      "Error": ""
+    },
+    {
+      "InputName": "20",
+      "TrialIndex": 2,
+      "Success": true,
+      "TotalMs": 3791,
+      "CoordinatorTotalMs": 3784,
+      "CaptureMs": 123,
+      "RequestMs": 3506,
+      "PostProcessMs": 0,
+      "PasteMs": 152,
+      "InputTokens": 190,
+      "OutputTokens": 131,
+      "CachedTokens": 0,
+      "Error": ""
+    }
+  ]
+}
