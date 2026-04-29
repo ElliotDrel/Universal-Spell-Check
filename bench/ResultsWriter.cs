@@ -12,12 +12,12 @@ internal static class ResultsWriter
             input_chars = input.InputChars,
             trial_count = input.Trials.Count,
             success_count = input.Trials.Count(t => t.Success),
-            total_ms = Stats.For(input.Trials, t => t.TotalMs),
-            coordinator_total_ms = Stats.For(input.Trials, t => t.CoordinatorTotalMs),
-            capture_ms = Stats.For(input.Trials, t => t.CaptureMs),
-            request_ms = Stats.For(input.Trials, t => t.RequestMs),
-            post_process_ms = Stats.For(input.Trials, t => t.PostProcessMs),
-            paste_ms = Stats.For(input.Trials, t => t.PasteMs),
+            total_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.TotalMs),
+            coordinator_total_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.CoordinatorTotalMs),
+            capture_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.CaptureMs),
+            request_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.RequestMs),
+            post_process_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PostProcessMs),
+            paste_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PasteMs),
             tokens = new
             {
                 input_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.InputTokens ?? 0),

@@ -38,7 +38,9 @@ internal sealed class BenchHarness
     // RunRecord captured by the coordinator's logger sink. The coordinator only
     // exposes timings via its FinalizeAsync log; the cleanest seam is to wrap
     // the logger so we can intercept the spellcheck_detail JSON per trial.
-    private TrialTimings? _lastTrialTimings;
+    private volatile TrialTimings? _lastTrialTimings;
+    private volatile bool _pasteExpected;
+    private long _t1Ticks;
 
     public BenchHarness(
         BenchTargetForm form,
@@ -69,6 +71,7 @@ internal sealed class BenchHarness
             {
                 _logger.Log($"bench warmup input={name} trial={w + 1}/{_warmup}");
                 _ = await RunOneTrialAsync(name, text, trialIndex: -(w + 1));
+                await Task.Delay(300);
             }
 
             for (var i = 0; i < _runs; i++)
@@ -76,6 +79,7 @@ internal sealed class BenchHarness
                 _logger.Log($"bench measured input={name} trial={i + 1}/{_runs}");
                 var trial = await RunOneTrialAsync(name, text, trialIndex: i + 1);
                 trials.Add(trial);
+                await Task.Delay(300);  // let stale clipboard/paste events settle between trials
             }
 
             results.Add(new InputResult
@@ -92,16 +96,15 @@ internal sealed class BenchHarness
     private async Task<TrialResult> RunOneTrialAsync(string name, string text, int trialIndex)
     {
         _lastTrialTimings = null;
+        _pasteExpected = false;
+        _t1Ticks = 0;
         var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Subscribe ONCE per trial to the textbox change event.
         void OnChanged(object? _, EventArgs __)
         {
-            if (string.Equals(_form.CurrentText, text, StringComparison.Ordinal))
-            {
-                // The change is from our own LoadAndSelect call; ignore.
-                return;
-            }
+            if (!_pasteExpected) return;   // ignore LoadAndSelect writes before we fire hotkey
+            Interlocked.Exchange(ref _t1Ticks, Stopwatch.GetTimestamp());
             ready.TrySetResult(true);
         }
 
@@ -113,12 +116,12 @@ internal sealed class BenchHarness
             Application.DoEvents();
             await Task.Delay(50);  // give Windows a tick to settle focus
 
+            _pasteExpected = true;
             var t0 = Stopwatch.GetTimestamp();
             HotkeyInjector.FireCtrlAltB();
 
             // Wait up to 60s for the textbox to change (cap = HttpClient timeout + slack).
             var winner = await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(60)));
-            var t1 = Stopwatch.GetTimestamp();
 
             if (winner != ready.Task)
             {
@@ -127,7 +130,7 @@ internal sealed class BenchHarness
                     InputName = name,
                     TrialIndex = trialIndex,
                     Success = false,
-                    TotalMs = TicksToMs(t0, t1),
+                    TotalMs = TicksToMs(t0, Stopwatch.GetTimestamp()),
                     CoordinatorTotalMs = 0,
                     CaptureMs = 0,
                     RequestMs = 0,
@@ -142,10 +145,14 @@ internal sealed class BenchHarness
 
             // Coordinator finalize runs as Task.Run after RunAsync returns; wait briefly
             // for the timings sink to receive the spellcheck_detail event.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
             while (_lastTrialTimings is null && DateTime.UtcNow < deadline)
             {
                 await Task.Delay(20);
+            }
+            if (_lastTrialTimings is null)
+            {
+                _logger.Log($"bench warn: FinalizeAsync timings not received within 5s for input={name} trial={trialIndex}");
             }
 
             var t = _lastTrialTimings;
@@ -154,7 +161,7 @@ internal sealed class BenchHarness
                 InputName = name,
                 TrialIndex = trialIndex,
                 Success = t?.Status == "success",
-                TotalMs = TicksToMs(t0, t1),
+                TotalMs = TicksToMs(t0, _t1Ticks),
                 CoordinatorTotalMs = t?.TotalMs ?? 0,
                 CaptureMs = t?.ClipboardMs ?? 0,
                 RequestMs = t?.RequestMs ?? 0,

@@ -33,6 +33,18 @@ def build_delta_rows(before_path: Path, after_path: Path) -> list[dict]:
                 "delta_ms": delta,
                 "delta_pct": pct,
             })
+    after_only = sorted(set(after_by_name.keys()) - {b["name"] for b in before.get("inputs", [])})
+    if after_only:
+        # Surface as a note row rather than data rows
+        for name in after_only:
+            rows.append({
+                "input": name,
+                "phase": "(new input)",
+                "before_median": 0.0,
+                "after_median": 0.0,
+                "delta_ms": 0.0,
+                "delta_pct": 0.0,
+            })
     return rows
 
 
