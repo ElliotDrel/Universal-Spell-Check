@@ -27,4 +27,9 @@
     </None>
   </ItemGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UniversalSpellCheck.Bench" />
+  </ItemGroup>
+
 </Project>
