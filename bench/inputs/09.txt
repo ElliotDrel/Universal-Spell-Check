@@ -1,0 +1,1 @@
+A zero-coupon bond pays nothing until maturity — no coupons, just a lump sum at the end. Its yield is clean and unambiguous: you know exactly what you paid and exactly what you'll receive.
