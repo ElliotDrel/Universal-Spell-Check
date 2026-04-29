@@ -52,7 +52,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         _hotkeyWindow = new HotkeyWindow();
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
-        _hotkeyWindow.Register();
+        _hotkeyWindow.Register(BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk);
 
         _updateService = new UpdateService(_logger);
         _updateService.StateChanged += OnUpdateStateChanged;

@@ -20,18 +20,18 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
         });
     }
 
-    public void Register()
+    public void Register(uint modifiers, uint vk)
     {
         if (_registered)
         {
             return;
         }
 
-        if (!RegisterHotKey(Handle, HotkeyId, BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk))
+        if (!RegisterHotKey(Handle, HotkeyId, modifiers, vk))
         {
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(),
-                $"Failed to register hotkey for {BuildChannel.DisplayName}.");
+                $"Failed to register hotkey (vk=0x{vk:X2}).");
         }
 
         _registered = true;
