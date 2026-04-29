@@ -20,7 +20,7 @@ internal sealed class RunRecord
     // Context
     public ActiveWindowInfo ActiveWindowAtStart { get; set; } = new();
     public ActiveWindowInfo? ActiveWindowAtPaste { get; set; }
-    public string Model { get; set; } = OpenAiSpellcheckService.Model;
+    public string Model { get; set; } = OpenAiSpellcheckService.DefaultModel;
     public string PasteMethod { get; } = "ctrl_v";
 
     // Text (refs only — strings are not copied on the hot path)

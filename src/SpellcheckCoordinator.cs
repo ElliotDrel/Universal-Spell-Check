@@ -59,7 +59,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         var record = new RunRecord
         {
             T_HotkeyReceived = hotkeyTicks,
-            Model = OpenAiSpellcheckService.Model
+            Model = _spellcheckService.ModelName
         };
 
         try

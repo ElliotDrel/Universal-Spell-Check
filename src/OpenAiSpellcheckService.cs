@@ -11,21 +11,19 @@ internal sealed class OpenAiSpellcheckService : IDisposable
 {
     private const string Endpoint = "https://api.openai.com/v1/responses";
     private const string ModelsEndpoint = "https://api.openai.com/v1/models";
-    public const string Model = "gpt-4.1";
+    public const string DefaultModel = "gpt-4.1";
 
     // AHK-canonical instruction text — keep byte-for-byte identical to legacy.
     public const string PromptInstruction =
         "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.";
 
-    // Pre-built UTF-8 byte slabs around the JSON-escaped user text. Built once
-    // at type init so the hot path only allocates one byte[] per request.
-    private static readonly byte[] PrefixBytes = Encoding.UTF8.GetBytes(
-        "{\"model\":\"" + Model + "\"," +
-        "\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"" +
-        "instructions: " + JsonEscape(PromptInstruction) + "\\n" +
-        "text input: ");
+    // SuffixBytes does not depend on model, so it stays static.
     private static readonly byte[] SuffixBytes = Encoding.UTF8.GetBytes(
         "\"}]}],\"store\":true,\"text\":{\"verbosity\":\"medium\"},\"temperature\":0.3}");
+
+    private readonly byte[] _prefixBytes;
+
+    public string ModelName { get; }
 
     private static readonly MediaTypeHeaderValue JsonMediaType =
         new("application/json") { CharSet = "utf-8" };
@@ -37,9 +35,16 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     private System.Threading.Timer? _rewarmTimer;
 
     public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger)
+        : this(cachedSettings, logger, DefaultModel)
+    {
+    }
+
+    public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger, string model)
     {
         _cachedSettings = cachedSettings;
         _logger = logger;
+        ModelName = model;
+        _prefixBytes = BuildPrefixBytes(model);
         _handler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
@@ -53,6 +58,15 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             DefaultRequestVersion = HttpVersion.Version20,
             DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
         };
+    }
+
+    private static byte[] BuildPrefixBytes(string model)
+    {
+        return Encoding.UTF8.GetBytes(
+            "{\"model\":\"" + model + "\"," +
+            "\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"" +
+            "instructions: " + JsonEscape(PromptInstruction) + "\\n" +
+            "text input: ");
     }
 
     // One-time + periodic background warm-up. Forces DNS+TCP+TLS+H2 negotiation
@@ -252,14 +266,14 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     // Build the request payload by sandwiching the JSON-escaped user text
     // between two pre-built UTF-8 slabs. No anonymous-object serialize, no
     // string allocations beyond the escape step.
-    private static byte[] BuildPayload(string inputText)
+    private byte[] BuildPayload(string inputText)
     {
         var escaped = JsonEncodedText.Encode(inputText).EncodedUtf8Bytes;
-        var buffer = new byte[PrefixBytes.Length + escaped.Length + SuffixBytes.Length];
+        var buffer = new byte[_prefixBytes.Length + escaped.Length + SuffixBytes.Length];
         var span = buffer.AsSpan();
-        PrefixBytes.AsSpan().CopyTo(span);
-        escaped.CopyTo(span[PrefixBytes.Length..]);
-        SuffixBytes.AsSpan().CopyTo(span[(PrefixBytes.Length + escaped.Length)..]);
+        _prefixBytes.AsSpan().CopyTo(span);
+        escaped.CopyTo(span[_prefixBytes.Length..]);
+        SuffixBytes.AsSpan().CopyTo(span[(_prefixBytes.Length + escaped.Length)..]);
         return buffer;
     }
 
