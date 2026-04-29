@@ -25,12 +25,17 @@ internal static class StartupRegistration
 
     public static bool IsRegistered()
     {
+        if (BuildChannel.IsDev) return false;
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
         return key?.GetValue(ValueName) is not null;
     }
 
     public static void Register()
     {
+        // Dev never writes a Run key. Dev is launched via `dotnet run` against
+        // an ephemeral build output; auto-starting it on login would be wrong
+        // even if the path happened to still exist.
+        if (BuildChannel.IsDev) return;
         var exe = Environment.ProcessPath
             ?? throw new InvalidOperationException("Environment.ProcessPath was null.");
         using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true);
@@ -39,6 +44,7 @@ internal static class StartupRegistration
 
     public static void Unregister()
     {
+        if (BuildChannel.IsDev) return;
         using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
         key?.DeleteValue(ValueName, throwOnMissingValue: false);
     }
