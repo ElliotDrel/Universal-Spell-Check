@@ -7,13 +7,21 @@ internal partial class SettingsPage : Page
 {
     private readonly SettingsStore _settingsStore;
     private readonly DiagnosticsLogger _logger;
+    private bool _suppressStartupToggle;
 
     public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger)
     {
         _settingsStore = settingsStore;
         _logger = logger;
         InitializeComponent();
-        StartupCheckBox.IsChecked = File.Exists(GetStartupShortcutPath());
+        _suppressStartupToggle = true;
+        StartupCheckBox.IsChecked = StartupRegistration.IsRegistered();
+        if (BuildChannel.IsDev)
+        {
+            StartupCheckBox.IsEnabled = false;
+            StartupCheckBox.ToolTip = "Dev builds are launched manually via dotnet run; auto-start is disabled.";
+        }
+        _suppressStartupToggle = false;
         ApiKeyBox.Password = "";
         ApiKeyBox.ToolTip = _settingsStore.HasApiKey()
             ? "API key saved. Enter a new key to replace it."
@@ -63,11 +71,34 @@ internal partial class SettingsPage : Page
         });
     }
 
-    private static string GetStartupShortcutPath()
+    private void OnStartupCheckBoxToggled(object sender, System.Windows.RoutedEventArgs e)
     {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Startup),
-            "Universal Spell Check Native.lnk");
+        if (_suppressStartupToggle) return;
+
+        var enable = StartupCheckBox.IsChecked == true;
+        try
+        {
+            if (enable)
+            {
+                StartupRegistration.Register();
+                _logger.Log("startup_registered dashboard=true");
+            }
+            else
+            {
+                StartupRegistration.Unregister();
+                _logger.Log("startup_unregistered dashboard=true");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"startup_toggle_failed enable={enable} error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\"");
+
+            _suppressStartupToggle = true;
+            StartupCheckBox.IsChecked = StartupRegistration.IsRegistered();
+            _suppressStartupToggle = false;
+        }
     }
 
     private static string Escape(string value)

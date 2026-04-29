@@ -128,8 +128,8 @@
                         <CheckBox x:Name="StartupCheckBox"
                                   Grid.Column="1"
                                   VerticalAlignment="Center"
-                                  IsEnabled="False"
-                                  ToolTip="Startup is controlled by the existing Windows Startup shortcut."/>
+                                  Checked="OnStartupCheckBoxToggled"
+                                  Unchecked="OnStartupCheckBoxToggled"/>
                     </Grid>
                 </StackPanel>
             </Border>

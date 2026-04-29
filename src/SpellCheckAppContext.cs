@@ -56,6 +56,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         OnUpdateStateChanged(_updateService, _updateService.State);
         _ = _updateService.CheckAsync(UpdateTrigger.Launch);
 
+        StartupRegistration.EnsureFirstRunRegistered(_logger);
+
         _logger.Log(
             $"started channel={BuildChannel.ChannelName} version={BuildChannel.AppVersion} " +
             $"hotkey_vk=0x{BuildChannel.HotkeyVk:X2}");
