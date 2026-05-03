@@ -2,9 +2,18 @@
 
 ## Overview
 
-`bench/` contains a deterministic-ish end-to-end speed harness that drives the real `SpellcheckCoordinator` via a hidden WinForms `TextBox` and Win32 `SendInput` hotkey injection. It measures wall-clock time from hotkey-press to `TextBox.TextChanged` and records per-phase timings via a `CapturingLogger` interceptor — no mocking, no stubs, no modifications to `src/` at runtime.
+`bench/` contains a deterministic speed harness that drives the real `SpellcheckCoordinator` and records per-phase timings via a `CapturingLogger` interceptor — no mocking, no stubs, no modifications to `src/` at runtime.
 
-The bench uses hotkey `Ctrl+Alt+B` and never touches `Ctrl+Alt+U` (prod) or `Ctrl+Alt+D` (dev), so all three can coexist without collision.
+Two modes:
+
+| Mode | How it works | When to use |
+|---|---|---|
+| **Headless** (default) | Calls `SpellcheckCoordinator.RunHeadlessAsync` directly — no clipboard, no paste, no focus required. You can keep using your PC. | Baselines, optimization comparisons — the common case. |
+| **E2E** (`--e2e`) | Uses a hidden `BenchTargetForm` + Win32 `SendInput` to fire `Ctrl+Alt+B`, driving the full clipboard-capture → paste path. Requires the PC to be idle. | Measuring clipboard/paste overhead or verifying the complete real-world flow. |
+
+In headless mode `total_ms ≈ request_ms` — clipboard and paste phases read as 0ms. In e2e mode all phases are captured.
+
+The e2e bench uses hotkey `Ctrl+Alt+B` and never touches `Ctrl+Alt+U` (prod) or `Ctrl+Alt+D` (dev).
 
 ---
 
@@ -34,23 +43,31 @@ python bench/extract_inputs.py
 
 ## Running the bench
 
+**Headless (default — keep using your PC):**
+
 ```powershell
-dotnet build bench/UniversalSpellCheck.Bench.csproj -c Release
-dotnet run --project bench/UniversalSpellCheck.Bench.csproj -c Release -- --runs 10 --warmup 2 --variant baseline
+dotnet run --project bench/UniversalSpellCheck.Bench.csproj -- --runs 10 --warmup 2 --variant baseline-headless
+```
+
+**E2E (full clipboard + paste path — PC must be idle):**
+
+```powershell
+dotnet run --project bench/UniversalSpellCheck.Bench.csproj -- --runs 10 --warmup 2 --variant baseline-e2e --e2e
 ```
 
 CLI flags:
 
 | Flag | Default | Description |
 |---|---|---|
-| `--runs` | required | Number of measured trials |
-| `--warmup` | `0` | Warmup trials excluded from stats |
+| `--runs` | `10` | Number of measured trials per input |
+| `--warmup` | `2` | Warmup trials excluded from stats |
 | `--model` | `gpt-4.1-nano` | OpenAI model passed to the coordinator |
 | `--variant` | `baseline` | Label embedded in the output filename |
+| `--e2e` | off | Enable full e2e mode (SendInput + clipboard) |
 
 Results are written to `bench/results/{utc}-{sha}-{variant}.json`.
 
-Do not click, type, or switch windows while the bench is running — `SendInput` steals focus and clipboard interference will corrupt results.
+In e2e mode: do not click, type, or switch windows while the bench is running — `SendInput` steals focus and clipboard interference will corrupt results.
 
 ---
 
@@ -58,14 +75,14 @@ Do not click, type, or switch windows while the bench is running — `SendInput`
 
 Per trial, the harness captures:
 
-| Field | Meaning |
-|---|---|
-| `total_ms` | Hotkey-press → `TextBox.TextChanged` (wall-clock) |
-| `coordinator_total_ms` | Inside `SpellcheckCoordinator.RunAsync` start → end |
-| `capture_ms` | Clipboard capture phase |
-| `request_ms` | OpenAI API round-trip |
-| `post_process_ms` | `TextPostProcessor.Process` |
-| `paste_ms` | Clipboard write + `SendInput` Ctrl+V |
+| Field | Headless | E2E | Meaning |
+|---|---|---|---|
+| `total_ms` | ✓ | ✓ | Full pipeline wall-clock (coordinator start → end) |
+| `coordinator_total_ms` | ✓ | ✓ | Same as total in headless; hotkey → HotPathReturned in e2e |
+| `capture_ms` | 0 | ✓ | Clipboard capture phase (Ctrl+C loop) |
+| `request_ms` | ✓ | ✓ | OpenAI API round-trip |
+| `post_process_ms` | ✓ | ✓ | `TextPostProcessor.Process` (replacements + prompt-leak guard) |
+| `paste_ms` | 0 | ✓ | Clipboard write + `SendInput` Ctrl+V |
 
 Per-phase stats reported: median, p95, mean, stddev, min, max. Only successful trials are included in stats — failed trials are counted separately.
 
@@ -91,32 +108,37 @@ Network jitter is irreducible; 10 trials gives ±5% confidence at the median. Fo
 
 ## Optimization workflow
 
-1. Run with `--variant baseline` to capture the current state.
+1. Run headless with `--variant baseline-headless` to capture the current state.
 2. Make one `src/` change.
-3. Rebuild and re-run with a descriptive `--variant` (e.g. `--variant pre-warm-http2`).
-4. Compare the two result files with `compare.py`.
+3. Rebuild and re-run headless with a descriptive `--variant` (e.g. `--variant http2-keepalive`).
+4. Compare with `compare.py`.
 
 Isolate one variable per variant. Concurrent `src/` changes make comparisons uninterpretable.
+
+Use headless for all optimization work — it's faster, deterministic, and removes focus/clipboard noise. Use `--e2e` only when you specifically want to measure the clipboard or paste phases.
 
 ---
 
 ## Architecture
 
-### `BenchTargetForm`
+### `BenchTargetForm` (e2e only)
 
-Hidden borderless WinForms form (`Opacity=0.01`) containing a multiline `TextBox`. Provides the focus target that the coordinator's `Ctrl+C` / `Ctrl+V` clipboard ops are directed at. Opacity is set to `0.01` (not `0`) so the window remains a valid foreground target on Windows.
+Hidden borderless WinForms form (`Opacity=0.01`) containing a multiline `TextBox`. Provides the focus target that the coordinator's `Ctrl+C` / `Ctrl+V` clipboard ops are directed at. Opacity is set to `0.01` (not `0`) so the window remains a valid foreground target on Windows. Not created in headless mode.
 
-### `HotkeyInjector`
+### `HotkeyInjector` (e2e only)
 
-Calls Win32 `SendInput` to synthesize `Ctrl+Alt+B`. Deliberately avoids `Ctrl+Alt+U` and `Ctrl+Alt+D` so the bench hotkey never collides with prod or dev.
+Calls Win32 `SendInput` to synthesize `Ctrl+Alt+B`. Deliberately avoids `Ctrl+Alt+U` and `Ctrl+Alt+D` so the bench hotkey never collides with prod or dev. Not used in headless mode.
 
 ### `CapturingLogger`
 
-Subclasses `DiagnosticsLogger` (`LogData` is `virtual`; `DiagnosticsLogger` is unsealed). Intercepts `spellcheck_detail` events to extract per-phase timing without modifying `SpellcheckCoordinator` or the logging path.
+Subclasses `DiagnosticsLogger` (`LogData` is `virtual`; `DiagnosticsLogger` is unsealed). Intercepts `spellcheck_detail` events to extract per-phase timing without modifying `SpellcheckCoordinator` or the logging path. Used by both modes.
 
 ### `BenchHarness`
 
-Drives the per-trial loop. Uses a `_pasteExpected` flag — not value equality — to distinguish the coordinator's paste from `BenchHarness`'s own `LoadAndSelect` write into the `TextBox`. This correctly handles inputs where the corrected text equals the input (no-correction cases).
+Drives the per-trial loop. Dispatches to `HeadlessTrialAsync` or `E2eTrialAsync` based on the `--e2e` flag.
+
+- **Headless path:** calls `coordinator.RunHeadlessAsync(text)` directly, then polls for `_lastTrialTimings` (populated by `CapturingLogger` when `FinalizeAsync` fires).
+- **E2e path:** uses a `_pasteExpected` flag — not value equality — to distinguish the coordinator's paste from `LoadAndSelect` writes into the `TextBox`. This correctly handles no-correction inputs where output text equals input.
 
 Warmup trials fire the full pipeline to prime the HTTP/2 connection pool and JIT; they are discarded before stats are computed.
 
@@ -131,3 +153,4 @@ These changes were made to `src/` to allow the bench to compose against the real
 | `DiagnosticsLogger.cs` | Class unsealed; `LogData` made `virtual` |
 | `OpenAiSpellcheckService.cs` | `Model` const renamed to `DefaultModel`; new 3-arg constructor `(CachedSettings, DiagnosticsLogger, string model)` added; prod default preserved |
 | `HotkeyWindow.cs` | `Register()` signature changed to `Register(uint modifiers, uint vk)`; prod call updated to pass `BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk` |
+| `SpellcheckCoordinator.cs` | `RunHeadlessAsync(string inputText)` and `ExecuteHeadlessAsync` added — skips clipboard capture and paste, runs API + post-process, fires `FinalizeAsync` for timing capture |
