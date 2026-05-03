@@ -86,6 +86,18 @@ Per trial, the harness captures:
 
 Per-phase stats reported: median, p95, mean, stddev, min, max. Only successful trials are included in stats — failed trials are counted separately.
 
+Each input also gets a `sample_output` field — the corrected text from the first successful trial. Used by `check_correctness.py` to enforce behavioral contracts deterministically without re-running the model.
+
+---
+
+## Correctness gate
+
+`bench/correctness.json` defines per-input behavioral assertions (`must_contain`, `must_contain_exact`). `python bench/check_correctness.py <results.json>` runs all assertions and exits 0 / 1.
+
+Calibrated to the current baseline — the goal is detecting *drift*, not enforcing absolute correctness. If you change `inputs.json` or the model's behavior shifts meaningfully, recalibrate by inspecting `sample_output` values and updating assertions to match.
+
+Used as a hard gate by the autoopt loop (see `docs/autoopt.md`) before any change is committed.
+
 ---
 
 ## Comparing runs

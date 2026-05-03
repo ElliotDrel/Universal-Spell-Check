@@ -35,7 +35,8 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Working inside the WPF dashboard folder | `src/UI/CLAUDE.md` + `DESIGN.md` |
 | Running, building, manual acceptance-testing the native app | `src/CLAUDE.md` |
 | Python fine-tune dataset tooling, benchmarks, eval runs | `tests/CLAUDE.md` |
-| Running the speed bench, comparing optimization variants, bench architecture | `docs/bench.md` |
+| Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
+| Autonomous speed optimization loop (`/autoopt N`), behavioral contracts, worktree workflow | `docs/autoopt.md` |
 | CI workflows, release tag automation, agent-sync workflow | `.github/workflows/` (read the YAML) |
 | Where to file new docs / when to add vs append / past filing mistakes | `docs/filing-rules.md` |
 | Reviving the legacy AHK fallback | `.archive/ahk-legacy/` |
