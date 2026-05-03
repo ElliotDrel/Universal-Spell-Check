@@ -25,6 +25,7 @@ internal sealed class InputResult
     public required string Name { get; init; }
     public required int InputChars { get; init; }
     public required List<TrialResult> Trials { get; init; }
+    public string? SampleOutput { get; set; }
 }
 
 internal sealed class BenchHarness
@@ -77,11 +78,14 @@ internal sealed class BenchHarness
                 await Task.Delay(300);
             }
 
+            string? sampleOutput = null;
             for (var i = 0; i < _runs; i++)
             {
                 _logger.Log($"bench measured input={name} trial={i + 1}/{_runs}");
                 var trial = await RunOneTrialAsync(name, text, trialIndex: i + 1);
                 trials.Add(trial);
+                if (sampleOutput is null && trial.Success && _lastTrialTimings?.OutputText is { Length: > 0 } o)
+                    sampleOutput = o;
                 await Task.Delay(300);  // let stale clipboard/paste events settle between trials
             }
 
@@ -90,6 +94,7 @@ internal sealed class BenchHarness
                 Name = name,
                 InputChars = text.Length,
                 Trials = trials,
+                SampleOutput = sampleOutput,
             });
         }
 
@@ -260,4 +265,5 @@ internal sealed class TrialTimings
     public required int OutputTokens { get; init; }
     public required int CachedTokens { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? OutputText { get; init; }
 }

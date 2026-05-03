@@ -24,6 +24,7 @@ internal static class ResultsWriter
                 output_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.OutputTokens ?? 0),
                 cached_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.CachedTokens ?? 0),
             },
+            sample_output = input.SampleOutput,
         });
 
         var aggregate = new

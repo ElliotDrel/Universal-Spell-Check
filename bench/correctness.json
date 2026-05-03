@@ -1,0 +1,22 @@
+[
+  { "id": "01", "must_contain": [], "must_contain_exact": [] },
+  { "id": "02", "must_contain": ["GitHub"], "must_contain_exact": [] },
+  { "id": "03", "must_contain": [], "must_contain_exact": [] },
+  { "id": "04", "must_contain": ["buildpurdue"], "must_contain_exact": [] },
+  { "id": "05", "must_contain": ["buildpurdue", "LinkedIn"], "must_contain_exact": [] },
+  { "id": "06", "must_contain": ["LinkedIn"], "must_contain_exact": [] },
+  { "id": "07", "must_contain": [], "must_contain_exact": [] },
+  { "id": "08", "must_contain": [], "must_contain_exact": [] },
+  { "id": "09", "must_contain": [], "must_contain_exact": [] },
+  { "id": "10", "must_contain": ["OpenAI", "GitHub", "ChatGPT", "LinkedIn"], "must_contain_exact": [] },
+  { "id": "11", "must_contain": ["OpenAI", "buildpurdue", "LinkedIn"], "must_contain_exact": ["https://www.example.com/blog/post-1", "https://docs.openai.com/api-reference"] },
+  { "id": "12", "must_contain": ["ClickUp", "Akiflow", "Supabase", "Discord", "Espressos & Entrepreneurs"], "must_contain_exact": [] },
+  { "id": "13", "must_contain": ["buildpurdue", "Purdue Innovates", "Discord", "ClickUp", "LinkedIn"], "must_contain_exact": [] },
+  { "id": "14", "must_contain": ["Night Shift", "Supabase", "OpenAI", "Claude Code", "GitHub", "16Tech", "Espressos & Entrepreneurs", "NotebookLM"], "must_contain_exact": [] },
+  { "id": "15", "must_contain": ["OpenAI", "GitHub", "Supabase", "ClickUp", "NotebookLM"], "must_contain_exact": ["https://api.openai.com/v1/responses"] },
+  { "id": "16", "must_contain": ["OpenAI", "GitHub", "Claude Code", "LinkedIn", "16Tech", "Purdue Innovates"], "must_contain_exact": ["https://buildpurdue.com/events", "https://purdueinnovates.org/programs", "https://platform.openai.com/docs/api-reference/responses", "https://github.com/buildpurdue/spellcheck-tool", "https://www.linkedin.com/posts/elliot-drel"] },
+  { "id": "17", "must_contain": ["buildpurdue", "Supabase", "OpenAI", "GitHub", "Discord", "NotebookLM", "Espressos & Entrepreneurs", "16Tech", "Night Shift", "ClickUp", "Purdue Innovates"], "must_contain_exact": ["https://supabase.com/dashboard/project/xyzabc/editor", "https://api.openai.com/v1/responses", "https://github.com/buildpurdue/platform/actions", "https://app.clickup.com/t/xyzabc"] },
+  { "id": "18", "must_contain": [], "must_contain_exact": ["https://github.com/org/repo/pull/42"] },
+  { "id": "19", "must_contain": [], "must_contain_exact": ["https://blog.nelhage.com/post/three-kinds-of-leaks/", "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Memory_management"] },
+  { "id": "20", "must_contain": ["OpenAI", "GitHub", "Discord", "buildpurdue"], "must_contain_exact": ["https://openai.com/blog/gpt-4-1", "https://cdn.openai.com/papers/gpt-4-1.pdf", "https://github.com/openai/evals"] }
+]

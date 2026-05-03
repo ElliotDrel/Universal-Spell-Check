@@ -204,6 +204,7 @@ internal sealed class CapturingLogger : DiagnosticsLogger
                 OutputTokens = tokens.GetProperty("output").GetInt32(),
                 CachedTokens = tokens.GetProperty("cached").GetInt32(),
                 ErrorMessage = root.TryGetProperty("error", out var err) ? err.GetString() : null,
+                OutputText = root.TryGetProperty("output_text", out var ot) ? ot.GetString() : null,
             });
         }
         catch
