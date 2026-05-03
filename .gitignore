@@ -42,4 +42,4 @@ benchmark_runs/
 benchmark_data/
 fine_tune_runs/
 fine_tune_data/
-bench/results/*.json
+bench/results/
