@@ -54,7 +54,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         _ = Task.Run(() => FinalizeAsync(record));
     }
 
-    public async Task<string?> RunHeadlessAsync(string inputText)
+    public async Task<HeadlessResult?> RunHeadlessAsync(string inputText)
     {
         if (!await _spellcheckGate.WaitAsync(0)) return null;
 
@@ -68,8 +68,25 @@ internal sealed class SpellcheckCoordinator : IDisposable
             _spellcheckGate.Release();
         }
 
+        var requestMs = TicksToMs(record.T_RequestSendStart, record.T_ResponseEnd);
+        var ppMs = TicksToMs(record.T_PostProcessStart, record.T_PostProcessEnd);
+        var promptGuardMs = record.PromptLeak.Triggered ? ppMs : 0;
+
         _ = Task.Run(() => FinalizeAsync(record));
-        return record.OutputText;
+
+        return new HeadlessResult(
+            Success: record.Status == RunStatus.Success,
+            OutputText: record.OutputText,
+            ErrorMessage: record.ErrorMessage,
+            ErrorCode: record.ErrorCode,
+            TotalMs: TicksToMs(record.T_HotkeyReceived, record.T_HotPathReturned),
+            RequestMs: requestMs,
+            ReplacementsMs: Math.Max(0, ppMs - promptGuardMs),
+            PromptGuardMs: promptGuardMs,
+            InputTokens: record.TokenUsage.Input,
+            OutputTokens: record.TokenUsage.Output,
+            CachedTokens: record.TokenUsage.Cached
+        );
     }
 
     private async Task<RunRecord> ExecuteHeadlessAsync(string inputText)
@@ -414,3 +431,17 @@ internal sealed class SpellcheckCoordinator : IDisposable
             : "Copy failed";
     }
 }
+
+public sealed record HeadlessResult(
+    bool Success,
+    string? OutputText,
+    string? ErrorMessage,
+    string? ErrorCode,
+    long TotalMs,
+    long RequestMs,
+    long ReplacementsMs,
+    long PromptGuardMs,
+    int InputTokens,
+    int OutputTokens,
+    int CachedTokens
+);

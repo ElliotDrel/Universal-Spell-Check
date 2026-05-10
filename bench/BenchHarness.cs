@@ -18,6 +18,7 @@ internal sealed class TrialResult
     public required int OutputTokens { get; init; }
     public required int CachedTokens { get; init; }
     public string? Error { get; init; }
+    public string? OutputText { get; init; }
 }
 
 internal sealed class InputResult
@@ -75,7 +76,7 @@ internal sealed class BenchHarness
             {
                 _logger.Log($"bench warmup input={name} trial={w + 1}/{_warmup}");
                 _ = await RunOneTrialAsync(name, text, trialIndex: -(w + 1));
-                await Task.Delay(300);
+                if (_e2eMode) await Task.Delay(300);
             }
 
             string? sampleOutput = null;
@@ -84,9 +85,9 @@ internal sealed class BenchHarness
                 _logger.Log($"bench measured input={name} trial={i + 1}/{_runs}");
                 var trial = await RunOneTrialAsync(name, text, trialIndex: i + 1);
                 trials.Add(trial);
-                if (sampleOutput is null && trial.Success && _lastTrialTimings?.OutputText is { Length: > 0 } o)
+                if (sampleOutput is null && trial.Success && trial.OutputText is { Length: > 0 } o)
                     sampleOutput = o;
-                await Task.Delay(300);  // let stale clipboard/paste events settle between trials
+                if (_e2eMode) await Task.Delay(300);
             }
 
             results.Add(new InputResult
@@ -186,6 +187,7 @@ internal sealed class BenchHarness
                 OutputTokens = t?.OutputTokens ?? 0,
                 CachedTokens = t?.CachedTokens ?? 0,
                 Error = t?.ErrorMessage,
+                OutputText = t?.OutputText,
             };
         }
         finally
@@ -196,51 +198,35 @@ internal sealed class BenchHarness
 
     private async Task<TrialResult> HeadlessTrialAsync(string name, string text, int trialIndex)
     {
-        _lastTrialTimings = null;
-        await _coordinator.RunHeadlessAsync(text);
+        var r = await _coordinator.RunHeadlessAsync(text);
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (_lastTrialTimings is null && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(10);
-        }
-
-        if (_lastTrialTimings is null)
+        if (r is null)
         {
             return new TrialResult
             {
-                InputName = name,
-                TrialIndex = trialIndex,
-                Success = false,
-                TotalMs = 0,
-                CoordinatorTotalMs = 0,
-                CaptureMs = 0,
-                RequestMs = 0,
-                PostProcessMs = 0,
-                PasteMs = 0,
-                InputTokens = 0,
-                OutputTokens = 0,
-                CachedTokens = 0,
-                Error = "Timed out waiting for headless timings.",
+                InputName = name, TrialIndex = trialIndex, Success = false,
+                TotalMs = 0, CoordinatorTotalMs = 0, CaptureMs = 0, RequestMs = 0,
+                PostProcessMs = 0, PasteMs = 0, InputTokens = 0, OutputTokens = 0,
+                CachedTokens = 0, Error = "Coordinator gate rejected (already running).",
             };
         }
 
-        var t = _lastTrialTimings;
         return new TrialResult
         {
             InputName = name,
             TrialIndex = trialIndex,
-            Success = t.Status == "success",
-            TotalMs = t.TotalMs,
-            CoordinatorTotalMs = t.TotalMs,
+            Success = r.Success,
+            TotalMs = r.TotalMs,
+            CoordinatorTotalMs = r.TotalMs,
             CaptureMs = 0,
-            RequestMs = t.RequestMs,
-            PostProcessMs = t.ReplacementsMs + t.PromptGuardMs,
+            RequestMs = r.RequestMs,
+            PostProcessMs = r.ReplacementsMs + r.PromptGuardMs,
             PasteMs = 0,
-            InputTokens = t.InputTokens,
-            OutputTokens = t.OutputTokens,
-            CachedTokens = t.CachedTokens,
-            Error = t.ErrorMessage,
+            InputTokens = r.InputTokens,
+            OutputTokens = r.OutputTokens,
+            CachedTokens = r.CachedTokens,
+            Error = r.ErrorMessage,
+            OutputText = r.OutputText,
         };
     }
 
