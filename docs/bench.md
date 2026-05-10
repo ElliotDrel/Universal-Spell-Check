@@ -92,9 +92,13 @@ Each input also gets a `sample_output` field — the corrected text from the fir
 
 ## Correctness gate
 
-`bench/correctness.json` defines per-input behavioral assertions (`must_contain`, `must_contain_exact`). `python bench/check_correctness.py <results.json>` runs all assertions and exits 0 / 1.
+`python bench/check_correctness.py <results.json>` runs behavioral contract checks and exits 0 / 1.
 
-Calibrated to the current baseline — the goal is detecting *drift*, not enforcing absolute correctness. If you change `inputs.json` or the model's behavior shifts meaningfully, recalibrate by inspecting `sample_output` values and updating assertions to match.
+Contracts are derived automatically from `bench/inputs.json` + `replacements.json` — no calibration file, no recalibration needed:
+
+- **URL passthrough** — every `https?://` URL in the original input must appear byte-identical in `sample_output`.
+- **Brand replacements** — every `replacements.json` variant present in the input text (outside URLs) must appear as its canonical form in `sample_output`.
+- Inputs with neither URLs nor matched variants are silently skipped.
 
 Used as a hard gate by the autoopt loop (see `docs/autoopt.md`) before any change is committed.
 
@@ -143,16 +147,16 @@ Calls Win32 `SendInput` to synthesize `Ctrl+Alt+B`. Deliberately avoids `Ctrl+Al
 
 ### `CapturingLogger`
 
-Subclasses `DiagnosticsLogger` (`LogData` is `virtual`; `DiagnosticsLogger` is unsealed). Intercepts `spellcheck_detail` events to extract per-phase timing without modifying `SpellcheckCoordinator` or the logging path. Used by both modes.
+Subclasses `DiagnosticsLogger` (`LogData` is `virtual`; `DiagnosticsLogger` is unsealed). Intercepts `spellcheck_detail` events to extract per-phase timing. Used by E2E mode only — headless gets timings directly from `RunHeadlessAsync`.
 
 ### `BenchHarness`
 
 Drives the per-trial loop. Dispatches to `HeadlessTrialAsync` or `E2eTrialAsync` based on the `--e2e` flag.
 
-- **Headless path:** calls `coordinator.RunHeadlessAsync(text)` directly, then polls for `_lastTrialTimings` (populated by `CapturingLogger` when `FinalizeAsync` fires).
+- **Headless path:** calls `coordinator.RunHeadlessAsync(text)`, which returns a `HeadlessResult` record with all timings computed directly from the `RunRecord` timestamps. No polling required.
 - **E2e path:** uses a `_pasteExpected` flag — not value equality — to distinguish the coordinator's paste from `LoadAndSelect` writes into the `TextBox`. This correctly handles no-correction inputs where output text equals input.
 
-Warmup trials fire the full pipeline to prime the HTTP/2 connection pool and JIT; they are discarded before stats are computed.
+Warmup trials fire the full pipeline to prime the HTTP/2 connection pool and JIT; they are discarded before stats are computed. The 300ms inter-trial delay only fires in E2E mode (headless has no clipboard events to settle).
 
 ---
 
@@ -165,4 +169,4 @@ These changes were made to `src/` to allow the bench to compose against the real
 | `DiagnosticsLogger.cs` | Class unsealed; `LogData` made `virtual` |
 | `OpenAiSpellcheckService.cs` | `Model` const renamed to `DefaultModel`; new 3-arg constructor `(CachedSettings, DiagnosticsLogger, string model)` added; prod default preserved |
 | `HotkeyWindow.cs` | `Register()` signature changed to `Register(uint modifiers, uint vk)`; prod call updated to pass `BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk` |
-| `SpellcheckCoordinator.cs` | `RunHeadlessAsync(string inputText)` and `ExecuteHeadlessAsync` added — skips clipboard capture and paste, runs API + post-process, fires `FinalizeAsync` for timing capture |
+| `SpellcheckCoordinator.cs` | `RunHeadlessAsync(string inputText)` returns `HeadlessResult?` with all phase timings; `ExecuteHeadlessAsync` added — skips clipboard capture and paste, runs API + post-process |
