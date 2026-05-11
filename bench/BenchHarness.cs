@@ -68,16 +68,23 @@ internal sealed class BenchHarness
     {
         var results = new List<InputResult>();
 
+        // Headless: one global warmup on the first input is enough — the HTTP/2 connection
+        // stays alive in the pool for all subsequent inputs. E2E: warmup per input because
+        // each input resets focus and clipboard state.
+        var globalWarmupDone = false;
+
         foreach (var (name, text) in inputs)
         {
             var trials = new List<TrialResult>();
 
-            for (var w = 0; w < _warmup; w++)
+            var warmupCount = _e2eMode ? _warmup : (globalWarmupDone ? 0 : _warmup);
+            for (var w = 0; w < warmupCount; w++)
             {
-                _logger.Log($"bench warmup input={name} trial={w + 1}/{_warmup}");
+                _logger.Log($"bench warmup input={name} trial={w + 1}/{warmupCount}");
                 _ = await RunOneTrialAsync(name, text, trialIndex: -(w + 1));
                 if (_e2eMode) await Task.Delay(300);
             }
+            if (!_e2eMode) globalWarmupDone = true;
 
             string? sampleOutput = null;
             for (var i = 0; i < _runs; i++)
