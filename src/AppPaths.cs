@@ -16,9 +16,11 @@ internal static class AppPaths
         "UniversalSpellCheck",
         "logs");
 
-    public static string LogPath { get; } = Path.Combine(
+    public static string LogPath => SpellcheckLogPathFor(DateTime.Now);
+
+    public static string SpellcheckLogPathFor(DateTime date) => Path.Combine(
         LogDirectory,
-        $"spellcheck-{DateTime.Now:yyyy-MM-dd}.jsonl");
+        $"spellcheck-{date:yyyy-MM-dd}.jsonl");
 
     public static string SettingsPath { get; } = Path.Combine(
         AppDataDirectory,

@@ -19,7 +19,7 @@ static class Program
             return RunDashboardSmoke();
         }
 
-        var startupLogger = new DiagnosticsLogger(AppPaths.LogPath);
+        var startupLogger = new DiagnosticsLogger(() => AppPaths.LogPath);
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {

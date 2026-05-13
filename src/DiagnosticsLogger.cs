@@ -9,12 +9,16 @@ internal class DiagnosticsLogger
     private static readonly int Pid = Process.GetCurrentProcess().Id;
 
     private readonly object _lock = new();
-    private readonly string _logPath;
+    private readonly Func<string> _resolveLogPath;
 
     public DiagnosticsLogger(string logPath)
+        : this(() => logPath)
     {
-        _logPath = logPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
+    }
+
+    public DiagnosticsLogger(Func<string> resolveLogPath)
+    {
+        _resolveLogPath = resolveLogPath;
     }
 
     public void Log(string message)
@@ -55,8 +59,10 @@ internal class DiagnosticsLogger
             {
                 try
                 {
+                    var logPath = _resolveLogPath();
+                    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
                     using var fs = new FileStream(
-                        _logPath,
+                        logPath,
                         FileMode.Append,
                         FileAccess.Write,
                         FileShare.ReadWrite);

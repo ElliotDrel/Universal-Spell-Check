@@ -73,20 +73,22 @@ internal static class ClipboardLoop
         return ReplaceResult.Ok(Environment.TickCount64 - startedAt);
     }
 
-    public static void RestoreClipboard(IDataObject? originalClipboard)
+    public static bool RestoreClipboard(IDataObject? originalClipboard)
     {
         if (originalClipboard is null)
         {
-            return;
+            return false;
         }
 
         try
         {
             Clipboard.SetDataObject(originalClipboard, true);
+            return true;
         }
         catch
         {
             // Best-effort only. This path is for non-destructive failure behavior.
+            return false;
         }
     }
 }

@@ -22,6 +22,10 @@ internal sealed class RunRecord
     public ActiveWindowInfo? ActiveWindowAtPaste { get; set; }
     public string Model { get; set; } = OpenAiSpellcheckService.DefaultModel;
     public string PasteMethod { get; } = "ctrl_v";
+    public string? PasteFailurePhase { get; set; }
+    public string? PasteErrorType { get; set; }
+    public bool CorrectedTextOnClipboard { get; set; }
+    public bool OriginalClipboardRestored { get; set; }
 
     // Text (refs only — strings are not copied on the hot path)
     public string? InputText { get; set; }

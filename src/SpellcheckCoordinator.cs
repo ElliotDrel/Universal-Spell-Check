@@ -226,7 +226,28 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.PromptLeak = pp.PromptLeak;
             record.Events.Add("postprocess_applied");
 
-            // Paste-target check
+            // Paste: set clipboard, then send Ctrl+V. Restore is moved to finalize.
+            record.T_PasteIssued = Stopwatch.GetTimestamp();
+            try
+            {
+                Clipboard.SetText(pp.Text, TextDataFormat.UnicodeText);
+                record.CorrectedTextOnClipboard = true;
+            }
+            catch (Exception ex)
+            {
+                record.Status = RunStatus.PasteFailed;
+                record.ErrorMessage = ex.Message;
+                record.PasteErrorType = ex.GetType().Name;
+                record.PasteFailurePhase = "set_corrected_clipboard";
+                record.Events.Add("paste_failed");
+                _notify("Paste failed", "The corrected text could not be copied to the clipboard.");
+                record.T_PasteAck = Stopwatch.GetTimestamp();
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
+
+            await Task.Delay(50);
+
             record.T_PasteTargetCheck = Stopwatch.GetTimestamp();
             var pasteTarget = ActiveWindowInfo.Capture();
             record.ActiveWindowAtPaste = pasteTarget;
@@ -235,28 +256,28 @@ internal sealed class SpellcheckCoordinator : IDisposable
             {
                 record.Status = RunStatus.PasteFailed;
                 record.ErrorMessage = "Target app changed before paste.";
+                record.PasteFailurePhase = "target_changed";
                 record.Events.Add("paste_failed");
                 _notify(
                     "Paste failed",
                     $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
+                record.T_PasteAck = Stopwatch.GetTimestamp();
                 record.T_HotPathReturned = Stopwatch.GetTimestamp();
                 return record;
             }
 
-            // Paste — set clipboard + Ctrl+V only. Restore is moved to finalize.
-            record.T_PasteIssued = Stopwatch.GetTimestamp();
             try
             {
-                Clipboard.SetText(pp.Text, TextDataFormat.UnicodeText);
-                await Task.Delay(50);
                 SendKeys.SendWait("^v");
             }
             catch (Exception ex)
             {
                 record.Status = RunStatus.PasteFailed;
                 record.ErrorMessage = ex.Message;
+                record.PasteErrorType = ex.GetType().Name;
+                record.PasteFailurePhase = "send_ctrl_v";
                 record.Events.Add("paste_failed");
-                _notify("Paste failed", "The corrected text could not be pasted.");
+                _notify("Paste failed", "The corrected text is on the clipboard, but could not be pasted automatically.");
                 record.T_PasteAck = Stopwatch.GetTimestamp();
                 record.T_HotPathReturned = Stopwatch.GetTimestamp();
                 return record;
@@ -287,8 +308,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
         {
             _setBusy(false);
 
-            // Single point of clipboard restore — covers every status path.
-            ClipboardLoop.RestoreClipboard(r.OriginalClipboard);
+            // Preserve corrected text for manual paste once it has reached the clipboard.
+            if (!r.CorrectedTextOnClipboard)
+            {
+                r.OriginalClipboardRestored = ClipboardLoop.RestoreClipboard(r.OriginalClipboard);
+            }
 
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
@@ -332,6 +356,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
                 $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
+                $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
+                $"original_clipboard_restored={r.OriginalClipboardRestored.ToString().ToLowerInvariant()} " +
+                (r.PasteFailurePhase is null ? "" : $"paste_failure_phase={r.PasteFailurePhase} ") +
+                (r.PasteErrorType is null ? "" : $"paste_error_type={r.PasteErrorType} ") +
                 (r.ErrorMessage is null ? "" : $"error=\"{Escape(r.ErrorMessage)}\" ") +
                 (r.ErrorCode is null ? "" : $"error_code={r.ErrorCode}"));
 
@@ -347,6 +375,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 paste_target_app = r.ActiveWindowAtPaste?.WindowTitle ?? "",
                 paste_target_exe = r.ActiveWindowAtPaste?.ProcessName ?? "",
                 paste_method = r.PasteMethod,
+                paste_failure_phase = r.PasteFailurePhase,
+                paste_error_type = r.PasteErrorType,
+                corrected_text_on_clipboard = r.CorrectedTextOnClipboard,
+                original_clipboard_restored = r.OriginalClipboardRestored,
                 text_changed = r.TextChanged,
                 input_text = r.InputText ?? "",
                 input_chars = r.InputText?.Length ?? 0,

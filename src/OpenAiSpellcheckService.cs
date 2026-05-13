@@ -56,7 +56,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         {
             Timeout = TimeSpan.FromSeconds(30),
             DefaultRequestVersion = HttpVersion.Version20,
-            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
         };
     }
 
@@ -69,8 +69,8 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             "text input: ");
     }
 
-    // One-time + periodic background warm-up. Forces DNS+TCP+TLS+H2 negotiation
-    // so the first hotkey doesn't pay handshake cost.
+    // One-time + periodic background warm-up. Keeps DNS+TCP+TLS+H2 warm so the
+    // first hotkey doesn't pay handshake cost, while avoiding HTTP/3/QUIC.
     public void StartConnectionWarmer()
     {
         _ = WarmConnectionAsync();
@@ -87,7 +87,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, ModelsEndpoint);
             req.Version = HttpVersion.Version20;
-            req.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            req.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
             using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
             // Status doesn't matter — we only want the live socket in the pool.
         }
@@ -162,7 +162,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             content.Headers.ContentType = JsonMediaType;
             request.Content = content;
             request.Version = HttpVersion.Version20;
-            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
 
             if (attempt == 1)
             {

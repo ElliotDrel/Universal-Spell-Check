@@ -25,7 +25,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     public SpellCheckAppContext()
     {
-        _logger = new DiagnosticsLogger(AppPaths.LogPath);
+        _logger = new DiagnosticsLogger(() => AppPaths.LogPath);
         Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
         _settingsStore = new SettingsStore(_logger);
         _cachedSettings = new CachedSettings(_settingsStore);
