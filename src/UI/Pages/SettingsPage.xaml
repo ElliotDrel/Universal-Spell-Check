@@ -138,6 +138,26 @@
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionHeader}" Text="API key"/>
+
+                    <!-- Env var toggle -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource BodyL}" Text="Use environment variable"/>
+                            <TextBlock Style="{StaticResource BodyMuted}"
+                                       Text="Read from OPENAI_API_KEY instead of encrypted storage"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <CheckBox x:Name="UseEnvApiKeyCheckBox"
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  Checked="OnUseEnvApiKeyToggled"
+                                  Unchecked="OnUseEnvApiKeyToggled"/>
+                    </Grid>
+
                     <TextBlock Style="{StaticResource BodyL}" Text="OpenAI API key" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -149,7 +169,8 @@
                                      VerticalAlignment="Center"
                                      Margin="0,0,12,0"
                                      Padding="8,6"/>
-                        <Button Grid.Column="1"
+                        <Button x:Name="SaveApiKeyButton"
+                                Grid.Column="1"
                                 Style="{StaticResource PrimaryButton}"
                                 Content="Save"
                                 Click="OnSaveApiKeyClicked"/>
