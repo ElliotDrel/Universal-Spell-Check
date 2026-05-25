@@ -181,8 +181,13 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.InputText = capture.Text;
             record.Events.Add("capture_succeeded");
 
+            // Pre-process: collapse terminal soft-wrap artifacts before the API call.
+            var norm = TerminalInputNormalizer.Normalize(capture.Text!, record.ActiveWindowAtStart.ProcessName);
+            record.TerminalNorm = norm;
+            var textToSpellcheck = norm.Applied ? norm.Text : capture.Text!;
+
             // Spellcheck request — timings filled inside the service via record.
-            var spell = await _spellcheckService.SpellcheckAsync(capture.Text!, record);
+            var spell = await _spellcheckService.SpellcheckAsync(textToSpellcheck, record);
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
             record.RawResponseBytes = spell.RawResponseBytes;
@@ -356,6 +361,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
                 $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
+                (r.TerminalNorm.Applied ? $"terminal_normalized=true terminal_norm_chars_removed={r.TerminalNorm.CharsRemoved} " : "") +
                 $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
                 $"original_clipboard_restored={r.OriginalClipboardRestored.ToString().ToLowerInvariant()} " +
                 (r.PasteFailurePhase is null ? "" : $"paste_failure_phase={r.PasteFailurePhase} ") +
@@ -421,6 +427,12 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     removed_chars = r.PromptLeak.RemovedChars,
                     before_length = r.PromptLeak.BeforeLength,
                     after_length = r.PromptLeak.AfterLength
+                },
+                terminal_normalization = new
+                {
+                    applied = r.TerminalNorm.Applied,
+                    chars_removed = r.TerminalNorm.CharsRemoved,
+                    process = r.TerminalNorm.ProcessName ?? ""
                 },
                 events = r.Events.ToArray()
             });

@@ -60,6 +60,9 @@ internal sealed class RunRecord
     // Tokens
     public TokenUsage TokenUsage { get; set; } = new();
 
+    // Pre-process
+    public TerminalNormResult TerminalNorm { get; set; } = TerminalNormResult.NotApplied("");
+
     // Post-process
     public List<string> ReplacementsApplied { get; set; } = new();
     public int UrlsProtected { get; set; }

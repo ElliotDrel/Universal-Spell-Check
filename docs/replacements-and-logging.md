@@ -1,5 +1,18 @@
 # Replacements, Prompt-Leak Guard, and Logging
 
+## Terminal input normalization (pre-processing)
+
+Before the API call, `TerminalInputNormalizer.Normalize` is invoked on the captured text when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It collapses ` *\r\n +` (optional trailing spaces + CRLF + one or more leading spaces) to a single space. This removes the soft-wrap artifacts that terminals insert when copying multi-line text.
+
+- Applied on the **hot path only** (`ExecuteHotPathAsync`). Headless/bench runs are unaffected.
+- Bare `\r\n` without trailing spaces is left untouched.
+- Result is recorded in `RunRecord.TerminalNorm`; logged as `terminal_normalized=true terminal_norm_chars_removed=N` on the `run_completed` line and as `terminal_normalization` in the `spellcheck_detail` JSON blob.
+- If not applied (non-terminal process or no artifacts found), `terminal_normalization.applied = false` and `chars_removed = 0`.
+
+Full pipeline order: **terminal normalize** → API call → post-process (replacements + prompt-leak guard).
+
+---
+
 ## Replacements system
 
 `replacements.json` lives at the repo root and is copied next to the exe at publish time via a `<None Include>` itemgroup in the csproj. `AppPaths.ReplacementsPath` finds it by walking up from `AppContext.BaseDirectory` until the file is found — works for both dev checkout (`src/bin/...` walks up to repo root) and Velopack-installed prod (found on the first try, next to the exe).
@@ -95,4 +108,4 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/urls_protected), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/urls_protected), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `terminal_normalization` (applied/chars_removed/process), `events[]`.
