@@ -31,7 +31,6 @@ internal static class AppPaths
         "apikey.dat");
 
     public static string ReplacementsPath { get; } = FindRepoFile("replacements.json");
-    public static string EnvFilePath { get; } = FindRepoFile(".env");
 
     private static string FindRepoFile(string fileName)
     {

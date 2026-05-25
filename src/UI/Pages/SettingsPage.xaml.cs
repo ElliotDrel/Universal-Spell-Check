@@ -8,7 +8,6 @@ internal partial class SettingsPage : Page
     private readonly SettingsStore _settingsStore;
     private readonly DiagnosticsLogger _logger;
     private bool _suppressStartupToggle;
-    private bool _suppressEnvKeyToggle;
 
     public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger)
     {
@@ -23,13 +22,6 @@ internal partial class SettingsPage : Page
             StartupCheckBox.ToolTip = "Dev builds are launched manually via dotnet run; auto-start is disabled.";
         }
         _suppressStartupToggle = false;
-
-        _suppressEnvKeyToggle = true;
-        var settings = _settingsStore.Load();
-        UseEnvApiKeyCheckBox.IsChecked = settings.UseEnvApiKey;
-        UpdateApiKeySection(settings.UseEnvApiKey);
-        _suppressEnvKeyToggle = false;
-
         ApiKeyBox.Password = "";
         ApiKeyBox.ToolTip = _settingsStore.HasApiKey()
             ? "API key saved. Enter a new key to replace it."
@@ -77,27 +69,6 @@ internal partial class SettingsPage : Page
             FileName = AppPaths.ReplacementsPath,
             UseShellExecute = true
         });
-    }
-
-    private void OnUseEnvApiKeyToggled(object sender, System.Windows.RoutedEventArgs e)
-    {
-        if (_suppressEnvKeyToggle) return;
-
-        var useEnv = UseEnvApiKeyCheckBox.IsChecked == true;
-        var settings = _settingsStore.Load();
-        settings.UseEnvApiKey = useEnv;
-        _settingsStore.SaveSettings(settings);
-        UpdateApiKeySection(useEnv);
-        _logger.Log($"use_env_api_key_toggled value={useEnv} dashboard=true");
-    }
-
-    private void UpdateApiKeySection(bool useEnv)
-    {
-        ApiKeyBox.IsEnabled = !useEnv;
-        SaveApiKeyButton.IsEnabled = !useEnv;
-        ApiKeyStatus.Text = useEnv
-            ? "Reading from OPENAI_API_KEY environment variable"
-            : "Stored encrypted for this Windows user with DPAPI";
     }
 
     private void OnStartupCheckBoxToggled(object sender, System.Windows.RoutedEventArgs e)

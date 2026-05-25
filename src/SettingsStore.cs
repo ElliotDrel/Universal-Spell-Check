@@ -49,14 +49,11 @@ internal sealed class SettingsStore
     {
         try
         {
-            var settings = Load();
-            if (settings.UseEnvApiKey)
+            if (!File.Exists(AppPaths.ApiKeyPath))
             {
-                var envKey = LoadApiKeyFromEnv();
-                if (envKey is not null) return envKey;
+                return null;
             }
 
-            if (!File.Exists(AppPaths.ApiKeyPath)) return null;
             var encrypted = File.ReadAllBytes(AppPaths.ApiKeyPath);
             var decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decrypted);
@@ -66,35 +63,6 @@ internal sealed class SettingsStore
             _logger.Log($"apikey_load_failed error=\"{ex.Message}\"");
             return null;
         }
-    }
-
-    public void SaveSettings(AppSettings settings)
-    {
-        Save(settings);
-        ApiKeyChanged?.Invoke();
-    }
-
-    private static string? LoadApiKeyFromEnv()
-    {
-        var envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        if (!string.IsNullOrWhiteSpace(envKey)) return envKey.Trim();
-
-        try
-        {
-            if (!File.Exists(AppPaths.EnvFilePath)) return null;
-            const string prefix = "OPENAI_API_KEY=";
-            foreach (var line in File.ReadLines(AppPaths.EnvFilePath))
-            {
-                var trimmed = line.Trim();
-                if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    var value = trimmed[prefix.Length..].Trim();
-                    if (!string.IsNullOrWhiteSpace(value)) return value;
-                }
-            }
-        }
-        catch { /* best-effort */ }
-        return null;
     }
 
     public void SaveApiKey(string apiKey)
