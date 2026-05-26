@@ -61,6 +61,8 @@ internal sealed class RunRecord
     public TokenUsage TokenUsage { get; set; } = new();
 
     // Pre-process
+    public long T_TerminalNormStart { get; set; }
+    public long T_TerminalNormEnd { get; set; }
     public TerminalNormResult TerminalNorm { get; set; } = TerminalNormResult.NotApplied("");
 
     // Post-process

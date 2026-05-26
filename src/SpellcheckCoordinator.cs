@@ -182,7 +182,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.Events.Add("capture_succeeded");
 
             // Pre-process: collapse terminal soft-wrap artifacts before the API call.
+            record.T_TerminalNormStart = Stopwatch.GetTimestamp();
             var norm = TerminalInputNormalizer.Normalize(capture.Text!, record.ActiveWindowAtStart.ProcessName);
+            record.T_TerminalNormEnd = Stopwatch.GetTimestamp();
             record.TerminalNorm = norm;
             var textToSpellcheck = norm.Applied ? norm.Text : capture.Text!;
 
@@ -320,6 +322,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
 
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
+            var normMs = TicksToMs(r.T_TerminalNormStart, r.T_TerminalNormEnd);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
             var apiMs = requestMs;
             var ppMs = TicksToMs(r.T_PostProcessStart, r.T_PostProcessEnd);
@@ -361,7 +364,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
                 $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
-                (r.TerminalNorm.Applied ? $"terminal_normalized=true terminal_norm_chars_removed={r.TerminalNorm.CharsRemoved} " : "") +
+                (r.TerminalNorm.Applied
+                    ? $"terminal_normalized=true terminal_norm_ms={normMs} terminal_norm_chars_removed={r.TerminalNorm.CharsRemoved} " +
+                      $"terminal_norm_double_break={r.TerminalNorm.DoubleBreakCount} terminal_norm_list_item={r.TerminalNorm.ListItemCount} terminal_norm_soft_wrap={r.TerminalNorm.SoftWrapCount} "
+                    : "") +
                 $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
                 $"original_clipboard_restored={r.OriginalClipboardRestored.ToString().ToLowerInvariant()} " +
                 (r.PasteFailurePhase is null ? "" : $"paste_failure_phase={r.PasteFailurePhase} ") +
@@ -404,6 +410,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 timings = new
                 {
                     clipboard_ms = clipboardMs,
+                    norm_ms = normMs,
                     payload_ms = 0,
                     request_ms = requestMs,
                     api_ms = apiMs,
@@ -431,8 +438,16 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 terminal_normalization = new
                 {
                     applied = r.TerminalNorm.Applied,
+                    process = r.TerminalNorm.ProcessName ?? "",
+                    norm_ms = normMs,
                     chars_removed = r.TerminalNorm.CharsRemoved,
-                    process = r.TerminalNorm.ProcessName ?? ""
+                    normalized_input_text = r.TerminalNorm.Applied ? r.TerminalNorm.Text : null,
+                    passes = new
+                    {
+                        double_break_count = r.TerminalNorm.DoubleBreakCount,
+                        list_item_count = r.TerminalNorm.ListItemCount,
+                        soft_wrap_count = r.TerminalNorm.SoftWrapCount
+                    }
                 },
                 events = r.Events.ToArray()
             });

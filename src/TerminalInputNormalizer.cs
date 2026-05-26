@@ -25,9 +25,11 @@ internal static class TerminalInputNormalizer
         if (processName is null || !TerminalProcesses.Contains(processName))
             return TerminalNormResult.NotApplied(text);
 
-        var normalized = DoubleBreakRegex.Replace(text, "\n\n");
-        normalized = ListItemRegex.Replace(normalized, "\n");
-        normalized = SoftWrapRegex.Replace(normalized, " ");
+        int doubleBreakCount = 0, listItemCount = 0, softWrapCount = 0;
+
+        var normalized = DoubleBreakRegex.Replace(text, _ => { doubleBreakCount++; return "\n\n"; });
+        normalized = ListItemRegex.Replace(normalized, _ => { listItemCount++; return "\n"; });
+        normalized = SoftWrapRegex.Replace(normalized, _ => { softWrapCount++; return " "; });
 
         var charsRemoved = text.Length - normalized.Length;
 
@@ -39,7 +41,10 @@ internal static class TerminalInputNormalizer
             Text = normalized,
             Applied = true,
             CharsRemoved = charsRemoved,
-            ProcessName = processName
+            ProcessName = processName,
+            DoubleBreakCount = doubleBreakCount,
+            ListItemCount = listItemCount,
+            SoftWrapCount = softWrapCount
         };
     }
 }
@@ -50,6 +55,9 @@ internal sealed class TerminalNormResult
     public bool Applied { get; init; }
     public int CharsRemoved { get; init; }
     public string? ProcessName { get; init; }
+    public int DoubleBreakCount { get; init; }
+    public int ListItemCount { get; init; }
+    public int SoftWrapCount { get; init; }
 
     public static TerminalNormResult NotApplied(string text) => new() { Text = text };
 }
