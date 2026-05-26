@@ -17,6 +17,18 @@
     <Optimize>false</Optimize>
   </PropertyGroup>
 
+  <!-- Embed the latest git tag as InformationalVersion for Dev builds so the app can display the real prod version with a -dev suffix. -->
+  <Target Name="SetDevVersionFromGit" BeforeTargets="GenerateAssemblyInfo" Condition="'$(Configuration)' == 'Dev'">
+    <Exec Command="git describe --tags --abbrev=0" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitLatestTag" />
+    </Exec>
+    <PropertyGroup>
+      <_GitTagStripped>$(_GitLatestTag.Trim())</_GitTagStripped>
+      <_GitTagStripped Condition="$(_GitTagStripped.StartsWith('v'))">$(_GitTagStripped.Substring(1))</_GitTagStripped>
+      <InformationalVersion Condition="'$(_GitTagStripped)' != ''">$(_GitTagStripped)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>

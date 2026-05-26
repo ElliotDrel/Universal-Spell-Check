@@ -35,19 +35,24 @@ internal static class BuildChannel
 
     private static string ResolveVersion()
     {
-#if DEV
-        return "0.0.0-dev";
-#else
         var asm = Assembly.GetEntryAssembly();
         var info = asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        string baseVersion;
         if (!string.IsNullOrWhiteSpace(info))
         {
             // Strip git-hash metadata that AssemblyInformationalVersion sometimes appends (e.g. "1.2.3+abcdef").
             var plus = info.IndexOf('+');
-            return plus > 0 ? info[..plus] : info;
+            baseVersion = plus > 0 ? info[..plus] : info;
         }
-        var ver = asm?.GetName().Version;
-        return ver is null ? "0.0.0" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+        else
+        {
+            var ver = asm?.GetName().Version;
+            baseVersion = ver is null ? "0.0.0" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+        }
+#if DEV
+        return baseVersion.EndsWith("-dev", StringComparison.Ordinal) ? baseVersion : $"{baseVersion}-dev";
+#else
+        return baseVersion;
 #endif
     }
 }
