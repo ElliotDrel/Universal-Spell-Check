@@ -19,9 +19,10 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Page header -->
         <Grid Grid.Row="0" Margin="0,0,0,24">
             <TextBlock Style="{StaticResource DisplayHeader}"
-                       Text="Today"
+                       Text="Activity"
                        VerticalAlignment="Center"/>
             <Button Style="{StaticResource GhostButton}"
                     Content="↻ Refresh"
@@ -39,52 +40,64 @@
 
             <!-- Activity feed card -->
             <Border Grid.Column="0" Style="{StaticResource Card}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="DiffStack">
-                        <TextBlock x:Name="EmptyState"
-                                   Style="{StaticResource BodyMuted}"
-                                   Text="No spell checks yet today. Press your hotkey to get started."
-                                   HorizontalAlignment="Center"
-                                   Margin="0,48,0,0"
-                                   Visibility="Collapsed"/>
-                    </StackPanel>
-                </ScrollViewer>
+                <DockPanel>
+                    <!-- Date range for currently loaded history -->
+                    <TextBlock x:Name="FeedRangeLabel"
+                               DockPanel.Dock="Top"
+                               Style="{StaticResource BodyMuted}"
+                               Margin="0,0,0,16"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="DiffStack">
+                            <TextBlock x:Name="EmptyState"
+                                       Style="{StaticResource BodyMuted}"
+                                       Text="No spell checks in the last 7 days. Press your hotkey to get started."
+                                       HorizontalAlignment="Center"
+                                       Margin="0,48,0,0"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
             </Border>
 
-            <!-- Stats card -->
+            <!-- Stats card: all-time counts -->
             <Border Grid.Column="2" Style="{StaticResource Card}" VerticalAlignment="Top">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="20"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Caption}"
+                               Text="ALL TIME"
+                               Margin="0,0,0,16"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="20"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Column="0" Grid.Row="0">
-                        <TextBlock x:Name="StatChecks" Style="{StaticResource DisplayStat}" Text="0"/>
-                        <TextBlock Style="{StaticResource Caption}" Text="CHECKS" Margin="0,4,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Grid.Row="0">
-                        <TextBlock x:Name="StatCorrections" Style="{StaticResource DisplayStat}" Text="0"/>
-                        <TextBlock Style="{StaticResource Caption}" Text="CORRECTIONS" Margin="0,4,0,0"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="0" Grid.Row="0">
+                            <TextBlock x:Name="StatChecks" Style="{StaticResource DisplayStat}" Text="0"/>
+                            <TextBlock Style="{StaticResource Caption}" Text="CHECKS" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Grid.Row="0">
+                            <TextBlock x:Name="StatCorrections" Style="{StaticResource DisplayStat}" Text="0"/>
+                            <TextBlock Style="{StaticResource Caption}" Text="CORRECTIONS" Margin="0,4,0,0"/>
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="0" Grid.Row="2">
-                        <TextBlock x:Name="StatAccuracy" Style="{StaticResource DisplayStat}" Text="—"/>
-                        <TextBlock Style="{StaticResource Caption}" Text="ACCURACY" Margin="0,4,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Grid.Row="2">
-                        <TextBlock x:Name="StatStreak"
-                                   Style="{StaticResource DisplayStat}"
-                                   Foreground="{StaticResource Accent}"
-                                   Text="0"/>
-                        <TextBlock Style="{StaticResource Caption}" Text="DAY STREAK" Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Grid>
+                        <StackPanel Grid.Column="0" Grid.Row="2">
+                            <TextBlock x:Name="StatAccuracy" Style="{StaticResource DisplayStat}" Text="—"/>
+                            <TextBlock Style="{StaticResource Caption}" Text="ACCURACY" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Grid.Row="2">
+                            <TextBlock x:Name="StatStreak"
+                                       Style="{StaticResource DisplayStat}"
+                                       Foreground="{StaticResource Accent}"
+                                       Text="0"/>
+                            <TextBlock Style="{StaticResource Caption}" Text="DAY STREAK" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
             </Border>
         </Grid>
     </Grid>
