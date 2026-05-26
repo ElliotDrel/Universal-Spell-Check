@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <!-- Embed the latest git tag as InformationalVersion for Dev builds so the app can display the real prod version with a -dev suffix. -->
-  <Target Name="SetDevVersionFromGit" BeforeTargets="GenerateAssemblyInfo" Condition="'$(Configuration)' == 'Dev'">
+  <Target Name="SetDevVersionFromGit" AfterTargets="AddSourceRevisionToInformationalVersion" BeforeTargets="GetAssemblyAttributes" Condition="'$(Configuration)' == 'Dev'">
     <Exec Command="git describe --tags --abbrev=0" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
       <Output TaskParameter="ConsoleOutput" PropertyName="_GitLatestTag" />
     </Exec>
