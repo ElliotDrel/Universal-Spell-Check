@@ -212,7 +212,7 @@ native/UniversalSpellCheck/UI/
 The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-is — it's transient and the WinForms implementation is already correct.
 
 ### Data binding
-Activity page reads from `DiagnosticsLogger`'s current log file (`%LOCALAPPDATA%\UniversalSpellCheck\native-spike-logs\phase5-YYYY-MM-DD.log`) and renders successful `spellcheck_detail` entries as diff rows. A richer observable collection or file watcher is deferred; speed is the product, but the dashboard is not the hot path.
+Activity page reads from `DiagnosticsLogger`'s current log file (`%LOCALAPPDATA%\UniversalSpellCheck\logs\spellcheck-YYYY-MM-DD.jsonl`) and renders successful `spellcheck_detail` entries as diff rows. A richer observable collection or file watcher is deferred; speed is the product, but the dashboard is not the hot path.
 
 Settings currently saves the API key through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture, model switching, startup toggling, and a replacements editor are deferred so v1 does not show fake controls.
 
