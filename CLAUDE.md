@@ -28,6 +28,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Editing API payloads, switching models, temperature/reasoning/verbosity | `docs/model-config.md` |
 | Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
 | Reading, filtering, or analyzing runtime logs | Use the `read-logs` skill — run `python .claude/skills/read-logs/scripts/logs.py --help` for options. Never manually parse log files. |
+| Pushing to Dev channel or releasing to Production | Use the `deploy` skill. Always. Do not push or tag manually. |
 | Auto-update flow, Velopack, release pipeline | `src/UpdateService.cs`, `.github/workflows/release.yml` |
 | Debugging a bug, verification standards, runtime diagnostics | `docs/debugging-principles.md` |
 | Clipboard/hotkey edge cases, loading overlay checks, cache pitfalls | `docs/watchlist.md` |
