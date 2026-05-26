@@ -13,19 +13,19 @@ internal partial class ActivityPage : Page
         Loaded += (_, _) => RefreshActivity();
     }
 
+    private void RefreshButton_Click(object sender, System.Windows.RoutedEventArgs e) => RefreshActivity();
+
     private void RefreshActivity()
     {
         var entries = NativeActivityLogReader.ReadToday().ToList();
-        DiffStack.Children.Clear();
+
+        // Remove dynamically added diff rows while keeping EmptyState at index 0
+        while (DiffStack.Children.Count > 1)
+            DiffStack.Children.RemoveAt(1);
 
         EmptyState.Visibility = entries.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
-
-        if (entries.Count == 0)
-        {
-            DiffStack.Children.Add(EmptyState);
-        }
 
         foreach (var entry in entries.Take(40))
         {
@@ -127,7 +127,8 @@ internal static class NativeActivityLogReader
                 continue;
             }
 
-            if (!DateTimeOffset.TryParse(line[..markerIndex], out var timestamp))
+            var firstSpace = line.IndexOf(' ');
+            if (firstSpace < 0 || !DateTimeOffset.TryParse(line[..firstSpace], out var timestamp))
             {
                 continue;
             }

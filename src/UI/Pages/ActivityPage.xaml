@@ -19,10 +19,16 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0"
-                   Style="{StaticResource DisplayHeader}"
-                   Text="Today"
-                   Margin="0,0,0,24"/>
+        <Grid Grid.Row="0" Margin="0,0,0,24">
+            <TextBlock Style="{StaticResource DisplayHeader}"
+                       Text="Today"
+                       VerticalAlignment="Center"/>
+            <Button Style="{StaticResource GhostButton}"
+                    Content="↻ Refresh"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Click="RefreshButton_Click"/>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -35,47 +41,6 @@
             <Border Grid.Column="0" Style="{StaticResource Card}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="DiffStack">
-                        <!-- Sample diff row — repeat for each correction.
-                             Replace this with ItemsControl bound to log entries
-                             from DiagnosticsLogger when wiring data. -->
-                        <Grid Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Grid.Column="0"
-                                       Style="{StaticResource MonoSmall}"
-                                       Text="10:24 AM"
-                                       Margin="0,0,0,4"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1"
-                                       Style="{StaticResource MonoSmall}"
-                                       Text="gpt-4.1"
-                                       Margin="0,0,0,4"/>
-
-                            <Border Grid.Row="1" Grid.ColumnSpan="2"
-                                    Style="{StaticResource DiffMinusLine}">
-                                <TextBlock FontFamily="{StaticResource FontMono}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource DiffMinusText}"
-                                           Text="− their going to the store"/>
-                            </Border>
-                            <Border Grid.Row="2" Grid.ColumnSpan="2"
-                                    Style="{StaticResource DiffPlusLine}">
-                                <TextBlock FontFamily="{StaticResource FontMono}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource DiffPlusText}"
-                                           Text="+ they&#x27;re going to the store"/>
-                            </Border>
-                        </Grid>
-
-                        <!-- Empty state placeholder shown when no entries.
-                             Toggle visibility based on data. -->
                         <TextBlock x:Name="EmptyState"
                                    Style="{StaticResource BodyMuted}"
                                    Text="No spell checks yet today. Press your hotkey to get started."
