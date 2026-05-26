@@ -2,10 +2,16 @@
 
 ## Terminal input normalization (pre-processing)
 
-Before the API call, `TerminalInputNormalizer.Normalize` is invoked on the captured text when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It collapses ` *\r\n +` (optional trailing spaces + CRLF + one or more leading spaces) to a single space. This removes the soft-wrap artifacts that terminals insert when copying multi-line text.
+Before the API call, `TerminalInputNormalizer.Normalize` is invoked on the captured text when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
+
+1. **Double CRLF** (`\r\n\r\n[ \t]*`) → `\n\n` — preserves paragraph/section breaks.
+2. **List items** (`\r\n[ \t]+` before `-`, `*`, `•`, or `N.`) → `\n` — preserves bullet and numbered list structure.
+3. **Soft-wrap continuation** (` *\r\n[ \t]+`) → ` ` — collapses lines that wrapped purely due to terminal width.
+
+Tabs are matched alongside spaces in all three passes. Bare `\r\n` without trailing whitespace is left untouched.
 
 - Applied on the **hot path only** (`ExecuteHotPathAsync`). Headless/bench runs are unaffected.
-- Bare `\r\n` without trailing spaces is left untouched.
+- Bare `\r\n` without trailing whitespace is left untouched.
 - Result is recorded in `RunRecord.TerminalNorm`; logged as `terminal_normalized=true terminal_norm_chars_removed=N` on the `run_completed` line and as `terminal_normalization` in the `spellcheck_detail` JSON blob.
 - If not applied (non-terminal process or no artifacts found), `terminal_normalization.applied = false` and `chars_removed = 0`.
 
