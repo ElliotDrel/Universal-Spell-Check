@@ -73,7 +73,7 @@ Thin `NativeWindow` subclass. Calls `RegisterHotKey` with `BuildChannel.HotkeyMo
 
 Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`guard_rejected reason=already_running`), never queued.
 
-1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, writes a sentinel to clipboard, sends Ctrl+C, polls for changed Unicode text.
+1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
 2. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
 3. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
 4. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
