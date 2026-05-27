@@ -24,13 +24,7 @@ internal static class ClipboardLoop
         string? lastFailureReason = null;
         for (var attempt = 1; attempt <= MaxCopyAttempts; attempt++)
         {
-            var sentinel = $"__USC_COPY_SENTINEL_{Guid.NewGuid():N}__";
-            if (!await TrySetTextAsync(sentinel))
-            {
-                lastFailureReason = "Clipboard was busy before copy.";
-                await Task.Delay(ClipboardRetryDelay);
-                continue;
-            }
+            var sequenceBeforeCopy = GetClipboardSequenceNumber();
 
             SendKeys.SendWait("^c");
 
@@ -39,17 +33,22 @@ internal static class ClipboardLoop
             {
                 await Task.Delay(PollInterval);
 
-                if (!TryContainsText(out var containsText) || !containsText)
+                if (GetClipboardSequenceNumber() == sequenceBeforeCopy)
+                {
+                    continue;
+                }
+
+                if (!TryContainsText(out var containsText))
+                {
+                    continue;
+                }
+
+                if (!containsText)
                 {
                     continue;
                 }
 
                 if (!TryGetText(out var text))
-                {
-                    continue;
-                }
-
-                if (text == sentinel)
                 {
                     continue;
                 }
@@ -181,6 +180,9 @@ internal static class ClipboardLoop
         result = default;
         return false;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetClipboardSequenceNumber();
 }
 
 internal sealed class CaptureResult
