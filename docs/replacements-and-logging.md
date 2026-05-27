@@ -86,7 +86,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 | Field | Source |
 |---|---|
 | `channel` | `BuildChannel.ChannelName` — `"prod"` or `"dev"` |
-| `app_version` | `BuildChannel.AppVersion` — semver for prod, `"0.0.0-dev"` for dev |
+| `app_version` | `BuildChannel.AppVersion` — semver for prod, and the same base version with `-dev` appended for dev (for example `0.1.6-dev`) |
 | `pid` | `Process.GetCurrentProcess().Id` — disambiguates two simultaneously running channels |
 
 ### Concurrent write safety

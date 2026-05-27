@@ -155,7 +155,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         try
         {
             // Clipboard backup must come before Ctrl+C so we can restore later.
-            try { record.OriginalClipboard = Clipboard.GetDataObject(); } catch { /* best-effort */ }
+            record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
             record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
             record.Events.Add("run_started");
             _setBusy(true);
@@ -235,16 +235,15 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             // Paste: set clipboard, then send Ctrl+V. Restore is moved to finalize.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
-            try
+            if (await ClipboardLoop.TrySetReplacementTextAsync(pp.Text))
             {
-                Clipboard.SetText(pp.Text, TextDataFormat.UnicodeText);
                 record.CorrectedTextOnClipboard = true;
             }
-            catch (Exception ex)
+            else
             {
                 record.Status = RunStatus.PasteFailed;
-                record.ErrorMessage = ex.Message;
-                record.PasteErrorType = ex.GetType().Name;
+                record.ErrorMessage = "Requested Clipboard operation did not succeed.";
+                record.PasteErrorType = "ExternalException";
                 record.PasteFailurePhase = "set_corrected_clipboard";
                 record.Events.Add("paste_failed");
                 _notify("Paste failed", "The corrected text could not be copied to the clipboard.");

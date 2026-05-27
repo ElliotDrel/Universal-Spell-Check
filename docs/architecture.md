@@ -30,7 +30,7 @@ All channel-specific values live in `BuildChannel` as `const` or static-read-onl
 | `MutexName` | `UniversalSpellCheck` | `UniversalSpellCheck.Dev` |
 | `TrayTooltip` | `Universal Spell Check` | `Universal Spell Check (Dev)` |
 | `HotkeyVk` | `0x55` (U) | `0x44` (D) |
-| `AppVersion` | from `AssemblyInformationalVersion` (injected at build time from tag) | `0.0.0-dev` |
+| `AppVersion` | from `AssemblyInformationalVersion` (injected at build time from tag) | same base version as prod with `-dev` appended (for example `0.1.6-dev`) |
 
 `IsDev` is a `const bool`, which means the compiler eliminates dead code at build time. CS0162 "unreachable code" warnings in channel-conditional blocks are expected and intentional.
 
