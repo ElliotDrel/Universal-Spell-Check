@@ -11,6 +11,14 @@
                 <ResourceDictionary Source="pack://application:,,,/UniversalSpellCheck;component/UI/Styles.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/UniversalSpellCheck;component/UI/Components.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <Storyboard x:Key="FeedLoadingSpinnerStoryboard" RepeatBehavior="Forever">
+                <DoubleAnimation Storyboard.TargetName="FeedLoadingSpinnerRotate"
+                                  Storyboard.TargetProperty="Angle"
+                                  From="0"
+                                  To="360"
+                                  Duration="0:0:0.75"/>
+            </Storyboard>
         </ResourceDictionary>
     </Page.Resources>
 
@@ -88,12 +96,34 @@
                                HorizontalAlignment="Center"
                                Margin="0,48,0,0"
                                Visibility="Collapsed"/>
-                    <TextBlock x:Name="LoadingIndicator"
-                               Style="{StaticResource BodyMuted}"
-                               Text="Loading earlier…"
-                               HorizontalAlignment="Center"
-                               Margin="0,16,0,24"
-                               Visibility="Collapsed"/>
+                    <StackPanel x:Name="FeedItems"/>
+                    <StackPanel x:Name="LoadingIndicator"
+                                HorizontalAlignment="Center"
+                                Margin="0,16,0,24"
+                                Visibility="Collapsed">
+                        <Grid Width="18"
+                              Height="18"
+                              Margin="0,0,0,8"
+                              HorizontalAlignment="Center">
+                            <Ellipse Width="18"
+                                     Height="18"
+                                     Stroke="{StaticResource Border}"
+                                     StrokeThickness="2"/>
+                            <Ellipse Width="18"
+                                     Height="18"
+                                     Stroke="{StaticResource TextMuted}"
+                                     StrokeThickness="2"
+                                     StrokeDashArray="2.5 20"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <RotateTransform x:Name="FeedLoadingSpinnerRotate"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
+                        <TextBlock Style="{StaticResource BodyMuted}"
+                                   Text="Loading earlier…"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </StackPanel>
             </ui:SmoothScrollViewer>
         </DockPanel>

@@ -5,8 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Threading;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfButton = System.Windows.Controls.Button;
@@ -45,8 +46,7 @@ internal partial class ActivityPage : Page
         _isLoadingMore = false;
         _renderedDays.Clear();
 
-        while (DiffStack.Children.Count > 1)
-            DiffStack.Children.RemoveAt(1);
+        FeedItems.Children.Clear();
 
         HideLoadingIndicator();
 
@@ -118,7 +118,7 @@ internal partial class ActivityPage : Page
     private void PrependEntries(IReadOnlyList<ActivityEntry> entries)
     {
         var today = DateTime.Now.Date;
-        var insertAt = 1;
+        var insertAt = 0;
         var isFirstInFeed = true;
 
         foreach (var dayGroup in entries
@@ -127,14 +127,14 @@ internal partial class ActivityPage : Page
         {
             if (_renderedDays.Add(dayGroup.Key))
             {
-                DiffStack.Children.Insert(
+                FeedItems.Children.Insert(
                     insertAt++,
                     CreateDayHeader(dayGroup.Key, today, isFirstInFeed: isFirstInFeed));
                 isFirstInFeed = false;
             }
 
             foreach (var entry in dayGroup.OrderByDescending(e => e.Timestamp))
-                DiffStack.Children.Insert(insertAt++, CreateDiffRow(entry));
+                FeedItems.Children.Insert(insertAt++, CreateDiffRow(entry));
         }
     }
 
@@ -147,20 +147,25 @@ internal partial class ActivityPage : Page
                      .OrderBy(g => g.Key))
         {
             if (_renderedDays.Add(dayGroup.Key))
-                DiffStack.Children.Add(CreateDayHeader(dayGroup.Key, today, isFirstInFeed: false));
+                FeedItems.Children.Add(CreateDayHeader(dayGroup.Key, today, isFirstInFeed: false));
 
             foreach (var entry in dayGroup.OrderBy(e => e.Timestamp))
-                DiffStack.Children.Add(CreateDiffRow(entry));
+                FeedItems.Children.Add(CreateDiffRow(entry));
         }
     }
 
     private void ShowLoadingIndicator()
     {
         LoadingIndicator.Visibility = Visibility.Visible;
+        if (FindResource("FeedLoadingSpinnerStoryboard") is Storyboard storyboard)
+            storyboard.Begin(LoadingIndicator, true);
     }
 
     private void HideLoadingIndicator()
     {
+        if (FindResource("FeedLoadingSpinnerStoryboard") is Storyboard storyboard)
+            storyboard.Stop(LoadingIndicator);
+
         LoadingIndicator.Visibility = Visibility.Collapsed;
     }
 
