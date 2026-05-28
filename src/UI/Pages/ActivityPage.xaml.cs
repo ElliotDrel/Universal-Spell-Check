@@ -1,15 +1,27 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Threading;
+using System.Windows.Media;
 using WpfBrush = System.Windows.Media.Brush;
+using WpfBrushes = System.Windows.Media.Brushes;
+using WpfButton = System.Windows.Controls.Button;
+using WpfColor = System.Windows.Media.Color;
+using WpfContextMenu = System.Windows.Controls.ContextMenu;
+using WpfMenuItem = System.Windows.Controls.MenuItem;
 using WpfFontFamily = System.Windows.Media.FontFamily;
 
 namespace UniversalSpellCheck.UI.Pages;
 
 internal partial class ActivityPage : Page
 {
+    /// <summary>Hard cap for the time column; fits "12:34 PM" in mono without excess gutter.</summary>
+    private const double TimestampColumnMaxWidth = 58;
+
     private int _weekOffset = 0;
 
     public ActivityPage()
@@ -29,11 +41,11 @@ internal partial class ActivityPage : Page
 
         AppendWeek();
 
-        var (checks, corrections) = NativeActivityLogReader.ReadAllTimeStats();
+        var (checks, corrections, dayStreak) = NativeActivityLogReader.ReadAllTimeStats();
         StatChecks.Text = checks.ToString("N0");
         StatCorrections.Text = corrections.ToString("N0");
         StatAccuracy.Text = checks == 0 ? "—" : $"{Math.Round((double)corrections / checks * 100)}%";
-        StatStreak.Text = checks == 0 ? "0" : "1";
+        StatStreak.Text = dayStreak.ToString("N0");
     }
 
     private void AppendWeek()
@@ -47,19 +59,76 @@ internal partial class ActivityPage : Page
         if (_weekOffset == 0)
             EmptyState.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        foreach (var entry in entries)
-            DiffStack.Children.Add(CreateDiffRow(entry));
+        var insertAt = GetFeedInsertIndex();
+        var isFirstInFeed = insertAt <= 1;
+        var isFirstHeader = true;
 
-        // Cumulative range label (updates to cover all loaded weeks)
-        var cumulativeFrom = today.AddDays(-(7 * _weekOffset + 6));
-        FeedRangeLabel.Text = $"{cumulativeFrom:MMM d} – {today:MMM d}";
+        foreach (var dayGroup in entries
+                     .GroupBy(e => e.Timestamp.ToLocalTime().Date)
+                     .OrderByDescending(g => g.Key))
+        {
+            DiffStack.Children.Insert(
+                insertAt++,
+                CreateDayHeader(dayGroup.Key, today, isFirstHeader && isFirstInFeed));
+            isFirstHeader = false;
+
+            foreach (var entry in dayGroup.OrderByDescending(e => e.Timestamp))
+                DiffStack.Children.Insert(insertAt++, CreateDiffRow(entry));
+        }
 
         DiffStack.Children.Add(CreateLoadEarlierButton());
     }
 
-    private System.Windows.Controls.Button CreateLoadEarlierButton()
+    private int GetFeedInsertIndex()
     {
-        var btn = new System.Windows.Controls.Button
+        for (var i = DiffStack.Children.Count - 1; i >= 0; i--)
+        {
+            if (DiffStack.Children[i] is WpfButton)
+                return i;
+        }
+
+        return DiffStack.Children.Count;
+    }
+
+    private FrameworkElement CreateDayHeader(DateTime day, DateTime today, bool isFirstInFeed)
+    {
+        var header = new StackPanel
+        {
+            Margin = new Thickness(0, isFirstInFeed ? 4 : 28, 0, 4)
+        };
+
+        header.Children.Add(new TextBlock
+        {
+            Style = (Style)FindResource("Caption"),
+            Text = FormatDayLabel(day, today).ToUpperInvariant(),
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+
+        header.Children.Add(new Border
+        {
+            Height = 1,
+            Background = (WpfBrush)FindResource("Border")
+        });
+
+        return header;
+    }
+
+    private static string FormatDayLabel(DateTime day, DateTime today)
+    {
+        if (day == today)
+            return "Today";
+
+        if (day == today.AddDays(-1))
+            return "Yesterday";
+
+        return day.Year == today.Year
+            ? day.ToString("MMMM d", CultureInfo.CurrentCulture)
+            : day.ToString("MMMM d, yyyy", CultureInfo.CurrentCulture);
+    }
+
+    private WpfButton CreateLoadEarlierButton()
+    {
+        var btn = new WpfButton
         {
             Style = (Style)FindResource("GhostButton"),
             Content = "Load earlier",
@@ -77,199 +146,551 @@ internal partial class ActivityPage : Page
 
     private FrameworkElement CreateDiffRow(ActivityEntry entry)
     {
-        var outer = new Grid { Margin = new Thickness(0, 0, 0, 16) };
-        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var rowWrap = new StackPanel();
 
-        // Header: date/time · model · [Split] toggle (only if text changed)
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 4) };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        if (entry.TextChanged)
-            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var rowChrome = new Border
+        {
+            Background = WpfBrushes.Transparent,
+            Padding = new Thickness(8, 4, 8, 4),
+            Margin = new Thickness(-8, 2, -8, 2),
+            CornerRadius = new CornerRadius(6)
+        };
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+            MaxWidth = TimestampColumnMaxWidth
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        rowChrome.Child = row;
+        rowWrap.Children.Add(rowChrome);
 
         var timestamp = new TextBlock
         {
             Style = (Style)FindResource("MonoSmall"),
-            Text = entry.Timestamp.ToLocalTime().ToString("MMM d, h:mm tt"),
-            VerticalAlignment = VerticalAlignment.Center
+            Text = entry.Timestamp.ToLocalTime().ToString("h:mm tt"),
+            Margin = new Thickness(0, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left
         };
         Grid.SetColumn(timestamp, 0);
-        header.Children.Add(timestamp);
+        row.Children.Add(timestamp);
 
-        var model = new TextBlock
+        var inlineBlock = CreateInlineDiffBlock(entry);
+        var splitBlock = CreateSplitDiffBlock(entry);
+        splitBlock.Visibility = Visibility.Collapsed;
+
+        var diffBody = new StackPanel();
+        diffBody.Children.Add(inlineBlock);
+        diffBody.Children.Add(splitBlock);
+
+        var diffHost = new Border
         {
-            Style = (Style)FindResource("MonoSmall"),
-            Text = entry.Model,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, entry.TextChanged ? 8 : 0, 0)
+            Child = diffBody,
+            Margin = new Thickness(0, 0, 12, 0),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = "Click to copy corrected text"
         };
-        Grid.SetColumn(model, 1);
-        header.Children.Add(model);
+        Grid.SetColumn(diffHost, 1);
+        row.Children.Add(diffHost);
 
-        // Pre-render both views; toggle via Visibility
-        var inlineView = CreateInlineView(entry);
-        FrameworkElement? splitView = entry.TextChanged ? CreateSplitView(entry) : null;
-
-        if (entry.TextChanged && splitView != null)
+        var actions = new StackPanel
         {
-            splitView.Visibility = Visibility.Collapsed;
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Top,
+            Opacity = 0,
+            Margin = new Thickness(0, -4, 0, 0)
+        };
+        Grid.SetColumn(actions, 2);
+        row.Children.Add(actions);
 
-            var toggleBtn = new System.Windows.Controls.Button
-            {
-                Style = (Style)FindResource("GhostButton"),
-                Content = "Split",
-                Padding = new Thickness(8, 2, 8, 2),
-                FontSize = 11,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(toggleBtn, 2);
-            header.Children.Add(toggleBtn);
+        var hoverBrush = (WpfBrush)FindResource("HoverGhost");
+        rowChrome.MouseEnter += (_, _) =>
+        {
+            rowChrome.Background = hoverBrush;
+            actions.Opacity = 1;
+        };
+        rowChrome.MouseLeave += (_, _) =>
+        {
+            rowChrome.Background = WpfBrushes.Transparent;
+            actions.Opacity = 0;
+        };
 
-            var showingSplit = false;
-            toggleBtn.Click += (_, _) =>
+        DispatcherTimer? copyResetTimer = null;
+        var copyButton = CreateIconButton(FeedActionIcons.Copy(), "Copy corrected text");
+
+        void CopyCorrectedText()
+        {
+            if (!TryCopyOutputText(entry.OutputText))
+                return;
+
+            copyButton.Content = FeedActionIcons.Check();
+            copyButton.ToolTip = "Copied";
+
+            copyResetTimer?.Stop();
+            copyResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            copyResetTimer.Tick += (_, _) =>
             {
-                showingSplit = !showingSplit;
-                inlineView.Visibility = showingSplit ? Visibility.Collapsed : Visibility.Visible;
-                splitView.Visibility = showingSplit ? Visibility.Visible : Visibility.Collapsed;
-                toggleBtn.Content = showingSplit ? "Inline" : "Split";
+                copyResetTimer?.Stop();
+                copyResetTimer = null;
+                copyButton.Content = FeedActionIcons.Copy();
+                copyButton.ToolTip = "Copy corrected text";
             };
+            copyResetTimer.Start();
         }
 
-        Grid.SetRow(header, 0);
-        outer.Children.Add(header);
+        copyButton.Click += (_, e) =>
+        {
+            CopyCorrectedText();
+            e.Handled = true;
+        };
+        actions.Children.Add(copyButton);
 
-        var contentStack = new StackPanel();
-        contentStack.Children.Add(inlineView);
-        if (splitView != null)
-            contentStack.Children.Add(splitView);
+        if (entry.TextChanged)
+            actions.Children.Add(CreateDiffViewMenuButton(inlineBlock, splitBlock));
 
-        Grid.SetRow(contentStack, 1);
-        outer.Children.Add(contentStack);
+        diffHost.MouseLeftButtonUp += (_, e) =>
+        {
+            CopyCorrectedText();
+            e.Handled = true;
+        };
 
-        return outer;
+        rowWrap.Children.Add(new Border
+        {
+            Height = 1,
+            Background = (WpfBrush)FindResource("Border"),
+            Opacity = 0.85
+        });
+
+        return rowWrap;
     }
 
-    // ~250 chars ≈ 3 lines of JetBrains Mono 12px in a typical card width
-    private const int TruncateAt = 250;
-
-    private FrameworkElement CreateInlineView(ActivityEntry entry)
+    private FrameworkElement CreateInlineDiffBlock(ActivityEntry entry)
     {
-        var tb = new TextBlock
+        var block = new StackPanel();
+
+        if (!entry.TextChanged)
+        {
+            block.Children.Add(CreatePlainTextLine(entry.OutputText));
+            return block;
+        }
+
+        var lineDiffs = InlineTextDiff.AlignLines(
+            SplitLines(entry.InputText),
+            SplitLines(entry.OutputText));
+
+        foreach (var line in lineDiffs)
+        {
+            block.Children.Add(line.Kind switch
+            {
+                LineDiffKind.Unchanged => CreatePlainTextLine(line.NewLine),
+                LineDiffKind.Modified => CreateInlineCharDiffLine(line.OldLine, line.NewLine),
+                LineDiffKind.Removed => CreateRemovedOnlyLine(line.OldLine),
+                LineDiffKind.Added => CreateAddedOnlyLine(line.NewLine),
+                _ => CreatePlainTextLine(line.NewLine)
+            });
+        }
+
+        return block;
+    }
+
+    private FrameworkElement CreateSplitDiffBlock(ActivityEntry entry)
+    {
+        var block = new StackPanel();
+
+        block.Children.Add(CreateSplitColumnHeader());
+
+        var lineDiffs = InlineTextDiff.AlignLines(
+            SplitLines(entry.InputText),
+            SplitLines(entry.OutputText));
+
+        var lineNumber = 1;
+        foreach (var line in lineDiffs)
+        {
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var leftSide = line.Kind switch
+            {
+                LineDiffKind.Unchanged => CreateSplitSidePlain(line.OldLine, lineNumber, isOriginal: true),
+                LineDiffKind.Modified => CreateSplitSideInline(line.OldLine, line.NewLine, lineNumber, isOriginal: true),
+                LineDiffKind.Removed => CreateSplitSideFullLine(line.OldLine, lineNumber, isOriginal: true),
+                LineDiffKind.Added => CreateSplitSideEmpty(lineNumber, isOriginal: true),
+                _ => CreateSplitSidePlain(line.OldLine, lineNumber, isOriginal: true)
+            };
+
+            var rightSide = line.Kind switch
+            {
+                LineDiffKind.Unchanged => CreateSplitSidePlain(line.NewLine, lineNumber, isOriginal: false),
+                LineDiffKind.Modified => CreateSplitSideInline(line.OldLine, line.NewLine, lineNumber, isOriginal: false),
+                LineDiffKind.Removed => CreateSplitSideEmpty(lineNumber, isOriginal: false),
+                LineDiffKind.Added => CreateSplitSideFullLine(line.NewLine, lineNumber, isOriginal: false),
+                _ => CreateSplitSidePlain(line.NewLine, lineNumber, isOriginal: false)
+            };
+
+            Grid.SetColumn(leftSide, 0);
+            Grid.SetColumn(rightSide, 1);
+            row.Children.Add(leftSide);
+            row.Children.Add(rightSide);
+            block.Children.Add(row);
+            lineNumber++;
+        }
+
+        return block;
+    }
+
+    private Grid CreateSplitColumnHeader()
+    {
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        row.Children.Add(new TextBlock
+        {
+            Style = (Style)FindResource("Caption"),
+            Text = "ORIGINAL",
+            Margin = new Thickness(0, 0, 8, 0)
+        });
+
+        var corrected = new TextBlock
+        {
+            Style = (Style)FindResource("Caption"),
+            Text = "CORRECTED",
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        Grid.SetColumn(corrected, 1);
+        row.Children.Add(corrected);
+
+        return row;
+    }
+
+    private Border CreatePlainTextLine(string text)
+    {
+        return WrapDiffText(CreateDiffTextBlock(text));
+    }
+
+    private Border CreateInlineCharDiffLine(string oldLine, string newLine)
+    {
+        var textBlock = CreateDiffTextBlock("");
+        AppendInlineCharDiff(textBlock.Inlines, oldLine, newLine);
+        return WrapDiffText(textBlock);
+    }
+
+    private Border CreateRemovedOnlyLine(string text)
+    {
+        var textBlock = CreateDiffTextBlock("");
+        AppendDiffRuns(textBlock.Inlines, text, TextDiffKind.Delete, showNewlineGlyphs: true);
+        return WrapDiffText(textBlock, highlightLine: true, removed: true);
+    }
+
+    private Border CreateAddedOnlyLine(string text)
+    {
+        var textBlock = CreateDiffTextBlock("");
+        AppendDiffRuns(textBlock.Inlines, text, TextDiffKind.Insert, showNewlineGlyphs: true);
+        return WrapDiffText(textBlock, highlightLine: true, removed: false);
+    }
+
+    private TextBlock CreateDiffTextBlock(string text)
+    {
+        return new TextBlock
         {
             FontFamily = (WpfFontFamily)FindResource("FontMono"),
             FontSize = 12,
-            TextWrapping = TextWrapping.Wrap
+            Foreground = (WpfBrush)FindResource("TextPrimary"),
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 16,
+            Text = text
         };
+    }
 
-        if (entry.TextChanged)
+    private Border WrapDiffText(TextBlock textBlock, bool highlightLine = false, bool removed = false)
+    {
+        var line = new Border
         {
-            var highlightBg = (WpfBrush)FindResource("DiffPlusBg");
-            var highlightFg = (WpfBrush)FindResource("DiffPlusText");
-            var normalFg = (WpfBrush)FindResource("TextPrimary");
-
-            int charCount = 0;
-            foreach (var (token, isChanged) in WordDiff.Compute(entry.InputText, entry.OutputText))
-            {
-                if (charCount + token.Length > TruncateAt)
-                {
-                    tb.Inlines.Add(new Run("…") { Foreground = normalFg });
-                    break;
-                }
-                tb.Inlines.Add(isChanged
-                    ? new Run(token) { Background = highlightBg, Foreground = highlightFg }
-                    : new Run(token) { Foreground = normalFg });
-                charCount += token.Length;
-            }
-        }
-        else
-        {
-            // No correction made — show text in muted style
-            var display = entry.OutputText.Length > TruncateAt
-                ? entry.OutputText[..TruncateAt] + "…"
-                : entry.OutputText;
-            tb.Text = display;
-            tb.Foreground = (WpfBrush)FindResource("TextMuted");
-        }
-
-        return new Border
-        {
-            Background = (WpfBrush)FindResource("Surface"),
-            BorderBrush = (WpfBrush)FindResource("Border"),
-            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8, 2, 8, 2),
             CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(12, 6, 12, 6),
-            Child = tb
+            Margin = new Thickness(0, 0, 0, 0),
+            Child = textBlock
         };
-    }
 
-    private FrameworkElement CreateSplitView(ActivityEntry entry)
-    {
-        var stack = new StackPanel { Margin = new Thickness(0, 2, 0, 0) };
-        stack.Children.Add(CreateDiffLine("DiffMinusLine", "DiffMinusText", "- " + entry.InputText));
-        stack.Children.Add(CreateDiffLine("DiffPlusLine", "DiffPlusText", "+ " + entry.OutputText));
-        return stack;
-    }
-
-    private Border CreateDiffLine(string borderStyle, string textBrush, string text)
-    {
-        var display = text.Length > TruncateAt ? text[..TruncateAt] + "…" : text;
-        return new Border
+        if (highlightLine)
         {
-            Style = (Style)FindResource(borderStyle),
-            Child = new TextBlock
+            line.Background = removed
+                ? (WpfBrush)FindResource("DiffMinusBg")
+                : (WpfBrush)FindResource("DiffPlusBg");
+        }
+
+        return line;
+    }
+
+    private void AppendInlineCharDiff(InlineCollection inlines, string oldLine, string newLine)
+    {
+        foreach (var segment in InlineTextDiff.ComputeChars(oldLine, newLine))
+            AppendDiffRuns(inlines, segment.Text, segment.Kind, showNewlineGlyphs: segment.Kind != TextDiffKind.Equal);
+    }
+
+    private void AppendDiffRuns(
+        InlineCollection inlines,
+        string text,
+        TextDiffKind kind,
+        bool showNewlineGlyphs)
+    {
+        if (text.Length == 0)
+            return;
+
+        if (!showNewlineGlyphs || !text.Contains('\n'))
+        {
+            inlines.Add(CreateDiffRun(text, kind));
+            return;
+        }
+
+        var parts = text.Split('\n');
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (parts[i].Length > 0)
+                inlines.Add(CreateDiffRun(parts[i], kind));
+
+            if (i >= parts.Length - 1)
+                continue;
+
+            if (kind != TextDiffKind.Equal)
             {
-                FontFamily = (WpfFontFamily)FindResource("FontMono"),
-                FontSize = 12,
-                Foreground = (WpfBrush)FindResource(textBrush),
-                Text = display,
-                TextWrapping = TextWrapping.Wrap
+                inlines.Add(new Run("↵")
+                {
+                    Foreground = kind == TextDiffKind.Delete
+                        ? (WpfBrush)FindResource("DiffMinusText")
+                        : (WpfBrush)FindResource("DiffPlusText"),
+                    Background = kind == TextDiffKind.Delete
+                        ? (WpfBrush)FindResource("DiffMinusBg")
+                        : (WpfBrush)FindResource("DiffPlusBg")
+                });
             }
+
+            inlines.Add(new Run("\n"));
+        }
+    }
+
+    private Run CreateDiffRun(string text, TextDiffKind kind)
+    {
+        var run = new Run(text);
+        switch (kind)
+        {
+            case TextDiffKind.Delete:
+                run.Background = (WpfBrush)FindResource("DiffMinusBg");
+                run.Foreground = (WpfBrush)FindResource("DiffMinusText");
+                run.TextDecorations = TextDecorations.Strikethrough;
+                break;
+            case TextDiffKind.Insert:
+                run.Background = (WpfBrush)FindResource("DiffPlusBg");
+                run.Foreground = (WpfBrush)FindResource("DiffPlusText");
+                break;
+        }
+
+        return run;
+    }
+
+    private Border CreateSplitSidePlain(string text, int lineNumber, bool isOriginal)
+    {
+        return CreateSplitSideShell(
+            lineNumber,
+            isOriginal,
+            highlightLine: false,
+            removedSide: isOriginal,
+            CreateDiffTextBlock(text));
+    }
+
+    private Border CreateSplitSideInline(string oldLine, string newLine, int lineNumber, bool isOriginal)
+    {
+        var textBlock = CreateDiffTextBlock("");
+        AppendSplitSideCharDiff(textBlock.Inlines, oldLine, newLine, isOriginal);
+        return CreateSplitSideShell(lineNumber, isOriginal, highlightLine: true, removedSide: isOriginal, textBlock);
+    }
+
+    private Border CreateSplitSideFullLine(string text, int lineNumber, bool isOriginal)
+    {
+        var textBlock = CreateDiffTextBlock("");
+        AppendSplitSideRuns(textBlock.Inlines, text, isOriginal ? TextDiffKind.Delete : TextDiffKind.Insert);
+        return CreateSplitSideShell(lineNumber, isOriginal, highlightLine: true, removedSide: isOriginal, textBlock);
+    }
+
+    private Border CreateSplitSideEmpty(int lineNumber, bool isOriginal)
+    {
+        return CreateSplitSideShell(
+            lineNumber,
+            isOriginal,
+            highlightLine: false,
+            removedSide: isOriginal,
+            CreateDiffTextBlock(""));
+    }
+
+    private Border CreateSplitSideShell(
+        int lineNumber,
+        bool isOriginal,
+        bool highlightLine,
+        bool removedSide,
+        TextBlock textBlock)
+    {
+        var side = new Border
+        {
+            Padding = new Thickness(8, 3, 8, 3),
+            Margin = new Thickness(isOriginal ? 0 : 8, 0, isOriginal ? 8 : 0, 0),
+            CornerRadius = new CornerRadius(4),
+            Background = highlightLine
+                ? (removedSide
+                    ? (WpfBrush)FindResource("DiffMinusBg")
+                    : (WpfBrush)FindResource("DiffPlusBg"))
+                : (WpfBrush)FindResource("Canvas")
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        grid.Children.Add(new TextBlock
+        {
+            FontFamily = (WpfFontFamily)FindResource("FontMono"),
+            FontSize = 12,
+            Foreground = (WpfBrush)FindResource("TextMuted"),
+            Text = lineNumber.ToString(),
+            TextAlignment = TextAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 0, 10, 0)
+        });
+
+        Grid.SetColumn(textBlock, 1);
+        grid.Children.Add(textBlock);
+
+        side.Child = grid;
+        return side;
+    }
+
+    private void AppendSplitSideCharDiff(InlineCollection inlines, string oldLine, string newLine, bool isOriginal)
+    {
+        foreach (var segment in InlineTextDiff.ComputeChars(oldLine, newLine))
+        {
+            if (isOriginal && segment.Kind == TextDiffKind.Insert)
+                continue;
+            if (!isOriginal && segment.Kind == TextDiffKind.Delete)
+                continue;
+
+            inlines.Add(segment.Kind switch
+            {
+                TextDiffKind.Equal => new Run(segment.Text)
+                {
+                    Foreground = (WpfBrush)FindResource("TextPrimary")
+                },
+                TextDiffKind.Delete => CreateSplitHighlightRun(segment.Text, removed: true),
+                TextDiffKind.Insert => CreateSplitHighlightRun(segment.Text, removed: false),
+                _ => new Run(segment.Text)
+                {
+                    Foreground = (WpfBrush)FindResource("TextPrimary")
+                }
+            });
+        }
+    }
+
+    private void AppendSplitSideRuns(InlineCollection inlines, string text, TextDiffKind kind)
+    {
+        if (text.Length == 0)
+            return;
+
+        inlines.Add(CreateSplitHighlightRun(text, removed: kind == TextDiffKind.Delete));
+    }
+
+    private Run CreateSplitHighlightRun(string text, bool removed)
+    {
+        var accentColor = (WpfColor)FindResource(removed ? "DiffMinusTextColor" : "DiffPlusTextColor");
+        return new Run(text)
+        {
+            Background = new SolidColorBrush(WpfColor.FromArgb(0x66, accentColor.R, accentColor.G, accentColor.B)),
+            Foreground = (WpfBrush)FindResource(removed ? "DiffMinusText" : "DiffPlusText"),
+            FontWeight = FontWeights.SemiBold
         };
     }
-}
 
-// ── Word-level LCS diff ────────────────────────────────────────────────────
-internal static class WordDiff
-{
-    // Returns output tokens with a flag for each token that differs from input.
-    // Spaces are folded into each word token so Inlines render correctly.
-    public static List<(string Token, bool IsChanged)> Compute(string input, string output)
+    private WpfButton CreateIconButton(UIElement icon, string toolTip, Action? onClick = null)
     {
-        var inWords = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var outWords = output.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        int m = inWords.Length, n = outWords.Length;
-
-        var dp = new int[m + 1, n + 1];
-        for (int i = 1; i <= m; i++)
-            for (int j = 1; j <= n; j++)
-                dp[i, j] = string.Equals(inWords[i - 1], outWords[j - 1], StringComparison.OrdinalIgnoreCase)
-                    ? dp[i - 1, j - 1] + 1
-                    : Math.Max(dp[i - 1, j], dp[i, j - 1]);
-
-        var changed = new bool[n];
-        int oi = m, oj = n;
-        while (oi > 0 || oj > 0)
+        var button = new WpfButton
         {
-            if (oi > 0 && oj > 0 && string.Equals(inWords[oi - 1], outWords[oj - 1], StringComparison.OrdinalIgnoreCase))
-            { oi--; oj--; }
-            else if (oj > 0 && (oi == 0 || dp[oi, oj - 1] >= dp[oi - 1, oj]))
-            { changed[oj - 1] = true; oj--; }
-            else
-            { oi--; }
+            Style = (Style)FindResource("IconButton"),
+            Content = icon,
+            ToolTip = toolTip
+        };
+        if (onClick is not null)
+            button.Click += (_, _) => onClick();
+        return button;
+    }
+
+    private WpfButton CreateDiffViewMenuButton(FrameworkElement inlineBlock, FrameworkElement splitBlock)
+    {
+        var inlineItem = new WpfMenuItem
+        {
+            Header = "Inline diff",
+            IsCheckable = true,
+            IsChecked = true
+        };
+        var sideBySideItem = new WpfMenuItem
+        {
+            Header = "Side by side",
+            IsCheckable = true
+        };
+
+        void SetDiffView(bool sideBySide)
+        {
+            inlineBlock.Visibility = sideBySide ? Visibility.Collapsed : Visibility.Visible;
+            splitBlock.Visibility = sideBySide ? Visibility.Visible : Visibility.Collapsed;
+            inlineItem.IsChecked = !sideBySide;
+            sideBySideItem.IsChecked = sideBySide;
         }
 
-        var result = new List<(string, bool)>(n);
-        for (int j = 0; j < n; j++)
+        inlineItem.Click += (_, _) => SetDiffView(sideBySide: false);
+        sideBySideItem.Click += (_, _) => SetDiffView(sideBySide: true);
+
+        var menu = new WpfContextMenu
         {
-            var token = j < n - 1 ? outWords[j] + " " : outWords[j];
-            result.Add((token, changed[j]));
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            StaysOpen = false
+        };
+        menu.Items.Add(inlineItem);
+        menu.Items.Add(sideBySideItem);
+
+        var button = CreateIconButton(FeedActionIcons.MoreVertical(), "Diff view options");
+        button.ContextMenu = menu;
+        button.Click += (_, e) =>
+        {
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+            e.Handled = true;
+        };
+        return button;
+    }
+
+    private static bool TryCopyOutputText(string text)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+            return true;
         }
-        return result;
+        catch
+        {
+            // Clipboard can be busy; the action is best-effort.
+            return false;
+        }
+    }
+
+    private static List<string> SplitLines(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return new List<string> { "" };
+
+        return text.Replace("\r\n", "\n").Split('\n').ToList();
     }
 }
 
-// ── Data model ─────────────────────────────────────────────────────────────
 internal sealed record ActivityEntry(
     DateTimeOffset Timestamp,
     string Status,
@@ -278,10 +699,8 @@ internal sealed record ActivityEntry(
     string OutputText,
     bool TextChanged);
 
-// ── Log reader ─────────────────────────────────────────────────────────────
 internal static class NativeActivityLogReader
 {
-    // Read entries for a date range, newest date first within each day.
     public static IEnumerable<ActivityEntry> ReadDateRange(DateTime from, DateTime to)
     {
         for (var date = to.Date; date >= from.Date; date = date.AddDays(-1))
@@ -294,27 +713,79 @@ internal static class NativeActivityLogReader
         }
     }
 
-    // Fast substring scan across all log files — no full JSON parse needed.
-    public static (int Checks, int Corrections) ReadAllTimeStats()
+    public static (int Checks, int Corrections, int DayStreak) ReadAllTimeStats()
     {
         if (!Directory.Exists(AppPaths.LogDirectory))
-            return (0, 0);
+            return (0, 0, 0);
 
         int checks = 0, corrections = 0;
+        var activeDays = new HashSet<DateTime>();
+
         foreach (var path in Directory.GetFiles(AppPaths.LogDirectory, "spellcheck-*.jsonl"))
         {
+            if (!TryParseLogDate(path, out var date))
+                continue;
+
+            var dayHasSuccess = false;
             foreach (var line in File.ReadLines(path))
             {
                 if (line.IndexOf(" spellcheck_detail ", StringComparison.Ordinal) < 0)
                     continue;
                 if (!line.Contains("\"status\":\"success\"", StringComparison.Ordinal))
                     continue;
+
                 checks++;
+                dayHasSuccess = true;
                 if (line.Contains("\"text_changed\":true", StringComparison.Ordinal))
                     corrections++;
             }
+
+            if (dayHasSuccess)
+                activeDays.Add(date);
         }
-        return (checks, corrections);
+
+        return (checks, corrections, ComputeDayStreak(activeDays, DateTime.Now.Date));
+    }
+
+    private static bool TryParseLogDate(string path, out DateTime date)
+    {
+        date = default;
+        var fileName = Path.GetFileNameWithoutExtension(path);
+        const string prefix = "spellcheck-";
+        if (!fileName.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
+
+        return DateTime.TryParseExact(
+            fileName[prefix.Length..],
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out date);
+    }
+
+    private static int ComputeDayStreak(IReadOnlySet<DateTime> activeDays, DateTime today)
+    {
+        if (activeDays.Count == 0)
+            return 0;
+
+        var cursor = today;
+        if (!activeDays.Contains(today))
+        {
+            var yesterday = today.AddDays(-1);
+            if (activeDays.Contains(yesterday))
+                cursor = yesterday;
+            else
+                return 0;
+        }
+
+        var streak = 0;
+        while (activeDays.Contains(cursor))
+        {
+            streak++;
+            cursor = cursor.AddDays(-1);
+        }
+
+        return streak;
     }
 
     private static IEnumerable<ActivityEntry> ReadFile(string path)
@@ -352,9 +823,13 @@ internal static class NativeActivityLogReader
                     output,
                     GetBool(root, "text_changed"));
             }
-            catch { continue; }
+            catch
+            {
+                continue;
+            }
 
-            yield return entry;
+            if (entry is not null)
+                yield return entry;
         }
     }
 
