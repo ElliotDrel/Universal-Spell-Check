@@ -271,9 +271,16 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     private void SetBusy(bool isBusy)
     {
-        try { _notifyIcon.Text = TruncateTooltip(isBusy
-            ? $"{BuildChannel.TrayTooltip} — checking"
-            : BuildChannel.TrayTooltip); } catch { /* tooltip is cosmetic */ }
+        try
+        {
+            _notifyIcon.Text = TruncateTooltip(isBusy
+                ? $"{BuildChannel.TrayTooltip} — checking"
+                : BuildChannel.TrayTooltip);
+        }
+        catch
+        {
+            // tooltip is cosmetic
+        }
 
         // OverlayHost owns its own STA background thread, so Show/Hide just
         // enqueue onto that thread's message loop and return immediately —
