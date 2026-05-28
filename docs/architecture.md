@@ -114,9 +114,26 @@ Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev ch
 
 ## WPF dashboard (`src/UI/`)
 
-`MainWindow` hosts two pages in a `Frame`: `ActivityPage` (recent spell-check history from `spellcheck_detail` log entries) and `SettingsPage` (API key, log folder, replacements file). Receives `UpdateService` reference; shows an update banner when state is `UpdateReady`.
+`MainWindow` hosts two pages in a `Frame`: **Home** → `ActivityPage`, **Settings** → `SettingsPage`. Sidebar nav is 240px; content area hosts the active page. Receives `UpdateService` reference; shows an update banner when state is `UpdateReady`.
 
-`SettingsPage` handles API-key save/clear, opens log folder, and opens `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
+### Activity feed (`ActivityPage`)
+
+Reads the **shared** log corpus (`AppPaths.LogDirectory`, `spellcheck-{yyyy-MM-dd}.jsonl`) — same path for Prod and Dev. Does not use `DiagnosticsLogger` directly at runtime; `NativeActivityLogReader` (in `ActivityPage.xaml.cs`) parses lines containing `spellcheck_detail` JSON blobs.
+
+| Concern | Implementation |
+|---|---|
+| Feed order | Newest first: daily files descending by date, lines within a file from EOF toward BOF |
+| Pagination | 30 entries per page; `ActivityLogCursor` (file index + line index); infinite scroll near bottom + viewport fill |
+| Stats bar | All-time checks, corrections, accuracy, day streak — full scan of all daily files |
+| Diff UI | `InlineTextDiff` (line align + char LCS); optional side-by-side per row |
+| Scroll | `SmoothScrollViewer` — smooth trackpad lerp, native mouse wheel, hidden scrollbar |
+| Refresh | Clears `FeedItems` panel only; reloads stats + first page |
+
+Successful rows require `status=success` with non-empty `input_text` and `output_text`. See `DESIGN.md` for visual contract.
+
+### Settings (`SettingsPage`)
+
+Handles API-key save/clear, opens log folder, and opens `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Design System — Universal Spell Check (Native Dashboard)
 
-> **Scope:** This spec covers the WPF dashboard window for the native C#/.NET tray app at `native/UniversalSpellCheck/`. The AHK production script (Universal Spell Checker.ahk) is unaffected. The dashboard opens from the tray icon and provides activity log, settings, and (later) deeper analytics.
+> **Scope:** This spec covers the WPF dashboard window for the native C#/.NET tray app under `src/`. The AHK production script (Universal Spell Checker.ahk) is archived and unaffected. The dashboard opens from the tray icon and provides an activity feed, settings, and (later) deeper analytics.
 
 ## Product Context
 
@@ -50,7 +50,7 @@ Generated via gstack `/design-consultation`. Originals at `~/.gstack/projects/El
 
 | Role | Family | Weight | Size | Used for |
 |---|---|---|---|---|
-| Display | Instrument Serif | Regular | 32px | Page headers ("Settings", "Today") |
+| Display | Instrument Serif | Regular | 32px | Page headers ("Activity", "Settings") |
 | Display Stat | Instrument Serif | Regular | 28px | Big stat numbers ("1,247", "412ms") |
 | Section | Instrument Serif | Regular | 18px | Subsection headers ("Hotkey", "Model") |
 | Body L | Instrument Sans | Regular | 15px | Form labels, primary body |
@@ -59,7 +59,7 @@ Generated via gstack `/design-consultation`. Originals at `~/.gstack/projects/El
 | Caption | Instrument Sans | Regular | 11px | Stat labels under numbers |
 | Mono | JetBrains Mono | Regular | 12px | Activity feed timestamps, hotkey chips, file paths, diff content |
 
-**Font sourcing:** Instrument Serif, Instrument Sans, JetBrains Mono are all OFL-licensed via Google Fonts. Bundle as embedded resources in the WPF project (see `native/UniversalSpellCheck/UI/Fonts/README.md`). Do **not** rely on Google Fonts CDN — desktop apps should be offline-capable.
+**Font sourcing:** Instrument Serif, Instrument Sans, JetBrains Mono are all OFL-licensed via Google Fonts. Bundle as embedded resources under `src/UI/Fonts/`. Do **not** rely on Google Fonts CDN — desktop apps should be offline-capable.
 
 ## Spacing
 
@@ -69,7 +69,8 @@ Generated via gstack `/design-consultation`. Originals at `~/.gstack/projects/El
 - **Card padding:** 24px
 - **Page padding:** 32px (top/sides), 32px between major sections
 - **Sidebar item padding:** 8px vertical, 12px horizontal
-- **Diff row vertical gap:** 16px between diffs in the activity feed
+- **Feed row vertical rhythm:** 4px padding inside row chrome; 2px margin between rows; hairline divider under each row
+- **Day section gap:** 28px above non-first day headers; 4px above first day header in feed
 
 ## Layout
 
@@ -120,22 +121,40 @@ Used to render `[Ctrl] + [Alt] + [U]`:
 - Text color: `TextPrimary`
 - Plus signs between chips: `TextMuted`
 
-### Diff row (activity feed)
-Each spell-check correction is rendered as two stacked lines:
-```
-- their going to the store          ← red bg, red text, leading minus
-+ they're going to the store        ← green bg, green text, leading plus
-```
-- Each line: 6px vertical padding, 12px horizontal padding, 4px border-radius
-- Lines stacked tight (no gap between - and + lines of the same diff)
-- Above each diff (or to the right): timestamp in Mono `TextMuted`, model label in `TextMuted`
-- Between diffs: 16px gap
+### Feed row (activity feed)
+Flat list on the canvas (no card wrapper). One row per successful `spellcheck_detail` entry:
 
-### Stat card (Home, top-right)
-Small grid (2 columns x 2-3 rows). Each cell:
-- Big number in Instrument Serif (24-28px)
-- Label in Caption (11px, `TextMuted`)
-- Streak number in `Accent` (terracotta) when applicable
+```
+[12:34 PM]  [inline diff body — click to copy]     [copy] [⋮]
+─────────────────────────────────────────────────────────────
+```
+
+- **Timestamp column:** JetBrains Mono 12px (`MonoSmall`), max width 58px, top-aligned
+- **Diff body:** character-level inline diff on changed lines (strikethrough + `DiffMinus*` for deletions, green insert for additions); unchanged lines render plain. Rows with `text_changed: false` show output text only.
+- **Actions:** outline copy + vertical-dots icons (`FeedActionIcons`); **opacity 0 until row hover**; row background `HoverGhost` on hover
+- **Copy:** click diff body or copy icon → clipboard gets corrected text; copy icon shows checkmark for 1.5s on success
+- **⋮ menu** (only when `text_changed`): toggle **Inline diff** vs **Side by side** (per-line char highlights in split columns)
+- Hairline `Border` divider under each row
+
+Legacy GitHub-style stacked `-` / `+` lines are superseded by inline diff; keep minus/plus *colors* for delete/insert segments.
+
+### Day section header
+Uppercase Caption label: `TODAY`, `YESTERDAY`, or formatted date (`MMMM d` / `MMMM d, yyyy`). Hairline divider below label. Inserted when the feed crosses a calendar day (including across paginated loads).
+
+### Stats bar (Activity, all-time)
+Full-width horizontal bar below the page header (not a sidebar card). Four equal columns separated by 1px `Border` hairlines:
+
+| CHECKS | CORRECTIONS | ACCURACY | DAY STREAK |
+|--------|-------------|----------|------------|
+
+- Big numbers: `DisplayStat` (Instrument Serif 28px)
+- Labels: Caption (11px, `TextMuted`)
+- **All-time** values from a lightweight scan of every `spellcheck-*.jsonl` file (not “today only”)
+- Streak uses `Accent` (terracotta)
+- Accuracy shows `—` when checks = 0
+
+### Loading indicator (pagination)
+Centered at the bottom of the feed while older pages load: rotating dashed ring (18px) + “Loading earlier…” in `BodyMuted`. Hidden when idle.
 
 ### Settings section
 - Card with section header (Instrument Serif 18px) at top
@@ -149,11 +168,21 @@ Standard pill toggle. Track 32x18px, knob 14px circle. Off: track `#E8E2D6`. On:
 ## Three Screens
 
 ### Home (Activity)
-**Layout:** Page header "Today" (Instrument Serif 32px) → two-column main:
-- **Left (flex):** Activity feed card. Stack of diff rows. Each row shows old text in red diff style and new text in green diff style, with timestamp + model label nearby.
-- **Right (280px):** Stats card. Today's checks count, corrections count, accuracy, streak (terracotta).
+Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif 32px). Ghost **↻ Refresh** button top-right.
 
-**Empty state:** When no checks today, show centered Instrument Sans muted text: "No spell checks yet today. Press your hotkey to get started." Never show empty stats — always render zero state with `0 / 0 / —`.
+**Layout (top to bottom):**
+1. Page header row (`Activity` + Refresh)
+2. All-time stats bar (four columns — see Stats bar above)
+3. Scrollable feed (`SmoothScrollViewer`, scrollbar hidden): day-grouped rows, infinite scroll
+
+**Feed behavior:**
+- Reads the shared log corpus: `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-*.jsonl`
+- Newest successful `spellcheck_detail` entries first; **30 entries per page**; loads older pages when scrolled near the bottom (~120px) or when content does not fill the viewport
+- Trackpad: smooth per-frame scroll (`SmoothScrollViewer`); mouse wheel: native WPF scroll
+
+**Empty state:** Centered `BodyMuted`: “No spell checks yet. Press your hotkey to get started.” Stats still show zeros / em dash.
+
+**Mockup note:** `docs/design-mockups/home.png` is the original two-column reference (tone, cream, typography). The shipped layout is a flat Wispr Flow–style feed with a top stats bar — treat this spec as the layout authority.
 
 ### Settings
 **Layout:** Page header "Settings" (Instrument Serif 32px) → vertical stack of section cards:
@@ -181,48 +210,51 @@ Mockup at `docs/design-mockups/insights-deferred.png`. Shows: 4 stat cards top r
 ## Implementation Notes (WPF)
 
 ### csproj setup
-Add to `native/UniversalSpellCheck/UniversalSpellCheck.csproj` PropertyGroup:
-```xml
-<UseWPF>true</UseWPF>
-```
-Keep `<UseWindowsForms>true</UseWindowsForms>` — the tray icon (`NotifyIcon`) and global hotkey (`HotkeyWindow`) stay WinForms; the dashboard window is WPF. Mixed mode is supported in .NET on Windows.
+`src/UniversalSpellCheck.csproj` enables both `<UseWindowsForms>true</UseWindowsForms>` (tray, hotkey, loading overlay) and `<UseWPF>true</UseWPF>` (dashboard). Mixed mode is supported in .NET on Windows.
 
 ### File layout
 ```
-native/UniversalSpellCheck/UI/
-├── Styles.xaml            # Design tokens (colors, brushes, fonts, type styles)
-├── Components.xaml        # Card, Primary button, Ghost button, Keyboard chip styles
-├── Fonts/
-│   ├── README.md          # How to bundle Instrument Serif/Sans + JetBrains Mono
-│   ├── InstrumentSerif-Regular.ttf   # (download from fonts.google.com)
-│   ├── InstrumentSans-Regular.ttf
-│   └── JetBrainsMono-Regular.ttf
-├── MainWindow.xaml        # Shell: sidebar + content host
+src/UI/
+├── Styles.xaml              # Design tokens (colors, brushes, fonts, type styles)
+├── Components.xaml          # Card, buttons, IconButton, HoverTextButton, nav styles
+├── SmoothScrollViewer.cs    # Trackpad smooth scroll; hidden vertical scrollbar
+├── InlineTextDiff.cs        # Line + character diff for feed rendering
+├── FeedActionIcons.cs       # Outline copy / check / more-vertical vectors
+├── MainWindow.xaml          # Shell: sidebar + Frame content host + update banner
 ├── MainWindow.xaml.cs
 └── Pages/
-    ├── ActivityPage.xaml
-    ├── ActivityPage.xaml.cs
+    ├── ActivityPage.xaml    # Stats bar + paginated feed
+    ├── ActivityPage.xaml.cs # NativeActivityLogReader + row builders
     ├── SettingsPage.xaml
     └── SettingsPage.xaml.cs
 ```
+
+Bundled fonts live under `src/UI/Fonts/` (Instrument Serif/Sans, JetBrains Mono). See `src/UI/CLAUDE.md` for font verification steps.
 
 ### Wiring into existing tray app
 `SpellCheckAppContext.cs` opens the WPF `MainWindow` from the tray's `Open Dashboard` menu item. The WPF window's lifecycle is owned by the tray context; quit disposes it with the tray app.
 
 The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-is — it's transient and the WinForms implementation is already correct.
 
-### Data binding
-Activity page reads from `DiagnosticsLogger`'s current log file (`%LOCALAPPDATA%\UniversalSpellCheck\logs\spellcheck-YYYY-MM-DD.jsonl`) and renders successful `spellcheck_detail` entries as diff rows. A richer observable collection or file watcher is deferred; speed is the product, but the dashboard is not the hot path.
+### Data binding (Activity)
+`ActivityPage` uses `NativeActivityLogReader` in `ActivityPage.xaml.cs` (not MVVM binding):
 
-Settings currently saves the API key through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture, model switching, startup toggling, and a replacements editor are deferred so v1 does not show fake controls.
+- **Feed:** `ReadEntries(pageSize, cursor)` walks daily `spellcheck-*.jsonl` files newest-first (newest line in each file first). Cursor tracks file index + line index. Page size = 30.
+- **Stats:** `ReadAllTimeStats()` scans all log files for successful runs (`status=success`); accuracy = corrections / checks; day streak from calendar days with at least one success.
+- **Refresh:** clears `FeedItems` only (preserves empty state + loading indicator hosts); reloads stats + first page.
+- No file watcher — user refreshes or scrolls to load more. Dashboard is not the hot path.
+
+Settings saves the API key through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture, model switching, startup toggling, and a replacements editor remain deferred (controls disabled, not faked).
 
 ### Testing the design
-After scaffolding, verify the design in this order:
-1. Open the dashboard window — does it match `docs/design-mockups/home.png`?
-2. Color palette correct? Compare cream tone — easy to drift toward gray.
-3. Typography rendering — Instrument Serif loaded? If you see Cambria/Georgia, fonts didn't bundle.
-4. Card border visible but subtle? If invisible, increase border alpha. If heavy, reduce.
-5. Diff rows readable? Red and green should not be saturated — keep them muted.
+After visual changes, verify in this order:
+1. Open **Home** — flat feed, top stats bar, **Activity** header (not two-column mockup layout).
+2. Cream `Canvas` — not gray or pure white.
+3. Instrument Serif/Sans loaded (no Cambria/Segoe fallback for headers).
+4. Inline diff readable — muted red/green, not saturated.
+5. Hover: row ghost background + copy/⋮ icons appear.
+6. Scroll to bottom — spinner + older entries; **Refresh** — feed reloads and pagination still works.
+7. Compare tone to `docs/design-mockups/home.png` and `settings.png` where layout still applies.
 
 ## Decisions Log
 
@@ -233,3 +265,5 @@ After scaffolding, verify the design in this order:
 | 2026-04-27 | WPF over WinForms for dashboard | WinForms cannot render this aesthetic without heavy custom drawing. WPF supports it natively. Tray + hotkey stay WinForms. |
 | 2026-04-27 | Activity feed uses GitHub-style diffs | User-requested. Each spell-check correction shows as red minus / green plus rows, not before-arrow-after. Reads as a log of changes. |
 | 2026-04-27 | Nav scope: Home + Settings only for v1 | Insights deferred — build the activity feed first, fold deeper analytics in later if needed. |
+| 2026-05-27 | Flat Activity feed + all-time stats bar | Wispr Flow–style layout: no feed card, inline char diff, hover actions, paginated infinite scroll (30/page), `SmoothScrollViewer` for trackpad. Mockup `home.png` remains tone reference only. |
+| 2026-05-27 | Inline diff replaces stacked +/- rows | Character-level highlights within lines; side-by-side view optional per row via ⋮ menu. |

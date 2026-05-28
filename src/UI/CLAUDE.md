@@ -2,27 +2,29 @@
 
 ## Grounding
 
-WPF dashboard for the tray app. Opened via the `Open Dashboard` tray menu item. Two pages: Activity (renders successful `spellcheck_detail` log entries as diff rows) and Settings (API key, log folder, replacements). Visual quality matters here — this is the user-facing surface beyond the hotkey itself. The cream tone, card borders, and font stack are intentional and easy to drift on.
+WPF dashboard for the tray app. Opened via the `Open Dashboard` tray menu item. Two pages: **Home** (`ActivityPage` — paginated activity feed with inline diffs) and **Settings** (API key, log folder, replacements). Visual quality matters here — this is the user-facing surface beyond the hotkey itself. The cream tone, card borders, and font stack are intentional and easy to drift on.
 
 ## Read first
 
-> **Always read `DESIGN.md` (repo root) before any visual change.** It is the canonical visual contract: colors, fonts, spacing, mockups. Then check root `CLAUDE.md` for routing and `docs/architecture.md` for how this folder plugs into the tray app lifetime.
+> **Always read `DESIGN.md` (repo root) before any visual change.** It is the canonical visual contract: colors, fonts, spacing, layout. Then check root `CLAUDE.md` for routing and `docs/architecture.md` § WPF dashboard for pagination and log wiring.
 
 ## What's here
 
 ```text
 UI/
 |-- Styles.xaml
-|-- Components.xaml
+|-- Components.xaml          # IconButton, HoverTextButton, cards, nav, buttons
+|-- SmoothScrollViewer.cs    # Trackpad smooth scroll
+|-- InlineTextDiff.cs        # Line + character diff
+|-- FeedActionIcons.cs       # Copy / check / more-vertical icons
 |-- MainWindow.xaml
 |-- MainWindow.xaml.cs
 |-- Pages/
-|   |-- ActivityPage.xaml
-|   |-- ActivityPage.xaml.cs
+|   |-- ActivityPage.xaml    # Activity header, stats bar, FeedItems + loading indicator
+|   |-- ActivityPage.xaml.cs # NativeActivityLogReader, row builders
 |   |-- SettingsPage.xaml
 |   `-- SettingsPage.xaml.cs
-`-- Fonts/
-    `-- README.md
+`-- Fonts/                   # Bundled Instrument + JetBrains Mono (embedded in csproj)
 ```
 
 ## Runtime wiring
@@ -31,19 +33,36 @@ UI/
 - `SpellCheckAppContext.ShowSettings()` opens `MainWindow.xaml` in-process.
 - `LoadingOverlayForm` (WinForms) stays separate — it's transient spell-check feedback, not dashboard UI.
 
-## Current data sources
+## Activity feed (data + UX)
 
-- `ActivityPage.xaml.cs` reads the current native log file and renders successful `spellcheck_detail` entries as diff rows.
+- **Logs:** `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
+- **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
+- **UI:** Flat rows (time | diff | hover actions), day headers (`TODAY` / `YESTERDAY` / date), all-time stats bar, bottom spinner while paginating.
+- **Refresh:** `FeedItems.Children.Clear()` — does not remove `LoadingIndicator` or `EmptyState` hosts.
+
+## Settings (data)
+
 - `SettingsPage.xaml.cs` saves the API key through `SettingsStore`, opens the native log folder, and opens `replacements.json`.
 
 Deferred controls are intentionally **disabled** instead of fake-wired: hotkey capture, model switching, startup toggle, replacements editor. Do not stub these — leave them disabled until real wiring lands.
 
 ## Visual verification (after any UI change)
 
-1. Compare against `docs/design-mockups/home.png` and `docs/design-mockups/settings.png`.
-2. Confirm the cream tone has not drifted gray.
-3. Check font loading. Cambria/Segoe UI fallback means the bundled font is missing — investigate before shipping.
-4. Card borders should be subtle but visible.
+1. **Layout authority:** `DESIGN.md` § Home (Activity) — flat feed + top stats bar (not the two-column `home.png` layout).
+2. **Tone reference:** `docs/design-mockups/home.png` and `settings.png` for cream, borders, typography.
+3. Confirm the cream tone has not drifted gray.
+4. Check font loading. Cambria/Segoe UI fallback on headers means the bundled font is missing.
+5. Card borders on Settings should be subtle but visible.
+
+## Manual checks (Activity)
+
+1. Open **Home** — stats show all-time numbers; feed shows newest entries first.
+2. Scroll to bottom — spinner appears; older entries append; day headers dedupe across pages.
+3. Click **↻ Refresh** — feed and stats reload; scroll-to-load still works afterward.
+4. Hover a row — ghost background, copy and ⋮ icons visible.
+5. Click diff body or copy — corrected text on clipboard; checkmark feedback on copy icon.
+6. On a `text_changed` row, ⋮ → toggle inline vs side-by-side diff.
+7. Trackpad scroll feels smooth; mouse wheel scrolls normally.
 
 ---
 

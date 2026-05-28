@@ -1,6 +1,6 @@
 # Native App Future Todo
 
-This is the future work list for the C#/.NET WinForms native replacement in `native/UniversalSpellCheck`.
+This is the future work list for the C#/.NET tray app + WPF dashboard under `src/`.
 
 Current status as of 2026-04-27: the native app is the main plain-text spell checker on `Ctrl+Alt+U`. The AutoHotkey app remains in the repo as a fallback/reference path, but its Windows Startup shortcut has been deleted.
 
@@ -52,7 +52,7 @@ Current status as of 2026-04-27: the native app is the main plain-text spell che
 
 ## Release And Packaging
 
-- Decide whether `native/UniversalSpellCheck/publish/UniversalSpellCheck.exe` should be checked in, distributed separately, or built on demand.
+- Decide whether `src/bin/Release/.../UniversalSpellCheck.exe` (or publish output) should be checked in, distributed separately, or built on demand via the release workflow.
 - Add a clean release script if publishing becomes routine.
 - Add version display and release notes before handing the app to anyone else.
 - Consider signing the executable if it becomes a real daily app.
@@ -62,7 +62,7 @@ Current status as of 2026-04-27: the native app is the main plain-text spell che
 ## Cleanup And Documentation
 
 - Rename "Native Spike" wording once the app is no longer experimental.
-- Update `native/UniversalSpellCheck/CUTOVER.md` after more daily-driver evidence.
+- Update cutover notes after more daily-driver evidence (if a `CUTOVER.md` is revived under `src/`).
 - Keep `Universal Spell Checker.ahk` untouched until cutover is explicitly accepted.
 - Archive or clearly label old planning docs after the native app becomes primary.
 

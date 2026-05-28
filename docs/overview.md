@@ -38,7 +38,7 @@ All channel constants live in `src/BuildChannel.cs` — that file is the canonic
 - `src/HotkeyWindow.cs` — Win32 `RegisterHotKey`, hotkey from `BuildChannel`.
 - `src/SpellCheckAppContext.cs` — tray lifetime, menu (version + Check/Update Now).
 - `src/LoadingOverlayForm.cs` — bottom-center loading progress bar.
-- `src/UI/` — WPF dashboard (MainWindow + Pages + Styles/Components).
+- `src/UI/` — WPF dashboard (MainWindow + Activity/Settings pages + Styles/Components; Activity feed paginates shared JSONL logs).
 - `replacements.json` (repo root) — copied next to the exe at publish time.
 
 ## Repo map

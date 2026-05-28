@@ -115,3 +115,14 @@ Every line written by `DiagnosticsLogger.Log()`:
 ### `spellcheck_detail` fields
 
 Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/urls_protected), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `terminal_normalization` (applied/chars_removed/process), `events[]`.
+
+### Dashboard Activity feed
+
+The WPF **Home** page (`ActivityPage`) renders successful `spellcheck_detail` rows from the unified log directory:
+
+- **Included:** `status == "success"` with non-empty `input_text` and `output_text`
+- **Diff display:** uses `input_text` vs `output_text` when `text_changed` is true; otherwise shows `output_text` only
+- **Stats bar:** all-time counts from every `spellcheck-*.jsonl` file (checks = success lines; corrections = success lines with `text_changed: true`)
+- **Pagination:** 30 entries per page, newest first; not a live tail — refresh or scroll to see new/historical data
+
+For visual layout and interaction (hover actions, inline diff, infinite scroll), see `DESIGN.md` § Home (Activity) and `docs/architecture.md` § WPF dashboard.
