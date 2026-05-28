@@ -21,12 +21,18 @@ internal partial class ActivityPage : Page
 {
     /// <summary>Hard cap for the time column; fits "12:34 PM" in mono without excess gutter.</summary>
     private const double TimestampColumnMaxWidth = 58;
+    private const int FeedPageSize = 30;
+    private const double LoadMoreScrollThreshold = 120;
 
-    private int _weekOffset = 0;
+    private ActivityLogCursor? _feedCursor;
+    private bool _hasMoreEntries = true;
+    private bool _isLoadingMore;
+    private readonly HashSet<DateTime> _renderedDays = new();
 
     public ActivityPage()
     {
         InitializeComponent();
+        FeedScrollViewer.ScrollChanged += OnFeedScrollChanged;
         Loaded += (_, _) => RefreshActivity();
     }
 
@@ -34,60 +40,128 @@ internal partial class ActivityPage : Page
 
     private void RefreshActivity()
     {
-        _weekOffset = 0;
+        _feedCursor = null;
+        _hasMoreEntries = true;
+        _isLoadingMore = false;
+        _renderedDays.Clear();
 
         while (DiffStack.Children.Count > 1)
             DiffStack.Children.RemoveAt(1);
 
-        AppendWeek();
+        HideLoadingIndicator();
 
         var (checks, corrections, dayStreak) = NativeActivityLogReader.ReadAllTimeStats();
         StatChecks.Text = checks.ToString("N0");
         StatCorrections.Text = corrections.ToString("N0");
         StatAccuracy.Text = checks == 0 ? "—" : $"{Math.Round((double)corrections / checks * 100)}%";
         StatStreak.Text = dayStreak.ToString("N0");
+
+        LoadNextPage(isInitial: true);
     }
 
-    private void AppendWeek()
+    private void OnFeedScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (_isLoadingMore || !_hasMoreEntries)
+            return;
+
+        if (e.VerticalOffset + e.ViewportHeight < e.ExtentHeight - LoadMoreScrollThreshold)
+            return;
+
+        LoadNextPage(isInitial: false);
+    }
+
+    private void LoadNextPage(bool isInitial)
+    {
+        if (_isLoadingMore || !_hasMoreEntries)
+            return;
+
+        _isLoadingMore = true;
+        if (!isInitial)
+            ShowLoadingIndicator();
+
+        try
+        {
+            var (entries, nextCursor, hasMore) = NativeActivityLogReader.ReadEntries(FeedPageSize, _feedCursor);
+            _feedCursor = nextCursor;
+            _hasMoreEntries = hasMore;
+
+            if (isInitial)
+                EmptyState.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            if (entries.Count > 0)
+            {
+                if (isInitial)
+                    PrependEntries(entries);
+                else
+                    AppendEntries(entries);
+            }
+        }
+        finally
+        {
+            _isLoadingMore = false;
+            HideLoadingIndicator();
+            MaybeFillViewport();
+        }
+    }
+
+    private void MaybeFillViewport()
+    {
+        if (!_hasMoreEntries || _isLoadingMore)
+            return;
+
+        if (FeedScrollViewer.ScrollableHeight > LoadMoreScrollThreshold)
+            return;
+
+        LoadNextPage(isInitial: false);
+    }
+
+    private void PrependEntries(IReadOnlyList<ActivityEntry> entries)
     {
         var today = DateTime.Now.Date;
-        var weekFrom = today.AddDays(-(7 * _weekOffset + 6));
-        var weekTo = today.AddDays(-7 * _weekOffset);
-
-        var entries = NativeActivityLogReader.ReadDateRange(weekFrom, weekTo).ToList();
-
-        if (_weekOffset == 0)
-            EmptyState.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
-        var insertAt = GetFeedInsertIndex();
-        var isFirstInFeed = insertAt <= 1;
-        var isFirstHeader = true;
+        var insertAt = 1;
+        var isFirstInFeed = true;
 
         foreach (var dayGroup in entries
                      .GroupBy(e => e.Timestamp.ToLocalTime().Date)
                      .OrderByDescending(g => g.Key))
         {
-            DiffStack.Children.Insert(
-                insertAt++,
-                CreateDayHeader(dayGroup.Key, today, isFirstHeader && isFirstInFeed));
-            isFirstHeader = false;
+            if (_renderedDays.Add(dayGroup.Key))
+            {
+                DiffStack.Children.Insert(
+                    insertAt++,
+                    CreateDayHeader(dayGroup.Key, today, isFirstInFeed: isFirstInFeed));
+                isFirstInFeed = false;
+            }
 
             foreach (var entry in dayGroup.OrderByDescending(e => e.Timestamp))
                 DiffStack.Children.Insert(insertAt++, CreateDiffRow(entry));
         }
-
-        DiffStack.Children.Add(CreateLoadEarlierButton());
     }
 
-    private int GetFeedInsertIndex()
+    private void AppendEntries(IReadOnlyList<ActivityEntry> entries)
     {
-        for (var i = DiffStack.Children.Count - 1; i >= 0; i--)
-        {
-            if (DiffStack.Children[i] is WpfButton)
-                return i;
-        }
+        var today = DateTime.Now.Date;
 
-        return DiffStack.Children.Count;
+        foreach (var dayGroup in entries
+                     .GroupBy(e => e.Timestamp.ToLocalTime().Date)
+                     .OrderBy(g => g.Key))
+        {
+            if (_renderedDays.Add(dayGroup.Key))
+                DiffStack.Children.Add(CreateDayHeader(dayGroup.Key, today, isFirstInFeed: false));
+
+            foreach (var entry in dayGroup.OrderBy(e => e.Timestamp))
+                DiffStack.Children.Add(CreateDiffRow(entry));
+        }
+    }
+
+    private void ShowLoadingIndicator()
+    {
+        LoadingIndicator.Visibility = Visibility.Visible;
+    }
+
+    private void HideLoadingIndicator()
+    {
+        LoadingIndicator.Visibility = Visibility.Collapsed;
     }
 
     private FrameworkElement CreateDayHeader(DateTime day, DateTime today, bool isFirstInFeed)
@@ -124,24 +198,6 @@ internal partial class ActivityPage : Page
         return day.Year == today.Year
             ? day.ToString("MMMM d", CultureInfo.CurrentCulture)
             : day.ToString("MMMM d, yyyy", CultureInfo.CurrentCulture);
-    }
-
-    private WpfButton CreateLoadEarlierButton()
-    {
-        var btn = new WpfButton
-        {
-            Style = (Style)FindResource("GhostButton"),
-            Content = "Load earlier",
-            Margin = new Thickness(0, 8, 0, 0),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
-        };
-        btn.Click += (_, _) =>
-        {
-            DiffStack.Children.Remove(btn);
-            _weekOffset++;
-            AppendWeek();
-        };
-        return btn;
     }
 
     private FrameworkElement CreateDiffRow(ActivityEntry entry)
@@ -699,18 +755,68 @@ internal sealed record ActivityEntry(
     string OutputText,
     bool TextChanged);
 
+internal sealed class ActivityLogCursor
+{
+    public required string[] LogPaths { get; init; }
+    public int FileIndex { get; init; }
+    public int LineIndex { get; init; }
+}
+
 internal static class NativeActivityLogReader
 {
-    public static IEnumerable<ActivityEntry> ReadDateRange(DateTime from, DateTime to)
+    public static (IReadOnlyList<ActivityEntry> Entries, ActivityLogCursor? NextCursor, bool HasMore) ReadEntries(
+        int count,
+        ActivityLogCursor? cursor)
     {
-        for (var date = to.Date; date >= from.Date; date = date.AddDays(-1))
+        if (count <= 0)
+            return ([], cursor, false);
+
+        var paths = cursor?.LogPaths ?? GetSortedLogPaths();
+        if (paths.Length == 0)
+            return ([], null, false);
+
+        var fileIndex = cursor?.FileIndex ?? 0;
+        var lineIndex = cursor?.LineIndex ?? 0;
+        var entries = new List<ActivityEntry>(count);
+        string[] fileLines = [];
+        var currentPath = (string?)null;
+
+        while (entries.Count < count && fileIndex < paths.Length)
         {
-            var path = AppPaths.SpellcheckLogPathFor(date);
-            if (!File.Exists(path))
-                continue;
-            foreach (var entry in ReadFile(path))
-                yield return entry;
+            var path = paths[fileIndex];
+            if (!string.Equals(currentPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                fileLines = File.Exists(path) ? File.ReadAllLines(path) : [];
+                currentPath = path;
+            }
+
+            while (entries.Count < count && lineIndex < fileLines.Length)
+            {
+                var line = fileLines[fileLines.Length - 1 - lineIndex];
+                lineIndex++;
+
+                if (TryParseLine(line, out var entry))
+                    entries.Add(entry);
+            }
+
+            if (lineIndex >= fileLines.Length)
+            {
+                fileIndex++;
+                lineIndex = 0;
+            }
         }
+
+        var hasMore = fileIndex < paths.Length;
+        ActivityLogCursor? nextCursor = hasMore
+            ? new ActivityLogCursor
+            {
+                LogPaths = paths,
+                FileIndex = fileIndex,
+                LineIndex = lineIndex
+            }
+            : null;
+
+        return (entries, nextCursor, hasMore);
     }
 
     public static (int Checks, int Corrections, int DayStreak) ReadAllTimeStats()
@@ -788,48 +894,57 @@ internal static class NativeActivityLogReader
         return streak;
     }
 
-    private static IEnumerable<ActivityEntry> ReadFile(string path)
+    private static string[] GetSortedLogPaths()
     {
-        foreach (var line in File.ReadLines(path).Reverse())
+        if (!Directory.Exists(AppPaths.LogDirectory))
+            return [];
+
+        return Directory.GetFiles(AppPaths.LogDirectory, "spellcheck-*.jsonl")
+            .Select(path => (Path: path, Date: TryParseLogDate(path, out var date) ? date : DateTime.MinValue))
+            .Where(item => item.Date != DateTime.MinValue)
+            .OrderByDescending(item => item.Date)
+            .Select(item => item.Path)
+            .ToArray();
+    }
+
+    private static bool TryParseLine(string line, out ActivityEntry entry)
+    {
+        entry = null!;
+
+        var markerIndex = line.IndexOf(" spellcheck_detail ", StringComparison.Ordinal);
+        if (markerIndex < 0)
+            return false;
+
+        var firstSpace = line.IndexOf(' ');
+        if (firstSpace < 0 || !DateTimeOffset.TryParse(line[..firstSpace], out var timestamp))
+            return false;
+
+        var jsonStart = markerIndex + " spellcheck_detail ".Length;
+        if (jsonStart >= line.Length)
+            return false;
+
+        try
         {
-            var markerIndex = line.IndexOf(" spellcheck_detail ", StringComparison.Ordinal);
-            if (markerIndex < 0)
-                continue;
+            using var doc = JsonDocument.Parse(line[jsonStart..]);
+            var root = doc.RootElement;
+            var status = GetString(root, "status");
+            var input = GetString(root, "input_text");
+            var output = GetString(root, "output_text");
+            if (status != "success" || string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(output))
+                return false;
 
-            var firstSpace = line.IndexOf(' ');
-            if (firstSpace < 0 || !DateTimeOffset.TryParse(line[..firstSpace], out var timestamp))
-                continue;
-
-            var jsonStart = markerIndex + " spellcheck_detail ".Length;
-            if (jsonStart >= line.Length)
-                continue;
-
-            ActivityEntry? entry = null;
-            try
-            {
-                using var doc = JsonDocument.Parse(line[jsonStart..]);
-                var root = doc.RootElement;
-                var status = GetString(root, "status");
-                var input = GetString(root, "input_text");
-                var output = GetString(root, "output_text");
-                if (status != "success" || string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(output))
-                    continue;
-
-                entry = new ActivityEntry(
-                    timestamp,
-                    status,
-                    GetString(root, "model", "unknown"),
-                    input,
-                    output,
-                    GetBool(root, "text_changed"));
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (entry is not null)
-                yield return entry;
+            entry = new ActivityEntry(
+                timestamp,
+                status,
+                GetString(root, "model", "unknown"),
+                input,
+                output,
+                GetBool(root, "text_changed"));
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

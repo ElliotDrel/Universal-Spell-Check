@@ -84,9 +84,15 @@
                 <StackPanel x:Name="DiffStack">
                     <TextBlock x:Name="EmptyState"
                                Style="{StaticResource BodyMuted}"
-                               Text="No spell checks in the last 7 days. Press your hotkey to get started."
+                               Text="No spell checks yet. Press your hotkey to get started."
                                HorizontalAlignment="Center"
                                Margin="0,48,0,0"
+                               Visibility="Collapsed"/>
+                    <TextBlock x:Name="LoadingIndicator"
+                               Style="{StaticResource BodyMuted}"
+                               Text="Loading earlier…"
+                               HorizontalAlignment="Center"
+                               Margin="0,16,0,24"
                                Visibility="Collapsed"/>
                 </StackPanel>
             </ui:SmoothScrollViewer>
