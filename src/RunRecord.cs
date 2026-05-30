@@ -26,6 +26,11 @@ internal sealed class RunRecord
     public string? PasteErrorType { get; set; }
     public bool CorrectedTextOnClipboard { get; set; }
     public bool OriginalClipboardRestored { get; set; }
+    // The captured (pre-correction) text was re-asserted with the
+    // CanIncludeInClipboardHistory=0 tag so it is kept out of Windows
+    // clipboard history / cloud clipboard. Best-effort; see ClipboardLoop.
+    public bool CapturedTextHistoryExcluded { get; set; }
+    public string? HistoryExcludeDetail { get; set; }
 
     // Text (refs only — strings are not copied on the hot path)
     public string? InputText { get; set; }

@@ -37,6 +37,7 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck\`.
 8. Select `open ai and github`, press the hotkey, verify output contains `OpenAI` and `GitHub`; confirm `replacements_count > 0` in log.
 9. Quit from the tray menu; verify the hotkey stops firing.
 10. Run Prod and Dev simultaneously; verify both appear in the tray with distinct icons and hotkeys, and both write entries to the same daily log file with correct `channel=` stamps.
+11. With Windows Clipboard History enabled (Settings → System → Clipboard, or Win+V), correct a misspelled selection, then open Win+V. Verify the **corrected** text is in history and the original **incorrect** text is **not** (best-effort — see `docs/watchlist.md` § Clipboard history exclusion). Confirm `captured_text_history_excluded=true` in the log.
 
 ## Top-of-mind reminders
 

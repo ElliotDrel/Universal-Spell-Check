@@ -24,6 +24,17 @@ Before adding app-specific timing rules: reproduce with a named target app and i
 
 ---
 
+## Clipboard history exclusion (Win+V)
+
+**Goal:** the corrected text must always be retained in Windows clipboard history; the captured incorrect text should be kept out.
+
+- **Corrected text in history (priority, guaranteed):** the corrected text is written via WinForms `Clipboard.SetText` with no exclusion tag and is the final clipboard state, so the OS history monitor captures it. Do **not** tag the corrected write as transient — that would drop it from history. (Nothing can force inclusion if the user has clipboard history disabled globally; that's an OS setting.)
+- **Incorrect text out of history (best-effort):** `ClipboardLoop.ExcludeTextFromHistory` runs right after capture, on the STA thread. It takes clipboard ownership (`OpenClipboard(ownerHwnd)` → `EmptyClipboard` → re-place text → set `CanIncludeInClipboardHistory=0` + `CanUploadToCloudClipboard=0`). The owner HWND must be a **real window** (the hotkey window) — `OpenClipboard(NULL)` + `EmptyClipboard` sets the owner to NULL and makes `SetClipboardData` fail.
+- This **races the OS history snapshot** (the source Ctrl+C already produced one untagged update). It wins in practice — this mirrors the proven legacy AHK `SetClipboardHistoryPolicy`. The WinRT `Clipboard.DeleteItemFromHistory` scrub is **not** an option: `GetHistoryItemsAsync` returns `AccessDenied` unless the calling app is foreground, and this tray app never holds focus during a run.
+- Every run logs `captured_text_history_excluded=true|false` and an always-on `history_exclude_detail="text=… include=… upload=… cf_include=<id> cf_upload=<id> owner=0x…"`. `include=ok` means the incorrect text was tagged out of history; `include=fail(win32=…)` / `upload=fail(win32=…)` give the exact Win32 error to debug from. `open_clipboard_failed` / `empty_clipboard_failed` mean another process held the clipboard or the owner HWND was invalid.
+
+---
+
 ## Loading overlay UI-thread marshalling
 
 `SetBusy` is called from the async spell-check pipeline (not the UI thread). `LoadingOverlayForm.Handle` is force-created on the UI thread in `SpellCheckAppContext`'s constructor so `InvokeRequired` is meaningful. If you move or defer handle creation, `InvokeRequired` may return `false` on a background thread and crash.

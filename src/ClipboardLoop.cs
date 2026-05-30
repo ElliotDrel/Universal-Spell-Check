@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace UniversalSpellCheck;
 
 internal static class ClipboardLoop
@@ -115,6 +117,152 @@ internal static class ClipboardLoop
         return TrySetTextAsync(replacementText);
     }
 
+    // Re-asserts the just-captured (pre-correction) selection onto the
+    // clipboard tagged with CanIncludeInClipboardHistory=0 and
+    // CanUploadToCloudClipboard=0, so the transient incorrect text is excluded
+    // from Windows clipboard history (Win+V) and the cloud clipboard. The
+    // corrected text written later via Clipboard.SetText carries no such tag,
+    // so it IS retained in history — that is the priority and is guaranteed
+    // because the corrected write is the final clipboard state.
+    //
+    // This needs the calling app to own the clipboard: OpenClipboard with a
+    // real owner window, EmptyClipboard (taking ownership — an HWND of NULL
+    // here makes SetClipboardData fail), then place the text plus the two
+    // policy DWORDs in one session. The text is re-placed so the clipboard
+    // stays coherent during the request; only the history tag is new.
+    //
+    // Best-effort by nature: the source Ctrl+C already produced one untagged
+    // clipboard update, so this races the OS history snapshot. It wins in
+    // practice (this mirrors the proven legacy AHK behavior).
+    //
+    // Returns true iff the history-exclusion tag (CanIncludeInClipboardHistory)
+    // was set — that is the bit that keeps the incorrect text out of Win+V.
+    // `detail` is ALWAYS populated with a per-step status (format ids, owner
+    // hwnd, and per-format win32 codes) so a test run shows exactly what
+    // happened, success or failure, without needing a debugger.
+    public static bool ExcludeTextFromHistory(string text, IntPtr ownerWindow, out string detail)
+    {
+        var inc = CfCanIncludeInClipboardHistory;
+        var up = CfCanUploadToCloudClipboard;
+        var ids = $"cf_include={inc} cf_upload={up} owner=0x{ownerWindow.ToInt64():X}";
+
+        if (inc == 0 && up == 0)
+        {
+            detail = $"formats_unavailable {ids}";
+            return false;
+        }
+
+        if (!OpenClipboard(ownerWindow))
+        {
+            detail = $"open_clipboard_failed win32={Marshal.GetLastWin32Error()} {ids}";
+            return false;
+        }
+
+        try
+        {
+            if (!EmptyClipboard())
+            {
+                detail = $"empty_clipboard_failed win32={Marshal.GetLastWin32Error()} {ids}";
+                return false;
+            }
+
+            var textOk = SetClipboardUnicodeText(text, out var textErr);
+
+            var incOk = true;
+            var incErr = 0;
+            if (inc != 0) incOk = SetClipboardDword(inc, 0, out incErr);
+
+            var upOk = true;
+            var upErr = 0;
+            if (up != 0) upOk = SetClipboardDword(up, 0, out upErr);
+
+            detail =
+                $"text={Step(true, textOk, textErr)} " +
+                $"include={Step(inc != 0, incOk, incErr)} " +
+                $"upload={Step(up != 0, upOk, upErr)} {ids}";
+
+            // The history-exclusion tag is the thing that matters for priority #2.
+            return inc != 0 && incOk;
+        }
+        finally
+        {
+            CloseClipboard();
+        }
+    }
+
+    private static string Step(bool attempted, bool ok, int win32) =>
+        !attempted ? "unavailable" : ok ? "ok" : $"fail(win32={win32})";
+
+    private static bool SetClipboardUnicodeText(string text, out int win32)
+    {
+        win32 = 0;
+        var byteCount = (text.Length + 1) * 2; // UTF-16 code units + null terminator
+        var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)byteCount);
+        if (hMem == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            return false;
+        }
+
+        var ptr = GlobalLock(hMem);
+        if (ptr == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            GlobalFree(hMem);
+            return false;
+        }
+
+        try
+        {
+            Marshal.Copy(text.ToCharArray(), 0, ptr, text.Length);
+            Marshal.WriteInt16(ptr, text.Length * 2, 0); // null terminator
+        }
+        finally
+        {
+            GlobalUnlock(hMem);
+        }
+
+        if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            GlobalFree(hMem); // ownership not transferred to the system on failure
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool SetClipboardDword(uint format, uint value, out int win32)
+    {
+        win32 = 0;
+        var hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, (UIntPtr)4);
+        if (hMem == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            return false;
+        }
+
+        var ptr = GlobalLock(hMem);
+        if (ptr == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            GlobalFree(hMem);
+            return false;
+        }
+
+        Marshal.WriteInt32(ptr, 0, (int)value);
+        GlobalUnlock(hMem);
+
+        if (SetClipboardData(format, hMem) == IntPtr.Zero)
+        {
+            win32 = Marshal.GetLastWin32Error();
+            GlobalFree(hMem);
+            return false;
+        }
+
+        return true;
+    }
+
     private static async Task<bool> TrySetTextAsync(string text)
     {
         for (var attempt = 1; attempt <= ClipboardRetryAttempts; attempt++)
@@ -181,8 +329,50 @@ internal static class ClipboardLoop
         return false;
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
+
+    private const uint GMEM_MOVEABLE = 0x0002;
+    private const uint GMEM_ZEROINIT = 0x0040;
+    private const uint CF_UNICODETEXT = 13;
+
+    // Registered once at type init. RegisterClipboardFormat returns the same id
+    // for the same name across all processes; 0 means the format is unavailable.
+    private static readonly uint CfCanIncludeInClipboardHistory =
+        RegisterClipboardFormat("CanIncludeInClipboardHistory");
+    private static readonly uint CfCanUploadToCloudClipboard =
+        RegisterClipboardFormat("CanUploadToCloudClipboard");
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern uint RegisterClipboardFormat(string lpszFormat);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
 }
 
 internal sealed class CaptureResult

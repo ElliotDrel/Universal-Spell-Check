@@ -40,7 +40,10 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             _postProcessor,
             ShowTip,
             SetBusy,
-            ShowSettings);
+            ShowSettings,
+            // Owner window for the clipboard-history exclusion. Lazy because the
+            // hotkey window is created just below, after the coordinator.
+            () => _hotkeyWindow.Handle);
 
         _notifyIcon = new Forms.NotifyIcon
         {

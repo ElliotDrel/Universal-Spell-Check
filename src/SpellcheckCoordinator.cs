@@ -11,6 +11,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
     private readonly Action<string, string> _notify;
     private readonly Action<bool> _setBusy;
     private readonly Action _showSettings;
+    private readonly Func<IntPtr>? _clipboardOwnerHandle;
     private readonly SemaphoreSlim _spellcheckGate = new(1, 1);
 
     public SpellcheckCoordinator(
@@ -19,7 +20,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
         TextPostProcessor postProcessor,
         Action<string, string> notify,
         Action<bool> setBusy,
-        Action showSettings)
+        Action showSettings,
+        Func<IntPtr>? clipboardOwnerHandle = null)
     {
         _logger = logger;
         _spellcheckService = spellcheckService;
@@ -27,6 +29,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
         _notify = notify;
         _setBusy = setBusy;
         _showSettings = showSettings;
+        // Owns the clipboard when re-tagging the captured text as transient.
+        // Null in headless/bench mode, which never touches the real clipboard.
+        _clipboardOwnerHandle = clipboardOwnerHandle;
     }
 
     public async Task RunAsync()
@@ -180,6 +185,21 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             record.InputText = capture.Text;
             record.Events.Add("capture_succeeded");
+
+            // Re-tag the just-captured (incorrect) text as transient so it stays
+            // out of Windows clipboard history / cloud clipboard. The corrected
+            // text written at paste time is left untagged so it IS kept in
+            // history. Best-effort; must happen here (right after capture, on the
+            // STA thread) to beat the OS history snapshot. Never fails the run.
+            if (_clipboardOwnerHandle is { } ownerHandle)
+            {
+                record.CapturedTextHistoryExcluded = ClipboardLoop.ExcludeTextFromHistory(
+                    capture.Text!, ownerHandle(), out var historyExcludeDetail);
+                record.HistoryExcludeDetail = historyExcludeDetail;
+                record.Events.Add(
+                    (record.CapturedTextHistoryExcluded ? "capture_history_excluded " : "capture_history_exclude_failed ")
+                    + historyExcludeDetail);
+            }
 
             // Pre-process: collapse terminal soft-wrap artifacts before the API call.
             record.T_TerminalNormStart = Stopwatch.GetTimestamp();
@@ -369,6 +389,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     : "") +
                 $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
                 $"original_clipboard_restored={r.OriginalClipboardRestored.ToString().ToLowerInvariant()} " +
+                $"captured_text_history_excluded={r.CapturedTextHistoryExcluded.ToString().ToLowerInvariant()} " +
+                (r.HistoryExcludeDetail is null ? "" : $"history_exclude_detail=\"{Escape(r.HistoryExcludeDetail)}\" ") +
                 (r.PasteFailurePhase is null ? "" : $"paste_failure_phase={r.PasteFailurePhase} ") +
                 (r.PasteErrorType is null ? "" : $"paste_error_type={r.PasteErrorType} ") +
                 (r.ErrorMessage is null ? "" : $"error=\"{Escape(r.ErrorMessage)}\" ") +
@@ -390,6 +412,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 paste_error_type = r.PasteErrorType,
                 corrected_text_on_clipboard = r.CorrectedTextOnClipboard,
                 original_clipboard_restored = r.OriginalClipboardRestored,
+                captured_text_history_excluded = r.CapturedTextHistoryExcluded,
+                history_exclude_detail = r.HistoryExcludeDetail ?? "",
                 text_changed = r.TextChanged,
                 input_text = r.InputText ?? "",
                 input_chars = r.InputText?.Length ?? 0,
