@@ -75,14 +75,15 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 
 1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
 2. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
-3. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
-4. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
-5. On request failure: restore clipboard, notify user, log `request_failed`, return.
-6. **Post-process** — `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
-7. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
-8. **Paste** — `ClipboardLoop.ReplaceSelectionAsync(replacement)`. Writes corrected text to clipboard, sends Ctrl+V.
-9. Log `replace_succeeded` with full timing breakdown.
-10. `SetBusy(false)` in `finally` — loading overlay hides even on failure.
+3. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` re-asserts the captured (incorrect) text tagged `CanIncludeInClipboardHistory=0` / `CanUploadToCloudClipboard=0` so it stays out of Windows clipboard history (Win+V). Best-effort, owned by the hotkey window, runs here to beat the OS history snapshot, never fails the run. Logged via `captured_text_history_excluded` / `history_exclude_detail`. See `docs/watchlist.md` § Clipboard history exclusion.
+4. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
+5. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
+6. On request failure: restore clipboard, notify user, log `request_failed`, return.
+7. **Post-process** — `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
+8. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
+9. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
+10. Log `replace_succeeded` with full timing breakdown.
+11. `SetBusy(false)` in `finally` — loading overlay hides even on failure.
 
 ---
 
