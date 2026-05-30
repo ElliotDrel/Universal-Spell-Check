@@ -75,7 +75,7 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 
 1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
 2. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
-3. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` re-asserts the captured (incorrect) text tagged `CanIncludeInClipboardHistory=0` / `CanUploadToCloudClipboard=0` so it stays out of Windows clipboard history (Win+V). Best-effort, owned by the hotkey window, runs here to beat the OS history snapshot, never fails the run. Logged via `captured_text_history_excluded` / `history_exclude_detail`. See `docs/watchlist.md` § Clipboard history exclusion.
+3. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
 4. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
 5. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
 6. On request failure: restore clipboard, notify user, log `request_failed`, return.
