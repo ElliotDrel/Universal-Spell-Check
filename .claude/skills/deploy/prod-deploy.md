@@ -87,14 +87,19 @@ this `AskUserQuestion` does not count as approval.
 
 ---
 
-## Step 5 — Tag and push
+## Step 5 — Tag and push (branch + tag together)
 
-Only after explicit Yes from Step 4:
+Only after explicit Yes from Step 4. **Always push the branch with the tag** so
+`origin/main` is never left behind the released commit:
 
 ```powershell
 git tag vX.Y.Z
-git push origin vX.Y.Z
+git push origin main vX.Y.Z
 ```
+
+This pushes the `main` branch and the new tag in one call. If `git push origin main`
+is rejected (non-fast-forward — someone else pushed), stop and reconcile before
+pushing the tag; do not force-push.
 
 ---
 
@@ -210,6 +215,7 @@ A good prod release satisfies **all** of the following:
 - `dotnet build -c Release` passed with no new errors.
 - The tag is strictly higher than the previous latest tag.
 - Approval was given via `AskUserQuestion` after the exact version and commit list were shown.
+- The `main` branch was pushed alongside the tag (`git push origin main vX.Y.Z`) — `origin/main` is not behind the released commit.
 - Tag confirmed present on GitHub remote via API.
 - CI `Release` workflow run confirmed triggered (matching run found within 60 s).
 - CI run completed with `conclusion=success` OR a stuck Draft was manually published.
@@ -221,6 +227,6 @@ If any of these are not true, the release is not complete. Do not end the conver
 
 ## Done
 
-Report to the user: the tag pushed (`vX.Y.Z`), the GitHub Actions run URL, confirmation
-that `isDraft=false`, and that installed prod copies (Ctrl+Alt+U) will auto-update
-on next launch or within the 4-hour periodic check.
+Report to the user: the tag and branch pushed (`vX.Y.Z` + `main`), the GitHub Actions
+run URL, confirmation that `isDraft=false`, and that installed prod copies (Ctrl+Alt+U)
+will auto-update on next launch or within the 4-hour periodic check.

@@ -52,10 +52,11 @@ shipping to production users.**
 
 ### Production release
 
-- **What it means:** Push a semver tag (`v*.*.*`) to origin. This triggers
-  `.github/workflows/release.yml` — `dotnet publish` → `vpk pack` → `vpk upload github`
-  → GitHub Release created. All installed prod copies auto-update via Velopack on
-  next launch or 4-hour periodic check.
+- **What it means:** Push a semver tag (`v*.*.*`) to origin, **along with the
+  `main` branch** so `origin/main` is never left behind the released commit. The
+  tag triggers `.github/workflows/release.yml` — `dotnet publish` → `vpk pack` →
+  `vpk upload github` → GitHub Release created. All installed prod copies
+  auto-update via Velopack on next launch or 4-hour periodic check.
 - **Hotkey when running:** Ctrl+Alt+U
 - **Auto-update:** Yes — every installed copy picks up the release automatically.
 - **Approval needed:** **YES. Hard stop. You must get explicit human confirmation
@@ -83,7 +84,7 @@ Load only the sub-file you need. Do not pre-load both.
 - Never reads `prod-deploy.md` unless explicitly routing a production release.
 - Never pushes a git tag without `AskUserQuestion` approval in the current session.
 - Leaves the repo clean after a dev deploy.
-- Leaves a new semver tag and a running CI job after a prod deploy.
+- Leaves a new semver tag, the `main` branch pushed alongside it (`origin/main` not behind the released commit), and a running CI job after a prod deploy.
 - Always reports back: what was pushed, the commit SHA, and next steps.
 
 ---
@@ -103,6 +104,6 @@ Load only the sub-file you need. Do not pre-load both.
 
 On completion, report to the user:
 - Which path was taken (Dev push or Prod release).
-- The branch or tag pushed.
+- The branch and/or tag pushed (a prod release pushes `main` + the tag together).
 - The commit SHA that landed on origin.
 - Next steps (Dev: how to pull and relaunch; Prod: CI run URL and auto-update timeline).
