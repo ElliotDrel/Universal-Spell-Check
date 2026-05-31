@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -80,6 +81,13 @@ internal sealed class TextPostProcessor
                         if (!string.IsNullOrEmpty(variant)
                             && !string.Equals(variant, canonical, StringComparison.Ordinal))
                         {
+                            // A variant that is a substring of its own canonical would corrupt
+                            // already-correct text on every run (e.g. "Comp" inside "Competition").
+                            if (canonical.Contains(variant, StringComparison.Ordinal))
+                            {
+                                _logger.Log($"replacements_variant_unsafe variant=\"{Escape(variant)}\" canonical=\"{Escape(canonical)}\" reason=\"variant_is_substring_of_canonical\"");
+                                continue;
+                            }
                             nextPairs.Add(new ReplacementPair(variant, canonical));
                         }
                     }
@@ -113,19 +121,50 @@ internal sealed class TextPostProcessor
         });
 
         var applied = new List<string>();
-        foreach (var pair in pairs)
+
+        if (pairs.Count > 0)
         {
-            if (!text.Contains(pair.Variant, StringComparison.Ordinal))
+            // Left-to-right positional scan: at each position find the earliest (then longest)
+            // matching variant, emit the canonical, and advance past the consumed variant chars.
+            // This means replacement output is never re-scanned, so cascading fires are impossible.
+            var sb = new StringBuilder(text.Length);
+            var pos = 0;
+
+            while (pos < text.Length)
             {
-                continue;
+                var bestPos = -1;
+                ReplacementPair? bestPair = null;
+
+                foreach (var pair in pairs)
+                {
+                    var idx = text.IndexOf(pair.Variant, pos, StringComparison.Ordinal);
+                    if (idx < 0) continue;
+
+                    if (bestPos < 0 || idx < bestPos ||
+                        (idx == bestPos && pair.Variant.Length > bestPair!.Variant.Length))
+                    {
+                        bestPos = idx;
+                        bestPair = pair;
+                    }
+                }
+
+                if (bestPair is null)
+                {
+                    sb.Append(text, pos, text.Length - pos);
+                    break;
+                }
+
+                sb.Append(text, pos, bestPos - pos);
+                sb.Append(bestPair.Canonical);
+
+                var entry = $"{bestPair.Variant} -> {bestPair.Canonical}";
+                if (!applied.Contains(entry))
+                    applied.Add(entry);
+
+                pos = bestPos + bestPair.Variant.Length;
             }
 
-            var before = text;
-            text = text.Replace(pair.Variant, pair.Canonical, StringComparison.Ordinal);
-            if (!string.Equals(before, text, StringComparison.Ordinal))
-            {
-                applied.Add($"{pair.Variant} -> {pair.Canonical}");
-            }
+            text = sb.ToString();
         }
 
         for (var i = urls.Count; i >= 1; i--)
