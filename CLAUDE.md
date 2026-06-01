@@ -27,7 +27,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Channel separation, hotkey/mutex/path constants, version stamping | `src/BuildChannel.cs` (canonical source) |
 | Editing API payloads, switching models, temperature/reasoning/verbosity | `docs/model-config.md` |
 | Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
-| Reading, filtering, or analyzing runtime logs | Use the `read-logs` skill — run `python .claude/skills/read-logs/scripts/logs.py --help` for options. Never manually parse log files. |
+| Reading, filtering, or analyzing runtime logs | Use the `read-logs` skill — run `python .claude/skills/read-logs/scripts/logs.py --help` for options. Use `--grep-detail <term>` or `--grep-detail field:term` to search inside spellcheck_detail blobs. Never manually parse log files. |
 | Pushing to Dev channel or releasing to Production | Use the `deploy` skill. Always. Do not push or tag manually. |
 | Auto-update flow, Velopack, release pipeline | `src/UpdateService.cs`, `.github/workflows/release.yml` |
 | Debugging a bug, verification standards, runtime diagnostics | `docs/debugging-principles.md` |
@@ -38,6 +38,8 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Running, building, manual acceptance-testing the native app | `src/CLAUDE.md` |
 | Python fine-tune dataset tooling, benchmarks, eval runs | `tests/CLAUDE.md` |
 | Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
+| Dry-running text through replacements.json without the live app | `python .claude/scripts/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
+| Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
 | Autonomous speed optimization loop (`/autoopt N`), behavioral contracts, worktree workflow | `docs/autoopt.md` |
 | CI workflows, release tag automation, agent-sync workflow | `.github/workflows/` (read the YAML) |
 | Where to file new docs / when to add vs append / past filing mistakes | `docs/filing-rules.md` |

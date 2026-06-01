@@ -126,6 +126,18 @@ def collect_files(log_dir: Path, from_date: date, to_date: date) -> list[Path]:
     return files
 
 
+_GREP_DETAIL_FIELDS = ("input_text", "output_text", "raw_ai_output")
+
+
+def _grep_detail_match(detail, query):
+    """Return True if query matches detail. Supports 'field:value' or plain substring (all three text fields)."""
+    if ":" in query:
+        field, _, needle = query.partition(":")
+        return needle.lower() in str(detail.get(field, "")).lower()
+    needle = query.lower()
+    return any(needle in str(detail.get(f, "")).lower() for f in _GREP_DETAIL_FIELDS)
+
+
 def main():
     today = date.today()
 
@@ -142,6 +154,9 @@ def main():
   python logs.py --today --channel dev
   python logs.py --today --raw --event run_completed
   python logs.py --today --json --event spellcheck_detail | python -m json.tool
+  python logs.py --today --grep-detail competition
+  python logs.py --today --grep-detail output_text:Competitionetition
+  python logs.py --today --grep-detail raw_ai_output:competition --last 10
         """,
     )
     parser.add_argument("--from", dest="from_date", metavar="YYYY-MM-DD",
@@ -168,6 +183,10 @@ def main():
                         help="Output as JSON objects (one per line), good for piping")
     parser.add_argument("--log-dir", metavar="PATH",
                         help=f"Override log directory (default: {LOG_DIR})")
+    parser.add_argument("--grep-detail", metavar="QUERY",
+                        help="Filter spellcheck_detail rows by substring match. "
+                             "Plain string searches input_text, output_text, and raw_ai_output (case-insensitive). "
+                             "Use 'field:value' to scope to one field (e.g. output_text:Competitionetition).")
 
     args = parser.parse_args()
 
@@ -221,6 +240,16 @@ def main():
                     try:
                         detail = json.loads(rest)
                         if args.app.lower() not in detail.get("active_exe", "").lower():
+                            continue
+                    except json.JSONDecodeError:
+                        continue
+
+                if args.grep_detail:
+                    if event != "spellcheck_detail":
+                        continue
+                    try:
+                        detail = json.loads(rest)
+                        if not _grep_detail_match(detail, args.grep_detail):
                             continue
                     except json.JSONDecodeError:
                         continue

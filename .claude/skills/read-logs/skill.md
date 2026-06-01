@@ -85,6 +85,16 @@ python .claude/skills/read-logs/scripts/logs.py --today --raw --event request_fa
 python .claude/skills/read-logs/scripts/logs.py --today --json --event spellcheck_detail
 ```
 
+### Search inside spellcheck_detail content (input/output/raw AI output)
+```powershell
+# Plain substring — searches input_text, output_text, and raw_ai_output (case-insensitive)
+python .claude/skills/read-logs/scripts/logs.py --today --grep-detail competition
+# Field-scoped — restrict to one field
+python .claude/skills/read-logs/scripts/logs.py --today --grep-detail output_text:Competitionetition
+python .claude/skills/read-logs/scripts/logs.py --today --grep-detail raw_ai_output:competition --last 10
+```
+This is the way to find "all runs where X appeared in the input/output" without writing a throwaway JSON parser. Implicitly restricts to `spellcheck_detail` events. A query containing `:` is treated as `field:value`.
+
 ## All flags
 
 | Flag | What it does |
@@ -100,6 +110,7 @@ python .claude/skills/read-logs/scripts/logs.py --today --json --event spellchec
 | `--last N` / `-n` | Show last N matching lines |
 | `--raw` | Print raw JSONL lines |
 | `--json` | Output parsed JSON objects one per line |
+| `--grep-detail QUERY` | Filter spellcheck_detail by substring in input_text/output_text/raw_ai_output; `field:value` scopes to one field |
 | `--log-dir PATH` | Override log directory |
 
 ## Error events caught by `--errors`

@@ -2,7 +2,10 @@
 
 ## Grounding
 
-Pytest suites for the **Python fine-tune dataset + benchmark scripts** that live under `.claude/skills/finetune-cycle/scripts/`. These are not tests for the C# product — they protect the dataset/eval tooling that consumes the unified JSONL log corpus. The whole reason logs are unified across Prod and Dev (with per-line `channel`/`app_version` stamps) is to feed this pipeline cleanly.
+Two kinds of pytest suites live here:
+
+1. **Python fine-tune dataset + benchmark scripts** under `.claude/skills/finetune-cycle/scripts/` — protecting the dataset/eval tooling that consumes the unified JSONL log corpus. The whole reason logs are unified across Prod and Dev (with per-line `channel`/`app_version` stamps) is to feed this pipeline cleanly.
+2. **Regression tests for C# product logic**, reimplemented in Python to keep the feedback loop fast (`test_text_post_processor.py`). The first of these guards the `TextPostProcessor` replacement algorithm — see `docs/tooling-gaps.md` § 2. We backfill these slowly as bugs surface; we are *not* aiming for blanket coverage of the C# product here.
 
 ## Read first
 
@@ -13,8 +16,11 @@ Pytest suites for the **Python fine-tune dataset + benchmark scripts** that live
 ```text
 tests/
 |-- test_benchmark_spellcheck_models.py    # Tests for benchmark_spellcheck_models.py
-`-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
+|-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
+`-- test_text_post_processor.py            # C# TextPostProcessor regression (via .claude/scripts/test-replacements.py)
 ```
+
+`test_text_post_processor.py` imports the replacement logic from `.claude/scripts/test-replacements.py` (a faithful Python port of `TextPostProcessor.ApplyReplacements`) and asserts the invariant that caught the Competitionetition bug: no variant may be a substring of its own canonical, and every canonical must pass through unchanged.
 
 The scripts under test:
 
