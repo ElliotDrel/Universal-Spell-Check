@@ -4,6 +4,28 @@ Items that have historically broken or have non-obvious behavior worth re-readin
 
 ---
 
+## Clipboard.* requires the STA thread — never call it from Task.Run
+
+WinForms `Clipboard.*` throws `ThreadStateException` on MTA thread-pool threads. The v0.3.0 hot-path split moved the original-clipboard restore into the fire-and-forget `FinalizeAsync` (`Task.Run` → MTA): every **failed** run with a clipboard backup crashed finalize, so (a) the user's clipboard was never restored and (b) the entire `run_completed` + `spellcheck_detail` record was lost — failed runs became invisible and the post-0.3.0 "0% failure rate" was partly an illusion. Only a bare `finalize_failed error_type=ThreadStateException` line remained.
+
+**Current shape:** the restore runs in `RunAsync` on the STA UI thread right after the hot path returns (failed runs only — successful runs keep the corrected text on the clipboard); `FinalizeAsync` does logging only and logs `finalize_failed` with status, active process, and full stack. If you move any `Clipboard.*` call, check which thread it lands on. A `finalize_failed` line in the logs means a run vanished — treat it as a missing-telemetry bug, not noise.
+
+---
+
+## Capture-failure forensics (open investigation: Notepad / outlook.com bursts)
+
+"Clipboard did not change after Ctrl+C." hit **46% of Notepad runs** (and outlook.com-in-Chrome complaints) across the first 5 weeks of logs. It fails in session bursts — several consecutive hotkey presses all dead, other sessions 100% fine — which retries never recover. Ruled out: admin-elevated Notepad (user confirmed), overlay focus steal (WS_EX_NOACTIVATE), old clipboard lock contention (fixed v0.2.0, commit bc46808). **Root cause not yet proven.**
+
+Since commit 808febb every capture failure carries per-attempt forensics in the `capture_failed` event inside `spellcheck_detail.events[]`:
+
+- `seq_before` / `seq_at_timeout` — clipboard sequence numbers; unchanged means the target app never executed the copy.
+- `mods_at_send` / `mods_at_timeout` — physical Ctrl/Alt/Shift/Win/hotkey-key state when Ctrl+C was injected; a modifier still `1` at send means the app saw Ctrl+Alt+C, not Ctrl+C.
+- `fg_at_timeout` — `exe=… elevated=0|1|access_denied`; `elevated=1` or `access_denied` means UIPI silently dropped the injected keystrokes.
+
+When the next burst happens, read these fields before theorizing. Reproduce with `--grep-detail` or `--event spellcheck_detail --app <exe>`.
+
+---
+
 ## Velopack bootstrap order
 
 `VelopackApp.Build().Run()` must be the **very first line of `Main`**, before mutex acquisition, WPF initialization, or any other startup code. Velopack installs first-run hooks and restart-after-update logic that must fire before the app does anything else. Moving it down breaks silent updates and first-run setup. This is a hard constraint, not a style preference.
@@ -20,7 +42,7 @@ Items that have historically broken or have non-obvious behavior worth re-readin
 - Repeated `copy_attempts=2`.
 - `paste_failed` with `expected_process` ≠ `actual_process` — the target app lost focus during the API request; this is not a capture failure, do not treat it as one.
 
-Before adding app-specific timing rules: reproduce with a named target app and inspect the log timing fields. Don't adjust constants blindly.
+Before adding app-specific timing rules: reproduce with a named target app and inspect the log timing fields. Don't adjust constants blindly. Every capture failure now logs per-attempt forensics — see § Capture-failure forensics at the top of this file.
 
 ---
 

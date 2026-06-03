@@ -100,7 +100,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 | `started` | App boot; includes `channel`, `version`, `hotkey_vk` |
 | `hotkey_pressed` | Every hotkey activation |
 | `run_started` | Pipeline begins; includes `active_process`, `window_title` |
-| `capture_succeeded` / `capture_failed` | After clipboard capture attempt |
+| `capture_succeeded` / `capture_failed` | After clipboard capture attempt. On failure, the `capture_failed` entry in `spellcheck_detail.events[]` carries per-attempt forensics: clipboard sequence numbers (`seq_before`/`seq_at_timeout`), physical modifier state (`mods_at_send`/`mods_at_timeout`), and foreground process + elevation (`fg_at_timeout`). See `docs/watchlist.md` § Capture-failure forensics |
 | `capture_history_excluded` / `capture_history_exclude_failed` | Whether the captured (incorrect) text was tagged out of Windows clipboard history |
 | `guard_rejected reason=already_running` | Overlapping hotkey press |
 | `request_failed` / `request_retrying` | API errors |
@@ -109,6 +109,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 | `spellcheck_detail` | JSON blob with full input/output/tokens/timings on every run |
 | `replacements_reloaded` / `replacements_reload_failed` | Replacements file change detection |
 | `update_check_start` / `update_download_done` / `update_apply_now` | UpdateService flow |
+| `finalize_failed` | The post-run finalize step threw — the run's `run_completed`/`spellcheck_detail` lines were **lost**. Logs status, active process, and full stack. Treat as a missing-telemetry bug |
 | `dashboard_open step=construct|show|activate|done` | Dashboard lifecycle |
 | `loading_overlay_show` / `loading_overlay_hide` | Overlay visibility |
 | `stopping` | Clean shutdown |
