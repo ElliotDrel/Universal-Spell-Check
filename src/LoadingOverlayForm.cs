@@ -20,17 +20,6 @@ internal sealed class LoadingOverlayForm : Form
         TopMost = true;
         BackColor = Color.FromArgb(32, 34, 37);
         Padding = new Padding(12);
-        ClientSize = new Size(300, 52);
-
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            BackColor = BackColor
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         _progressBar.Style = ProgressBarStyle.Marquee;
         _progressBar.MarqueeAnimationSpeed = 35;
@@ -39,17 +28,52 @@ internal sealed class LoadingOverlayForm : Form
 
         _label = new Label
         {
-            Text = "Copying text...",
-            AutoSize = true,
+            Text = PhaseText(SpellcheckPhase.Copying),
             ForeColor = Color.White,
             Font = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Regular),
-            Anchor = AnchorStyles.Left
+            Anchor = AnchorStyles.Left,
+            TextAlign = ContentAlignment.MiddleLeft
         };
+
+        // Size the box once to the widest phase text so it hugs the content
+        // and never resizes (or drifts off-center) when the label changes
+        // mid-run. The label is locked to that size (AutoSize off, +8px
+        // slack) so layout rounding can never clamp it into wrapping —
+        // the text is always a single line.
+        const int barColumnWidth = 52;
+        var maxText = Size.Empty;
+        foreach (var phase in new[] { SpellcheckPhase.Copying, SpellcheckPhase.Sending, SpellcheckPhase.Receiving })
+        {
+            var measured = TextRenderer.MeasureText(PhaseText(phase), _label.Font);
+            maxText.Width = Math.Max(maxText.Width, measured.Width);
+            maxText.Height = Math.Max(maxText.Height, measured.Height);
+        }
+        _label.AutoSize = false;
+        _label.Size = new Size(maxText.Width + 8, maxText.Height);
+        ClientSize = new Size(Padding.Left + barColumnWidth + _label.Width + Padding.Right, 52);
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = BackColor
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, barColumnWidth));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         layout.Controls.Add(_progressBar, 0, 0);
         layout.Controls.Add(_label, 1, 0);
         Controls.Add(layout);
     }
+
+    private static string PhaseText(SpellcheckPhase phase) => phase switch
+    {
+        SpellcheckPhase.Copying => "Copying text...",
+        SpellcheckPhase.Sending => "Sending to AI...",
+        SpellcheckPhase.Receiving => "Pasting...",
+        _ => ""
+    };
 
     // Visibility timing matches the old Show/Hide pair exactly: Copying shows
     // the form (run start), Done hides it (run end). Sending/Receiving only
@@ -59,14 +83,12 @@ internal sealed class LoadingOverlayForm : Form
         switch (phase)
         {
             case SpellcheckPhase.Copying:
-                _label.Text = "Copying text...";
+                _label.Text = PhaseText(phase);
                 ShowNearTaskbar();
                 break;
             case SpellcheckPhase.Sending:
-                _label.Text = "Sending to AI...";
-                break;
             case SpellcheckPhase.Receiving:
-                _label.Text = "Pasting...";
+                _label.Text = PhaseText(phase);
                 break;
             case SpellcheckPhase.Done:
                 if (Visible) Hide();
