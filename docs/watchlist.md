@@ -59,11 +59,11 @@ Before adding app-specific timing rules: reproduce with a named target app and i
 
 ## Loading overlay UI-thread marshalling
 
-`SetBusy` is called from the async spell-check pipeline (not the UI thread). `LoadingOverlayForm.Handle` is force-created on the UI thread in `SpellCheckAppContext`'s constructor so `InvokeRequired` is meaningful. If you move or defer handle creation, `InvokeRequired` may return `false` on a background thread and crash.
+`SetPhase` is called from the async spell-check pipeline (not a UI thread). `OverlayHost` owns a dedicated STA background thread with its own message loop; the form and its Win32 handle are created on that thread at startup and every `SetPhase` is queued onto it via `BeginInvoke`, returning immediately. If you move or defer form/handle creation off that thread, the marshalling breaks and the overlay crashes or silently stops updating.
 
-`loading_overlay_failed` in logs means `ShowNearTaskbar()` or `Hide()` threw — check that handle creation is still happening before `Application.Run`.
+Phase-to-visibility contract: `Copying` shows the form, `Done` hides it, `Sending`/`Receiving` only swap the label text. `Done` is dispatched in `RunAsync` immediately after the hot path returns — deliberately **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats. Moving the hide after the restore (e.g., back into `FinalizeAsync`) re-introduces an overlay that sticks on screen after failures.
 
-See commits 52b5e27 and 77239cc for the specific WPF-in-WinForms crash sequence this fixed.
+See commits 52b5e27 and 77239cc for the specific WPF-in-WinForms crash sequence the original marshalling fixed.
 
 ---
 

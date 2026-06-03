@@ -31,7 +31,7 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck\`.
 2. Save a valid API key in Settings.
 3. Select misspelled text in Notepad, press the hotkey, verify corrected text replaces the selection.
 4. Select misspelled text in a browser textarea, press the hotkey, verify replacement.
-5. During a request, verify the bottom-center loading overlay appears after copy, does not steal focus, and disappears after replacement or failure.
+5. During a request, verify the bottom-center loading overlay appears immediately ("Copying text..."), updates to "Sending to AI..." during the request and "Pasting..." after the response, does not steal focus, and disappears after replacement or failure. The text must always be a single line.
 6. Press the hotkey with no selected text; verify stale clipboard text is not pasted.
 7. Press the hotkey twice rapidly; verify only one replacement attempt runs (`guard_rejected reason=already_running` in log).
 8. Select `open ai and github`, press the hotkey, verify output contains `OpenAI` and `GitHub`; confirm `replacements_count > 0` in log.

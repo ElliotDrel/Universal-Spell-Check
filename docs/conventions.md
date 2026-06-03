@@ -30,7 +30,7 @@
 
 **API key storage:** DPAPI `DataProtectionScope.CurrentUser` only (via `SettingsStore`). Never write keys to `settings.json` or any plain-text file.
 
-**UI threading:** `SetBusy` and `OnUpdateStateChanged` are called from async pipelines and must marshal to the UI thread via `BeginInvoke` / `Dispatcher.BeginInvoke` before touching form or WPF controls.
+**UI threading:** `SetPhase` and `OnUpdateStateChanged` are called from async pipelines and must marshal to the UI thread via `BeginInvoke` / `Dispatcher.BeginInvoke` before touching form or WPF controls.
 
 **Coordinator serialization:** capture/request/paste run through a single `SemaphoreSlim(1,1)`. Overlapping hotkey presses are rejected, never queued.
 

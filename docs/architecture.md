@@ -73,23 +73,27 @@ Thin `NativeWindow` subclass. Calls `RegisterHotKey` with `BuildChannel.HotkeyMo
 
 Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`guard_rejected reason=already_running`), never queued.
 
-1. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
-2. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
-3. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
-4. `SetBusy(true)` — tray text changes, `LoadingOverlayForm` shows.
-5. **Request** — `OpenAiSpellcheckService.SpellcheckAsync(text)`.
+1. `SetPhase(Copying)` — tray text changes, `LoadingOverlayForm` shows with "Copying text...".
+2. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
+3. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
+4. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
+5. **Request** — `SetPhase(Sending)` (overlay reads "Sending to AI..."), then `OpenAiSpellcheckService.SpellcheckAsync(text)`.
 6. On request failure: restore clipboard, notify user, log `request_failed`, return.
-7. **Post-process** — `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
+7. **Post-process** — `SetPhase(Receiving)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
 8. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
 9. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
 10. Log `replace_succeeded` with full timing breakdown.
-11. `SetBusy(false)` in `finally` — loading overlay hides even on failure.
+11. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
 
 ---
 
-## Loading overlay (`src/LoadingOverlayForm.cs`)
+## Loading overlay (`src/LoadingOverlayForm.cs` + `src/OverlayHost.cs`)
 
-Borderless, topmost WinForms form. Uses `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` to avoid stealing focus. Positioned at bottom-center of the primary screen's working area. Its Win32 handle is force-created on the UI thread at startup so `InvokeRequired` is meaningful when `SetBusy` is called from the async pipeline.
+Borderless, topmost WinForms form. Uses `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` to avoid stealing focus. Positioned at bottom-center of the primary screen's working area.
+
+Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the form ("Copying text..."), `Sending`/`Receiving` swap the label only ("Sending to AI..." / "Pasting..."), `Done` hides it. The box is sized once at startup to the widest phase string (measured via `TextRenderer`) and the label is locked to that size — it never wraps and never resizes mid-run.
+
+`OverlayHost` owns a dedicated STA background thread with its own message loop; the form and its Win32 handle are pre-created there at startup, and `SetPhase` calls from the async pipeline are queued via `BeginInvoke` so they return immediately and never block the hot path. Threading gotchas: `docs/watchlist.md` § Loading overlay UI-thread marshalling.
 
 ---
 

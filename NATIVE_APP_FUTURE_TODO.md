@@ -28,7 +28,7 @@ Current status as of 2026-04-27: the native app is the main plain-text spell che
 - Add app-specific capture/paste rules only after a named app failure is reproduced.
 - Track target-window changes between capture and paste if wrong-window paste is observed.
 - Add clearer user notification for invalid key, timeout, rate limit, and server failure.
-- If the loading overlay ever gets stuck, verify coordinator `finally` path and `SetBusy(false)` first.
+- If the loading overlay ever gets stuck, verify `SetPhase(SpellcheckPhase.Done)` in `RunAsync` still fires before the clipboard restore (see `docs/watchlist.md` § Loading overlay UI-thread marshalling).
 - Consider using the OpenAI `Retry-After` header for rate limits instead of a fixed retry delay.
 - Add a small diagnostics command or log summary view if raw logs become hard to inspect.
 
