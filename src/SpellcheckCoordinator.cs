@@ -194,7 +194,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
             {
                 record.Status = RunStatus.CaptureFailed;
                 record.ErrorMessage = capture.FailureReason;
-                record.Events.Add("capture_failed");
+                record.Events.Add(capture.Detail is null
+                    ? "capture_failed"
+                    : $"capture_failed {capture.Detail}");
                 _notify(
                     CaptureFailureTitle(capture.FailureReason),
                     capture.FailureReason ?? "The selected app did not copy text.");

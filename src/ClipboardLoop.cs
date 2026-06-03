@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace UniversalSpellCheck;
@@ -20,13 +21,19 @@ internal static class ClipboardLoop
             return CaptureResult.Fail(
                 "Hotkey keys were not released before copy.",
                 Environment.TickCount64 - startedAt,
-                0);
+                0,
+                $"mods=[{KeyboardState.DescribeModifierState()}]");
         }
 
         string? lastFailureReason = null;
+        // Failure forensics, one entry per attempt. Built only on the failure
+        // path — the success path pays for two GetAsyncKeyState snapshots and
+        // nothing else.
+        List<string>? failureDiag = null;
         for (var attempt = 1; attempt <= MaxCopyAttempts; attempt++)
         {
             var sequenceBeforeCopy = GetClipboardSequenceNumber();
+            var modsAtSend = KeyboardState.DescribeModifierState();
 
             SendKeys.SendWait("^c");
 
@@ -60,20 +67,92 @@ internal static class ClipboardLoop
                     return CaptureResult.Fail(
                         "Copied selection was empty.",
                         Environment.TickCount64 - startedAt,
-                        attempt);
+                        attempt,
+                        $"attempt={attempt} seq_before={sequenceBeforeCopy} seq_now={GetClipboardSequenceNumber()} " +
+                        $"copied_len={text?.Length ?? 0} mods_at_send=[{modsAtSend}] fg=[{DescribeForegroundWindow()}]");
                 }
 
                 return CaptureResult.Ok(text, Environment.TickCount64 - startedAt, attempt);
             }
 
             lastFailureReason = "Clipboard did not change after Ctrl+C.";
+            failureDiag ??= new List<string>(MaxCopyAttempts);
+            failureDiag.Add(
+                $"attempt={attempt} seq_before={sequenceBeforeCopy} seq_at_timeout={GetClipboardSequenceNumber()} " +
+                $"mods_at_send=[{modsAtSend}] mods_at_timeout=[{KeyboardState.DescribeModifierState()}] " +
+                $"fg_at_timeout=[{DescribeForegroundWindow()}]");
             await Task.Delay(60);
         }
 
         return CaptureResult.Fail(
             lastFailureReason ?? "Clipboard capture failed.",
             Environment.TickCount64 - startedAt,
-            MaxCopyAttempts);
+            MaxCopyAttempts,
+            failureDiag is null ? null : string.Join("; ", failureDiag));
+    }
+
+    // Identifies where the injected Ctrl+C actually went and whether Windows
+    // could even deliver it: UIPI silently drops SendInput into elevated
+    // processes, so elevated=1 (or access_denied) on a capture failure is the
+    // smoking gun for "clipboard did not change after Ctrl+C".
+    private static string DescribeForegroundWindow()
+    {
+        try
+        {
+            var handle = GetForegroundWindow();
+            if (handle == IntPtr.Zero) return "none";
+            GetWindowThreadProcessId(handle, out var processId);
+            if (processId == 0) return "unknown";
+
+            string name;
+            try
+            {
+                name = Process.GetProcessById((int)processId).ProcessName;
+            }
+            catch
+            {
+                name = $"pid_{processId}";
+            }
+
+            return $"exe={name} elevated={DescribeElevation((int)processId)}";
+        }
+        catch
+        {
+            return "probe_failed";
+        }
+    }
+
+    private static string DescribeElevation(int processId)
+    {
+        var process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (process == IntPtr.Zero)
+        {
+            // Access denied here usually means an elevated or protected process.
+            return "access_denied";
+        }
+
+        try
+        {
+            if (!OpenProcessToken(process, TOKEN_QUERY, out var token))
+            {
+                return "token_denied";
+            }
+
+            try
+            {
+                return GetTokenInformation(token, TokenElevationClass, out var elevated, sizeof(uint), out _)
+                    ? (elevated != 0 ? "1" : "0")
+                    : "unknown";
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
     }
 
     public static async Task<ReplaceResult> ReplaceSelectionAsync(string replacementText)
@@ -332,6 +411,36 @@ internal static class ClipboardLoop
     [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const uint TOKEN_QUERY = 0x0008;
+    private const int TokenElevationClass = 20; // TOKEN_INFORMATION_CLASS.TokenElevation
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenProcessToken(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTokenInformation(
+        IntPtr tokenHandle,
+        int tokenInformationClass,
+        out uint tokenInformation,
+        int tokenInformationLength,
+        out int returnLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
+
     private const uint GMEM_MOVEABLE = 0x0002;
     private const uint GMEM_ZEROINIT = 0x0040;
     private const uint CF_UNICODETEXT = 13;
@@ -380,6 +489,9 @@ internal sealed class CaptureResult
     public bool Success { get; init; }
     public string? Text { get; init; }
     public string? FailureReason { get; init; }
+    // Per-attempt forensics (sequence numbers, modifier state, foreground
+    // process + elevation). Populated only on failure.
+    public string? Detail { get; init; }
     public long DurationMs { get; init; }
     public int Attempts { get; init; }
 
@@ -391,10 +503,11 @@ internal sealed class CaptureResult
         Attempts = attempts
     };
 
-    public static CaptureResult Fail(string reason, long durationMs, int attempts) => new()
+    public static CaptureResult Fail(string reason, long durationMs, int attempts, string? detail = null) => new()
     {
         Success = false,
         FailureReason = reason,
+        Detail = detail,
         DurationMs = durationMs,
         Attempts = attempts
     };
