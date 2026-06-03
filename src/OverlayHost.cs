@@ -31,7 +31,7 @@ internal sealed class OverlayHost : IDisposable
         Application.Run();
     }
 
-    public void Show()
+    public void SetPhase(SpellcheckPhase phase)
     {
         var f = _form;
         if (_disposed || f is null || !f.IsHandleCreated) return;
@@ -39,35 +39,12 @@ internal sealed class OverlayHost : IDisposable
         {
             f.BeginInvoke(new Action(() =>
             {
-                if (!f.IsDisposed)
-                {
-                    f.ShowNearTaskbar();
-                }
+                if (!f.IsDisposed) f.SetPhase(phase);
             }));
         }
         catch
         {
             // best-effort; never break the hot path
-        }
-    }
-
-    public void Hide()
-    {
-        var f = _form;
-        if (_disposed || f is null || !f.IsHandleCreated) return;
-        try
-        {
-            f.BeginInvoke(new Action(() =>
-            {
-                if (!f.IsDisposed && f.Visible)
-                {
-                    f.Hide();
-                }
-            }));
-        }
-        catch
-        {
-            // best-effort
         }
     }
 

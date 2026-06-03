@@ -10,6 +10,7 @@ internal sealed class LoadingOverlayForm : Form
 
     private static readonly IntPtr HwndTopmost = new(-1);
     private readonly ProgressBar _progressBar = new();
+    private readonly Label _label;
 
     public LoadingOverlayForm()
     {
@@ -36,9 +37,9 @@ internal sealed class LoadingOverlayForm : Form
         _progressBar.Size = new Size(40, 14);
         _progressBar.Anchor = AnchorStyles.Left;
 
-        var label = new Label
+        _label = new Label
         {
-            Text = "Spell check loading...",
+            Text = "Copying text...",
             AutoSize = true,
             ForeColor = Color.White,
             Font = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Regular),
@@ -46,8 +47,31 @@ internal sealed class LoadingOverlayForm : Form
         };
 
         layout.Controls.Add(_progressBar, 0, 0);
-        layout.Controls.Add(label, 1, 0);
+        layout.Controls.Add(_label, 1, 0);
         Controls.Add(layout);
+    }
+
+    // Visibility timing matches the old Show/Hide pair exactly: Copying shows
+    // the form (run start), Done hides it (run end). Sending/Receiving only
+    // swap the label text — they never touch visibility.
+    public void SetPhase(SpellcheckPhase phase)
+    {
+        switch (phase)
+        {
+            case SpellcheckPhase.Copying:
+                _label.Text = "Copying text...";
+                ShowNearTaskbar();
+                break;
+            case SpellcheckPhase.Sending:
+                _label.Text = "Sending to AI...";
+                break;
+            case SpellcheckPhase.Receiving:
+                _label.Text = "Pasting...";
+                break;
+            case SpellcheckPhase.Done:
+                if (Visible) Hide();
+                break;
+        }
     }
 
     protected override CreateParams CreateParams

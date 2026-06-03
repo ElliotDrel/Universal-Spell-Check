@@ -66,7 +66,7 @@ internal static class Program
             spellService,
             postProcessor,
             notify: (_, _) => { },
-            setBusy: _ => { },
+            setPhase: _ => { },
             showSettings: () => { });
 
         Application.EnableVisualStyles();

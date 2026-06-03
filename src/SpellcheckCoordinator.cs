@@ -9,7 +9,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
     private readonly Action<string, string> _notify;
-    private readonly Action<bool> _setBusy;
+    private readonly Action<SpellcheckPhase> _setPhase;
     private readonly Action _showSettings;
     private readonly Func<IntPtr>? _clipboardOwnerHandle;
     private readonly SemaphoreSlim _spellcheckGate = new(1, 1);
@@ -19,7 +19,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         OpenAiSpellcheckService spellcheckService,
         TextPostProcessor postProcessor,
         Action<string, string> notify,
-        Action<bool> setBusy,
+        Action<SpellcheckPhase> setPhase,
         Action showSettings,
         Func<IntPtr>? clipboardOwnerHandle = null)
     {
@@ -27,7 +27,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         _spellcheckService = spellcheckService;
         _postProcessor = postProcessor;
         _notify = notify;
-        _setBusy = setBusy;
+        _setPhase = setPhase;
         _showSettings = showSettings;
         // Owns the clipboard when re-tagging the captured text as transient.
         // Null in headless/bench mode, which never touches the real clipboard.
@@ -53,9 +53,25 @@ internal sealed class SpellcheckCoordinator : IDisposable
             _spellcheckGate.Release();
         }
 
+        // Hide the overlay the moment the run is over — before the clipboard
+        // restore below, which can block for seconds while the OS renders the
+        // original clipboard formats.
+        _setPhase(SpellcheckPhase.Done);
+
+        // Clipboard restore must run here, on the STA UI thread — WinForms
+        // Clipboard.* throws ThreadStateException on MTA pool threads, which
+        // killed FinalizeAsync before it could log the run (finalize_failed
+        // error_type=ThreadStateException) and left the user's clipboard
+        // unrestored. Only failed runs take this branch, so the hot path for
+        // successful runs is unaffected.
+        if (!record.CorrectedTextOnClipboard)
+        {
+            record.OriginalClipboardRestored = ClipboardLoop.RestoreClipboard(record.OriginalClipboard);
+        }
+
         // Fire-and-forget: every non-paste-critical step (logging serialization,
-        // clipboard restore, replacements refresh, overlay hide) runs after the
-        // hot path returns so the next hotkey can fire without waiting.
+        // replacements refresh, overlay hide) runs after the hot path returns so
+        // the next hotkey can fire without waiting.
         _ = Task.Run(() => FinalizeAsync(record));
     }
 
@@ -72,6 +88,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
         {
             _spellcheckGate.Release();
         }
+
+        _setPhase(SpellcheckPhase.Done);
 
         var requestMs = TicksToMs(record.T_RequestSendStart, record.T_ResponseEnd);
         var ppMs = TicksToMs(record.T_PostProcessStart, record.T_PostProcessEnd);
@@ -104,9 +122,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
         try
         {
-            _setBusy(true);
+            _setPhase(SpellcheckPhase.Copying);
             record.InputText = inputText;
 
+            _setPhase(SpellcheckPhase.Sending);
             var spell = await _spellcheckService.SpellcheckAsync(inputText, record);
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
@@ -163,7 +182,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
             record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
             record.Events.Add("run_started");
-            _setBusy(true);
+            _setPhase(SpellcheckPhase.Copying);
 
             // Capture
             record.T_CaptureStart = Stopwatch.GetTimestamp();
@@ -209,6 +228,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var textToSpellcheck = norm.Applied ? norm.Text : capture.Text!;
 
             // Spellcheck request — timings filled inside the service via record.
+            _setPhase(SpellcheckPhase.Sending);
             var spell = await _spellcheckService.SpellcheckAsync(textToSpellcheck, record);
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
@@ -237,6 +257,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
 
             record.Events.Add("request_succeeded");
+            _setPhase(SpellcheckPhase.Receiving);
 
             // Post-process (replacements + prompt-leak guard)
             record.T_PostProcessStart = Stopwatch.GetTimestamp();
@@ -332,14 +353,6 @@ internal sealed class SpellcheckCoordinator : IDisposable
     {
         try
         {
-            _setBusy(false);
-
-            // Preserve corrected text for manual paste once it has reached the clipboard.
-            if (!r.CorrectedTextOnClipboard)
-            {
-                r.OriginalClipboardRestored = ClipboardLoop.RestoreClipboard(r.OriginalClipboard);
-            }
-
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var normMs = TicksToMs(r.T_TerminalNormStart, r.T_TerminalNormEnd);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
@@ -482,9 +495,13 @@ internal sealed class SpellcheckCoordinator : IDisposable
         {
             try
             {
+                // Stack included: a finalize failure means a whole run vanished
+                // from the logs, so this line is the only forensic trace left.
                 _logger.Log(
                     $"finalize_failed error_type={ex.GetType().Name} " +
-                    $"error=\"{Escape(ex.Message)}\"");
+                    $"error=\"{Escape(ex.Message)}\" " +
+                    $"status={r.Status} active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
+                    $"stack=\"{Escape(ex.ToString())}\"");
             }
             catch { /* swallow — finalize must never affect the next hotkey */ }
         }
@@ -513,6 +530,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             : "Copy failed";
     }
 }
+
+public enum SpellcheckPhase { Copying, Sending, Receiving, Done }
 
 public sealed record HeadlessResult(
     bool Success,

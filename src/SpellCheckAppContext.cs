@@ -39,7 +39,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             _spellcheckService,
             _postProcessor,
             ShowTip,
-            SetBusy,
+            SetPhase,
             ShowSettings,
             // Owner window for the clipboard-history exclusion. Lazy because the
             // hotkey window is created just below, after the coordinator.
@@ -272,30 +272,23 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _notifyIcon.ShowBalloonTip(2500, title, message, Forms.ToolTipIcon.Info);
     }
 
-    private void SetBusy(bool isBusy)
+    private void SetPhase(SpellcheckPhase phase)
     {
         try
         {
-            _notifyIcon.Text = TruncateTooltip(isBusy
-                ? $"{BuildChannel.TrayTooltip} — checking"
-                : BuildChannel.TrayTooltip);
+            _notifyIcon.Text = TruncateTooltip(phase == SpellcheckPhase.Done
+                ? BuildChannel.TrayTooltip
+                : $"{BuildChannel.TrayTooltip} — checking");
         }
         catch
         {
             // tooltip is cosmetic
         }
 
-        // OverlayHost owns its own STA background thread, so Show/Hide just
-        // enqueue onto that thread's message loop and return immediately —
+        // OverlayHost owns its own STA background thread, so SetPhase just
+        // enqueues onto that thread's message loop and returns immediately —
         // never blocks the spellcheck hot path.
-        if (isBusy)
-        {
-            _overlayHost.Show();
-        }
-        else
-        {
-            _overlayHost.Hide();
-        }
+        _overlayHost.SetPhase(phase);
     }
 
     private void ShowSettings()
