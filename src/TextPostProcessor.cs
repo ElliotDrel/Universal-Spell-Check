@@ -1,12 +1,10 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace UniversalSpellCheck;
 
 internal sealed class TextPostProcessor
 {
-    private static readonly Regex UrlRegex = new(@"https?://\S+", RegexOptions.Compiled);
     private static readonly string LeakedPromptLine =
         "instructions: " + OpenAiSpellcheckService.PromptInstruction;
 
@@ -23,17 +21,19 @@ internal sealed class TextPostProcessor
     }
 
     // Hot-path: no file I/O, just snapshot + apply.
-    public PostProcessResult Process(string outputText)
+    public PostProcessResult Process(string outputText, ProtectionResult protection)
     {
         var pairs = _pairs;
         var replacements = ApplyReplacements(outputText, pairs);
         var promptGuard = StripPromptLeak(replacements.Text);
+        var restored = ProtectedText.Restore(promptGuard.Text, protection);
 
         return new PostProcessResult
         {
-            Text = promptGuard.Text,
+            Text = restored.Text,
             ReplacementsApplied = replacements.Applied,
-            UrlsProtected = replacements.UrlsProtected,
+            ProtectionRestored = restored.Success,
+            InvalidPlaceholder = restored.InvalidPlaceholder,
             PromptLeak = promptGuard
         };
     }
@@ -113,13 +113,6 @@ internal sealed class TextPostProcessor
 
     private static ReplacementResult ApplyReplacements(string text, IReadOnlyList<ReplacementPair> pairs)
     {
-        var urls = new List<string>();
-        text = UrlRegex.Replace(text, match =>
-        {
-            urls.Add(match.Value);
-            return $"__URL_{urls.Count}__";
-        });
-
         var applied = new List<string>();
 
         if (pairs.Count > 0)
@@ -167,12 +160,7 @@ internal sealed class TextPostProcessor
             text = sb.ToString();
         }
 
-        for (var i = urls.Count; i >= 1; i--)
-        {
-            text = text.Replace($"__URL_{i}__", urls[i - 1], StringComparison.Ordinal);
-        }
-
-        return new ReplacementResult(text, applied, urls.Count);
+        return new ReplacementResult(text, applied);
     }
 
     private static PromptLeakResult StripPromptLeak(string text)
@@ -225,14 +213,15 @@ internal sealed class TextPostProcessor
     }
 
     private sealed record ReplacementPair(string Variant, string Canonical);
-    private sealed record ReplacementResult(string Text, List<string> Applied, int UrlsProtected);
+    private sealed record ReplacementResult(string Text, List<string> Applied);
 }
 
 internal sealed class PostProcessResult
 {
     public string Text { get; init; } = "";
     public List<string> ReplacementsApplied { get; init; } = [];
-    public int UrlsProtected { get; init; }
+    public bool ProtectionRestored { get; init; } = true;
+    public string? InvalidPlaceholder { get; init; }
     public PromptLeakResult PromptLeak { get; init; } = PromptLeakResult.NotTriggered("");
 }
 

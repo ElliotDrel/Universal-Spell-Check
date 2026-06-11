@@ -29,7 +29,7 @@ Autoopt state files under `bench/autoopt/*.json` and `bench/autoopt/*.jsonl` are
 
 Enforced deterministically by `bench/check_correctness.py`, which derives assertions automatically from `bench/inputs.json` + `replacements.json` — no calibration file, no recalibration needed. If any assertion fails, revert.
 
-1. **URL protection** - any `https?://...` URL in input must appear byte-identical in output.
+1. **Protected literal passthrough** - URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs in input must appear byte-identical in output.
 2. **Brand replacements** - all canonical variants from `replacements.json` must be applied.
 3. **Prompt-leak guard** - if the model echoes `instructions:` or `text input:`, those labels must be stripped before paste.
 4. **Channel separation** - Prod and Dev never collide on hotkey, mutex, or app-data folder; values come from `BuildChannel.cs`.

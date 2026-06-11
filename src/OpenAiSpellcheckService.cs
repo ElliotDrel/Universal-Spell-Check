@@ -411,6 +411,7 @@ internal static class SpellcheckErrorCodes
     public const string Timeout = "timeout";
     public const string RequestFailed = "request_failed";
     public const string ParseFailed = "parse_failed";
+    public const string ProtectedTextRestoreFailed = "protected_text_restore_failed";
 }
 
 internal sealed class HotPathSpellcheckResult

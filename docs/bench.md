@@ -31,7 +31,7 @@ Three equal-weight categories:
 |---|---|
 | General spelling/grammar | Core correction path |
 | Brand-name replacements | `replacements.json` post-processing (`OpenAI`, `GitHub`, `buildPurdue`, etc.) |
-| URL protection | Prompt-leak guard; URLs must pass through unchanged |
+| Protected literals | URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs pass through unchanged |
 
 To refresh inputs from real production logs:
 
@@ -96,9 +96,9 @@ Each input also gets a `sample_output` field — the corrected text from the fir
 
 Contracts are derived automatically from `bench/inputs.json` + `replacements.json` — no calibration file, no recalibration needed:
 
-- **URL passthrough** — every `https?://` URL in the original input must appear byte-identical in `sample_output`.
-- **Brand replacements** — every `replacements.json` variant present in the input text (outside URLs) must appear as its canonical form in `sample_output`.
-- Inputs with neither URLs nor matched variants are silently skipped.
+- **Protected literal passthrough** — URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs in the original input must appear byte-identical in `sample_output`.
+- **Brand replacements** — every `replacements.json` variant present outside protected literals must appear as its canonical form in `sample_output`.
+- Inputs with neither protected literals nor matched variants are silently skipped.
 
 Used as a hard gate by the autoopt loop (see `docs/autoopt.md`) before any change is committed.
 

@@ -15,7 +15,24 @@ Tabs are matched alongside spaces in all three passes. Bare `\r\n` without trail
 - Result is recorded in `RunRecord.TerminalNorm`; logged as `terminal_normalized=true terminal_norm_chars_removed=N` on the `run_completed` line and as `terminal_normalization` in the `spellcheck_detail` JSON blob.
 - If not applied (non-terminal process or no artifacts found), `terminal_normalization.applied = false` and `chars_removed = 0`.
 
-Full pipeline order: **terminal normalize** → API call → post-process (replacements + prompt-leak guard).
+Full pipeline order: **terminal normalize** → **protect literals** → API call → post-process
+(replacements + prompt-leak guard) → **restore literals**.
+
+## Protected literals
+
+Before the API call, `ProtectedText.Protect` replaces exact literals with collision-safe numbered
+placeholders. It protects:
+
+- `http://` and `https://` URLs
+- UUIDs and long opaque IDs containing both letters and digits
+- common prefixed API keys/tokens, JWTs, and values assigned to key/token/secret/session fields
+- Windows drive paths, UNC paths, POSIX paths, and slash-delimited relative paths
+
+Quoted file paths may contain spaces. Unquoted paths stop at whitespace. After the AI response,
+replacements and the prompt-leak guard run while placeholders are still present, then
+`ProtectedText.Restore` restores the original byte-for-byte values. If a placeholder is missing
+or duplicated, the run fails with `protected_text_restore_failed` and does not paste potentially
+corrupted text.
 
 ---
 
@@ -36,7 +53,7 @@ Format — canonical key maps to an array of variants to replace:
 
 - Parses the JSON, strips BOM, flattens to `(variant, canonical)` pairs, sorts longest-first so longer variants win over shorter overlapping ones.
 - Uses case-sensitive ordinal comparisons and replacements (`StringComparison.Ordinal`).
-- Before replacements, extracts `https?://\S+` URLs into `__URL_N__` placeholders; restores them afterward. Scheme-less links are not protected.
+- Protected literals remain as placeholders during replacements, so replacement variants cannot alter them.
 - Reloads when `FileInfo.LastWriteTimeUtc` or `Length` changes. Keeps last known-good cache on reload failure. Clears cache when the file is missing.
 - Reload logged as `replacements_reloaded count={N}`. Reload failure logged as `replacements_reload_failed`.
 
@@ -116,7 +133,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/urls_protected), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `terminal_normalization` (applied/chars_removed/process), `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `terminal_normalization` (applied/chars_removed/process), `events[]`.
 
 ### Dashboard Activity feed
 

@@ -1,11 +1,12 @@
 """Verify bench results against behavioral contracts.
 
 Contracts are derived automatically from inputs.json + replacements.json:
-  - URL passthrough: every https?:// URL in the input must appear byte-identical in the output.
-  - Brand replacements: every replacements.json variant present in the input text (outside URLs)
+  - Protected literal passthrough: URLs, UUIDs/session IDs, API keys, file paths, and opaque
+    IDs in the input must appear byte-identical in the output.
+  - Brand replacements: every replacements.json variant present outside protected literals
     must appear as its canonical form in the output.
 
-Inputs with no URLs and no matched variants are skipped — no assertion is possible for them.
+Inputs with no protected literals and no matched variants are skipped.
 
 Usage: python bench/check_correctness.py bench/results/<file>.json
 
@@ -16,7 +17,38 @@ import re
 import sys
 from pathlib import Path
 
-URL_RE = re.compile(r'https?://[^\s\]"\'<>)]+')
+PROTECTED_RE = re.compile(
+    r"""
+    https?://[^\s"'<>]+
+    |
+    (?:sk|pk|rk)-(?:proj-)?[A-Za-z0-9_-]{16,}
+    |
+    github_pat_[A-Za-z0-9_]{20,}
+    |
+    gh[pousr]_[A-Za-z0-9]{20,}
+    |
+    xox[baprs]-[A-Za-z0-9-]{10,}
+    |
+    AKIA[A-Z0-9]{16}
+    |
+    AIza[A-Za-z0-9_-]{20,}
+    |
+    eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}
+    |
+    (?i:\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|session[_-]?id)\b)
+    \s*[:=]\s*["']?[A-Za-z0-9_./+=-]{12,}["']?
+    |
+    \b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}\b
+    |
+    ["'](?:(?:[A-Za-z]:\\)|(?:\\\\[^\\\s]+\\)|(?:(?:~|\.\.?)[/\\])|/|(?:[A-Za-z0-9_.-]+[/\\]))[^"'<>|:*?]+["']
+    |
+    (?<![\w:/\\])(?:(?:[A-Za-z]:\\)|(?:\\\\[^\\\s]+\\)|(?:(?:~|\.\.?)[/\\])|/|(?:[A-Za-z0-9_.-]+[/\\]))
+    (?:[^\s"'<>|:*?]+[/\\])*[^\s"'<>|:*?]*[A-Za-z0-9_.-]
+    |
+    \b(?=[A-Za-z0-9_-]{20,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]+\b
+    """,
+    re.VERBOSE,
+)
 
 
 def load_json(p: Path):
@@ -24,12 +56,8 @@ def load_json(p: Path):
         return json.load(f)
 
 
-def strip_trailing_punct(url: str) -> str:
-    return url.rstrip(".,;:)")
-
-
-def extract_urls(text: str) -> list[str]:
-    return [strip_trailing_punct(u) for u in URL_RE.findall(text)]
+def extract_protected_literals(text: str) -> list[str]:
+    return [match.group(0) for match in PROTECTED_RE.finditer(text)]
 
 
 def build_variant_map(replacements: dict) -> dict[str, str]:
@@ -75,11 +103,11 @@ def main() -> int:
         if original is None:
             continue
 
-        urls = extract_urls(original)
-        text_no_urls = URL_RE.sub("", original)
-        variants = find_variants(text_no_urls, variant_map)
+        protected_literals = extract_protected_literals(original)
+        text_without_literals = PROTECTED_RE.sub("", original)
+        variants = find_variants(text_without_literals, variant_map)
 
-        if not urls and not variants:
+        if not protected_literals and not variants:
             skipped += 1
             continue
 
@@ -88,16 +116,16 @@ def main() -> int:
             if inp.get("success_count", 0) > 0:
                 failures.append(f"  [{name}] no sample_output captured (bench instrumentation issue)")
             else:
-                failures.append(f"  [{name}] all trials failed — cannot verify correctness")
+                failures.append(f"  [{name}] all trials failed - cannot verify correctness")
             continue
 
-        for url in urls:
-            if url not in sample:
-                failures.append(f"  [{name}] URL not preserved: {url}")
+        for literal in protected_literals:
+            if literal not in sample:
+                failures.append(f"  [{name}] protected literal not preserved: {literal}")
 
         for variant, canonical in variants.items():
             if canonical not in sample:
-                failures.append(f"  [{name}] replacement missing: '{variant}' → '{canonical}' not in output")
+                failures.append(f"  [{name}] replacement missing: '{variant}' -> '{canonical}' not in output")
 
         checked += 1
 
@@ -105,15 +133,15 @@ def main() -> int:
     if failures:
         print(
             f"FAIL: {len(failures)} contract violation(s) across {checked} checked "
-            f"input(s) ({skipped}/{total} skipped — no URL/replacement)"
+            f"input(s) ({skipped}/{total} skipped - no protected literal/replacement)"
         )
-        for f in failures:
-            print(f)
+        for failure in failures:
+            print(failure)
         return 1
 
     print(
         f"PASS: all contracts satisfied across {checked} checked "
-        f"input(s) ({skipped}/{total} skipped — no URL/replacement)"
+        f"input(s) ({skipped}/{total} skipped - no protected literal/replacement)"
     )
     return 0
 

@@ -42,6 +42,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="UniversalSpellCheck.Bench" />
+    <InternalsVisibleTo Include="UniversalSpellCheck.ProtectedTextTests" />
   </ItemGroup>
 
 </Project>

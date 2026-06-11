@@ -77,13 +77,14 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 2. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
 3. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
 4. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
-5. **Request** — `SetPhase(Sending)` (overlay reads "Sending to AI..."), then `OpenAiSpellcheckService.SpellcheckAsync(text)`.
-6. On request failure: restore clipboard, notify user, log `request_failed`, return.
-7. **Post-process** — `SetPhase(Receiving)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, promptInstruction)`. Applies replacements and strips prompt-leak text.
-8. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
-9. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
-10. Log `replace_succeeded` with full timing breakdown.
-11. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
+5. **Protect literals** — replace URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs with collision-safe placeholders.
+6. **Request** — `SetPhase(Sending)` (overlay reads "Sending to AI..."), then `OpenAiSpellcheckService.SpellcheckAsync(protectedText)`.
+7. On request failure: restore clipboard, notify user, log `request_failed`, return.
+8. **Post-process and restore** — `SetPhase(Receiving)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
+9. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
+10. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
+11. Log `replace_succeeded` with full timing breakdown.
+12. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
 
 ---
 

@@ -64,7 +64,7 @@ When a change is kept, both baselines update to the new result. Subsequent compa
 
 Enforced deterministically by `check_correctness.py`:
 
-1. **URL protection**: `https?://...` URLs in input must appear byte-identical in output.
+1. **Protected literal passthrough**: URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs in input must appear byte-identical in output.
 2. **Brand replacements**: canonical variants from `replacements.json` must be applied.
 3. **Prompt-leak guard**: `instructions:` and `text input:` echoes must be stripped before paste.
 4. **Channel separation**: Prod/Dev never collide on hotkey, mutex, or app-data folder; values come from `BuildChannel.cs`.
@@ -89,8 +89,8 @@ Runs in a git worktree at `../universal-spell-check-autoopt` on a fresh branch `
 
 `check_correctness.py` derives contracts automatically from `bench/inputs.json` + `replacements.json` — no calibration file, no recalibration needed. Contracts are:
 
-- **URL passthrough**: every `https?://` URL in the original input must appear byte-identical in `sample_output`.
-- **Brand replacements**: every `replacements.json` variant present in the input text (outside URLs) must appear as its canonical form in `sample_output`.
-- Inputs with neither URLs nor matched variants are silently skipped.
+- **Protected literal passthrough**: URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs in the original input must appear byte-identical in `sample_output`.
+- **Brand replacements**: every `replacements.json` variant present outside protected literals must appear as its canonical form in `sample_output`.
+- Inputs with neither protected literals nor matched variants are silently skipped.
 
 Because contracts are derived from source-of-truth files that are off-limits to the autoopt loop, the gate is always valid.

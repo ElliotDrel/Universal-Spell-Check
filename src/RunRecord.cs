@@ -69,10 +69,10 @@ internal sealed class RunRecord
     public long T_TerminalNormStart { get; set; }
     public long T_TerminalNormEnd { get; set; }
     public TerminalNormResult TerminalNorm { get; set; } = TerminalNormResult.NotApplied("");
+    public ProtectionResult Protection { get; set; } = ProtectionResult.Empty("");
 
     // Post-process
     public List<string> ReplacementsApplied { get; set; } = new();
-    public int UrlsProtected { get; set; }
     public PromptLeakResult PromptLeak { get; set; } = PromptLeakResult.NotTriggered("");
 
     // Cleanup

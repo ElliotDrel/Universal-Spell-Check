@@ -125,8 +125,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
             _setPhase(SpellcheckPhase.Copying);
             record.InputText = inputText;
 
+            record.Protection = ProtectedText.Protect(inputText);
             _setPhase(SpellcheckPhase.Sending);
-            var spell = await _spellcheckService.SpellcheckAsync(inputText, record);
+            var spell = await _spellcheckService.SpellcheckAsync(record.Protection.Text, record);
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
             record.RawResponseBytes = spell.RawResponseBytes;
@@ -144,7 +145,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
 
             record.T_PostProcessStart = Stopwatch.GetTimestamp();
-            var pp = _postProcessor.Process(spell.OutputText!);
+            var pp = _postProcessor.Process(spell.OutputText!, record.Protection);
             record.T_PostProcessEnd = Stopwatch.GetTimestamp();
             if (pp.PromptLeak.Triggered)
             {
@@ -153,8 +154,15 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
             record.OutputText = pp.Text;
             record.ReplacementsApplied = pp.ReplacementsApplied;
-            record.UrlsProtected = pp.UrlsProtected;
             record.PromptLeak = pp.PromptLeak;
+            if (!pp.ProtectionRestored)
+            {
+                record.Status = RunStatus.RunFailed;
+                record.ErrorCode = SpellcheckErrorCodes.ProtectedTextRestoreFailed;
+                record.ErrorMessage = $"AI output changed protected placeholder {pp.InvalidPlaceholder}.";
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
             record.Status = RunStatus.Success;
             record.T_HotPathReturned = Stopwatch.GetTimestamp();
             return record;
@@ -229,9 +237,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.TerminalNorm = norm;
             var textToSpellcheck = norm.Applied ? norm.Text : capture.Text!;
 
+            record.Protection = ProtectedText.Protect(textToSpellcheck);
+
             // Spellcheck request — timings filled inside the service via record.
             _setPhase(SpellcheckPhase.Sending);
-            var spell = await _spellcheckService.SpellcheckAsync(textToSpellcheck, record);
+            var spell = await _spellcheckService.SpellcheckAsync(record.Protection.Text, record);
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
             record.RawResponseBytes = spell.RawResponseBytes;
@@ -261,9 +271,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.Events.Add("request_succeeded");
             _setPhase(SpellcheckPhase.Receiving);
 
-            // Post-process (replacements + prompt-leak guard)
+            // Post-process (replacements + prompt-leak guard + protected literal restore)
             record.T_PostProcessStart = Stopwatch.GetTimestamp();
-            var pp = _postProcessor.Process(spell.OutputText!);
+            var pp = _postProcessor.Process(spell.OutputText!, record.Protection);
             record.T_PostProcessEnd = Stopwatch.GetTimestamp();
             if (pp.PromptLeak.Triggered)
             {
@@ -272,8 +282,17 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
             record.OutputText = pp.Text;
             record.ReplacementsApplied = pp.ReplacementsApplied;
-            record.UrlsProtected = pp.UrlsProtected;
             record.PromptLeak = pp.PromptLeak;
+            if (!pp.ProtectionRestored)
+            {
+                record.Status = RunStatus.RunFailed;
+                record.ErrorCode = SpellcheckErrorCodes.ProtectedTextRestoreFailed;
+                record.ErrorMessage = $"AI output changed protected placeholder {pp.InvalidPlaceholder}.";
+                record.Events.Add("protected_text_restore_failed");
+                _notify("Spell check failed", "Protected text could not be restored safely.");
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
             record.Events.Add("postprocess_applied");
 
             // Paste: set clipboard, then send Ctrl+V. Restore is moved to finalize.
@@ -394,7 +413,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"copy_attempts={r.CopyAttempts} " +
                 $"request_attempts={r.RequestAttempts} " +
                 $"replacements_count={r.ReplacementsApplied.Count} " +
-                $"urls_protected={r.UrlsProtected} " +
+                $"protected_values={r.Protection.Entries.Count} " +
+                $"urls_protected={r.Protection.Count(ProtectedLiteralKind.Url)} " +
                 $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
                 $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
@@ -462,7 +482,12 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 {
                     count = r.ReplacementsApplied.Count,
                     applied = r.ReplacementsApplied,
-                    urls_protected = r.UrlsProtected
+                    protected_values = r.Protection.Entries.Count,
+                    urls_protected = r.Protection.Count(ProtectedLiteralKind.Url),
+                    api_keys_protected = r.Protection.Count(ProtectedLiteralKind.ApiKey),
+                    uuids_protected = r.Protection.Count(ProtectedLiteralKind.Uuid),
+                    file_paths_protected = r.Protection.Count(ProtectedLiteralKind.FilePath),
+                    opaque_ids_protected = r.Protection.Count(ProtectedLiteralKind.OpaqueId)
                 },
                 prompt_leak = new
                 {
