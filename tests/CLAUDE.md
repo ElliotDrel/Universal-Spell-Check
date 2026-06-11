@@ -19,6 +19,7 @@ tests/
 |-- ProtectedTextTests/                    # Real C# literal extraction/restoration tests
 |-- test_benchmark_spellcheck_models.py    # Tests for benchmark_spellcheck_models.py
 |-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
+|-- test-replacements.py                   # Replacements dry-run helper
 `-- test_text_post_processor.py            # C# TextPostProcessor regression (via tests/test-replacements.py)
 ```
 
