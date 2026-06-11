@@ -41,7 +41,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Dry-running text through replacements.json without the live app | `python .claude/scripts/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
 | Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
 | Autonomous speed optimization loop (`/autoopt N`), behavioral contracts, worktree workflow | `docs/autoopt.md` |
-| CI workflows, release tag automation, agent-sync workflow | `.github/workflows/` (read the YAML) |
+| CI workflows, release tag automation | `.github/workflows/` (read the YAML) |
 | Where to file new docs / when to add vs append / past filing mistakes | `docs/filing-rules.md` |
 | Reviving the legacy AHK fallback | `.archive/ahk-legacy/` |
 
