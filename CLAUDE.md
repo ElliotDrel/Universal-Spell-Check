@@ -14,6 +14,8 @@
 
 **Collaboration tone:** speed first, simplicity second, minimal UI/overhead third. Concise, action-oriented. Decide fast.
 
+**Agent root:** `.agents` is the canonical editable root for agent files and helper scripts. `.claude` exists only as a compatibility junction; do not edit it directly.
+
 For full project overview, stack details, and repo map → load `docs/overview.md`.
 
 ---
