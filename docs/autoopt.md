@@ -14,7 +14,7 @@ Default N = 50. Drives the full loop in one conversation turn. Accumulating cont
 
 | File | Purpose |
 |---|---|
-| `.claude/skills/autoopt/skill.md` | The skill body with step-by-step loop instructions. |
+| `.agents/skills/autoopt/skill.md` | The skill body with step-by-step loop instructions. |
 | `bench/autoopt/program.md` | Constraints, goal, off-limits, API budget, behavioral contracts. Read each iteration. |
 | `bench/autoopt/journal.jsonl` | One line per iteration: hypothesis, files, build/bench/correctness/delta result. Created at run start, persists for resume and review. |
 | `bench/autoopt/baseline.json` | Path to current 80-call screen baseline result. Updated when a change is kept. |

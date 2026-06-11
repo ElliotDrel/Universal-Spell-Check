@@ -2,7 +2,7 @@
 Regression tests for the TextPostProcessor replacement logic.
 
 Implemented in Python against the authoritative reimplementation in
-.claude/scripts/test-replacements.py, which mirrors TextPostProcessor.ApplyReplacements
+tests/test-replacements.py, which mirrors TextPostProcessor.ApplyReplacements
 exactly (left-to-right single-pass scan, longest-first sorting, URL placeholder protection).
 
 Gap covered: docs/tooling-gaps.md § 2 — no unit tests for TextPostProcessor.
@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPLACEMENTS_PATH = REPO_ROOT / "replacements.json"
 
-_script = REPO_ROOT / ".claude" / "scripts" / "test-replacements.py"
+_script = REPO_ROOT / "tests" / "test-replacements.py"
 _spec = importlib.util.spec_from_file_location("test_replacements", _script)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

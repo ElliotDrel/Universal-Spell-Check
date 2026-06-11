@@ -10,9 +10,9 @@ Python reimplementation of TextPostProcessor.ApplyReplacements. Matches the C# b
   - URLs (https?://...) are protected via __URL_N__ placeholders
 
 Usage:
-  python .claude/scripts/test-replacements.py "Burton Morgan Competition - Fall 2025"
-  python .claude/scripts/test-replacements.py --run <ISO8601-timestamp>
-  python .claude/scripts/test-replacements.py --replacements /path/to/replacements.json "some text"
+  python .agents/scripts/test-replacements.py "Burton Morgan Competition - Fall 2025"
+  python .agents/scripts/test-replacements.py --run <ISO8601-timestamp>
+  python .agents/scripts/test-replacements.py --replacements /path/to/replacements.json "some text"
 """
 import argparse
 import json
@@ -125,10 +125,10 @@ def main():
         description="Dry-run text through replacements.json without touching the live app.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python .claude/scripts/test-replacements.py "Burton Morgan Competition"
-  python .claude/scripts/test-replacements.py "open ai and github stuff"
-  python .claude/scripts/test-replacements.py --run 2026-05-30T14
-  python .claude/scripts/test-replacements.py --replacements /alt/replacements.json "text"
+  python .agents/scripts/test-replacements.py "Burton Morgan Competition"
+  python .agents/scripts/test-replacements.py "open ai and github stuff"
+  python .agents/scripts/test-replacements.py --run 2026-05-30T14
+  python .agents/scripts/test-replacements.py --replacements /alt/replacements.json "text"
         """,
     )
     parser.add_argument("text", nargs="?", help="Input text to run through replacements")

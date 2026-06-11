@@ -105,7 +105,7 @@ scriptVersion: 21 → 22
 ## Skill structure
 
 ```
-.claude/skills/finetune-cycle/
+.agents/skills/finetune-cycle/
   SKILL.md                    # agent-facing workflow + resume logic + gates
   scripts/
     submit_finetune.py        # NEW: upload + create job + poll
