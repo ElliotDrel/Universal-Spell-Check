@@ -53,6 +53,9 @@ internal sealed class RunRecord
     public long T_RequestSendEnd { get; set; }
     public long T_ResponseFirstByte { get; set; }
     public long T_ResponseEnd { get; set; }
+    public long RequestSendTicks { get; set; }
+    public long RequestWaitTicks { get; set; }
+    public long ResponseDownloadTicks { get; set; }
     public long T_PostProcessStart { get; set; }
     public long T_PostProcessEnd { get; set; }
     public long T_PromptGuardStart { get; set; }

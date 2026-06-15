@@ -126,8 +126,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.InputText = inputText;
 
             record.Protection = ProtectedText.Protect(inputText);
-            _setPhase(SpellcheckPhase.Sending);
-            var spell = await _spellcheckService.SpellcheckAsync(record.Protection.Text, record);
+            var spell = await _spellcheckService.SpellcheckAsync(
+                record.Protection.Text,
+                record,
+                onRequestSending: () => _setPhase(SpellcheckPhase.Sending),
+                onRequestBodySent: () => _setPhase(SpellcheckPhase.Waiting));
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
             record.RawResponseBytes = spell.RawResponseBytes;
@@ -240,8 +243,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.Protection = ProtectedText.Protect(textToSpellcheck);
 
             // Spellcheck request — timings filled inside the service via record.
-            _setPhase(SpellcheckPhase.Sending);
-            var spell = await _spellcheckService.SpellcheckAsync(record.Protection.Text, record);
+            var spell = await _spellcheckService.SpellcheckAsync(
+                record.Protection.Text,
+                record,
+                onRequestSending: () => _setPhase(SpellcheckPhase.Sending),
+                onRequestBodySent: () => _setPhase(SpellcheckPhase.Waiting));
             record.RequestAttempts = spell.Attempts;
             record.StatusCode = spell.StatusCode;
             record.RawResponseBytes = spell.RawResponseBytes;
@@ -269,7 +275,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
 
             record.Events.Add("request_succeeded");
-            _setPhase(SpellcheckPhase.Receiving);
+            _setPhase(SpellcheckPhase.Pasting);
 
             // Post-process (replacements + prompt-leak guard + protected literal restore)
             record.T_PostProcessStart = Stopwatch.GetTimestamp();
@@ -377,6 +383,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var normMs = TicksToMs(r.T_TerminalNormStart, r.T_TerminalNormEnd);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
+            var requestSendMs = TicksToMs(r.RequestSendTicks);
+            var requestWaitMs = TicksToMs(r.RequestWaitTicks);
+            var responseDownloadMs = TicksToMs(r.ResponseDownloadTicks);
             var apiMs = requestMs;
             var ppMs = TicksToMs(r.T_PostProcessStart, r.T_PostProcessEnd);
             var promptGuardMs = r.PromptLeak.Triggered ? ppMs : 0;
@@ -408,6 +417,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"total_ms={totalMs} " +
                 $"clipboard_ms={clipboardMs} " +
                 $"request_ms={requestMs} " +
+                $"request_send_ms={requestSendMs} " +
+                $"request_wait_ms={requestWaitMs} " +
+                $"response_download_ms={responseDownloadMs} " +
                 $"postprocess_ms={ppMs} " +
                 $"paste_ms={pasteMs} " +
                 $"copy_attempts={r.CopyAttempts} " +
@@ -472,6 +484,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     payload_ms = 0,
                     request_ms = requestMs,
                     api_ms = apiMs,
+                    request_send_ms = requestSendMs,
+                    request_wait_ms = requestWaitMs,
+                    response_download_ms = responseDownloadMs,
                     parse_ms = 0,
                     replacements_ms = replacementsMs,
                     prompt_guard_ms = promptGuardMs,
@@ -540,6 +555,12 @@ internal sealed class SpellcheckCoordinator : IDisposable
         return (long)((end - start) * 1000.0 / Stopwatch.Frequency);
     }
 
+    private static long TicksToMs(long ticks)
+    {
+        if (ticks <= 0) return 0;
+        return (long)(ticks * 1000.0 / Stopwatch.Frequency);
+    }
+
     public void Dispose()
     {
         _spellcheckGate.Dispose();
@@ -558,7 +579,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
     }
 }
 
-public enum SpellcheckPhase { Copying, Sending, Receiving, Done }
+public enum SpellcheckPhase { Copying, Sending, Waiting, Pasting, Done }
 
 public sealed record HeadlessResult(
     bool Success,

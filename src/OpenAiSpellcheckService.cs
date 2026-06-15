@@ -97,7 +97,11 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         }
     }
 
-    public async Task<HotPathSpellcheckResult> SpellcheckAsync(string inputText, RunRecord record)
+    public async Task<HotPathSpellcheckResult> SpellcheckAsync(
+        string inputText,
+        RunRecord record,
+        Action? onRequestSending = null,
+        Action? onRequestBodySent = null)
     {
         var apiKey = _cachedSettings.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -118,7 +122,13 @@ internal sealed class OpenAiSpellcheckService : IDisposable
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var result = await TrySpellcheckOnceAsync(inputText, apiKey, attempt, record);
+            onRequestSending?.Invoke();
+            var result = await TrySpellcheckOnceAsync(
+                inputText,
+                apiKey,
+                attempt,
+                record,
+                onRequestBodySent);
             if (result.Success)
             {
                 return result;
@@ -150,15 +160,26 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         string inputText,
         string apiKey,
         int attempt,
-        RunRecord record)
+        RunRecord record,
+        Action? onRequestBodySent)
     {
         byte[]? payload = null;
+        var attemptStart = 0L;
+        var bodySent = 0L;
+        var firstByte = 0L;
         try
         {
             payload = BuildPayload(inputText);
             using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            var content = new ByteArrayContent(payload);
+            attemptStart = Stopwatch.GetTimestamp();
+            var content = new CallbackByteArrayContent(payload, () =>
+            {
+                bodySent = Stopwatch.GetTimestamp();
+                record.RequestSendTicks += bodySent - attemptStart;
+                record.T_RequestSendEnd = bodySent;
+                onRequestBodySent?.Invoke();
+            });
             content.Headers.ContentType = JsonMediaType;
             request.Content = content;
             request.Version = HttpVersion.Version20;
@@ -173,14 +194,15 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                 request,
                 HttpCompletionOption.ResponseHeadersRead);
 
-            record.T_ResponseFirstByte = Stopwatch.GetTimestamp();
-            if (record.T_RequestSendEnd == 0)
-            {
-                record.T_RequestSendEnd = record.T_ResponseFirstByte;
-            }
+            firstByte = Stopwatch.GetTimestamp();
+            record.T_ResponseFirstByte = firstByte;
+            if (bodySent != 0)
+                record.RequestWaitTicks += firstByte - bodySent;
 
             var bodyBytes = await response.Content.ReadAsByteArrayAsync();
-            record.T_ResponseEnd = Stopwatch.GetTimestamp();
+            var responseEnd = Stopwatch.GetTimestamp();
+            record.T_ResponseEnd = responseEnd;
+            record.ResponseDownloadTicks += responseEnd - firstByte;
 
             if (!response.IsSuccessStatusCode)
             {
@@ -229,6 +251,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         }
         catch (TaskCanceledException ex)
         {
+            AddIncompleteAttemptTiming(record, bodySent, firstByte);
             return new HotPathSpellcheckResult
             {
                 Success = false,
@@ -240,6 +263,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         }
         catch (Exception ex)
         {
+            AddIncompleteAttemptTiming(record, bodySent, firstByte);
             return new HotPathSpellcheckResult
             {
                 Success = false,
@@ -249,6 +273,15 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                 RequestPayloadBytes = payload
             };
         }
+    }
+
+    private static void AddIncompleteAttemptTiming(RunRecord record, long bodySent, long firstByte)
+    {
+        var now = Stopwatch.GetTimestamp();
+        if (bodySent != 0 && firstByte == 0)
+            record.RequestWaitTicks += now - bodySent;
+        else if (firstByte != 0)
+            record.ResponseDownloadTicks += now - firstByte;
     }
 
     private static bool ShouldRetry(int? statusCode)
@@ -401,6 +434,34 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     {
         _rewarmTimer?.Dispose();
         _httpClient.Dispose();
+    }
+}
+
+internal sealed class CallbackByteArrayContent : HttpContent
+{
+    private readonly byte[] _payload;
+    private readonly Action _onWritten;
+    private int _callbackInvoked;
+
+    public CallbackByteArrayContent(byte[] payload, Action onWritten)
+    {
+        _payload = payload;
+        _onWritten = onWritten;
+    }
+
+    protected override async Task SerializeToStreamAsync(
+        Stream stream,
+        TransportContext? context)
+    {
+        await stream.WriteAsync(_payload);
+        if (Interlocked.Exchange(ref _callbackInvoked, 1) == 0)
+            _onWritten();
+    }
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = _payload.Length;
+        return true;
     }
 }
 

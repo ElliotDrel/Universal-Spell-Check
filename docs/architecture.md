@@ -78,9 +78,9 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 3. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
 4. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
 5. **Protect literals** — replace URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs with collision-safe placeholders.
-6. **Request** — `SetPhase(Sending)` (overlay reads "Sending to AI..."), then `OpenAiSpellcheckService.SpellcheckAsync(protectedText)`.
+6. **Request** — the overlay reads "Sending to AI..." while the request body is written, then "Waiting for AI..." until response headers arrive. `OpenAiSpellcheckService` records separate send, wait, and response-download timings.
 7. On request failure: restore clipboard, notify user, log `request_failed`, return.
-8. **Post-process and restore** — `SetPhase(Receiving)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
+8. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
 9. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
 10. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
 11. Log `replace_succeeded` with full timing breakdown.
@@ -92,7 +92,7 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 
 Borderless, topmost WinForms form. Uses `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` to avoid stealing focus. Positioned at bottom-center of the primary screen's working area.
 
-Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the form ("Copying text..."), `Sending`/`Receiving` swap the label only ("Sending to AI..." / "Pasting..."), `Done` hides it. The box is sized once at startup to the widest phase string (measured via `TextRenderer`) and the label is locked to that size — it never wraps and never resizes mid-run.
+Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the form ("Copying text..."); `Sending`, `Waiting`, and `Pasting` swap the label only ("Sending to AI..." / "Waiting for AI..." / "Pasting..."); `Done` hides it. A right-aligned elapsed timer starts at `Copying`, updates every 100 ms, and stops when `Done` hides the overlay. The box is sized once at startup to the widest phase string and timer width (measured via `TextRenderer`) — it never wraps or resizes mid-run.
 
 `OverlayHost` owns a dedicated STA background thread with its own message loop; the form and its Win32 handle are pre-created there at startup, and `SetPhase` calls from the async pipeline are queued via `BeginInvoke` so they return immediately and never block the hot path. Threading gotchas: `docs/watchlist.md` § Loading overlay UI-thread marshalling.
 
