@@ -11,19 +11,23 @@ internal sealed class OpenAiSpellcheckService : IDisposable
 {
     private const string Endpoint = "https://api.openai.com/v1/responses";
     private const string ModelsEndpoint = "https://api.openai.com/v1/models";
-    public const string DefaultModel = "gpt-4.1";
+    public const string DefaultModel = "gpt-4.1-mini";
+    public const string Gpt54MiniModel = "gpt-5.4-mini";
 
     // AHK-canonical instruction text — keep byte-for-byte identical to legacy.
     public const string PromptInstruction =
         "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.";
 
     // SuffixBytes does not depend on model, so it stays static.
-    private static readonly byte[] SuffixBytes = Encoding.UTF8.GetBytes(
+    private static readonly byte[] StandardSuffixBytes = Encoding.UTF8.GetBytes(
         "\"}]}],\"store\":true,\"text\":{\"verbosity\":\"medium\"},\"temperature\":0.3}");
+    private static readonly byte[] ReasoningSuffixBytes = Encoding.UTF8.GetBytes(
+        "\"}]}],\"store\":true,\"text\":{\"verbosity\":\"low\"}," +
+        "\"reasoning\":{\"effort\":\"none\",\"summary\":\"auto\"}}");
 
-    private readonly byte[] _prefixBytes;
+    private volatile PayloadConfig _payloadConfig;
 
-    public string ModelName { get; }
+    public string ModelName => _payloadConfig.Model;
 
     private static readonly MediaTypeHeaderValue JsonMediaType =
         new("application/json") { CharSet = "utf-8" };
@@ -35,7 +39,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     private System.Threading.Timer? _rewarmTimer;
 
     public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger)
-        : this(cachedSettings, logger, DefaultModel)
+        : this(cachedSettings, logger, NormalizeModel(cachedSettings.SettingsStore.Load().Model))
     {
     }
 
@@ -43,8 +47,8 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     {
         _cachedSettings = cachedSettings;
         _logger = logger;
-        ModelName = model;
-        _prefixBytes = BuildPrefixBytes(model);
+        _payloadConfig = BuildPayloadConfig(model);
+        cachedSettings.SettingsStore.SettingsChanged += OnSettingsChanged;
         _handler = new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
@@ -59,6 +63,20 @@ internal sealed class OpenAiSpellcheckService : IDisposable
             DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
         };
     }
+
+    public static string NormalizeModel(string? model) => model == Gpt54MiniModel ? model : DefaultModel;
+
+    private static byte[] BuildSuffixBytes(string model) =>
+        model == Gpt54MiniModel ? ReasoningSuffixBytes : StandardSuffixBytes;
+
+    private void OnSettingsChanged()
+    {
+        var model = NormalizeModel(_cachedSettings.SettingsStore.Load().Model);
+        _payloadConfig = BuildPayloadConfig(model);
+    }
+
+    private static PayloadConfig BuildPayloadConfig(string model) =>
+        new(model, BuildPrefixBytes(model), BuildSuffixBytes(model));
 
     private static byte[] BuildPrefixBytes(string model)
     {
@@ -103,10 +121,12 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         Action? onRequestSending = null,
         Action? onRequestBodySent = null)
     {
+        var payloadConfig = _payloadConfig;
+        record.Model = payloadConfig.Model;
         var apiKey = _cachedSettings.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            var payload = BuildPayload(inputText);
+            var payload = BuildPayload(inputText, payloadConfig);
             return new HotPathSpellcheckResult
             {
                 Success = false,
@@ -128,6 +148,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
                 apiKey,
                 attempt,
                 record,
+                payloadConfig,
                 onRequestBodySent);
             if (result.Success)
             {
@@ -161,6 +182,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         string apiKey,
         int attempt,
         RunRecord record,
+        PayloadConfig payloadConfig,
         Action? onRequestBodySent)
     {
         byte[]? payload = null;
@@ -169,7 +191,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
         var firstByte = 0L;
         try
         {
-            payload = BuildPayload(inputText);
+            payload = BuildPayload(inputText, payloadConfig);
             using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             attemptStart = Stopwatch.GetTimestamp();
@@ -299,16 +321,18 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     // Build the request payload by sandwiching the JSON-escaped user text
     // between two pre-built UTF-8 slabs. No anonymous-object serialize, no
     // string allocations beyond the escape step.
-    private byte[] BuildPayload(string inputText)
+    private static byte[] BuildPayload(string inputText, PayloadConfig config)
     {
         var escaped = JsonEncodedText.Encode(inputText).EncodedUtf8Bytes;
-        var buffer = new byte[_prefixBytes.Length + escaped.Length + SuffixBytes.Length];
+        var buffer = new byte[config.Prefix.Length + escaped.Length + config.Suffix.Length];
         var span = buffer.AsSpan();
-        _prefixBytes.AsSpan().CopyTo(span);
-        escaped.CopyTo(span[_prefixBytes.Length..]);
-        SuffixBytes.AsSpan().CopyTo(span[(_prefixBytes.Length + escaped.Length)..]);
+        config.Prefix.AsSpan().CopyTo(span);
+        escaped.CopyTo(span[config.Prefix.Length..]);
+        config.Suffix.AsSpan().CopyTo(span[(config.Prefix.Length + escaped.Length)..]);
         return buffer;
     }
+
+    private sealed record PayloadConfig(string Model, byte[] Prefix, byte[] Suffix);
 
     // JSON-escape a constant string at type-init time. Returns the escaped
     // representation without surrounding quotes.

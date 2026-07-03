@@ -188,7 +188,7 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 **Layout:** Page header "Settings" (Instrument Serif 32px) → vertical stack of section cards:
 
 1. **Hotkey** — current hotkey shown as keyboard chips. Runtime hotkey changes are deferred.
-2. **Model** — display current model (`gpt-4.1`). Runtime model selection is deferred.
+2. **Model** — choose `gpt-4.1-mini` or `gpt-5.4-mini`; changes apply to the next request.
 3. **Replacements** — "Edit list" button → opens replacements editor; shows entry count
 4. **Startup** — "Start on login" toggle
 5. **API key** — masked password input with "Save" button; helper text "Stored encrypted for this Windows user with DPAPI"
@@ -244,7 +244,7 @@ The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-i
 - **Refresh:** clears `FeedItems` only (preserves empty state + loading indicator hosts); reloads stats + first page.
 - No file watcher — user refreshes or scrolls to load more. Dashboard is not the hot path.
 
-Settings saves the API key through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture, model switching, startup toggling, and a replacements editor remain deferred (controls disabled, not faked).
+Settings saves the API key and model through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture remains deferred.
 
 ### Testing the design
 After visual changes, verify in this order:

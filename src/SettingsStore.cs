@@ -9,6 +9,7 @@ internal sealed class SettingsStore
     private readonly DiagnosticsLogger _logger;
 
     public event Action? ApiKeyChanged;
+    public event Action? SettingsChanged;
 
     public SettingsStore(DiagnosticsLogger logger)
     {
@@ -43,6 +44,7 @@ internal sealed class SettingsStore
             WriteIndented = true
         });
         File.WriteAllText(AppPaths.SettingsPath, json);
+        SettingsChanged?.Invoke();
     }
 
     public string? LoadApiKey()

@@ -74,14 +74,12 @@
                                        Margin="0,2,0,0"/>
                         </StackPanel>
                         <ComboBox Grid.Column="1"
+                                  x:Name="ModelComboBox"
                                   VerticalAlignment="Center"
                                   Width="160"
-                                  SelectedIndex="0"
-                                  IsEnabled="False"
-                                  ToolTip="Model selection is not wired yet. The native app currently uses gpt-4.1.">
-                            <ComboBoxItem Content="gpt-4.1"/>
-                            <ComboBoxItem Content="gpt-5.1"/>
-                            <ComboBoxItem Content="gpt-5-mini"/>
+                                  SelectionChanged="OnModelSelectionChanged">
+                            <ComboBoxItem Content="4.1 mini" Tag="gpt-4.1-mini"/>
+                            <ComboBoxItem Content="5.4 mini" Tag="gpt-5.4-mini"/>
                         </ComboBox>
                     </Grid>
                 </StackPanel>

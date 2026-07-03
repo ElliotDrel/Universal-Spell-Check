@@ -5,7 +5,7 @@
 
 ## Current caller
 
-`src/OpenAiSpellcheckService.cs` — persistent app-lifetime `HttpClient`, sends directly to the Responses API. Current model: `gpt-4.1` (hardcoded as `OpenAiSpellcheckService.Model`). No model-selection UI exists yet.
+`src/OpenAiSpellcheckService.cs` — persistent app-lifetime `HttpClient`, sends directly to the Responses API. Settings supports `gpt-4.1-mini` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
 ## API key storage
 
@@ -15,7 +15,7 @@ Saved through `SettingsStore` using DPAPI `DataProtectionScope.CurrentUser` into
 
 ## Standard vs. Reasoning models — do not mix parameters
 
-| Feature | Standard (`gpt-4.1`) | Reasoning (`gpt-5.1`, `gpt-5-mini`, `o1`, `o3`) |
+| Feature | Standard (`gpt-4.1-mini`) | Reasoning (`gpt-5.4-mini`) |
 |---|---|---|
 | `temperature` | Yes | **No — API error if present** |
 | `top_p`, penalties, `logprobs` | Yes | No |
@@ -27,11 +27,11 @@ This is a hard rule (see `CLAUDE.md` §2). Reasoning models return a 4xx API err
 
 ---
 
-## Current payload — `gpt-4.1`
+## Current payload — `gpt-4.1-mini`
 
 ```json
 {
-  "model": "gpt-4.1",
+  "model": "gpt-4.1-mini",
   "input": [{"role": "user", "content": [{"type": "input_text", "text": "..."}]}],
   "store": true,
   "text": {"verbosity": "medium"},
@@ -50,19 +50,12 @@ text input: <selected text>
 
 ---
 
-## Reasoning model payloads (reference — not currently wired)
+## Current reasoning payload — `gpt-5.4-mini`
 
-**gpt-5.1**
 ```json
-{"model": "gpt-5.1", "input": [...], "store": true, "text": {"verbosity": "low"}, "reasoning": {"effort": "none", "summary": "auto"}}
+{"model": "gpt-5.4-mini", "input": [...], "store": true, "text": {"verbosity": "low"}, "reasoning": {"effort": "none", "summary": "auto"}}
 ```
 
-**gpt-5-mini**
-```json
-{"model": "gpt-5-mini", "input": [...], "store": true, "text": {"verbosity": "low"}, "reasoning": {"effort": "minimal", "summary": "auto"}}
-```
-
-- `effort: "minimal"` is unique to gpt-5-mini.
 - Correct shape is `reasoning: { effort: ... }`, NOT `reasoning_effort`.
 - `store: true` required for all models.
 

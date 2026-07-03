@@ -15,6 +15,7 @@ internal sealed class CachedSettings
     }
 
     public string? ApiKey => _apiKey;
+    public SettingsStore SettingsStore => _store;
 
     private void OnApiKeyChanged()
     {

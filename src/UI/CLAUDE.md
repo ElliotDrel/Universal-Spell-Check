@@ -44,7 +44,7 @@ UI/
 
 - `SettingsPage.xaml.cs` saves the API key through `SettingsStore`, opens the native log folder, and opens `replacements.json`.
 
-Deferred controls are intentionally **disabled** instead of fake-wired: hotkey capture, model switching, startup toggle, replacements editor. Do not stub these — leave them disabled until real wiring lands.
+Model selection is persisted through `SettingsStore` and applies to the next request. Hotkey capture remains intentionally disabled.
 
 ## Visual verification (after any UI change)
 

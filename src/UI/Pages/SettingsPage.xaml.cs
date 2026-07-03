@@ -8,12 +8,17 @@ internal partial class SettingsPage : Page
     private readonly SettingsStore _settingsStore;
     private readonly DiagnosticsLogger _logger;
     private bool _suppressStartupToggle;
+    private bool _suppressModelSelection = true;
 
     public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger)
     {
         _settingsStore = settingsStore;
         _logger = logger;
         InitializeComponent();
+        var model = OpenAiSpellcheckService.NormalizeModel(_settingsStore.Load().Model);
+        ModelComboBox.SelectedItem = ModelComboBox.Items.OfType<ComboBoxItem>()
+            .First(item => (string)item.Tag == model);
+        _suppressModelSelection = false;
         _suppressStartupToggle = true;
         StartupCheckBox.IsChecked = StartupRegistration.IsRegistered();
         if (BuildChannel.IsDev)
@@ -26,6 +31,16 @@ internal partial class SettingsPage : Page
         ApiKeyBox.ToolTip = _settingsStore.HasApiKey()
             ? "API key saved. Enter a new key to replace it."
             : "Enter your OpenAI API key.";
+    }
+
+    private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressModelSelection || ModelComboBox.SelectedItem is not ComboBoxItem item) return;
+
+        var settings = _settingsStore.Load();
+        settings.Model = (string)item.Tag;
+        _settingsStore.Save(settings);
+        _logger.Log($"model_changed model={settings.Model} dashboard=true");
     }
 
     private void OnSaveApiKeyClicked(object sender, System.Windows.RoutedEventArgs e)
