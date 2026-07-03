@@ -240,7 +240,8 @@ The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-i
 `ActivityPage` uses `NativeActivityLogReader` in `ActivityPage.xaml.cs` (not MVVM binding):
 
 - **Feed:** `ReadEntries(pageSize, cursor)` walks daily `spellcheck-*.jsonl` files newest-first (newest line in each file first). Cursor tracks file index + line index. Page size = 30.
-- **Stats:** `ReadAllTimeStats()` scans all log files for successful runs (`status=success`); accuracy = corrections / checks; day streak from calendar days with at least one success.
+- **Stats:** `ReadAllTimeStats()` scans all log files on a worker thread for successful runs (`status=success`); accuracy = corrections / checks; day streak from calendar days with at least one success.
+- **Responsiveness:** log I/O never runs on the WPF dispatcher. Initial rendering is one page; viewport fill is measured after layout and loads at most one page per dispatcher turn. Hidden side-by-side diffs are created lazily, and diff matrix size is capped for unusually large text.
 - **Refresh:** clears `FeedItems` only (preserves empty state + loading indicator hosts); reloads stats + first page.
 - No file watcher — user refreshes or scrolls to load more. Dashboard is not the hot path.
 

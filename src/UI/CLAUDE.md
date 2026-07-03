@@ -37,6 +37,8 @@ UI/
 
 - **Logs:** `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
 - **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
+- **Threading:** file reads and all-time stats run off-dispatcher. The UI renders one 30-entry page, yields through a completed layout pass, then loads another page only if the measured viewport is still empty or the user scrolls.
+- **Diff cost:** inline diff renders first; side-by-side diff is lazy. LCS work is bounded so a large historical entry cannot freeze the dashboard.
 - **UI:** Flat rows (time | diff | hover actions), day headers (`TODAY` / `YESTERDAY` / date), all-time stats bar, bottom spinner while paginating.
 - **Refresh:** `FeedItems.Children.Clear()` — does not remove `LoadingIndicator` or `EmptyState` hosts.
 
@@ -63,6 +65,7 @@ Model selection is persisted through `SettingsStore` and applies to the next req
 5. Click diff body or copy — corrected text on clipboard; checkmark feedback on copy icon.
 6. On a `text_changed` row, ⋮ → toggle inline vs side-by-side diff.
 7. Trackpad scroll feels smooth; mouse wheel scrolls normally.
+8. Run the Release `--dashboard-smoke` mode against the real log corpus; it must exit 0 without rendering more than the first page or tripping the dispatcher watchdog.
 
 ---
 

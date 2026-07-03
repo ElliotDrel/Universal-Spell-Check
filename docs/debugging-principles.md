@@ -62,6 +62,10 @@ A spell-check run is clean when:
 
 The `--dashboard-smoke` mode (`dotnet run -- --dashboard-smoke`) pumps `DispatcherFrame`s and hooks `Dispatcher.UnhandledException`. A smoke log that says `dashboard_smoke_ok` while the user still sees a crash means the pump duration is too short, not that the code is correct.
 
+The smoke mode also verifies responsiveness, not only exceptions: a background watchdog terminates a blocked dispatcher after 10 seconds; the first activity page must finish within 5 seconds; initial and deferred startup rendering must remain bounded to 30 entries; and a synthetic large-text diff must take the bounded fallback. Run the built Release executable with `Start-Process -Wait` because the project is a Windows GUI executable and direct PowerShell invocation does not reliably wait for process exit.
+
+When pumping WPF for deferred-work assertions, the frame sentinel must run below the work under test. The smoke sentinel uses `DispatcherPriority.ApplicationIdle` so `ContextIdle` viewport-fill callbacks execute before the frame exits; using `Background` would starve them and create a false pass.
+
 ---
 
 ## 6. Simplest solution first (performance priority)

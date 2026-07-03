@@ -124,7 +124,18 @@ Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev ch
 
 ### Activity feed (`ActivityPage`)
 
-Reads the **shared** log corpus (`AppPaths.LogDirectory`, `spellcheck-{yyyy-MM-dd}.jsonl`) — same path for Prod and Dev. Does not use `DiagnosticsLogger` directly at runtime; `NativeActivityLogReader` (in `ActivityPage.xaml.cs`) parses lines containing `spellcheck_detail` JSON blobs.
+Reads the **shared** log corpus (`AppPaths.LogDirectory`, `spellcheck-{yyyy-MM-dd}.jsonl`) — same path for Prod and Dev. `NativeActivityLogReader` (in `ActivityPage.xaml.cs`) parses lines containing `spellcheck_detail` JSON blobs; `DiagnosticsLogger` is used only to record `activity_load_failed` diagnostics.
+
+Startup and pagination are deliberately split across dispatcher turns:
+
+1. `Loaded` starts the all-time statistics scan and first-page read on worker threads.
+2. Only the first 30 parsed entries are materialized into WPF controls initially.
+3. A viewport-fill check is queued at `DispatcherPriority.ContextIdle`, after WPF has measured the new content. It may request one page per dispatcher turn when the measured content does not fill the viewport, then re-measures before deciding whether another page is needed.
+4. Scroll-triggered pages repeat the same read/yield/layout cycle. Pagination must never call itself synchronously.
+5. Inline diffs are the initial view. Side-by-side controls and their second diff pass are created lazily when the user selects that view.
+6. The LCS diff implementation has a matrix-size ceiling. Oversized inputs fall back to whole-text delete/insert segments instead of allocating an unbounded `n * m` matrix on the dispatcher.
+
+This separation is a responsiveness contract. The WinForms message loop and WPF dispatcher share the startup thread; blocking dashboard rendering also blocks window paint, tray interaction, and `WM_HOTKEY` delivery.
 
 | Concern | Implementation |
 |---|---|

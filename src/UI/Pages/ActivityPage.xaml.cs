@@ -28,38 +28,68 @@ internal partial class ActivityPage : Page
     private ActivityLogCursor? _feedCursor;
     private bool _hasMoreEntries = true;
     private bool _isLoadingMore;
+    private bool _viewportFillScheduled;
+    private int _loadGeneration;
     private readonly HashSet<DateTime> _renderedDays = new();
+    private readonly DiagnosticsLogger _logger;
+    private readonly TaskCompletionSource _initialLoadCompleted =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public ActivityPage()
+    internal Task InitialLoadCompleted => _initialLoadCompleted.Task;
+    internal int InitialPageEntryCount { get; private set; }
+    internal int LoadedEntryCount { get; private set; }
+
+    public ActivityPage(DiagnosticsLogger logger)
     {
+        _logger = logger;
         InitializeComponent();
         FeedScrollViewer.ScrollChanged += OnFeedScrollChanged;
-        Loaded += (_, _) => RefreshActivity();
+        Loaded += OnLoaded;
     }
 
-    private void RefreshButton_Click(object sender, RoutedEventArgs e) => RefreshActivity();
-
-    private void RefreshActivity()
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        Loaded -= OnLoaded;
+        await RefreshActivityAsync();
+    }
+
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshActivityAsync();
+
+    private async Task RefreshActivityAsync()
+    {
+        var generation = ++_loadGeneration;
         _feedCursor = null;
         _hasMoreEntries = true;
         _isLoadingMore = false;
+        _viewportFillScheduled = false;
         _renderedDays.Clear();
+        LoadedEntryCount = 0;
 
         FeedItems.Children.Clear();
 
         HideLoadingIndicator();
 
-        var (checks, corrections, dayStreak) = NativeActivityLogReader.ReadAllTimeStats();
-        StatChecks.Text = checks.ToString("N0");
-        StatCorrections.Text = corrections.ToString("N0");
-        StatAccuracy.Text = checks == 0 ? "—" : $"{Math.Round((double)corrections / checks * 100)}%";
-        StatStreak.Text = dayStreak.ToString("N0");
+        var statsTask = Task.Run(NativeActivityLogReader.ReadAllTimeStats);
+        await LoadNextPageAsync(isInitial: true, generation);
 
-        LoadNextPage(isInitial: true);
+        try
+        {
+            var (checks, corrections, dayStreak) = await statsTask;
+            if (generation != _loadGeneration)
+                return;
+
+            StatChecks.Text = checks.ToString("N0");
+            StatCorrections.Text = corrections.ToString("N0");
+            StatAccuracy.Text = checks == 0 ? "—" : $"{Math.Round((double)corrections / checks * 100)}%";
+            StatStreak.Text = dayStreak.ToString("N0");
+        }
+        catch (Exception ex)
+        {
+            LogLoadFailure("stats", ex);
+        }
     }
 
-    private void OnFeedScrollChanged(object sender, ScrollChangedEventArgs e)
+    private async void OnFeedScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (_isLoadingMore || !_hasMoreEntries)
             return;
@@ -67,10 +97,10 @@ internal partial class ActivityPage : Page
         if (e.VerticalOffset + e.ViewportHeight < e.ExtentHeight - LoadMoreScrollThreshold)
             return;
 
-        LoadNextPage(isInitial: false);
+        await LoadNextPageAsync(isInitial: false, _loadGeneration);
     }
 
-    private void LoadNextPage(bool isInitial)
+    private async Task LoadNextPageAsync(bool isInitial, int generation)
     {
         if (_isLoadingMore || !_hasMoreEntries)
             return;
@@ -81,12 +111,20 @@ internal partial class ActivityPage : Page
 
         try
         {
-            var (entries, nextCursor, hasMore) = NativeActivityLogReader.ReadEntries(FeedPageSize, _feedCursor);
+            var cursor = _feedCursor;
+            var (entries, nextCursor, hasMore) = await Task.Run(
+                () => NativeActivityLogReader.ReadEntries(FeedPageSize, cursor));
+            if (generation != _loadGeneration)
+                return;
+
             _feedCursor = nextCursor;
             _hasMoreEntries = hasMore;
 
             if (isInitial)
+            {
+                InitialPageEntryCount = entries.Count;
                 EmptyState.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             if (entries.Count > 0)
             {
@@ -94,25 +132,60 @@ internal partial class ActivityPage : Page
                     PrependEntries(entries);
                 else
                     AppendEntries(entries);
+                LoadedEntryCount += entries.Count;
             }
+
+            if (isInitial)
+                _initialLoadCompleted.TrySetResult();
+        }
+        catch (Exception ex)
+        {
+            LogLoadFailure(isInitial ? "initial_page" : "next_page", ex);
+            if (isInitial)
+                _initialLoadCompleted.TrySetException(ex);
         }
         finally
         {
-            _isLoadingMore = false;
-            HideLoadingIndicator();
-            MaybeFillViewport();
+            if (generation == _loadGeneration)
+            {
+                _isLoadingMore = false;
+                HideLoadingIndicator();
+                ScheduleViewportFill(generation);
+            }
         }
     }
 
-    private void MaybeFillViewport()
+    private void ScheduleViewportFill(int generation)
     {
-        if (!_hasMoreEntries || _isLoadingMore)
+        if (_viewportFillScheduled || !_hasMoreEntries || _isLoadingMore)
             return;
 
-        if (FeedScrollViewer.ScrollableHeight > LoadMoreScrollThreshold)
-            return;
+        _viewportFillScheduled = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(async () =>
+        {
+            _viewportFillScheduled = false;
+            if (generation != _loadGeneration || !_hasMoreEntries || _isLoadingMore)
+                return;
 
-        LoadNextPage(isInitial: false);
+            // Extent/viewport values are valid only after WPF has completed a layout pass.
+            if (FeedScrollViewer.ViewportHeight <= 0 ||
+                FeedScrollViewer.ExtentHeight > FeedScrollViewer.ViewportHeight + LoadMoreScrollThreshold)
+                return;
+
+            await LoadNextPageAsync(isInitial: false, generation);
+        }));
+    }
+
+    private void LogLoadFailure(string stage, Exception ex)
+    {
+        _logger.Log(
+            $"activity_load_failed stage={stage} error_type={ex.GetType().Name} " +
+            $"error=\"{Escape(ex.Message)}\" stack=\"{Escape(ex.ToString())}\"");
+    }
+
+    private static string Escape(string? value)
+    {
+        return (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ");
     }
 
     private void PrependEntries(IReadOnlyList<ActivityEntry> entries)
@@ -240,12 +313,9 @@ internal partial class ActivityPage : Page
         row.Children.Add(timestamp);
 
         var inlineBlock = CreateInlineDiffBlock(entry);
-        var splitBlock = CreateSplitDiffBlock(entry);
-        splitBlock.Visibility = Visibility.Collapsed;
 
         var diffBody = new StackPanel();
         diffBody.Children.Add(inlineBlock);
-        diffBody.Children.Add(splitBlock);
 
         var diffHost = new Border
         {
@@ -310,7 +380,7 @@ internal partial class ActivityPage : Page
         actions.Children.Add(copyButton);
 
         if (entry.TextChanged)
-            actions.Children.Add(CreateDiffViewMenuButton(inlineBlock, splitBlock));
+            actions.Children.Add(CreateDiffViewMenuButton(inlineBlock, diffBody, entry));
 
         diffHost.MouseLeftButtonUp += (_, e) =>
         {
@@ -685,7 +755,10 @@ internal partial class ActivityPage : Page
         return button;
     }
 
-    private WpfButton CreateDiffViewMenuButton(FrameworkElement inlineBlock, FrameworkElement splitBlock)
+    private WpfButton CreateDiffViewMenuButton(
+        FrameworkElement inlineBlock,
+        System.Windows.Controls.Panel diffBody,
+        ActivityEntry entry)
     {
         var inlineItem = new WpfMenuItem
         {
@@ -699,10 +772,19 @@ internal partial class ActivityPage : Page
             IsCheckable = true
         };
 
+        FrameworkElement? splitBlock = null;
+
         void SetDiffView(bool sideBySide)
         {
+            if (sideBySide && splitBlock is null)
+            {
+                splitBlock = CreateSplitDiffBlock(entry);
+                diffBody.Children.Add(splitBlock);
+            }
+
             inlineBlock.Visibility = sideBySide ? Visibility.Collapsed : Visibility.Visible;
-            splitBlock.Visibility = sideBySide ? Visibility.Visible : Visibility.Collapsed;
+            if (splitBlock is not null)
+                splitBlock.Visibility = sideBySide ? Visibility.Visible : Visibility.Collapsed;
             inlineItem.IsChecked = !sideBySide;
             sideBySideItem.IsChecked = sideBySide;
         }

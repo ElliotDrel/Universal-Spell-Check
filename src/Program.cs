@@ -128,6 +128,13 @@ static class Program
             var settingsStore = new SettingsStore(logger);
             var window = new UI.MainWindow(settingsStore, logger);
 
+            using var smokeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            smokeTimeout.Token.Register(() =>
+            {
+                logger.Log("dashboard_smoke_failed reason=dispatcher_timeout timeout_ms=10000");
+                Environment.Exit(1);
+            });
+
             Exception? renderError = null;
             wpfApp.Dispatcher.UnhandledException += (_, e) =>
             {
@@ -136,10 +143,22 @@ static class Program
             };
 
             window.Show();
-            // Pump the dispatcher so layout, resource resolution, and template
-            // expansion actually execute. Show()+Close() alone never ran them,
-            // which is why the smoke test was a false positive.
-            PumpDispatcher(wpfApp.Dispatcher, TimeSpan.FromSeconds(3));
+            PumpDispatcherUntil(
+                wpfApp.Dispatcher,
+                () => window.ActivityPage.InitialLoadCompleted.IsCompleted,
+                TimeSpan.FromSeconds(5));
+
+            if (!window.ActivityPage.InitialLoadCompleted.IsCompletedSuccessfully)
+                throw new TimeoutException("Activity feed did not complete its initial page load within 5 seconds.");
+            if (window.ActivityPage.InitialPageEntryCount > 30)
+                throw new InvalidOperationException("Activity feed rendered more than one page during initial load.");
+
+            // Keep pumping after the initial load to catch deferred layout and resource failures.
+            PumpDispatcher(wpfApp.Dispatcher, TimeSpan.FromMilliseconds(500));
+            if (window.ActivityPage.LoadedEntryCount > 30)
+                throw new InvalidOperationException("Activity feed loaded additional pages without user scrolling.");
+
+            VerifyDiffComplexityGuard();
             window.Close();
             PumpDispatcher(wpfApp.Dispatcher, TimeSpan.FromMilliseconds(250));
 
@@ -171,10 +190,35 @@ static class Program
         {
             var frame = new DispatcherFrame();
             dispatcher.BeginInvoke(
-                DispatcherPriority.Background,
+                DispatcherPriority.ApplicationIdle,
                 new Action(() => frame.Continue = false));
             Dispatcher.PushFrame(frame);
             Thread.Sleep(20);
+        }
+    }
+
+    private static void PumpDispatcherUntil(
+        Dispatcher dispatcher,
+        Func<bool> completed,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!completed() && DateTime.UtcNow < deadline)
+            PumpDispatcher(dispatcher, TimeSpan.FromMilliseconds(20));
+    }
+
+    private static void VerifyDiffComplexityGuard()
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var segments = UI.InlineTextDiff.ComputeChars(new string('a', 10_000), new string('b', 10_000));
+        stopwatch.Stop();
+
+        if (segments.Count != 2 ||
+            segments[0].Kind != UI.TextDiffKind.Delete ||
+            segments[1].Kind != UI.TextDiffKind.Insert ||
+            stopwatch.Elapsed > TimeSpan.FromSeconds(1))
+        {
+            throw new InvalidOperationException("Large-text diff complexity guard failed.");
         }
     }
 

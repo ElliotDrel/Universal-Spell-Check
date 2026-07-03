@@ -115,6 +115,30 @@ Watch `replacements_reload_failed` and `replacements_missing` in logs.
 
 ---
 
+## Activity feed pagination must never recurse before layout
+
+The May 2026 infinite-scroll implementation called `MaybeFillViewport()` directly from `LoadNextPage()`'s `finally` block. WPF had not performed a layout pass, so `ScrollableHeight` remained zero. The method recursively loaded every remaining page on the dispatcher. With 1,587 history entries, startup stopped painting and processing hotkeys for more than a minute; Windows eventually classified the process as `AppHangB1` and closed it. The `dashboard_open step=done` log was misleading because the hang began later in the page's `Loaded` event.
+
+Permanent rules:
+
+- Log reads and all-time statistics scans run through `Task.Run`; do not put filesystem work in a WPF `Loaded`, scroll, or click handler.
+- Initial rendering is exactly one bounded page (currently 30 entries).
+- Viewport-fill checks run at `DispatcherPriority.ContextIdle`, after measurement, and may schedule only one page per dispatcher turn.
+- Never call a page-loading method from its own cleanup path. `_isLoadingMore` prevents overlapping reads; a generation token prevents stale refresh results from mutating current UI state.
+- Do not eagerly create hidden alternate views. The side-by-side diff is constructed only when selected.
+- Any dynamic-programming diff must cap `n * m`; large inputs use a linear fallback.
+- Treat a responsive tray and hotkey as part of dashboard acceptance testing. They share the startup UI thread.
+
+Verification after any activity-feed or startup change:
+
+1. Build Release.
+2. Run `UniversalSpellCheck.exe --dashboard-smoke` with the real `%LocalAppData%\UniversalSpellCheck\logs` corpus.
+3. Require exit code 0. The smoke test enforces a 10-second hard watchdog, a 5-second first-page deadline, at most 30 initial entries, no unsolicited second page after deferred layout, and a bounded large-text diff.
+   The smoke dispatcher's frame sentinel runs at `ApplicationIdle`, below the production `ContextIdle` viewport callback. Raising the sentinel priority would starve the callback and make the deferred-pagination assertion a false positive.
+4. Launch Dev normally and verify the window paints immediately, Ctrl+Alt+D is processed, scrolling loads older entries, refresh remains responsive, and no `activity_load_failed` event appears.
+
+---
+
 ## Dashboard auto-open on startup
 
 `SpellCheckAppContext` hooks `Application.Idle` to auto-open the dashboard once on startup. This surfaces WPF failures immediately rather than requiring the user to find the tray menu. Check `dashboard_auto_open_attempt` and subsequent `dashboard_open step=` entries in the log if the dashboard doesn't appear. Step values: `construct` → `show` → `activate` → `done`. A missing `done` with an error after `construct` means the `MainWindow` constructor or XAML initialization threw.

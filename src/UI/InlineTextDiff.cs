@@ -24,10 +24,23 @@ internal readonly record struct LineDiff(LineDiffKind Kind, string OldLine, stri
 /// </summary>
 internal static class InlineTextDiff
 {
+    // LCS allocates and fills an n*m matrix. Bound it so one unusually large
+    // spellcheck record cannot monopolize the dashboard dispatcher.
+    private const long MaxDiffMatrixCells = 1_000_000;
+
     internal static IReadOnlyList<TextDiffSegment> ComputeChars(string oldText, string newText)
     {
         if (oldText == newText)
             return oldText.Length == 0 ? Array.Empty<TextDiffSegment>() : [new TextDiffSegment(oldText, TextDiffKind.Equal)];
+
+        if ((long)oldText.Length * newText.Length > MaxDiffMatrixCells)
+        {
+            return
+            [
+                new TextDiffSegment(oldText, TextDiffKind.Delete),
+                new TextDiffSegment(newText, TextDiffKind.Insert)
+            ];
+        }
 
         var oldChars = oldText.ToCharArray();
         var newChars = newText.ToCharArray();
@@ -36,6 +49,13 @@ internal static class InlineTextDiff
 
     internal static IReadOnlyList<LineDiff> AlignLines(IReadOnlyList<string> oldLines, IReadOnlyList<string> newLines)
     {
+        if ((long)oldLines.Count * newLines.Count > MaxDiffMatrixCells)
+        {
+            return oldLines.Select(line => new LineDiff(LineDiffKind.Removed, line, ""))
+                .Concat(newLines.Select(line => new LineDiff(LineDiffKind.Added, "", line)))
+                .ToArray();
+        }
+
         var segments = ComputeSequenceDiff(oldLines.ToArray(), newLines.ToArray(), static s => s);
         var lines = new List<LineDiff>();
 

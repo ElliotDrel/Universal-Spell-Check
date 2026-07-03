@@ -58,6 +58,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 5. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
 6. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
 7. **Native retests require rebuild/relaunch.** A code change is not running until the process is stopped and rebuilt. Prod owns Ctrl+Alt+U; Dev owns Ctrl+Alt+D — they can run side by side.
+8. **Dashboard startup work must be bounded and yield to WPF.** Never perform log I/O, corpus-wide scans, recursive pagination, or unbounded diff construction on the dispatcher. Initial feed rendering is capped at one 30-entry page; additional pages may load only after a completed layout pass or user scroll. Run `--dashboard-smoke` against a production-sized log corpus after changing dashboard loading or rendering.
 
 ---
 

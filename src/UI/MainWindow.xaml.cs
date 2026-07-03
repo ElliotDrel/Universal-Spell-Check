@@ -12,7 +12,7 @@ internal partial class MainWindow : Window
     public MainWindow(SettingsStore settingsStore, DiagnosticsLogger logger, UpdateService? updateService = null)
     {
         InitializeComponent();
-        _activityPage = new ActivityPage();
+        _activityPage = new ActivityPage(logger);
         _settingsPage = new SettingsPage(settingsStore, logger);
         _updateService = updateService;
         ContentFrame.Navigate(_activityPage);
@@ -29,6 +29,8 @@ internal partial class MainWindow : Window
             Closed += (_, _) => _updateService.StateChanged -= OnUpdateStateChanged;
         }
     }
+
+    internal ActivityPage ActivityPage => _activityPage;
 
     private void OnNavChecked(object sender, RoutedEventArgs e)
     {
