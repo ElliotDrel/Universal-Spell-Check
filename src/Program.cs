@@ -14,12 +14,15 @@ static class Program
         // build, so it is safe for Dev / dotnet-run.
         VelopackApp.Build().Run();
 
+        var migrationResult = AppPaths.EnsureDataMigration();
+
         if (args.Contains("--dashboard-smoke", StringComparer.OrdinalIgnoreCase))
         {
             return RunDashboardSmoke();
         }
 
         var startupLogger = new DiagnosticsLogger(() => AppPaths.LogPath);
+        startupLogger.Log(migrationResult);
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {

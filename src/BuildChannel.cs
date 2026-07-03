@@ -4,6 +4,9 @@ namespace UniversalSpellCheck;
 
 internal static class BuildChannel
 {
+    public const string SharedDataFolder = "UniversalSpellCheck.Data";
+    public const string LegacyInstallFolder = "UniversalSpellCheck";
+
 #if DEV
     public const bool IsDev = true;
     public const string DisplayName = "Universal Spell Check (Dev)";
@@ -18,7 +21,7 @@ internal static class BuildChannel
     public const bool IsDev = false;
     public const string DisplayName = "Universal Spell Check";
     public const string ChannelName = "prod";
-    public const string AppDataFolder = "UniversalSpellCheck";
+    public const string AppDataFolder = SharedDataFolder;
     public const string MutexName = "UniversalSpellCheck";
     public const string TrayTooltip = "Universal Spell Check";
 

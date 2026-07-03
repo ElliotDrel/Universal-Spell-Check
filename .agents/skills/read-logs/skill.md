@@ -25,7 +25,7 @@ python .claude/skills/read-logs/scripts/logs.py [options]
 
 ## Log file location
 
-`%LOCALAPPDATA%\UniversalSpellCheck\logs\spellcheck-YYYY-MM-DD.jsonl`
+`%LOCALAPPDATA%\UniversalSpellCheck.Data\logs\spellcheck-YYYY-MM-DD.jsonl`
 
 Both `prod` and `dev` channels write to the same files, stamped per-line with `channel` and `app_version`.
 

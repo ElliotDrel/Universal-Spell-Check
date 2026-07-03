@@ -2,7 +2,7 @@
 """
 logs.py - Read and filter Universal Spell Check JSONL logs.
 
-Log files live at: %LOCALAPPDATA%/UniversalSpellCheck/logs/spellcheck-YYYY-MM-DD.jsonl
+Log files live at: %LOCALAPPDATA%/UniversalSpellCheck.Data/logs/spellcheck-YYYY-MM-DD.jsonl
 Each line: {ISO8601} channel={prod|dev} app_version={semver} pid={int} {event} {key=value...}
 spellcheck_detail lines have a JSON blob after the event name.
 """
@@ -14,7 +14,7 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-LOG_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "UniversalSpellCheck" / "logs"
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "UniversalSpellCheck.Data" / "logs"
 
 LINE_RE = re.compile(
     r"^(?P<ts>\S+)\s+channel=(?P<channel>\S+)\s+app_version=(?P<version>\S+)\s+pid=(?P<pid>\d+)\s+(?P<event>\S+)(?:\s+(?P<rest>.*))?$"
@@ -23,6 +23,7 @@ LINE_RE = re.compile(
 ERROR_EVENTS = {
     "request_failed", "request_retrying", "capture_failed", "paste_failed",
     "replacements_reload_failed", "guard_rejected", "connection_warm_failed",
+    "data_migration_failed", "activity_load_failed",
 }
 
 

@@ -19,10 +19,10 @@ Full project context. Routed from root `CLAUDE.md` when overview, stack, or repo
 
 ## Channels
 
-- **Prod** (`Release` config) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck\`. Auto-updates from GitHub Releases.
+- **Prod** (`Release` config) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck.Data\`. Auto-updates from GitHub Releases.
 - **Dev** (`Dev` config, `DEV` compile constant) — Ctrl+Alt+D, mutex `UniversalSpellCheck.Dev`, settings under `%LocalAppData%\UniversalSpellCheck.Dev\`, tray icon orange-tinted. Never auto-updates; updated via `git pull` + `dotnet run -c Dev`.
 
-**Logs are unified across channels:** both write to `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{date}.jsonl`. Every line is stamped with `channel`, `app_version`, and `pid` so downstream tooling can filter while keeping the corpus together for fine-tune use.
+**Logs are unified across channels:** both write to `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl`. Every line is stamped with `channel`, `app_version`, and `pid` so downstream tooling can filter while keeping the corpus together for fine-tune use. `%LocalAppData%\UniversalSpellCheck` is reserved for Velopack installation files and must never hold durable user data.
 
 All channel constants live in `src/BuildChannel.cs` — that file is the canonical source. Never hardcode channel-conditional values elsewhere.
 

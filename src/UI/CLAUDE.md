@@ -35,7 +35,7 @@ UI/
 
 ## Activity feed (data + UX)
 
-- **Logs:** `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
+- **Logs:** `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
 - **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
 - **Threading:** file reads and all-time stats run off-dispatcher. The UI renders one 30-entry page, yields through a completed layout pass, then loads another page only if the measured viewport is still empty or the user scrolls.
 - **Diff cost:** inline diff renders first; side-by-side diff is lazy. LCS work is bounded so a large historical entry cannot freeze the dashboard.
@@ -46,7 +46,7 @@ UI/
 
 - `SettingsPage.xaml.cs` saves the API key through `SettingsStore`, opens the native log folder, and opens `replacements.json`.
 
-Model selection is persisted through `SettingsStore` and applies to the next request. Hotkey capture remains intentionally disabled.
+Model selection is persisted through `SettingsStore` and applies to the next request. GPT-4.1 is the default; GPT-5.4 mini is optional. Hotkey capture remains intentionally disabled.
 
 ## Visual verification (after any UI change)
 

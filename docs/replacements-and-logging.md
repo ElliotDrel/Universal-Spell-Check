@@ -83,10 +83,10 @@ If the model echoes the instruction preamble back in its output, `StripPromptLea
 Both Prod and Dev write to the same directory:
 
 ```
-%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{yyyy-MM-dd}.jsonl
+%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{yyyy-MM-dd}.jsonl
 ```
 
-`AppPaths.LogDirectory` always returns this path regardless of `BuildChannel.AppDataFolder`. Logs are **never split by channel** — the unified corpus is required for fine-tune dataset use.
+`AppPaths.LogDirectory` always returns this path regardless of `BuildChannel.AppDataFolder`. Logs are **never split by channel** — the unified corpus is required for fine-tune dataset use. The `.Data` suffix is mandatory because the unsuffixed directory is owned and replaced by Velopack.
 
 ### Line format
 

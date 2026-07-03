@@ -9,7 +9,7 @@ When root cause is unclear, add logging first, analyze the output, then fix. No 
 3. Reproduce the failure and read the log.
 4. Implement a fix based on data, not assumptions.
 
-Logs live at `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{yyyy-MM-dd}.jsonl`. Both channels write here; filter by `channel=prod` or `channel=dev`. Filter by `pid` to isolate a single run when both are running simultaneously.
+Logs live at `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{yyyy-MM-dd}.jsonl`. Both channels write here; filter by `channel=prod` or `channel=dev`. Filter by `pid` to isolate a single run when both are running simultaneously.
 
 ---
 
@@ -32,7 +32,7 @@ Real example: migrating to a reasoning model passed name/endpoint checks but mis
 ## 3. Native app debugging workflow
 
 1. Confirm which process is running — dev checkout (`dotnet run -c Dev`) or installed Prod. They use different hotkeys and data folders. Check `channel=` and `app_version=` on the first `started` log line.
-2. Read `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{today}.jsonl` before changing code.
+2. Read `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{today}.jsonl` before changing code.
 3. For a capture or paste failure: find the `run_started` → `capture_*` → `replace_succeeded`/`paste_failed` sequence and read `capture_duration_ms`, `copy_attempts`, `request_duration_ms`, `postprocess_duration_ms`, `paste_duration_ms`. A `capture_failed` event inside `spellcheck_detail.events[]` carries per-attempt forensics (sequence numbers, modifier state, foreground exe + elevation) — read those before theorizing. See `docs/watchlist.md` § Capture-failure forensics.
 3a. If a run is missing from the logs entirely (a `hotkey_pressed` with no `run_completed`), grep for `finalize_failed` — a finalize crash erases the run's telemetry.
 4. For a request failure: read `status_code`, `error_code`, and the raw response body logged with `request_failed`.

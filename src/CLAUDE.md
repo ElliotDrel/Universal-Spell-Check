@@ -14,7 +14,7 @@ This is **the product**: a C#/.NET 10 WinForms tray app + WPF dashboard. Select 
 dotnet run --project src/UniversalSpellCheck.csproj -c Dev
 ```
 
-Hotkey: Ctrl+Alt+D. Settings: `%LocalAppData%\UniversalSpellCheck.Dev\`. Logs (shared): `%LocalAppData%\UniversalSpellCheck\logs\`.
+Hotkey: Ctrl+Alt+D. Settings: `%LocalAppData%\UniversalSpellCheck.Dev\`. Logs (shared): `%LocalAppData%\UniversalSpellCheck.Data\logs\`.
 
 ## Run (Release / Prod-like local build)
 
@@ -23,7 +23,7 @@ dotnet publish src/UniversalSpellCheck.csproj -c Release -r win-x64 --self-conta
 publish\UniversalSpellCheck.exe
 ```
 
-Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck\`.
+Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 
 ## Manual Acceptance Checks
 

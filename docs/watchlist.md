@@ -30,6 +30,10 @@ When the next burst happens, read these fields before theorizing. Reproduce with
 
 `VelopackApp.Build().Run()` must be the **very first line of `Main`**, before mutex acquisition, WPF initialization, or any other startup code. Velopack installs first-run hooks and restart-after-update logic that must fire before the app does anything else. Moving it down breaks silent updates and first-run setup. This is a hard constraint, not a style preference.
 
+Immediately after Velopack returns, run `AppPaths.EnsureDataMigration()` before constructing a logger or settings service. Velopack owns `%LocalAppData%\UniversalSpellCheck`; a manual reinstall of v0.6.1 replaced that directory and permanently deleted the historical JSONL corpus that had been stored beneath it. Durable Prod data now belongs in `%LocalAppData%\UniversalSpellCheck.Data`, while Dev settings remain in `%LocalAppData%\UniversalSpellCheck.Dev`. Never point `AppDataDirectory` or `LogDirectory` back at the unsuffixed installer root.
+
+The migration is copy-only and checkpointed. It preserves any surviving legacy files, merges same-day logs without duplicate lines, and does not delete the source. Each startup rechecks files newer than the previous checkpoint so activity written by v0.6.1 during the rollout window is still captured. The checkpoint records migration start time, ensuring writes that race a migration are picked up on the next launch. `data_migration_completed`, `data_migration_skipped`, or `data_migration_failed` is the first native diagnostic written after migration.
+
 ---
 
 ## Clipboard / hotkey timing in `SpellcheckCoordinator`
@@ -132,7 +136,7 @@ Permanent rules:
 Verification after any activity-feed or startup change:
 
 1. Build Release.
-2. Run `UniversalSpellCheck.exe --dashboard-smoke` with the real `%LocalAppData%\UniversalSpellCheck\logs` corpus.
+2. Run `UniversalSpellCheck.exe --dashboard-smoke` with the real `%LocalAppData%\UniversalSpellCheck.Data\logs` corpus.
 3. Require exit code 0. The smoke test enforces a 10-second hard watchdog, a 5-second first-page deadline, at most 30 initial entries, no unsolicited second page after deferred layout, and a bounded large-text diff.
    The smoke dispatcher's frame sentinel runs at `ApplicationIdle`, below the production `ContextIdle` viewport callback. Raising the sentinel priority would starve the callback and make the deferred-pagination assertion a false positive.
 4. Launch Dev normally and verify the window paints immediately, Ctrl+Alt+D is processed, scrolling loads older entries, refresh remains responsive, and no `activity_load_failed` event appears.

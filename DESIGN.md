@@ -176,7 +176,7 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 3. Scrollable feed (`SmoothScrollViewer`, scrollbar hidden): day-grouped rows, infinite scroll
 
 **Feed behavior:**
-- Reads the shared log corpus: `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-*.jsonl`
+- Reads the shared log corpus: `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-*.jsonl`
 - Newest successful `spellcheck_detail` entries first; **30 entries per page**; loads older pages when scrolled near the bottom (~120px) or when content does not fill the viewport
 - Trackpad: smooth per-frame scroll (`SmoothScrollViewer`); mouse wheel: native WPF scroll
 
