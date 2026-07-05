@@ -41,6 +41,16 @@ static class Program
             }
         };
 
+        // Startup smoke: construct the real tray app context (the exact path
+        // that crashed in 0.7.0 when a constructor field-init ordering bug left
+        // _updateService null), then quit. Any exception → exit 1. Wired into
+        // release.yml so a startup-crashing build can never be packed. Runs
+        // before the mutex so it does not false-pass when an instance is live.
+        if (args.Contains("--startup-smoke", StringComparer.OrdinalIgnoreCase))
+        {
+            return RunStartupSmoke(startupLogger);
+        }
+
         using var appMutex = new Mutex(true, BuildChannel.MutexName, out var createdNew);
         if (!createdNew)
         {
@@ -111,6 +121,53 @@ static class Program
                 $"error=\"{Escape(ex.Message)}\" " +
                 $"stack=\"{Escape(ex.ToString())}\"");
             throw;
+        }
+    }
+
+    private static int RunStartupSmoke(DiagnosticsLogger logger)
+    {
+        try
+        {
+            System.Windows.Forms.Application.EnableVisualStyles();
+            System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+
+            var wpfApp = new System.Windows.Application
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown
+            };
+            LoadGlobalWpfResources(wpfApp, logger);
+            logger.Log("wpf_app_initialized");
+
+            SpellCheckAppContext? context = null;
+
+            // Quit the moment the message loop goes idle. This fires only after
+            // the SpellCheckAppContext constructor has fully run — the crash
+            // path we are guarding — so a constructor exception is caught below
+            // and reported as exit 1 before we ever get here. Subscribed before
+            // the context is built so it runs ahead of the context's own Idle
+            // handler (the dashboard auto-open).
+            void QuitOnFirstIdle(object? _, EventArgs __)
+            {
+                System.Windows.Forms.Application.Idle -= QuitOnFirstIdle;
+                context!.ExitThread();
+            }
+            System.Windows.Forms.Application.Idle += QuitOnFirstIdle;
+
+            context = new SpellCheckAppContext();
+            System.Windows.Forms.Application.Run(context);
+
+            Console.WriteLine("startup_smoke_ok");
+            logger.Log("startup_smoke_ok");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            logger.Log(
+                $"startup_smoke_failed error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\" " +
+                $"stack=\"{Escape(ex.ToString())}\"");
+            return 1;
         }
     }
 

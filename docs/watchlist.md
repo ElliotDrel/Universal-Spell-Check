@@ -84,6 +84,20 @@ If you see `wpf_resources_failed` in logs at startup, the dashboard will not wor
 
 ---
 
+## Tray app startup crash — construct order in `SpellCheckAppContext..ctor`
+
+v0.7.0 shipped a `NullReferenceException` that killed the app on **every** launch, on **both** channels. `_notifyIcon` was built with `ContextMenuStrip = BuildMenu()`, and `BuildMenu()` → `BuildVersionLine()` dereferences `_updateService.State` — but `_updateService` was assigned several lines later. The constructor threw before the tray icon or hotkey ever registered, so the app "just never started" and, because startup dies before the update check runs, an already-updated copy cannot self-heal via a later release (it needs a manual reinstall or DLL patch). The bug is channel-independent: Dev would have crashed identically on its first launch — it was simply never started before the Prod tag.
+
+Rules:
+
+- In the constructor, a field that `BuildMenu()`/`BuildVersionLine()` reads (today: `_updateService`) must be assigned **before** the `_notifyIcon` block. Event wiring and the initial `CheckAsync` stay after `BuildMenu()` because `OnUpdateStateChanged` touches `_versionItem`, which `BuildMenu()` creates. Don't reorder one without the other.
+- Never send a change to a Prod tag without launching it once on **some** channel. `dotnet run -c Dev` exercises the same constructor.
+- The `--startup-smoke` mode (`Program.RunStartupSmoke`) constructs the real `SpellCheckAppContext` and self-exits; any constructor exception → exit 1. It is a required, auto-run gate in `release.yml` between Publish and Pack — a startup-crashing build can no longer be packed. `--dashboard-smoke` does **not** cover this: it only builds the WPF `MainWindow`, never the tray context.
+
+Run locally with `UniversalSpellCheck.exe --startup-smoke` (exit 0 = ok). It registers the channel hotkey, so close a running instance of that channel first or it fails on `RegisterHotKey`.
+
+---
+
 ## WPF smoke tests must pump the Dispatcher
 
 `window.Show(); window.Close();` returns before layout, template expansion, and resource resolution run. A smoke test that does only this is a false positive. The `--dashboard-smoke` mode pumps `DispatcherFrame`s for several seconds and hooks `Dispatcher.UnhandledException`. If a smoke test "passes" but the user still sees a crash, distrust the test first.

@@ -41,6 +41,29 @@ jobs:
             /p:FileVersion=${{ steps.ver.outputs.semver }}.0 `
             -o publish
 
+      - name: Startup smoke test
+        shell: pwsh
+        run: |
+          # Launch the published app in --startup-smoke mode: it constructs the
+          # real tray app context (the path that crashed in 0.7.0) and self-exits.
+          # A GUI-subsystem exe does not block PowerShell, so wait explicitly and
+          # read the real exit code. Non-zero or a hang aborts the release before
+          # anything is packed or uploaded.
+          $p = Start-Process -FilePath "publish/UniversalSpellCheck.exe" `
+            -ArgumentList "--startup-smoke" -PassThru
+          try {
+            $p | Wait-Process -Timeout 60 -ErrorAction Stop
+          } catch {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            Write-Error "Startup smoke timed out (>60s) — app hung on launch. Aborting release."
+            exit 1
+          }
+          if ($p.ExitCode -ne 0) {
+            Write-Error "Startup smoke failed (exit $($p.ExitCode)) — app crashes on construction. Aborting release."
+            exit 1
+          }
+          Write-Host "Startup smoke passed (exit 0)."
+
       - name: Install vpk
         run: dotnet tool install --global vpk
 
