@@ -126,10 +126,11 @@ Flat list on the canvas (no card wrapper). One row per successful `spellcheck_de
 
 ```
 [12:34 PM]  [inline diff body — click to copy]     [copy] [⋮]
+[gpt-4.1]
 ─────────────────────────────────────────────────────────────
 ```
 
-- **Timestamp column:** JetBrains Mono 12px (`MonoSmall`), max width 58px, top-aligned
+- **Metadata column:** timestamp in JetBrains Mono 12px (`MonoSmall`) with the exact model ID beneath it in Caption text; max width 96px, top-aligned
 - **Diff body:** character-level inline diff on changed lines (strikethrough + `DiffMinus*` for deletions, green insert for additions); unchanged lines render plain. Rows with `text_changed: false` show output text only.
 - **Actions:** outline copy + vertical-dots icons (`FeedActionIcons`); **opacity 0 until row hover**; row background `HoverGhost` on hover
 - **Copy:** click diff body or copy icon → clipboard gets corrected text; copy icon shows checkmark for 1.5s on success

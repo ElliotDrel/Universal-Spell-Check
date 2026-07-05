@@ -20,8 +20,8 @@ namespace UniversalSpellCheck.UI.Pages;
 
 internal partial class ActivityPage : Page
 {
-    /// <summary>Hard cap for the time column; fits "12:34 PM" in mono without excess gutter.</summary>
-    private const double TimestampColumnMaxWidth = 58;
+    /// <summary>Hard cap for the timestamp and model metadata without excess gutter.</summary>
+    private const double MetadataColumnMaxWidth = 96;
     private const int FeedPageSize = 30;
     private const double LoadMoreScrollThreshold = 120;
 
@@ -294,23 +294,34 @@ internal partial class ActivityPage : Page
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = GridLength.Auto,
-            MaxWidth = TimestampColumnMaxWidth
+            MaxWidth = MetadataColumnMaxWidth
         });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         rowChrome.Child = row;
         rowWrap.Children.Add(rowChrome);
 
-        var timestamp = new TextBlock
+        var metadata = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        metadata.Children.Add(new TextBlock
         {
             Style = (Style)FindResource("MonoSmall"),
             Text = entry.Timestamp.ToLocalTime().ToString("h:mm tt"),
-            Margin = new Thickness(0, 0, 6, 0),
-            VerticalAlignment = VerticalAlignment.Top,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left
-        };
-        Grid.SetColumn(timestamp, 0);
-        row.Children.Add(timestamp);
+        });
+        metadata.Children.Add(new TextBlock
+        {
+            Style = (Style)FindResource("Caption"),
+            Text = entry.Model,
+            Margin = new Thickness(0, 2, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            ToolTip = entry.Model
+        });
+        Grid.SetColumn(metadata, 0);
+        row.Children.Add(metadata);
 
         var inlineBlock = CreateInlineDiffBlock(entry);
 
