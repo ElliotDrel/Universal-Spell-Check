@@ -9,6 +9,7 @@ internal partial class SettingsPage : Page
     private readonly DiagnosticsLogger _logger;
     private bool _suppressStartupToggle;
     private bool _suppressModelSelection = true;
+    private bool _suppressApiKeySelection;
 
     public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger)
     {
@@ -27,10 +28,7 @@ internal partial class SettingsPage : Page
             StartupCheckBox.ToolTip = "Dev builds are launched manually via dotnet run; auto-start is disabled.";
         }
         _suppressStartupToggle = false;
-        ApiKeyBox.Password = "";
-        ApiKeyBox.ToolTip = _settingsStore.HasApiKey()
-            ? "API key saved. Enter a new key to replace it."
-            : "Enter your OpenAI API key.";
+        RefreshApiKeys();
     }
 
     private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -43,9 +41,15 @@ internal partial class SettingsPage : Page
         _logger.Log($"model_changed model={settings.Model} dashboard=true");
     }
 
-    private void OnSaveApiKeyClicked(object sender, System.Windows.RoutedEventArgs e)
+    private void OnAddApiKeyClicked(object sender, System.Windows.RoutedEventArgs e)
     {
+        var name = ApiKeyNameBox.Text.Trim();
         var apiKey = ApiKeyBox.Password.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            ApiKeyStatus.Text = "Enter a name for the API key.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             ApiKeyStatus.Text = "Enter an API key before saving.";
@@ -54,17 +58,79 @@ internal partial class SettingsPage : Page
 
         try
         {
-            _settingsStore.SaveApiKey(apiKey);
+            _settingsStore.AddApiKey(name, apiKey);
+            ApiKeyNameBox.Clear();
             ApiKeyBox.Clear();
-            ApiKeyBox.ToolTip = "API key saved. Enter a new key to replace it.";
-            ApiKeyStatus.Text = "Saved encrypted for this Windows user with DPAPI.";
-            _logger.Log("apikey_saved dashboard=true");
+            RefreshApiKeys();
+            ApiKeyStatus.Text = "Key added and selected.";
+            _logger.Log("apikey_added dashboard=true");
         }
         catch (Exception ex)
         {
-            ApiKeyStatus.Text = "Save failed.";
+            ApiKeyStatus.Text = ex is ArgumentException or InvalidOperationException
+                ? ex.Message
+                : "Save failed.";
             _logger.Log($"apikey_save_failed dashboard=true error=\"{Escape(ex.Message)}\"");
         }
+    }
+
+    private void OnApiKeySelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressApiKeySelection || ApiKeyComboBox.SelectedItem is not ApiKeyInfo selected)
+            return;
+
+        try
+        {
+            _settingsStore.SelectApiKey(selected.Id);
+            ApiKeyStatus.Text = $"Using {selected.Name}.";
+            _logger.Log("apikey_selected dashboard=true");
+        }
+        catch (Exception ex)
+        {
+            ApiKeyStatus.Text = "Selection failed.";
+            _logger.Log($"apikey_select_failed dashboard=true error=\"{Escape(ex.Message)}\"");
+            RefreshApiKeys();
+        }
+    }
+
+    private void OnRemoveApiKeyClicked(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (ApiKeyComboBox.SelectedItem is not ApiKeyInfo selected)
+        {
+            ApiKeyStatus.Text = "Select a key to remove.";
+            return;
+        }
+
+        var answer = System.Windows.MessageBox.Show(
+            $"Remove the key named '{selected.Name}'?",
+            "Remove API key",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+        if (answer != System.Windows.MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            _settingsStore.RemoveApiKey(selected.Id);
+            RefreshApiKeys();
+            ApiKeyStatus.Text = "Key removed.";
+            _logger.Log("apikey_removed dashboard=true");
+        }
+        catch (Exception ex)
+        {
+            ApiKeyStatus.Text = "Remove failed.";
+            _logger.Log($"apikey_remove_failed dashboard=true error=\"{Escape(ex.Message)}\"");
+        }
+    }
+
+    private void RefreshApiKeys()
+    {
+        var keys = _settingsStore.LoadApiKeyInfos();
+        _suppressApiKeySelection = true;
+        ApiKeyComboBox.ItemsSource = keys;
+        ApiKeyComboBox.SelectedItem = keys.FirstOrDefault(key => key.IsActive) ?? keys.FirstOrDefault();
+        _suppressApiKeySelection = false;
+        ApiKeyComboBox.IsEnabled = keys.Count > 0;
     }
 
     private void OnOpenLogsClicked(object sender, System.Windows.RoutedEventArgs e)

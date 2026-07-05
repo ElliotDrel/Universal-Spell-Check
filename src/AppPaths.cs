@@ -72,7 +72,7 @@ internal static class AppPaths
             if (Directory.Exists(legacyDirectory))
             {
                 copiedFiles += CopyIfNewer(legacyDirectory, sharedDataDirectory, "settings.json");
-                copiedFiles += CopyIfNewer(legacyDirectory, sharedDataDirectory, "apikey.dat");
+                copiedFiles += CopyIfMissing(legacyDirectory, sharedDataDirectory, "apikey.dat");
                 copiedFiles += CopyIfNewer(legacyDirectory, sharedDataDirectory, "startup.initialized");
                 copiedFiles += CopyIfNewer(legacyDirectory, sharedDataDirectory, "last-update-check.txt");
 
@@ -131,6 +131,17 @@ internal static class AppPaths
             return 0;
 
         File.Copy(sourcePath, destinationPath, overwrite: true);
+        return 1;
+    }
+
+    private static int CopyIfMissing(string sourceDirectory, string destinationDirectory, string fileName)
+    {
+        var sourcePath = Path.Combine(sourceDirectory, fileName);
+        var destinationPath = Path.Combine(destinationDirectory, fileName);
+        if (!File.Exists(sourcePath) || File.Exists(destinationPath))
+            return 0;
+
+        File.Copy(sourcePath, destinationPath);
         return 1;
     }
 

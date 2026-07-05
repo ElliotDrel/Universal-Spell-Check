@@ -44,7 +44,7 @@ UI/
 
 ## Settings (data)
 
-- `SettingsPage.xaml.cs` saves the API key through `SettingsStore`, opens the native log folder, and opens `replacements.json`.
+- `SettingsPage.xaml.cs` manages named API keys through `SettingsStore`, switches the active key for the next request, opens the native log folder, and opens `replacements.json`. Only masked key identifiers belong in UI; never log or display full keys.
 
 Model selection is persisted through `SettingsStore` and applies to the next request. GPT-4.1 is the default; GPT-5.4 mini is optional. Hotkey capture remains intentionally disabled.
 

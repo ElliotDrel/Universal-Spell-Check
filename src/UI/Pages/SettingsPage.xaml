@@ -135,26 +135,51 @@
             <!-- API key -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource SectionHeader}" Text="API key"/>
-                    <TextBlock Style="{StaticResource BodyL}" Text="OpenAI API key" Margin="0,0,0,8"/>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="API keys"/>
+                    <TextBlock Style="{StaticResource BodyL}" Text="Active key" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ApiKeyComboBox"
+                                  Grid.Column="0"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,12,0"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectionChanged="OnApiKeySelectionChanged"/>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource GhostButton}"
+                                Content="Remove"
+                                Click="OnRemoveApiKeyClicked"/>
+                    </Grid>
+                    <TextBlock Style="{StaticResource BodyL}" Text="Add a key" Margin="0,20,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ApiKeyNameBox"
+                                 Grid.Column="0"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,12,0"
+                                 MaxLength="64"
+                                 Padding="8,6"
+                                 ToolTip="A name that helps you identify this key"/>
                         <PasswordBox x:Name="ApiKeyBox"
-                                     Grid.Column="0"
+                                     Grid.Column="1"
                                      VerticalAlignment="Center"
                                      Margin="0,0,12,0"
                                      Padding="8,6"/>
-                        <Button Grid.Column="1"
+                        <Button Grid.Column="2"
                                 Style="{StaticResource PrimaryButton}"
-                                Content="Save"
-                                Click="OnSaveApiKeyClicked"/>
+                                Content="Add key"
+                                Click="OnAddApiKeyClicked"/>
                     </Grid>
                     <TextBlock x:Name="ApiKeyStatus"
                                Style="{StaticResource Caption}"
-                               Text="Stored encrypted for this Windows user with DPAPI"
+                               Text="Keys are stored encrypted for this Windows user with DPAPI"
                                Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>

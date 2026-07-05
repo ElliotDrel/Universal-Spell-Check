@@ -9,7 +9,9 @@
 
 ## API key storage
 
-Saved through `SettingsStore` using DPAPI `DataProtectionScope.CurrentUser` into `%LocalAppData%\{BuildChannel.AppDataFolder}\apikey.dat`. Never written to `settings.json` or any plain-text file. Prod and Dev keys are isolated by channel (`AppDataFolder` differs).
+Named API keys are saved as one DPAPI-encrypted collection through `SettingsStore` using `DataProtectionScope.CurrentUser` in `%LocalAppData%\{BuildChannel.AppDataFolder}\apikey.dat`. The dashboard shows only each name and a masked identifier derived in memory; full keys are never displayed or logged. The active key can be changed without restarting and applies to the next request.
+
+The collection, including names and active-key selection, is never written to `settings.json` or any plain-text file. Prod and Dev collections remain isolated because `BuildChannel.AppDataFolder` differs. Existing single-key encrypted files load as a `Default` entry and migrate to the collection format on the next key change. Legacy install-directory migration copies `apikey.dat` only when the durable destination is missing, so it cannot replace an existing collection.
 
 ---
 

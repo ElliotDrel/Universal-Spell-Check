@@ -28,7 +28,7 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 ## Manual Acceptance Checks
 
 1. Launch with no saved API key, trigger the hotkey, and verify Settings opens without replacing selected text.
-2. Save a valid API key in Settings.
+2. Add two named API keys in Settings. Verify each shows only a masked identifier, switching the active key applies on the next hotkey request, and Dev retains its own separate list from Prod.
 3. Select misspelled text in Notepad, press the hotkey, verify corrected text replaces the selection.
 4. Select misspelled text in a browser textarea, press the hotkey, verify replacement.
 5. During a request, verify the bottom-center loading overlay appears immediately ("Copying text..."), briefly shows "Sending to AI..." while the request body is written, shows "Waiting for AI..." while awaiting the response, then "Pasting...". Verify the right-aligned elapsed timer starts at `0.0s`, counts up throughout the run, and stops when the overlay disappears. The overlay must not steal focus, and its text must always remain on one line.

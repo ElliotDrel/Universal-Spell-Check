@@ -39,9 +39,9 @@ All channel-specific values live in `BuildChannel` as `const` or static-read-onl
 
 ## Settings isolation vs. unified logs (`src/AppPaths.cs`)
 
-- `AppDataDirectory` — `%LocalAppData%\{BuildChannel.AppDataFolder}`. Prod and Dev are fully isolated for settings and API keys. Prod uses `UniversalSpellCheck.Data`; Dev uses `UniversalSpellCheck.Dev`.
+- `AppDataDirectory` — `%LocalAppData%\{BuildChannel.AppDataFolder}`. Prod and Dev are fully isolated for settings and named API-key collections. Prod uses `UniversalSpellCheck.Data`; Dev uses `UniversalSpellCheck.Dev`.
 - `LogDirectory` — always `%LocalAppData%\UniversalSpellCheck.Data\logs\` regardless of channel. Both channels append to the same daily file `spellcheck-{yyyy-MM-dd}.jsonl`. Every line carries `channel`, `app_version`, and `pid`.
-- `%LocalAppData%\UniversalSpellCheck\` is Velopack's installer-owned root. `AppPaths.EnsureDataMigration()` runs immediately after Velopack bootstrap and copies legacy settings, API key, state, and logs into the safe data root. It rechecks files newer than its checkpoint so writes made by an older installed version during rollout are not missed. Never place durable data back in the installer root; reinstall cleanup may replace it wholesale.
+- `%LocalAppData%\UniversalSpellCheck\` is Velopack's installer-owned root. `AppPaths.EnsureDataMigration()` runs immediately after Velopack bootstrap and copies legacy settings, API key, state, and logs into the safe data root. The API-key file is copied only when the destination is missing, so an old single-key file can never overwrite a named collection. Other migratable files and logs are rechecked against the checkpoint. Never place durable data back in the installer root; reinstall cleanup may replace it wholesale.
 - `ReplacementsPath` — walks up from `AppContext.BaseDirectory` until `replacements.json` is found. Works for both dev checkout (`src/bin/...`) and Velopack-installed prod (file is copied next to the exe at publish time).
 
 ---
@@ -152,7 +152,7 @@ Successful rows require `status=success` with non-empty `input_text` and `output
 
 ### Settings (`SettingsPage`)
 
-Handles API-key save/clear, opens log folder, and opens `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
+Adds, selects, and removes named API keys; only masked identifiers are displayed. Selection refreshes `CachedSettings`, so the next request uses the chosen key. It also opens the log folder and `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
 
 ---
 
