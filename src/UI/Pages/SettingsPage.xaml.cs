@@ -15,15 +15,15 @@ internal partial class SettingsPage : Page
     public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger, UpdateService? updateService = null)
     {
         _settingsStore = settingsStore;
-        _updateService = updateService;
         _logger = logger;
+        _updateService = updateService;
+        InitializeComponent();
         RefreshUpdateDetails();
         if (_updateService is not null)
         {
             _updateService.CheckCompleted += OnUpdateCheckCompleted;
             _updateService.StateChanged += OnUpdateStateChanged;
         }
-        InitializeComponent();
         var model = OpenAiSpellcheckService.NormalizeModel(_settingsStore.Load().Model);
         ModelComboBox.SelectedItem = ModelComboBox.Items.OfType<ComboBoxItem>()
             .First(item => (string)item.Tag == model);
@@ -39,8 +39,6 @@ internal partial class SettingsPage : Page
         RefreshApiKeys();
     }
 
-    private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
     private void OnCheckForUpdatesClicked(object sender, System.Windows.RoutedEventArgs e)
     {
         if (_updateService is null) return;
@@ -79,6 +77,8 @@ internal partial class SettingsPage : Page
         }
     }
 
+    private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
         if (_suppressModelSelection || ModelComboBox.SelectedItem is not ComboBoxItem item) return;
 
         var settings = _settingsStore.Load();

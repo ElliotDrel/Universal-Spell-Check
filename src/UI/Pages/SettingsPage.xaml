@@ -164,6 +164,26 @@
                                  Grid.Column="0"
                                  VerticalAlignment="Center"
                                  Margin="0,0,12,0"
+                                 MaxLength="64"
+                                 Padding="8,6"
+                                 ToolTip="A name that helps you identify this key"/>
+                        <PasswordBox x:Name="ApiKeyBox"
+                                     Grid.Column="1"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,12,0"
+                                     Padding="8,6"/>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource PrimaryButton}"
+                                Content="Add key"
+                                Click="OnAddApiKeyClicked"/>
+                    </Grid>
+                    <TextBlock x:Name="ApiKeyStatus"
+                               Style="{StaticResource Caption}"
+                               Text="Keys are stored encrypted for this Windows user with DPAPI"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
             <!-- Updates -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
@@ -188,26 +208,6 @@
                                 VerticalAlignment="Bottom"
                                 Click="OnCheckForUpdatesClicked"/>
                     </Grid>
-                </StackPanel>
-            </Border>
-
-                                 MaxLength="64"
-                                 Padding="8,6"
-                                 ToolTip="A name that helps you identify this key"/>
-                        <PasswordBox x:Name="ApiKeyBox"
-                                     Grid.Column="1"
-                                     VerticalAlignment="Center"
-                                     Margin="0,0,12,0"
-                                     Padding="8,6"/>
-                        <Button Grid.Column="2"
-                                Style="{StaticResource PrimaryButton}"
-                                Content="Add key"
-                                Click="OnAddApiKeyClicked"/>
-                    </Grid>
-                    <TextBlock x:Name="ApiKeyStatus"
-                               Style="{StaticResource Caption}"
-                               Text="Keys are stored encrypted for this Windows user with DPAPI"
-                               Margin="0,8,0,0"/>
                 </StackPanel>
             </Border>
 
