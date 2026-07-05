@@ -45,6 +45,11 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             // hotkey window is created just below, after the coordinator.
             () => _hotkeyWindow.Handle);
 
+        // Must exist before BuildMenu(): the version line dereferences
+        // _updateService.State. Constructing it here only needs _logger; the
+        // event wiring + initial check stay below, after _versionItem exists.
+        _updateService = new UpdateService(_logger);
+
         _notifyIcon = new Forms.NotifyIcon
         {
             Icon = BuildTrayIcon(),
@@ -58,7 +63,6 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
         _hotkeyWindow.Register(BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk);
 
-        _updateService = new UpdateService(_logger);
         _updateService.StateChanged += OnUpdateStateChanged;
         _updateService.CheckCompleted += OnUpdateCheckCompleted;
         OnUpdateStateChanged(_updateService, _updateService.State);
