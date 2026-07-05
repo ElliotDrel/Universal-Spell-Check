@@ -9,7 +9,7 @@ internal enum UpdateTrigger
     Launch,
     Periodic,
     ManualTray,
-    ManualDashboardButton,
+    ManualDashboard,
 }
 
 internal sealed record CheckCompletedEventArgs(UpdateTrigger Trigger, UpdateState Result);
@@ -47,8 +47,10 @@ internal sealed class UpdateService : IDisposable
     public event EventHandler<CheckCompletedEventArgs>? CheckCompleted;
 
     public DateTimeOffset? LastCheckedAt { get; private set; }
+    public DateTimeOffset? LastUpdatedAt { get; private set; }
 
     private static string LastCheckedPath => Path.Combine(AppPaths.AppDataDirectory, "last-update-check.txt");
+    private static string InstalledVersionPath => Path.Combine(AppPaths.AppDataDirectory, "installed-version.txt");
 
     public UpdateService(DiagnosticsLogger logger)
     {
@@ -62,6 +64,7 @@ internal sealed class UpdateService : IDisposable
         }
 
         LastCheckedAt = LoadLastCheckedAt();
+        LastUpdatedAt = LoadOrRecordInstalledVersion();
 
         try
         {
@@ -138,11 +141,6 @@ internal sealed class UpdateService : IDisposable
 
             SetState(new UpdateState.UpdateReady(latestVersion));
 
-            if (trigger == UpdateTrigger.ManualDashboardButton)
-            {
-                _logger.Log($"update_apply_immediate version={latestVersion}");
-                _manager.ApplyUpdatesAndRestart(_pendingUpdates);
-            }
         }
         catch (Exception ex)
         {
@@ -198,6 +196,34 @@ internal sealed class UpdateService : IDisposable
             _logger.Log(
                 $"update_last_checked_save_failed error_type={ex.GetType().Name} " +
                 $"error=\"{Escape(ex.Message)}\"");
+        }
+    }
+
+    private DateTimeOffset? LoadOrRecordInstalledVersion()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.AppDataDirectory);
+            if (File.Exists(InstalledVersionPath))
+            {
+                var lines = File.ReadAllLines(InstalledVersionPath);
+                if (lines.Length >= 2 && lines[0] == BuildChannel.AppVersion &&
+                    DateTimeOffset.TryParse(lines[1], out var installedAt))
+                {
+                    return installedAt;
+                }
+            }
+
+            var now = DateTimeOffset.Now;
+            File.WriteAllLines(InstalledVersionPath, [BuildChannel.AppVersion, now.ToString("O")]);
+            return now;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                $"update_installed_version_save_failed error_type={ex.GetType().Name} " +
+                $"error=\"{Escape(ex.Message)}\"");
+            return null;
         }
     }
 

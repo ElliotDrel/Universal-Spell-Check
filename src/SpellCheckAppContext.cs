@@ -18,10 +18,10 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly OverlayHost _overlayHost = new();
     private readonly UpdateService _updateService;
     private DashboardWindow? _dashboardWindow;
+    private UpdatePromptForm? _updatePrompt;
     private Forms.ToolStripMenuItem _versionItem = null!;
-    private Forms.ToolStripMenuItem _lastCheckedItem = null!;
     private Forms.ToolStripMenuItem _checkForUpdatesItem = null!;
-    private Forms.ToolStripMenuItem _updateNowItem = null!;
+    private bool _updateNotificationActive;
 
     public SpellCheckAppContext()
     {
@@ -52,6 +52,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildMenu()
         };
+        _notifyIcon.BalloonTipClicked += OnBalloonTipClicked;
 
         _hotkeyWindow = new HotkeyWindow();
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
@@ -85,25 +86,13 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private Forms.ContextMenuStrip BuildMenu()
     {
         var menu = new Forms.ContextMenuStrip();
-        _versionItem = new Forms.ToolStripMenuItem($"v{BuildChannel.AppVersion}") { Enabled = false };
-        _lastCheckedItem = new Forms.ToolStripMenuItem("Last checked: never")
-        {
-            Enabled = false,
-            Visible = !BuildChannel.IsDev,
-        };
+        _versionItem = new Forms.ToolStripMenuItem(BuildVersionLine()) { Enabled = false };
         _checkForUpdatesItem = new Forms.ToolStripMenuItem(
             "Check for Updates",
             null,
             (_, _) => _ = _updateService.CheckAsync(UpdateTrigger.ManualTray));
-        _updateNowItem = new Forms.ToolStripMenuItem(
-            "Update Now",
-            null,
-            (_, _) => _ = _updateService.ApplyUpdatesAndRestartAsync()) { Visible = false };
-
         menu.Items.Add(_versionItem);
-        menu.Items.Add(_lastCheckedItem);
         menu.Items.Add(_checkForUpdatesItem);
-        menu.Items.Add(_updateNowItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Open Dashboard", null, (_, _) => ShowSettings());
         menu.Items.Add("Open Logs Folder", null, (_, _) => OpenLogsFolder());
@@ -111,19 +100,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         // Refresh the relative timestamp each time the menu opens so it does
         // not look stale after the app has been idle.
-        menu.Opening += (_, _) => RefreshLastCheckedLabel();
+        menu.Opening += (_, _) => _versionItem.Text = BuildVersionLine();
         return menu;
-    }
-
-    private void RefreshLastCheckedLabel()
-    {
-        if (_updateService.State is UpdateState.Checking)
-        {
-            _lastCheckedItem.Text = "Checking for updates…";
-            return;
-        }
-
-        _lastCheckedItem.Text = "Last checked: " + FormatLastChecked(_updateService.LastCheckedAt);
     }
 
     private static string FormatLastChecked(DateTimeOffset? when)
@@ -149,6 +127,19 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         return when.Value.LocalDateTime.ToString("yyyy-MM-dd");
     }
 
+    private string BuildVersionLine()
+    {
+        if (_updateService.State is UpdateState.Checking)
+            return $"v{BuildChannel.AppVersion} · Checking…";
+        if (_updateService.State is UpdateState.Downloading downloading)
+            return $"v{BuildChannel.AppVersion} · Downloading {downloading.Version}…";
+        if (_updateService.State is UpdateState.UpdateReady ready)
+            return $"v{BuildChannel.AppVersion} · {ready.Version} ready";
+        return BuildChannel.IsDev
+            ? $"v{BuildChannel.AppVersion}"
+            : $"v{BuildChannel.AppVersion} · Checked {FormatLastChecked(_updateService.LastCheckedAt)}";
+    }
+
     private void OnUpdateCheckCompleted(object? sender, CheckCompletedEventArgs e)
     {
         // Marshal to UI thread for ShowBalloonTip.
@@ -158,7 +149,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             return;
         }
 
-        if (e.Trigger != UpdateTrigger.ManualTray) return;
+        if (e.Trigger is not (UpdateTrigger.ManualTray or UpdateTrigger.ManualDashboard) &&
+            e.Result is not UpdateState.UpdateReady) return;
 
         switch (e.Result)
         {
@@ -166,7 +158,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
                 ShowTip("Up to date", $"You're on the latest version (v{BuildChannel.AppVersion}).");
                 break;
             case UpdateState.UpdateReady ready:
-                ShowTip("Update available", $"v{ready.Version} is ready. Click 'Update Now' in the tray menu to install.");
+                _updateNotificationActive = true;
+                ShowTip("Update ready", $"v{ready.Version} is downloaded. Click to install.");
                 break;
             case UpdateState.Downloading dl:
                 ShowTip("Downloading update", $"Fetching v{dl.Version}…");
@@ -175,6 +168,27 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
                 ShowTip("Update check failed", failed.Reason);
                 break;
         }
+    }
+
+    private void OnBalloonTipClicked(object? sender, EventArgs e)
+    {
+        if (!_updateNotificationActive || _updateService.State is not UpdateState.UpdateReady ready) return;
+        _updateNotificationActive = false;
+        ShowUpdatePrompt(ready.Version);
+    }
+
+    private void ShowUpdatePrompt(string version)
+    {
+        if (_updatePrompt is { IsDisposed: false })
+        {
+            _updatePrompt.Activate();
+            return;
+        }
+
+        _updatePrompt = new UpdatePromptForm(version, () => _ = _updateService.ApplyUpdatesAndRestartAsync());
+        _updatePrompt.FormClosed += (_, _) => _updatePrompt = null;
+        _updatePrompt.Show();
+        _updatePrompt.Activate();
     }
 
     private void OnUpdateStateChanged(object? sender, UpdateState state)
@@ -188,32 +202,24 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         switch (state)
         {
-            case UpdateState.UpdateReady ready:
-                _versionItem.Text = $"v{BuildChannel.AppVersion} — Update available ({ready.Version})";
-                _updateNowItem.Visible = true;
+            case UpdateState.UpdateReady:
                 _checkForUpdatesItem.Enabled = true;
                 break;
             case UpdateState.Checking:
-                _versionItem.Text = $"v{BuildChannel.AppVersion} — Checking…";
-                _updateNowItem.Visible = false;
                 _checkForUpdatesItem.Enabled = false;
                 break;
-            case UpdateState.Downloading dl:
-                _versionItem.Text = $"v{BuildChannel.AppVersion} — Downloading {dl.Version}…";
-                _updateNowItem.Visible = false;
+            case UpdateState.Downloading:
                 _checkForUpdatesItem.Enabled = false;
                 break;
             case UpdateState.Failed:
             case UpdateState.UpToDate:
             case UpdateState.Idle:
             default:
-                _versionItem.Text = $"v{BuildChannel.AppVersion}";
-                _updateNowItem.Visible = false;
                 _checkForUpdatesItem.Enabled = true;
                 break;
         }
 
-        RefreshLastCheckedLabel();
+        _versionItem.Text = BuildVersionLine();
     }
 
     private static System.Drawing.Icon BuildTrayIcon()
@@ -358,7 +364,9 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _hotkeyWindow.HotkeyPressed -= OnHotkeyPressed;
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
+        _notifyIcon.BalloonTipClicked -= OnBalloonTipClicked;
         _notifyIcon.Dispose();
+        _updatePrompt?.Close();
         _dashboardWindow?.Close();
         _overlayHost.Dispose();
         _coordinator.Dispose();
