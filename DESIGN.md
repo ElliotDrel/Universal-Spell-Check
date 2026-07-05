@@ -132,8 +132,9 @@ Flat list on the canvas (no card wrapper). One row per successful `spellcheck_de
 
 - **Metadata column:** timestamp in JetBrains Mono 12px (`MonoSmall`) with the exact model ID beneath it in Caption text; max width 96px, top-aligned
 - **Diff body:** character-level inline diff on changed lines (strikethrough + `DiffMinus*` for deletions, green insert for additions); unchanged lines render plain. Rows with `text_changed: false` show output text only.
-- **Actions:** outline copy + vertical-dots icons (`FeedActionIcons`); **opacity 0 until row hover**; row background `HoverGhost` on hover
+- **Actions:** outline copy, timing clock, and vertical-dots icons (`FeedActionIcons`); **opacity 0 until row hover**; row background `HoverGhost` on hover
 - **Copy:** click diff body or copy icon → clipboard gets corrected text; copy icon shows checkmark for 1.5s on success
+- **Timing clock:** shown when the log entry contains timing telemetry; toggles a compact breakdown panel beneath the diff with clipboard, AI request phases, post-processing, paste, and total duration
 - **⋮ menu** (only when `text_changed`): toggle **Inline diff** vs **Side by side** (per-line char highlights in split columns)
 - Hairline `Border` divider under each row
 

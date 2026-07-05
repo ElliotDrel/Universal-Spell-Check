@@ -141,6 +141,7 @@ The WPF **Home** page (`ActivityPage`) renders successful `spellcheck_detail` ro
 
 - **Included:** `status == "success"` with non-empty `input_text` and `output_text`
 - **Diff display:** uses `input_text` vs `output_text` when `text_changed` is true; otherwise shows `output_text` only
+- **Timing breakdown:** hover a row and click the clock button to expand its persisted pipeline timings (clipboard capture, request construction, AI send/wait/download, post-processing, paste, and total). Older rows without a `timings` object do not show the button.
 - **Stats bar:** all-time counts from every `spellcheck-*.jsonl` file (checks = success lines; corrections = success lines with `text_changed: true`)
 - **Pagination:** 30 entries per page, newest first; not a live tail — refresh or scroll to see new/historical data
 

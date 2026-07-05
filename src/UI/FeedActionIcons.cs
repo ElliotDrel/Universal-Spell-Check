@@ -18,6 +18,8 @@ internal static class FeedActionIcons
 
     public static Viewbox Check() => Wrap(CreateCheckIcon());
 
+    public static Viewbox Clock() => Wrap(CreateClockIcon());
+
     public static Viewbox MoreVertical() => Wrap(CreateMoreIcon());
 
     private static Viewbox Wrap(UIElement content)
@@ -102,6 +104,41 @@ internal static class FeedActionIcons
         };
         BindStroke(check);
         canvas.Children.Add(check);
+        return canvas;
+    }
+
+    private static Canvas CreateClockIcon()
+    {
+        var canvas = new Canvas { Width = CanvasSize, Height = CanvasSize };
+        var face = new Ellipse
+        {
+            Width = 12,
+            Height = 12,
+            StrokeThickness = 1.25,
+            Fill = WpfBrushes.Transparent
+        };
+        Canvas.SetLeft(face, 2);
+        Canvas.SetTop(face, 2);
+        BindStroke(face);
+
+        var hands = new Polyline
+        {
+            Points = new PointCollection
+            {
+                new(8, 4.75),
+                new(8, 8),
+                new(10.5, 9.5)
+            },
+            StrokeThickness = 1.25,
+            Fill = WpfBrushes.Transparent,
+            StrokeLineJoin = PenLineJoin.Round,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round
+        };
+        BindStroke(hands);
+
+        canvas.Children.Add(face);
+        canvas.Children.Add(hands);
         return canvas;
     }
 

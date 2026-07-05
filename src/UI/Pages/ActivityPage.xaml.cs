@@ -290,6 +290,7 @@ internal partial class ActivityPage : Page
             CornerRadius = new CornerRadius(6)
         };
 
+        var rowHost = new StackPanel();
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
@@ -298,7 +299,8 @@ internal partial class ActivityPage : Page
         });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        rowChrome.Child = row;
+        rowHost.Children.Add(row);
+        rowChrome.Child = rowHost;
         rowWrap.Children.Add(rowChrome);
 
         var metadata = new StackPanel
@@ -390,6 +392,9 @@ internal partial class ActivityPage : Page
         };
         actions.Children.Add(copyButton);
 
+        if (entry.Timings.HasValues)
+            actions.Children.Add(CreateTimingButton(rowHost, entry.Timings));
+
         if (entry.TextChanged)
             actions.Children.Add(CreateDiffViewMenuButton(inlineBlock, diffBody, entry));
 
@@ -408,6 +413,97 @@ internal partial class ActivityPage : Page
 
         return rowWrap;
     }
+
+    private WpfButton CreateTimingButton(System.Windows.Controls.Panel rowHost, ActivityTimings timings)
+    {
+        FrameworkElement? timingPanel = null;
+        var button = CreateIconButton(FeedActionIcons.Clock(), "Show timing breakdown");
+
+        button.Click += (_, e) =>
+        {
+            if (timingPanel is null)
+            {
+                timingPanel = CreateTimingPanel(timings);
+                rowHost.Children.Add(timingPanel);
+            }
+
+            var show = timingPanel.Visibility != Visibility.Visible;
+            timingPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            button.ToolTip = show ? "Hide timing breakdown" : "Show timing breakdown";
+            e.Handled = true;
+        };
+
+        return button;
+    }
+
+    private FrameworkElement CreateTimingPanel(ActivityTimings timings)
+    {
+        var values = new (string Label, double? Milliseconds)[]
+        {
+            ("Clipboard capture", timings.ClipboardMs),
+            ("Terminal cleanup", timings.NormalizationMs),
+            ("Build request", timings.PayloadMs),
+            ("AI round trip", timings.ApiMs ?? timings.RequestMs),
+            ("Send request", timings.RequestSendMs),
+            ("Wait for AI", timings.RequestWaitMs),
+            ("Download response", timings.ResponseDownloadMs),
+            ("Parse response", timings.ParseMs),
+            ("Replacements", timings.ReplacementsMs),
+            ("Prompt guard", timings.PromptGuardMs),
+            ("Paste", timings.PasteMs),
+            ("Total", timings.TotalMs)
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var row = 0;
+        foreach (var (label, milliseconds) in values)
+        {
+            if (milliseconds is null)
+                continue;
+
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var labelBlock = new TextBlock
+            {
+                Style = (Style)FindResource("Caption"),
+                Text = label,
+                Margin = new Thickness(0, 2, 20, 2)
+            };
+            var valueBlock = new TextBlock
+            {
+                Style = (Style)FindResource("MonoSmall"),
+                Text = FormatMilliseconds(milliseconds.Value),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+            Grid.SetRow(labelBlock, row);
+            Grid.SetRow(valueBlock, row);
+            Grid.SetColumn(valueBlock, 1);
+            grid.Children.Add(labelBlock);
+            grid.Children.Add(valueBlock);
+            row++;
+        }
+
+        return new Border
+        {
+            Background = (WpfBrush)FindResource("Surface"),
+            BorderBrush = (WpfBrush)FindResource("Border"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 8, 12, 8),
+            Margin = new Thickness(MetadataColumnMaxWidth + 10, 8, 36, 4),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Visibility = Visibility.Collapsed,
+            Child = grid
+        };
+    }
+
+    private static string FormatMilliseconds(double milliseconds)
+        => milliseconds >= 1000
+            ? $"{milliseconds / 1000:0.00} s"
+            : $"{milliseconds:0.##} ms";
 
     private FrameworkElement CreateInlineDiffBlock(ActivityEntry entry)
     {
@@ -851,7 +947,31 @@ internal sealed record ActivityEntry(
     string Model,
     string InputText,
     string OutputText,
-    bool TextChanged);
+    bool TextChanged,
+    ActivityTimings Timings);
+
+internal sealed record ActivityTimings(
+    double? ClipboardMs,
+    double? NormalizationMs,
+    double? PayloadMs,
+    double? RequestMs,
+    double? ApiMs,
+    double? RequestSendMs,
+    double? RequestWaitMs,
+    double? ResponseDownloadMs,
+    double? ParseMs,
+    double? ReplacementsMs,
+    double? PromptGuardMs,
+    double? PasteMs,
+    double? TotalMs)
+{
+    public bool HasValues =>
+        ClipboardMs is not null || NormalizationMs is not null || PayloadMs is not null ||
+        RequestMs is not null || ApiMs is not null || RequestSendMs is not null ||
+        RequestWaitMs is not null || ResponseDownloadMs is not null || ParseMs is not null ||
+        ReplacementsMs is not null || PromptGuardMs is not null || PasteMs is not null ||
+        TotalMs is not null;
+}
 
 internal sealed class ActivityLogCursor
 {
@@ -1037,7 +1157,8 @@ internal static class NativeActivityLogReader
                 GetString(root, "model", "unknown"),
                 input,
                 output,
-                GetBool(root, "text_changed"));
+                GetBool(root, "text_changed"),
+                ParseTimings(root));
             return true;
         }
         catch
@@ -1053,4 +1174,30 @@ internal static class NativeActivityLogReader
 
     private static bool GetBool(JsonElement root, string name)
         => root.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+
+    private static ActivityTimings ParseTimings(JsonElement root)
+    {
+        if (!root.TryGetProperty("timings", out var timings) || timings.ValueKind != JsonValueKind.Object)
+            return new ActivityTimings(null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+        return new ActivityTimings(
+            GetNumber(timings, "clipboard_ms"),
+            GetNumber(timings, "norm_ms"),
+            GetNumber(timings, "payload_ms"),
+            GetNumber(timings, "request_ms"),
+            GetNumber(timings, "api_ms"),
+            GetNumber(timings, "request_send_ms"),
+            GetNumber(timings, "request_wait_ms"),
+            GetNumber(timings, "response_download_ms"),
+            GetNumber(timings, "parse_ms"),
+            GetNumber(timings, "replacements_ms"),
+            GetNumber(timings, "prompt_guard_ms"),
+            GetNumber(timings, "paste_ms"),
+            GetNumber(timings, "total_ms"));
+    }
+
+    private static double? GetNumber(JsonElement root, string name)
+        => root.TryGetProperty(name, out var p) && p.TryGetDouble(out var value)
+            ? value
+            : null;
 }

@@ -39,7 +39,7 @@ UI/
 - **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
 - **Threading:** file reads and all-time stats run off-dispatcher. The UI renders one 30-entry page, yields through a completed layout pass, then loads another page only if the measured viewport is still empty or the user scrolls.
 - **Diff cost:** inline diff renders first; side-by-side diff is lazy. LCS work is bounded so a large historical entry cannot freeze the dashboard.
-- **UI:** Flat rows (time + model | diff | hover actions), day headers (`TODAY` / `YESTERDAY` / date), all-time stats bar, bottom spinner while paginating.
+- **UI:** Flat rows (time + model | diff | hover actions), expandable per-row timing breakdowns, day headers (`TODAY` / `YESTERDAY` / date), all-time stats bar, bottom spinner while paginating.
 - **Refresh:** `FeedItems.Children.Clear()` — does not remove `LoadingIndicator` or `EmptyState` hosts.
 
 ## Settings (data)
@@ -62,11 +62,12 @@ Model selection is persisted through `SettingsStore` and applies to the next req
 2. Scroll to bottom — spinner appears; older entries append; day headers dedupe across pages.
 3. Click **↻ Refresh** — feed and stats reload; scroll-to-load still works afterward.
 4. Confirm each row shows the exact model ID used for that spell check beneath its timestamp.
-5. Hover a row — ghost background, copy and ⋮ icons visible.
+5. Hover a row — ghost background and copy/timing/⋮ icons visible (⋮ appears only for changed text; timing appears only when telemetry exists).
 6. Click diff body or copy — corrected text on clipboard; checkmark feedback on copy icon.
-7. On a `text_changed` row, ⋮ → toggle inline vs side-by-side diff.
-8. Trackpad scroll feels smooth; mouse wheel scrolls normally.
-9. Run the Release `--dashboard-smoke` mode against the real log corpus; it must exit 0 without rendering more than the first page or tripping the dispatcher watchdog.
+7. Click the timing clock — the pipeline breakdown expands beneath the row; click again to collapse it.
+8. On a `text_changed` row, ⋮ → toggle inline vs side-by-side diff.
+9. Trackpad scroll feels smooth; mouse wheel scrolls normally.
+10. Run the Release `--dashboard-smoke` mode against the real log corpus; it must exit 0 without rendering more than the first page or tripping the dispatcher watchdog.
 
 ---
 
