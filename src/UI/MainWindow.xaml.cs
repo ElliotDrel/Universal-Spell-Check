@@ -13,7 +13,7 @@ internal partial class MainWindow : Window
     {
         InitializeComponent();
         _activityPage = new ActivityPage(logger);
-        _settingsPage = new SettingsPage(settingsStore, logger);
+        _settingsPage = new SettingsPage(settingsStore, logger, updateService);
         _updateService = updateService;
         ContentFrame.Navigate(_activityPage);
 
@@ -26,7 +26,11 @@ internal partial class MainWindow : Window
         {
             _updateService.StateChanged += OnUpdateStateChanged;
             ApplyUpdateState(_updateService.State);
-            Closed += (_, _) => _updateService.StateChanged -= OnUpdateStateChanged;
+            Closed += (_, _) =>
+            {
+                _updateService.StateChanged -= OnUpdateStateChanged;
+                _settingsPage.DisposeUpdateEvents();
+            };
         }
     }
 
@@ -54,6 +58,7 @@ internal partial class MainWindow : Window
 
     private void ApplyUpdateState(UpdateState state)
     {
+        VersionCheckButton.IsEnabled = state is not (UpdateState.Checking or UpdateState.Downloading) && !BuildChannel.IsDev;
         if (state is UpdateState.UpdateReady ready)
         {
             UpdateBannerText.Text = $"Update available — v{ready.Version}";
@@ -69,5 +74,11 @@ internal partial class MainWindow : Window
     {
         if (_updateService is null) return;
         _ = _updateService.ApplyUpdatesAndRestartAsync();
+    }
+
+    private void OnCheckForUpdatesClicked(object sender, RoutedEventArgs e)
+    {
+        if (_updateService is null) return;
+        _ = _updateService.CheckAsync(UpdateTrigger.ManualDashboard);
     }
 }

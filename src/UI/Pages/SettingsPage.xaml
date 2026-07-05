@@ -164,6 +164,33 @@
                                  Grid.Column="0"
                                  VerticalAlignment="Center"
                                  Margin="0,0,12,0"
+            <!-- Updates -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Updates"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource BodyMuted}" Text="Current version"/>
+                            <TextBlock x:Name="CurrentVersionText" Style="{StaticResource BodyL}"/>
+                            <TextBlock Style="{StaticResource BodyMuted}" Text="Last updated" Margin="0,10,0,0"/>
+                            <TextBlock x:Name="LastUpdatedText" Style="{StaticResource BodyL}"/>
+                            <TextBlock Style="{StaticResource BodyMuted}" Text="Last checked" Margin="0,10,0,0"/>
+                            <TextBlock x:Name="LastCheckedText" Style="{StaticResource BodyL}"/>
+                        </StackPanel>
+                        <Button x:Name="CheckForUpdatesButton"
+                                Grid.Column="1"
+                                Style="{StaticResource PrimaryButton}"
+                                Content="Check for updates"
+                                VerticalAlignment="Bottom"
+                                Click="OnCheckForUpdatesClicked"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
                                  MaxLength="64"
                                  Padding="8,6"
                                  ToolTip="A name that helps you identify this key"/>

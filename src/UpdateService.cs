@@ -26,7 +26,7 @@ internal abstract record UpdateState
 
 /// <summary>
 /// Single, unified update flow. Every UI affordance — launch check, periodic
-/// timer, tray "Check for Updates", dashboard "Update Now" — funnels into
+/// timer, tray check, and dashboard checks — funnels into
 /// <see cref="CheckAsync(UpdateTrigger)"/>. There are intentionally no
 /// parallel implementations.
 /// </summary>

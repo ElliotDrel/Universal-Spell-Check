@@ -7,14 +7,22 @@ internal partial class SettingsPage : Page
 {
     private readonly SettingsStore _settingsStore;
     private readonly DiagnosticsLogger _logger;
+    private readonly UpdateService? _updateService;
     private bool _suppressStartupToggle;
     private bool _suppressModelSelection = true;
     private bool _suppressApiKeySelection;
 
-    public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger)
+    public SettingsPage(SettingsStore settingsStore, DiagnosticsLogger logger, UpdateService? updateService = null)
     {
         _settingsStore = settingsStore;
+        _updateService = updateService;
         _logger = logger;
+        RefreshUpdateDetails();
+        if (_updateService is not null)
+        {
+            _updateService.CheckCompleted += OnUpdateCheckCompleted;
+            _updateService.StateChanged += OnUpdateStateChanged;
+        }
         InitializeComponent();
         var model = OpenAiSpellcheckService.NormalizeModel(_settingsStore.Load().Model);
         ModelComboBox.SelectedItem = ModelComboBox.Items.OfType<ComboBoxItem>()
@@ -33,6 +41,44 @@ internal partial class SettingsPage : Page
 
     private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+    private void OnCheckForUpdatesClicked(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_updateService is null) return;
+        _ = _updateService.CheckAsync(UpdateTrigger.ManualDashboard);
+    }
+
+    private void OnUpdateCheckCompleted(object? sender, CheckCompletedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(RefreshUpdateDetails);
+    }
+
+    private void OnUpdateStateChanged(object? sender, UpdateState state)
+    {
+        Dispatcher.BeginInvoke(() =>
+            CheckForUpdatesButton.IsEnabled = state is not (UpdateState.Checking or UpdateState.Downloading) &&
+                                              !BuildChannel.IsDev);
+    }
+
+    private void RefreshUpdateDetails()
+    {
+        CurrentVersionText.Text = $"v{BuildChannel.AppVersion}";
+        LastUpdatedText.Text = FormatTimestamp(_updateService?.LastUpdatedAt);
+        LastCheckedText.Text = FormatTimestamp(_updateService?.LastCheckedAt);
+        CheckForUpdatesButton.IsEnabled = !BuildChannel.IsDev && _updateService is not null;
+    }
+
+    private static string FormatTimestamp(DateTimeOffset? value) =>
+        value?.LocalDateTime.ToString("MMM d, yyyy 'at' h:mm tt") ?? "Never";
+
+    internal void DisposeUpdateEvents()
+    {
+        if (_updateService is not null)
+        {
+            _updateService.CheckCompleted -= OnUpdateCheckCompleted;
+            _updateService.StateChanged -= OnUpdateStateChanged;
+        }
+    }
+
         if (_suppressModelSelection || ModelComboBox.SelectedItem is not ComboBoxItem item) return;
 
         var settings = _settingsStore.Load();

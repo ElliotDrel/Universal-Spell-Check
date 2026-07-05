@@ -51,7 +51,7 @@
                 <Button x:Name="UpdateNowButton"
                         Grid.Column="1"
                         Style="{StaticResource PrimaryButton}"
-                        Content="Update Now"
+                        Content="Install now"
                         Click="OnUpdateNowClicked"/>
             </Grid>
         </Border>
@@ -88,10 +88,20 @@
                 <RadioButton x:Name="HelpNav"
                              Style="{StaticResource NavItem}"
                              Content="Help"/>
-                <TextBlock x:Name="VersionLabel"
-                           Style="{StaticResource Caption}"
-                           Text="Version"
-                           Margin="12,8,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="12,8,0,0">
+                    <TextBlock x:Name="VersionLabel"
+                               Style="{StaticResource Caption}"
+                               Text="Version"
+                               VerticalAlignment="Center"/>
+                    <Button x:Name="VersionCheckButton"
+                            Content="↻"
+                            Width="24"
+                            Height="24"
+                            Padding="0"
+                            Margin="6,0,0,0"
+                            ToolTip="Check for updates"
+                            Click="OnCheckForUpdatesClicked"/>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
