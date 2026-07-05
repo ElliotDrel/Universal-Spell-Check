@@ -9,7 +9,7 @@ The product is a C#/.NET 10 WinForms tray app with an embedded WPF dashboard, li
 ## Startup sequence (`src/Program.cs`)
 
 1. `VelopackApp.Build().Run()` — **must be the very first line of `Main`**. Handles first-run hooks and restart-after-update. Safe no-op when running via `dotnet run`.
-2. `AppPaths.EnsureDataMigration()` creates the safe data roots and performs the one-time copy out of the legacy Velopack directory before any logger or settings service opens a file.
+2. `AppPaths.EnsureDataMigration()` creates the safe data roots and copies or merges legacy Velopack-directory data newer than the previous migration checkpoint before any logger or settings service opens a file.
 3. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0.
 4. Instantiate `System.Windows.Application` with `ShutdownMode.OnExplicitShutdown`. Merge `UI/Styles.xaml` and `UI/Components.xaml` into `app.Resources`. **Without this step**, WPF `DynamicResource` lookups crash (see watchlist).
 5. `Application.Run(new SpellCheckAppContext())` — starts the WinForms message loop.
@@ -41,7 +41,7 @@ All channel-specific values live in `BuildChannel` as `const` or static-read-onl
 
 - `AppDataDirectory` — `%LocalAppData%\{BuildChannel.AppDataFolder}`. Prod and Dev are fully isolated for settings and API keys. Prod uses `UniversalSpellCheck.Data`; Dev uses `UniversalSpellCheck.Dev`.
 - `LogDirectory` — always `%LocalAppData%\UniversalSpellCheck.Data\logs\` regardless of channel. Both channels append to the same daily file `spellcheck-{yyyy-MM-dd}.jsonl`. Every line carries `channel`, `app_version`, and `pid`.
-- `%LocalAppData%\UniversalSpellCheck\` is Velopack's installer-owned root. `AppPaths.EnsureDataMigration()` runs immediately after Velopack bootstrap and copies legacy settings, API key, state, and logs into the safe data root once. Never place durable data back in the installer root; reinstall cleanup may replace it wholesale.
+- `%LocalAppData%\UniversalSpellCheck\` is Velopack's installer-owned root. `AppPaths.EnsureDataMigration()` runs immediately after Velopack bootstrap and copies legacy settings, API key, state, and logs into the safe data root. It rechecks files newer than its checkpoint so writes made by an older installed version during rollout are not missed. Never place durable data back in the installer root; reinstall cleanup may replace it wholesale.
 - `ReplacementsPath` — walks up from `AppContext.BaseDirectory` until `replacements.json` is found. Works for both dev checkout (`src/bin/...`) and Velopack-installed prod (file is copied next to the exe at publish time).
 
 ---

@@ -28,7 +28,7 @@ All channel constants live in `src/BuildChannel.cs` — that file is the canonic
 
 ## Primary files
 
-- `src/Program.cs` — entrypoint. `VelopackApp.Run()` first, then mutex + tray bootstrap.
+- `src/Program.cs` — entrypoint. `VelopackApp.Run()` first, safe-data migration second, then mutex + tray bootstrap.
 - `src/BuildChannel.cs` — Prod/Dev constants: hotkey, mutex, paths, version, display strings.
 - `src/AppPaths.cs` — settings/API isolated per channel; logs shared.
 - `src/UpdateService.cs` — single unified update flow (Launch / Periodic / ManualTray / ManualDashboard).
