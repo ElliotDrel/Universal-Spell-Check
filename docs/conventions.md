@@ -7,7 +7,7 @@
 **Naming:**
 - PascalCase for types, public members, and constants.
 - `_camelCase` for private readonly fields.
-- snake_case for JSONL log event names and field keys: `replace_succeeded`, `input_len`, `request_duration_ms`.
+- snake_case for JSONL log event names and field keys: `run_completed`, `input_len`, `request_ms`.
 
 **Nullability:** nullable reference types enabled. Use `?` and null-checks; avoid `!` suppression unless provably safe.
 

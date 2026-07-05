@@ -122,7 +122,7 @@ Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev ch
 
 ### Activity feed (`ActivityPage`)
 
-Reads the **shared** log corpus (`AppPaths.LogDirectory`, `spellcheck-{yyyy-MM-dd}.jsonl`) — same path for Prod and Dev. `NativeActivityLogReader` (in `ActivityPage.xaml.cs`) parses lines containing `spellcheck_detail` JSON blobs; `DiagnosticsLogger` is used only to record `activity_load_failed` diagnostics.
+Reads the **shared** log corpus (`AppPaths.LogDirectory`, `spellcheck-{yyyy-MM-dd}.jsonl`) — same path for Prod and Dev. `NativeActivityLogReader` (in `ActivityPage.xaml.cs`) parses lines containing `spellcheck_detail` JSON blobs, including their optional `timings` objects; `DiagnosticsLogger` is used only to record `activity_load_failed` diagnostics. Rows with timing telemetry show a hover clock that lazily creates and toggles a compact phase breakdown. Older entries without timings render normally without the clock.
 
 Startup and pagination are deliberately split across dispatcher turns:
 

@@ -85,5 +85,5 @@ On parse failure (`output_text` empty or absent): logs `parse_failed empty_outpu
 For any model change, also verify:
 - Persistent `HttpClient` remains app-lifetime; do not recreate it per hotkey press.
 - Failure paths still return a `SpellcheckResult` and do not paste over the user's selected text.
-- Logs include `request_duration_ms`, `request_attempts`, `status_code`, and `error_code` for failures.
+- Logs include `request_ms`, `request_attempts`, `status_code`, and `error_code` for failures.
 - Post-processing (`TextPostProcessor`) still runs after successful model output and before paste.

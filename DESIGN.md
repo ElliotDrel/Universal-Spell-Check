@@ -125,7 +125,7 @@ Used to render `[Ctrl] + [Alt] + [U]`:
 Flat list on the canvas (no card wrapper). One row per successful `spellcheck_detail` entry:
 
 ```
-[12:34 PM]  [inline diff body — click to copy]     [copy] [⋮]
+[12:34 PM]  [inline diff body — click to copy]     [copy] [clock] [⋮]
 [gpt-4.1]
 ─────────────────────────────────────────────────────────────
 ```
@@ -270,3 +270,4 @@ After visual changes, verify in this order:
 | 2026-04-27 | Nav scope: Home + Settings only for v1 | Insights deferred — build the activity feed first, fold deeper analytics in later if needed. |
 | 2026-05-27 | Flat Activity feed + all-time stats bar | Wispr Flow–style layout: no feed card, inline char diff, hover actions, paginated infinite scroll (30/page), `SmoothScrollViewer` for trackpad. Mockup `home.png` remains tone reference only. |
 | 2026-05-27 | Inline diff replaces stacked +/- rows | Character-level highlights within lines; side-by-side view optional per row via ⋮ menu. |
+| 2026-07-05 | Activity rows expose persisted timing telemetry | A hover clock lazily expands the clipboard, AI request, post-processing, paste, and total durations without adding hot-path work. |

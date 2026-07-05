@@ -42,7 +42,7 @@ The migration is copy-only and checkpointed. It preserves any surviving legacy f
 
 - `capture_failed reason="Clipboard did not change after Ctrl+C."` — the key-release wait may have been too short, or the target app didn't respond to Ctrl+C.
 - `capture_failed reason="Copied selection was empty."` when text was actually selected — same timing issue, or the app uses a non-clipboard copy path.
-- Unexpectedly high `capture_duration_ms`.
+- Unexpectedly high `clipboard_ms`.
 - Repeated `copy_attempts=2`.
 - `paste_failed` with `expected_process` ≠ `actual_process` — the target app lost focus during the API request; this is not a capture failure, do not treat it as one.
 
