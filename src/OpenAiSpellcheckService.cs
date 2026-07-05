@@ -11,7 +11,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
 {
     private const string Endpoint = "https://api.openai.com/v1/responses";
     private const string ModelsEndpoint = "https://api.openai.com/v1/models";
-    public const string DefaultModel = "gpt-4.1-mini";
+    public const string DefaultModel = "gpt-4.1";
     public const string Gpt54MiniModel = "gpt-5.4-mini";
 
     // AHK-canonical instruction text — keep byte-for-byte identical to legacy.

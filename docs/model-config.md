@@ -5,7 +5,7 @@
 
 ## Current caller
 
-`src/OpenAiSpellcheckService.cs` — persistent app-lifetime `HttpClient`, sends directly to the Responses API. Settings supports `gpt-4.1-mini` (default) and `gpt-5.4-mini`; changes apply to the next request.
+`src/OpenAiSpellcheckService.cs` — persistent app-lifetime `HttpClient`, sends directly to the Responses API. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
 ## API key storage
 
@@ -15,7 +15,7 @@ Saved through `SettingsStore` using DPAPI `DataProtectionScope.CurrentUser` into
 
 ## Standard vs. Reasoning models — do not mix parameters
 
-| Feature | Standard (`gpt-4.1-mini`) | Reasoning (`gpt-5.4-mini`) |
+| Feature | Standard (`gpt-4.1`) | Reasoning (`gpt-5.4-mini`) |
 |---|---|---|
 | `temperature` | Yes | **No — API error if present** |
 | `top_p`, penalties, `logprobs` | Yes | No |
@@ -27,11 +27,11 @@ This is a hard rule (see `CLAUDE.md` §2). Reasoning models return a 4xx API err
 
 ---
 
-## Current payload — `gpt-4.1-mini`
+## Current payload — `gpt-4.1`
 
 ```json
 {
-  "model": "gpt-4.1-mini",
+  "model": "gpt-4.1",
   "input": [{"role": "user", "content": [{"type": "input_text", "text": "..."}]}],
   "store": true,
   "text": {"verbosity": "medium"},

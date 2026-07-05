@@ -78,7 +78,7 @@
                                   VerticalAlignment="Center"
                                   Width="160"
                                   SelectionChanged="OnModelSelectionChanged">
-                            <ComboBoxItem Content="4.1 mini" Tag="gpt-4.1-mini"/>
+                            <ComboBoxItem Content="GPT-4.1" Tag="gpt-4.1"/>
                             <ComboBoxItem Content="5.4 mini" Tag="gpt-5.4-mini"/>
                         </ComboBox>
                     </Grid>

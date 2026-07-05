@@ -188,7 +188,7 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 **Layout:** Page header "Settings" (Instrument Serif 32px) → vertical stack of section cards:
 
 1. **Hotkey** — current hotkey shown as keyboard chips. Runtime hotkey changes are deferred.
-2. **Model** — choose `gpt-4.1-mini` or `gpt-5.4-mini`; changes apply to the next request.
+2. **Model** — choose `gpt-4.1` (default) or `gpt-5.4-mini`; changes apply to the next request.
 3. **Replacements** — "Edit list" button → opens replacements editor; shows entry count
 4. **Startup** — "Start on login" toggle
 5. **API key** — masked password input with "Save" button; helper text "Stored encrypted for this Windows user with DPAPI"
