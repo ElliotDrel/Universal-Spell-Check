@@ -51,13 +51,9 @@ All channel-specific values live in `BuildChannel` as `const` or static-read-onl
 Owns all long-lived objects: `NotifyIcon`, `HotkeyWindow`, `SpellcheckCoordinator`, `UpdateService`, `LoadingOverlayForm`, and the WPF `MainWindow` reference.
 
 Tray menu items:
-1. Version label (disabled) — shows `v{version}` or `v{version} — Update available ({new})` / `— Downloading {ver}…` / `— Checking…`
-2. Check for Updates → `UpdateService.CheckAsync(ManualTray)`
-3. Update Now (hidden until `UpdateState.UpdateReady`) → `UpdateService.ApplyUpdatesAndRestartAsync()`
-4. Separator
-5. Open Dashboard → `ShowSettings()` (reuses existing window if open)
-6. Open Logs Folder → `Process.Start(AppPaths.LogDirectory)`
-7. Quit
+1. One status line combining the current version and last-check/update state.
+2. Check for Updates → `UpdateService.CheckAsync(ManualTray)`.
+3. Separator, Open Dashboard, Open Logs Folder, and Quit.
 
 Dev tray icon is orange-tinted at runtime (draws a semi-transparent orange overlay onto `SystemIcons.Application`).
 
@@ -102,7 +98,7 @@ Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the
 
 ## Update service (`src/UpdateService.cs`)
 
-Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboardButton }`.
+Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboard }`.
 
 State machine: `Idle | Checking | Downloading(version) | UpdateReady(version) | UpToDate | Failed(reason)`.
 
@@ -113,8 +109,8 @@ Flow:
 4. If no update: set `UpToDate`, return.
 5. If stale pending download exists for a different version: evict it.
 6. Download via `DownloadUpdatesAsync`. Set `UpdateReady`.
-7. If `trigger == ManualDashboardButton`: call `ApplyUpdatesAndRestart` immediately.
-8. Otherwise leave pending; Velopack applies it silently on next launch.
+7. Notify only after the package is downloaded. Clicking the notification opens the small `UpdatePromptForm`; its single `Install now` action applies the pending package and restarts.
+8. If the user does nothing, Velopack applies the pending package on the next launch.
 
 Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev channel skips all update activity.
 
@@ -152,7 +148,7 @@ Successful rows require `status=success` with non-empty `input_text` and `output
 
 ### Settings (`SettingsPage`)
 
-Adds, selects, and removes named API keys; only masked identifiers are displayed. Selection refreshes `CachedSettings`, so the next request uses the chosen key. It also opens the log folder and `replacements.json`. The dashboard "Update Now" button calls `UpdateService.CheckAsync(ManualDashboardButton)`.
+Adds, selects, and removes named API keys; only masked identifiers are displayed. Selection refreshes `CachedSettings`, so the next request uses the chosen key. It also opens the log folder and `replacements.json`. The Updates card shows current version, last updated, last checked, and calls `UpdateService.CheckAsync(ManualDashboard)`. The sidebar reload icon uses the same action.
 
 ---
 
