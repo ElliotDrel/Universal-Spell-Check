@@ -31,7 +31,9 @@ All channel constants live in `src/BuildChannel.cs` — that file is the canonic
 - `src/Program.cs` — entrypoint. `VelopackApp.Run()` first, safe-data migration second, then mutex + tray bootstrap.
 - `src/BuildChannel.cs` — Prod/Dev constants: hotkey, mutex, paths, version, display strings.
 - `src/AppPaths.cs` — settings/API isolated per channel; logs shared.
+- `src/SettingsStore.cs` — app settings plus DPAPI-encrypted named API-key collections.
 - `src/UpdateService.cs` — single unified update flow (Launch / Periodic / ManualTray / ManualDashboard).
+- `src/UpdatePromptForm.cs` — downloaded-update prompt with one-click install and restart.
 - `src/SpellcheckCoordinator.cs` — capture/request/post-process/paste pipeline.
 - `src/OpenAiSpellcheckService.cs` — persistent HttpClient + Responses API.
 - `src/TextPostProcessor.cs` — `replacements.json` + prompt-leak guard.
@@ -50,10 +52,12 @@ Universal Spell Check/
 |   |-- Program.cs
 |   |-- BuildChannel.cs
 |   |-- AppPaths.cs
+|   |-- SettingsStore.cs
 |   |-- DiagnosticsLogger.cs          # JSONL append with channel/app_version/pid stamping
 |   |-- HotkeyWindow.cs
 |   |-- SpellCheckAppContext.cs
 |   |-- UpdateService.cs
+|   |-- UpdatePromptForm.cs
 |   |-- SpellcheckCoordinator.cs
 |   |-- OpenAiSpellcheckService.cs
 |   |-- TextPostProcessor.cs

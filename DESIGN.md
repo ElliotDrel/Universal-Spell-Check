@@ -247,7 +247,7 @@ The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-i
 - **Refresh:** clears `FeedItems` only (preserves empty state + loading indicator hosts); reloads stats + first page.
 - No file watcher — user refreshes or scrolls to load more. Dashboard is not the hot path.
 
-Settings saves the API key and model through `SettingsStore`, opens the log folder, and opens `replacements.json`. Hotkey capture remains deferred.
+Settings manages named API keys and the selected model through `SettingsStore`, exposes update status and the shared manual update check, opens the log folder, and opens `replacements.json`. Hotkey capture remains deferred.
 
 ### Testing the design
 After visual changes, verify in this order:

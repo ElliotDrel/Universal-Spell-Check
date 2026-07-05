@@ -2,7 +2,7 @@
 
 ## Grounding
 
-WPF dashboard for the tray app. Opened via the `Open Dashboard` tray menu item. Two pages: **Home** (`ActivityPage` — paginated activity feed with inline diffs) and **Settings** (API key, log folder, replacements). Visual quality matters here — this is the user-facing surface beyond the hotkey itself. The cream tone, card borders, and font stack are intentional and easy to drift on.
+WPF dashboard for the tray app. Opened via the `Open Dashboard` tray menu item. Two pages: **Home** (`ActivityPage` — paginated activity feed with inline diffs) and **Settings** (named API keys, model, updates, log folder, replacements). Visual quality matters here — this is the user-facing surface beyond the hotkey itself. The cream tone, card borders, and font stack are intentional and easy to drift on.
 
 ## Read first
 

@@ -4,9 +4,9 @@ A Windows-wide AI spell checker. Select text anywhere, press **Ctrl+Alt+U**, and
 
 ## Install
 
-Download the latest `Setup.exe` from the [Releases](https://github.com/ElliotDrel/Universal-Spell-Check/releases) page and run it. No admin prompt, no code signing — Windows SmartScreen may warn on first install. The app self-updates from GitHub Releases on launch and every ~4 hours.
+Download the latest `Setup.exe` from the [Releases](https://github.com/ElliotDrel/Universal-Spell-Check/releases) page and run it. No admin prompt, no code signing — Windows SmartScreen may warn on first install. The app checks GitHub Releases on launch and every ~4 hours, downloads an available update, and offers a one-click restart to install it.
 
-You'll need an OpenAI API key. Open the dashboard from the tray icon and paste it in.
+You'll need an OpenAI API key. Open the dashboard from the tray icon, add a named key, and select it. You can store multiple keys and switch the active key without restarting.
 
 ## Use
 
@@ -23,8 +23,8 @@ src/                       # The product — C# .NET 10 WinForms + WPF
 .github/workflows/         # Tag-triggered Velopack release pipeline
 replacements.json          # Brand/casing post-processing rules
 docs/                      # Architecture, conventions, debugging notes
-archive/ahk-legacy/        # The original AutoHotkey implementation (history)
-tests/                     # Python fine-tune dataset tooling
+.archive/ahk-legacy/       # The original AutoHotkey implementation (history)
+tests/                     # Native tests plus Python fine-tune and benchmark tooling
 ```
 
 ## Development
@@ -37,7 +37,7 @@ dotnet run --project src/UniversalSpellCheck.csproj -c Dev
 dotnet publish src/UniversalSpellCheck.csproj -c Release -r win-x64 --self-contained false
 ```
 
-Prod and Dev settings are isolated (`%LocalAppData%\UniversalSpellCheck\` vs `UniversalSpellCheck.Dev\`). Logs are intentionally unified at `%LocalAppData%\UniversalSpellCheck\logs\spellcheck-{date}.jsonl` with per-line `channel` and `app_version` stamps.
+Prod and Dev settings are isolated (`%LocalAppData%\UniversalSpellCheck.Data\` vs `%LocalAppData%\UniversalSpellCheck.Dev\`). Logs are intentionally unified at `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl` with per-line `channel`, `app_version`, and `pid` stamps. `%LocalAppData%\UniversalSpellCheck\` is reserved for Velopack installation files.
 
 ## Release
 
