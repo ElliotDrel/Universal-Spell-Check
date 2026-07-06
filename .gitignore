@@ -1,6 +1,7 @@
 # Ignore common build artifacts
 bin/
 obj/
+publish/
 *.exe
 *.dll
 *.pdb
