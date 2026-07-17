@@ -1,8 +1,20 @@
 # Replacements, Prompt-Leak Guard, and Logging
 
+## Target formatting hooks
+
+`TargetFormattingPipeline` resolves one rule from its explicit ordered list after clipboard-history
+exclusion. Its after-copy hook runs before literal protection and the API request. After the existing
+post-processing restores protected literals, the optional before-paste hook runs against a second set
+of formatter-neutral private-use placeholders. Missing or duplicated placeholders abort the paste;
+an unexpected hook exception retains the unmodified text and is recorded asynchronously.
+
+Unmatched runs perform only the short resolver scan and a null branch. They do not perform the second
+literal-protection scan. Headless benchmark runs remain unmatched unless a test explicitly supplies a
+target context.
+
 ## Terminal input normalization (pre-processing)
 
-Before the API call, `TerminalInputNormalizer.Normalize` is invoked on the captured text when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
+Before the API call, `TerminalFormattingRule.AfterCopy` is invoked when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
 
 1. **Double CRLF** (`\r\n\r\n[ \t]*`) → `\n\n` — preserves paragraph/section breaks.
 2. **List items** (`\r\n[ \t]+` before `-`, `*`, `•`, or `N.`) → `\n` — preserves bullet and numbered list structure.
@@ -12,11 +24,12 @@ Tabs are matched alongside spaces in all three passes. Bare `\r\n` without trail
 
 - Applied on the **hot path only** (`ExecuteHotPathAsync`). Headless/bench runs are unaffected.
 - Bare `\r\n` without trailing whitespace is left untouched.
-- Result is recorded in `RunRecord.TerminalNorm`; logged as `terminal_normalized=true terminal_norm_chars_removed=N` on the `run_completed` line and as `terminal_normalization` in the `spellcheck_detail` JSON blob.
+- Result is recorded through the common formatting result; the legacy `terminal_normalized=true terminal_norm_chars_removed=N` line fields and `terminal_normalization` JSON object remain unchanged.
 - If not applied (non-terminal process or no artifacts found), `terminal_normalization.applied = false` and `chars_removed = 0`.
 
-Full pipeline order: **terminal normalize** → **protect literals** → API call → post-process
-(replacements + prompt-leak guard) → **restore literals**.
+Full pipeline order: **resolve target** → **after-copy format** → **protect literals** → API call →
+post-process (replacements + prompt-leak guard) → **restore literals** → **validate target** →
+**before-paste format with protected literals** → **final target validation**.
 
 ## Protected literals
 
@@ -133,7 +146,10 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), `terminal_normalization` (applied/chars_removed/process), `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
+
+`target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
+path, query, fragment, page title, selected text, or extension message.
 
 ### Dashboard Activity feed
 

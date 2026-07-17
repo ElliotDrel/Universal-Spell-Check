@@ -15,6 +15,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly CachedSettings _cachedSettings;
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
+    private readonly TargetFormattingPipeline _formattingPipeline;
     private readonly OverlayHost _overlayHost = new();
     private readonly UpdateService _updateService;
     private DashboardWindow? _dashboardWindow;
@@ -31,6 +32,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _cachedSettings = new CachedSettings(_settingsStore);
         _spellcheckService = new OpenAiSpellcheckService(_cachedSettings, _logger);
         _postProcessor = new TextPostProcessor(_logger);
+        _formattingPipeline = new TargetFormattingPipeline();
         // Pre-warm the HTTPS connection (DNS+TCP+TLS+H2) off-thread so the
         // first hotkey press doesn't pay handshake cost. Re-warms every 4 min.
         _spellcheckService.StartConnectionWarmer();
@@ -38,6 +40,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             _logger,
             _spellcheckService,
             _postProcessor,
+            _formattingPipeline,
             ShowTip,
             SetPhase,
             ShowSettings,

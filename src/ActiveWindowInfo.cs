@@ -7,11 +7,20 @@ namespace UniversalSpellCheck;
 internal sealed class ActiveWindowInfo
 {
     public string ProcessName { get; init; } = "unknown";
+    public int ProcessId { get; init; }
+    public IntPtr WindowHandle { get; init; }
+    public IntPtr RootOwnerWindowHandle { get; init; }
     public string WindowTitle { get; init; } = "";
 
-    public bool HasSameProcess(ActiveWindowInfo other)
+    public TargetContext ToTargetContext(BrowserTargetContext? browser = null)
     {
-        return string.Equals(ProcessName, other.ProcessName, StringComparison.OrdinalIgnoreCase);
+        return new TargetContext(
+            ProcessName,
+            ProcessId,
+            WindowHandle,
+            RootOwnerWindowHandle,
+            WindowTitle,
+            browser);
     }
 
     public static ActiveWindowInfo Capture()
@@ -37,6 +46,9 @@ internal sealed class ActiveWindowInfo
             return new ActiveWindowInfo
             {
                 ProcessName = processName,
+                ProcessId = (int)processId,
+                WindowHandle = handle,
+                RootOwnerWindowHandle = GetAncestor(handle, GetAncestorFlags.RootOwner),
                 WindowTitle = title.ToString()
             };
         }
@@ -54,4 +66,12 @@ internal sealed class ActiveWindowInfo
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, GetAncestorFlags flags);
+
+    private enum GetAncestorFlags : uint
+    {
+        RootOwner = 3
+    }
 }

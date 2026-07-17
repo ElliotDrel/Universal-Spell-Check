@@ -8,6 +8,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
     private readonly DiagnosticsLogger _logger;
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
+    private readonly TargetFormattingPipeline _formattingPipeline;
     private readonly Action<string, string> _notify;
     private readonly Action<SpellcheckPhase> _setPhase;
     private readonly Action _showSettings;
@@ -18,6 +19,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         DiagnosticsLogger logger,
         OpenAiSpellcheckService spellcheckService,
         TextPostProcessor postProcessor,
+        TargetFormattingPipeline formattingPipeline,
         Action<string, string> notify,
         Action<SpellcheckPhase> setPhase,
         Action showSettings,
@@ -26,6 +28,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         _logger = logger;
         _spellcheckService = spellcheckService;
         _postProcessor = postProcessor;
+        _formattingPipeline = formattingPipeline;
         _notify = notify;
         _setPhase = setPhase;
         _showSettings = showSettings;
@@ -189,9 +192,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
         try
         {
-            // Clipboard backup must come before Ctrl+C so we can restore later.
-            record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
             record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
+            // Capture target identity before any clipboard work can yield, then
+            // back up the clipboard before Ctrl+C so failed runs can restore it.
+            record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
             record.Events.Add("run_started");
             _setPhase(SpellcheckPhase.Copying);
 
@@ -233,12 +237,17 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     + historyExcludeDetail);
             }
 
-            // Pre-process: collapse terminal soft-wrap artifacts before the API call.
-            record.T_TerminalNormStart = Stopwatch.GetTimestamp();
-            var norm = TerminalInputNormalizer.Normalize(capture.Text!, record.ActiveWindowAtStart.ProcessName);
-            record.T_TerminalNormEnd = Stopwatch.GetTimestamp();
-            record.TerminalNorm = norm;
-            var textToSpellcheck = norm.Applied ? norm.Text : capture.Text!;
+            record.T_AfterCopyFormatStart = Stopwatch.GetTimestamp();
+            record.FormattingMatch = _formattingPipeline.Resolve(record.ActiveWindowAtStart.ToTargetContext());
+            record.AfterCopyFormatting = record.FormattingMatch is null
+                ? FormattingResult.NotApplied(capture.Text!)
+                : _formattingPipeline.ApplyAfterCopy(record.FormattingMatch, capture.Text!);
+            record.T_AfterCopyFormatEnd = Stopwatch.GetTimestamp();
+            if (record.AfterCopyFormatting.FailureCode is not null)
+            {
+                record.Events.Add($"target_format_after_copy_failed reason={record.AfterCopyFormatting.FailureCode}");
+            }
+            var textToSpellcheck = record.AfterCopyFormatting.Text;
 
             record.Protection = ProtectedText.Protect(textToSpellcheck);
 
@@ -286,7 +295,6 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 record.T_PromptGuardStart = record.T_PostProcessStart;
                 record.T_PromptGuardEnd = record.T_PostProcessEnd;
             }
-            record.OutputText = pp.Text;
             record.ReplacementsApplied = pp.ReplacementsApplied;
             record.PromptLeak = pp.PromptLeak;
             if (!pp.ProtectionRestored)
@@ -301,9 +309,58 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
             record.Events.Add("postprocess_applied");
 
-            // Paste: set clipboard, then send Ctrl+V. Restore is moved to finalize.
+            var beforePasteWindow = ActiveWindowInfo.Capture();
+            record.ActiveWindowAtPaste = beforePasteWindow;
+            var beforePasteContext = beforePasteWindow.ToTargetContext();
+            record.T_BeforePasteFormatStart = Stopwatch.GetTimestamp();
+            record.BeforePasteFormatting = record.FormattingMatch is null
+                ? FormattingResult.NotApplied(pp.Text)
+                : _formattingPipeline.ApplyBeforePaste(record.FormattingMatch, pp.Text, beforePasteContext);
+            record.T_BeforePasteFormatEnd = Stopwatch.GetTimestamp();
+
+            if (!_formattingPipeline.ValidateDestination(
+                    record.FormattingMatch,
+                    record.ActiveWindowAtStart.ToTargetContext(),
+                    beforePasteContext)
+                || record.BeforePasteFormatting.AbortPaste)
+            {
+                var literalRestoreFailed = string.Equals(
+                    record.BeforePasteFormatting.FailureCode,
+                    "literal_restore_failed",
+                    StringComparison.Ordinal);
+                record.Status = literalRestoreFailed ? RunStatus.RunFailed : RunStatus.PasteFailed;
+                record.ErrorCode = literalRestoreFailed
+                    ? SpellcheckErrorCodes.ProtectedTextRestoreFailed
+                    : record.BeforePasteFormatting.FailureCode;
+                record.ErrorMessage = literalRestoreFailed
+                    ? "Target formatting changed a protected placeholder."
+                    : "Target app changed before paste.";
+                record.PasteFailurePhase = literalRestoreFailed
+                    ? "before_paste_literal_restore"
+                    : "target_changed_before_format";
+                record.Events.Add(literalRestoreFailed
+                    ? "target_format_literal_restore_failed"
+                    : "paste_failed");
+                _notify(
+                    literalRestoreFailed ? "Spell check failed" : "Paste failed",
+                    literalRestoreFailed
+                        ? "Protected text could not be restored safely."
+                        : $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
+
+            if (record.BeforePasteFormatting.FailureCode is not null)
+            {
+                record.Events.Add($"target_format_before_paste_failed reason={record.BeforePasteFormatting.FailureCode}");
+            }
+
+            var finalText = record.BeforePasteFormatting.Text;
+            record.OutputText = finalText;
+
+            // Paste: set clipboard, let it settle, validate once more, then send Ctrl+V.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
-            if (await ClipboardLoop.TrySetReplacementTextAsync(pp.Text))
+            if (await ClipboardLoop.TrySetReplacementTextAsync(finalText))
             {
                 record.CorrectedTextOnClipboard = true;
             }
@@ -326,12 +383,16 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var pasteTarget = ActiveWindowInfo.Capture();
             record.ActiveWindowAtPaste = pasteTarget;
 
-            if (!record.ActiveWindowAtStart.HasSameProcess(pasteTarget))
+            if (!_formattingPipeline.ValidateDestination(
+                    record.FormattingMatch,
+                    record.ActiveWindowAtStart.ToTargetContext(),
+                    pasteTarget.ToTargetContext()))
             {
                 record.Status = RunStatus.PasteFailed;
                 record.ErrorMessage = "Target app changed before paste.";
                 record.PasteFailurePhase = "target_changed";
                 record.Events.Add("paste_failed");
+                record.CorrectedTextOnClipboard = false;
                 _notify(
                     "Paste failed",
                     $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
@@ -358,7 +419,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
             record.T_PasteAck = Stopwatch.GetTimestamp();
 
-            record.TextChanged = !string.Equals(capture.Text, pp.Text, StringComparison.Ordinal);
+            record.TextChanged = !string.Equals(capture.Text, finalText, StringComparison.Ordinal);
             record.Status = RunStatus.Success;
             record.Events.Add("replace_succeeded");
             record.T_HotPathReturned = Stopwatch.GetTimestamp();
@@ -381,7 +442,15 @@ internal sealed class SpellcheckCoordinator : IDisposable
         try
         {
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
-            var normMs = TicksToMs(r.T_TerminalNormStart, r.T_TerminalNormEnd);
+            var afterCopyFormatMs = TicksToMs(r.T_AfterCopyFormatStart, r.T_AfterCopyFormatEnd);
+            var beforePasteFormatMs = TicksToMs(r.T_BeforePasteFormatStart, r.T_BeforePasteFormatEnd);
+            var terminalApplied = r.FormattingMatch?.Rule.Id == TerminalFormattingRule.RuleId
+                && r.AfterCopyFormatting.Applied;
+            var normMs = terminalApplied ? afterCopyFormatMs : 0;
+            var terminalCounters = r.AfterCopyFormatting.Counters;
+            var doubleBreakCount = GetCounter(terminalCounters, TerminalFormattingRule.DoubleBreakCounter);
+            var listItemCount = GetCounter(terminalCounters, TerminalFormattingRule.ListItemCounter);
+            var softWrapCount = GetCounter(terminalCounters, TerminalFormattingRule.SoftWrapCounter);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
             var requestSendMs = TicksToMs(r.RequestSendTicks);
             var requestWaitMs = TicksToMs(r.RequestWaitTicks);
@@ -421,6 +490,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"request_wait_ms={requestWaitMs} " +
                 $"response_download_ms={responseDownloadMs} " +
                 $"postprocess_ms={ppMs} " +
+                $"after_copy_format_ms={afterCopyFormatMs} " +
+                $"before_paste_format_ms={beforePasteFormatMs} " +
                 $"paste_ms={pasteMs} " +
                 $"copy_attempts={r.CopyAttempts} " +
                 $"request_attempts={r.RequestAttempts} " +
@@ -430,10 +501,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"prompt_leak_triggered={r.PromptLeak.Triggered.ToString().ToLowerInvariant()} " +
                 $"prompt_leak_removed_chars={r.PromptLeak.RemovedChars} " +
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
-                (r.TerminalNorm.Applied
-                    ? $"terminal_normalized=true terminal_norm_ms={normMs} terminal_norm_chars_removed={r.TerminalNorm.CharsRemoved} " +
-                      $"terminal_norm_double_break={r.TerminalNorm.DoubleBreakCount} terminal_norm_list_item={r.TerminalNorm.ListItemCount} terminal_norm_soft_wrap={r.TerminalNorm.SoftWrapCount} "
+                (terminalApplied
+                    ? $"terminal_normalized=true terminal_norm_ms={normMs} terminal_norm_chars_removed={r.AfterCopyFormatting.CharsRemoved} " +
+                      $"terminal_norm_double_break={doubleBreakCount} terminal_norm_list_item={listItemCount} terminal_norm_soft_wrap={softWrapCount} "
                     : "") +
+                $"target_formatting_rule={r.FormattingMatch?.Rule.Id ?? "none"} " +
                 $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
                 $"original_clipboard_restored={r.OriginalClipboardRestored.ToString().ToLowerInvariant()} " +
                 $"captured_text_history_excluded={r.CapturedTextHistoryExcluded.ToString().ToLowerInvariant()} " +
@@ -450,9 +522,13 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 error_code = r.ErrorCode,
                 status_code = r.StatusCode,
                 model = r.Model,
-                active_app = r.ActiveWindowAtStart.WindowTitle,
+                active_app = r.FormattingMatch?.Rule.MatchType == TargetFormattingMatchType.Site
+                    ? ""
+                    : r.ActiveWindowAtStart.WindowTitle,
                 active_exe = r.ActiveWindowAtStart.ProcessName,
-                paste_target_app = r.ActiveWindowAtPaste?.WindowTitle ?? "",
+                paste_target_app = r.FormattingMatch?.Rule.MatchType == TargetFormattingMatchType.Site
+                    ? ""
+                    : r.ActiveWindowAtPaste?.WindowTitle ?? "",
                 paste_target_exe = r.ActiveWindowAtPaste?.ProcessName ?? "",
                 paste_method = r.PasteMethod,
                 paste_failure_phase = r.PasteFailurePhase,
@@ -481,6 +557,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 {
                     clipboard_ms = clipboardMs,
                     norm_ms = normMs,
+                    after_copy_format_ms = afterCopyFormatMs,
+                    before_paste_format_ms = beforePasteFormatMs,
                     payload_ms = 0,
                     request_ms = requestMs,
                     api_ms = apiMs,
@@ -515,16 +593,48 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 },
                 terminal_normalization = new
                 {
-                    applied = r.TerminalNorm.Applied,
-                    process = r.TerminalNorm.ProcessName ?? "",
+                    applied = terminalApplied,
+                    process = terminalApplied ? r.ActiveWindowAtStart.ProcessName : "",
                     norm_ms = normMs,
-                    chars_removed = r.TerminalNorm.CharsRemoved,
-                    normalized_input_text = r.TerminalNorm.Applied ? r.TerminalNorm.Text : null,
+                    chars_removed = terminalApplied ? r.AfterCopyFormatting.CharsRemoved : 0,
+                    normalized_input_text = terminalApplied ? r.AfterCopyFormatting.Text : null,
                     passes = new
                     {
-                        double_break_count = r.TerminalNorm.DoubleBreakCount,
-                        list_item_count = r.TerminalNorm.ListItemCount,
-                        soft_wrap_count = r.TerminalNorm.SoftWrapCount
+                        double_break_count = doubleBreakCount,
+                        list_item_count = listItemCount,
+                        soft_wrap_count = softWrapCount
+                    }
+                },
+                target_formatting = new
+                {
+                    rule_id = r.FormattingMatch?.Rule.Id ?? "",
+                    match_type = r.FormattingMatch?.Rule.MatchType switch
+                    {
+                        TargetFormattingMatchType.App => "app",
+                        TargetFormattingMatchType.Site => "site",
+                        _ => "none"
+                    },
+                    browser_context_state = r.FormattingMatch?.Rule.MatchType == TargetFormattingMatchType.Site
+                        ? "matched"
+                        : "not_applicable",
+                    host = r.FormattingMatch?.StartingContext.Browser?.Host ?? "",
+                    after_copy = new
+                    {
+                        applied = r.AfterCopyFormatting.Applied,
+                        chars_added = r.AfterCopyFormatting.CharsAdded,
+                        chars_removed = r.AfterCopyFormatting.CharsRemoved,
+                        operations = r.AfterCopyFormatting.Operations,
+                        failure = r.AfterCopyFormatting.FailureCode ?? "",
+                        failure_type = r.AfterCopyFormatting.FailureType ?? ""
+                    },
+                    before_paste = new
+                    {
+                        applied = r.BeforePasteFormatting.Applied,
+                        chars_added = r.BeforePasteFormatting.CharsAdded,
+                        chars_removed = r.BeforePasteFormatting.CharsRemoved,
+                        operations = r.BeforePasteFormatting.Operations,
+                        failure = r.BeforePasteFormatting.FailureCode ?? "",
+                        failure_type = r.BeforePasteFormatting.FailureType ?? ""
                     }
                 },
                 events = r.Events.ToArray()
@@ -559,6 +669,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
     {
         if (ticks <= 0) return 0;
         return (long)(ticks * 1000.0 / Stopwatch.Frequency);
+    }
+
+    private static int GetCounter(IReadOnlyDictionary<string, int>? counters, string key)
+    {
+        return counters is not null && counters.TryGetValue(key, out var value) ? value : 0;
     }
 
     public void Dispose()

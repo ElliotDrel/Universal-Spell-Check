@@ -13,6 +13,8 @@ internal sealed class TrialResult
     public required long CaptureMs { get; init; }
     public required long RequestMs { get; init; }
     public required long PostProcessMs { get; init; }
+    public required long AfterCopyFormatMs { get; init; }
+    public required long BeforePasteFormatMs { get; init; }
     public required long PasteMs { get; init; }
     public required int InputTokens { get; init; }
     public required int OutputTokens { get; init; }
@@ -158,6 +160,8 @@ internal sealed class BenchHarness
                     CaptureMs = 0,
                     RequestMs = 0,
                     PostProcessMs = 0,
+                    AfterCopyFormatMs = 0,
+                    BeforePasteFormatMs = 0,
                     PasteMs = 0,
                     InputTokens = 0,
                     OutputTokens = 0,
@@ -189,6 +193,8 @@ internal sealed class BenchHarness
                 CaptureMs = t?.ClipboardMs ?? 0,
                 RequestMs = t?.RequestMs ?? 0,
                 PostProcessMs = (t?.ReplacementsMs ?? 0) + (t?.PromptGuardMs ?? 0),
+                AfterCopyFormatMs = t?.AfterCopyFormatMs ?? 0,
+                BeforePasteFormatMs = t?.BeforePasteFormatMs ?? 0,
                 PasteMs = t?.PasteMs ?? 0,
                 InputTokens = t?.InputTokens ?? 0,
                 OutputTokens = t?.OutputTokens ?? 0,
@@ -213,7 +219,8 @@ internal sealed class BenchHarness
             {
                 InputName = name, TrialIndex = trialIndex, Success = false,
                 TotalMs = 0, CoordinatorTotalMs = 0, CaptureMs = 0, RequestMs = 0,
-                PostProcessMs = 0, PasteMs = 0, InputTokens = 0, OutputTokens = 0,
+                PostProcessMs = 0, AfterCopyFormatMs = 0, BeforePasteFormatMs = 0,
+                PasteMs = 0, InputTokens = 0, OutputTokens = 0,
                 CachedTokens = 0, Error = "Coordinator gate rejected (already running).",
             };
         }
@@ -228,6 +235,8 @@ internal sealed class BenchHarness
             CaptureMs = 0,
             RequestMs = r.RequestMs,
             PostProcessMs = r.ReplacementsMs + r.PromptGuardMs,
+            AfterCopyFormatMs = 0,
+            BeforePasteFormatMs = 0,
             PasteMs = 0,
             InputTokens = r.InputTokens,
             OutputTokens = r.OutputTokens,
@@ -253,6 +262,8 @@ internal sealed class TrialTimings
     public required long RequestMs { get; init; }
     public required long ReplacementsMs { get; init; }
     public required long PromptGuardMs { get; init; }
+    public required long AfterCopyFormatMs { get; init; }
+    public required long BeforePasteFormatMs { get; init; }
     public required long PasteMs { get; init; }
     public required int InputTokens { get; init; }
     public required int OutputTokens { get; init; }

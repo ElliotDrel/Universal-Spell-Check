@@ -17,6 +17,8 @@ internal static class ResultsWriter
             capture_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.CaptureMs),
             request_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.RequestMs),
             post_process_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PostProcessMs),
+            after_copy_format_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.AfterCopyFormatMs),
+            before_paste_format_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.BeforePasteFormatMs),
             paste_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PasteMs),
             tokens = new
             {

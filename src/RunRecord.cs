@@ -58,6 +58,10 @@ internal sealed class RunRecord
     public long ResponseDownloadTicks { get; set; }
     public long T_PostProcessStart { get; set; }
     public long T_PostProcessEnd { get; set; }
+    public long T_AfterCopyFormatStart { get; set; }
+    public long T_AfterCopyFormatEnd { get; set; }
+    public long T_BeforePasteFormatStart { get; set; }
+    public long T_BeforePasteFormatEnd { get; set; }
     public long T_PromptGuardStart { get; set; }
     public long T_PromptGuardEnd { get; set; }
     public long T_PasteTargetCheck { get; set; }
@@ -68,10 +72,10 @@ internal sealed class RunRecord
     // Tokens
     public TokenUsage TokenUsage { get; set; } = new();
 
-    // Pre-process
-    public long T_TerminalNormStart { get; set; }
-    public long T_TerminalNormEnd { get; set; }
-    public TerminalNormResult TerminalNorm { get; set; } = TerminalNormResult.NotApplied("");
+    // Target formatting
+    public FormattingMatch? FormattingMatch { get; set; }
+    public FormattingResult AfterCopyFormatting { get; set; } = FormattingResult.NotApplied("");
+    public FormattingResult BeforePasteFormatting { get; set; } = FormattingResult.NotApplied("");
     public ProtectionResult Protection { get; set; } = ProtectionResult.Empty("");
 
     // Post-process

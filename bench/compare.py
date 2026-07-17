@@ -7,7 +7,15 @@ import json
 import statistics
 from pathlib import Path
 
-PHASES = ["total_ms", "request_ms", "post_process_ms", "capture_ms", "paste_ms"]
+PHASES = [
+    "total_ms",
+    "request_ms",
+    "post_process_ms",
+    "after_copy_format_ms",
+    "before_paste_format_ms",
+    "capture_ms",
+    "paste_ms",
+]
 PRIMARY = "request_ms"
 
 

@@ -6,7 +6,7 @@ Three kinds of regression suites live here:
 
 1. **Python fine-tune dataset + benchmark scripts** under `.agents/skills/finetune-cycle/scripts/` — protecting the dataset/eval tooling that consumes the unified JSONL log corpus. The whole reason logs are unified across Prod and Dev (with per-line `channel`/`app_version` stamps) is to feed this pipeline cleanly.
 2. **Regression tests for C# product logic**, reimplemented in Python to keep the feedback loop fast (`test_text_post_processor.py`). The first of these guards the `TextPostProcessor` replacement algorithm — see `docs/tooling-gaps.md` § 2. We backfill these slowly as bugs surface; we are *not* aiming for blanket coverage of the C# product here.
-3. **Package-free C# executable tests** for hot-path logic where matching the production implementation exactly matters (`ProtectedTextTests/`).
+3. **Package-free C# executable tests** for hot-path logic where matching the production implementation exactly matters (`ProtectedTextTests/` and `TargetFormattingTests/`).
 
 ## Read first
 
@@ -17,6 +17,7 @@ Three kinds of regression suites live here:
 ```text
 tests/
 |-- ProtectedTextTests/                    # Real C# literal extraction/restoration tests
+|-- TargetFormattingTests/                 # Rule matching, hooks, identity, literal safety, resolver microbench
 |-- test_benchmark_spellcheck_models.py    # Tests for benchmark_spellcheck_models.py
 |-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
 |-- test-replacements.py                   # Replacements dry-run helper
@@ -40,6 +41,7 @@ The scripts under test:
 ```powershell
 python -m pytest tests/ -v
 dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextTests.csproj -c Release
+dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
 ```
 
 Outputs from real (non-test) runs land in `benchmark_runs/` and `fine_tune_runs/` under dated subfolders — never commit those run artifacts.

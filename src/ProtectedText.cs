@@ -70,13 +70,26 @@ internal static partial class ProtectedText
 
     public static ProtectionResult Protect(string text)
     {
+        return Protect(text, namespaceId => $"{PlaceholderStem}{namespaceId}_", index => $"{index}__");
+    }
+
+    public static ProtectionResult ProtectForFormatting(string text)
+    {
+        return Protect(text, namespaceId => $"\uE000USC{namespaceId}_", index => $"{index}\uE001");
+    }
+
+    private static ProtectionResult Protect(
+        string text,
+        Func<int, string> prefixFactory,
+        Func<int, string> suffixFactory)
+    {
         var entries = new List<ProtectedLiteral>();
         var namespaceId = 0;
         string placeholderPrefix;
 
         do
         {
-            placeholderPrefix = $"{PlaceholderStem}{namespaceId}_";
+            placeholderPrefix = prefixFactory(namespaceId);
             namespaceId++;
         }
         while (text.Contains(placeholderPrefix, StringComparison.Ordinal));
@@ -89,7 +102,7 @@ internal static partial class ProtectedText
                 : match.Groups["file_path"].Success ? ProtectedLiteralKind.FilePath
                 : ProtectedLiteralKind.OpaqueId;
 
-            var placeholder = $"{placeholderPrefix}{entries.Count + 1}__";
+            var placeholder = $"{placeholderPrefix}{suffixFactory(entries.Count + 1)}";
             entries.Add(new ProtectedLiteral(placeholder, match.Value, kind));
             return placeholder;
         });

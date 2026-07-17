@@ -60,11 +60,13 @@ internal static class Program
         using var spellService = new OpenAiSpellcheckService(cachedSettings, capturingLogger, opts.Model);
         spellService.StartConnectionWarmer();
         var postProcessor = new TextPostProcessor(capturingLogger);
+        var formattingPipeline = new TargetFormattingPipeline();
 
         using var coordinator = new SpellcheckCoordinator(
             capturingLogger,
             spellService,
             postProcessor,
+            formattingPipeline,
             notify: (_, _) => { },
             setPhase: _ => { },
             showSettings: () => { });
@@ -199,6 +201,8 @@ internal sealed class CapturingLogger : DiagnosticsLogger
                 RequestMs = timings.GetProperty("request_ms").GetInt64(),
                 ReplacementsMs = timings.GetProperty("replacements_ms").GetInt64(),
                 PromptGuardMs = timings.GetProperty("prompt_guard_ms").GetInt64(),
+                AfterCopyFormatMs = timings.GetProperty("after_copy_format_ms").GetInt64(),
+                BeforePasteFormatMs = timings.GetProperty("before_paste_format_ms").GetInt64(),
                 PasteMs = timings.GetProperty("paste_ms").GetInt64(),
                 InputTokens = tokens.GetProperty("input").GetInt32(),
                 OutputTokens = tokens.GetProperty("output").GetInt32(),

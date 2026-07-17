@@ -82,6 +82,8 @@ Per trial, the harness captures:
 | `capture_ms` | 0 | ✓ | Clipboard capture phase (Ctrl+C loop) |
 | `request_ms` | ✓ | ✓ | OpenAI API round-trip |
 | `post_process_ms` | ✓ | ✓ | `TextPostProcessor.Process` (replacements + prompt-leak guard) |
+| `after_copy_format_ms` | 0 | ✓ | Target rule resolution plus after-copy hook |
+| `before_paste_format_ms` | 0 | ✓ | Before-paste target validation and hook |
 | `paste_ms` | 0 | ✓ | Clipboard write + `SendInput` Ctrl+V |
 
 Per-phase stats reported: median, p95, mean, stddev, min, max. Only successful trials are included in stats — failed trials are counted separately.
@@ -119,6 +121,15 @@ Output shows delta per phase. Interpretation:
 | < 5% either direction | Noise — discard |
 
 Network jitter is irreducible; 10 trials gives ±5% confidence at the median. For clean signal, use `--runs 20` or more.
+
+The package-free target-formatting suite includes the deterministic no-match microbenchmark:
+
+```powershell
+dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
+```
+
+It fails if average no-match resolution reaches one millisecond. Headless runs do not synthesize a
+target, so their formatting timings remain zero.
 
 ---
 

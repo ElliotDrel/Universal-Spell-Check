@@ -75,14 +75,29 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 2. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
 3. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
 4. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
-5. **Protect literals** — replace URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs with collision-safe placeholders.
-6. **Request** — the overlay reads "Sending to AI..." while the request body is written, then "Waiting for AI..." until response headers arrive. `OpenAiSpellcheckService` records separate send, wait, and response-download timings.
-7. On request failure: restore clipboard, notify user, log `request_failed`, return.
-8. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
-9. **Focus check** — verify foreground process still matches original target. On mismatch: restore clipboard, log `paste_failed`, return.
-10. **Paste** — writes corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), sends Ctrl+V. On success the corrected text is intentionally left on the clipboard (not restored).
-11. Log `replace_succeeded` with full timing breakdown.
-12. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
+5. **Resolve target formatting** — `TargetFormattingPipeline` scans its short ordered rule list, freezes the first match, and runs its deterministic after-copy hook. The first rule is terminal normalization. No rule means the original string reference continues unchanged.
+6. **Protect literals** — replace URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs with collision-safe placeholders.
+7. **Request** — the overlay reads "Sending to AI..." while the request body is written, then "Waiting for AI..." until response headers arrive. `OpenAiSpellcheckService` records separate send, wait, and response-download timings.
+8. On request failure: restore clipboard, notify user, log `request_failed`, return.
+9. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
+10. **Validate and format destination** — recapture the foreground PID and root-owner window, require the frozen target/rule identity to remain valid, then run the optional before-paste hook. Before-paste rules receive formatter-neutral, private-use placeholders; a missing or duplicated placeholder aborts the paste.
+11. **Paste** — write corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), wait for the existing settle delay, validate the destination once more, then send Ctrl+V. A destination mismatch restores the original clipboard through the existing failure path. On success the corrected text is intentionally left on the clipboard.
+12. Log `replace_succeeded` with target-formatting metadata and separate hook timings.
+13. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
+
+### Target formatting (`src/TargetFormatting/`)
+
+`TargetContext` is an immutable snapshot of foreground process, PID, HWND, root-owner HWND, title,
+and optional pre-cached browser metadata. `TargetFormattingPipeline` owns one explicit ordered list
+of deterministic rules and catches optional hook failures so formatting cannot turn a valid generic
+spellcheck into a failed request. `TerminalFormattingRule` preserves the former terminal normalizer's
+process list, transformation order, output, and counters.
+
+Desktop destination identity is PID plus root-owner HWND, which permits IME/autocomplete owned
+windows while rejecting another window or process with the same executable name. Site-rule support
+already requires a fresh, focused HTTP(S) browser snapshot and validates the same browser window,
+tab, and frozen rule before paste. The Chrome cache/extension that supplies such snapshots remains
+deferred until a named target requires real URL matching; no browser query occurs on the hot path.
 
 ---
 
