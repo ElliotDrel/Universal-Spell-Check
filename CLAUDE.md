@@ -26,6 +26,8 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 |---|---|
 | Project overview, stack, repo map, channel summary | `docs/overview.md` |
 | Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md` |
+| Adding app/site-specific formatting rules or Chrome target detection | `.planning/app-site-formatting-customizations.md` |
+| Clipboard formatting fidelity, CF_HTML, preserving bold/links/spacing through a correction | `.planning/rich-text-clipboard-pipeline.md` |
 | Channel separation, hotkey/mutex/path constants, version stamping | `src/BuildChannel.cs` (canonical source) |
 | Editing API payloads, switching models, temperature/reasoning/verbosity | `docs/model-config.md` |
 | Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
@@ -81,3 +83,15 @@ This routing table is only useful if it reflects reality. **Treat doc drift as a
 - When the Grounding header no longer matches what the project is doing (channel rename, stack change, new top-of-mind concern), revise it.
 - **Flag drift proactively.** If during any task you notice this file, `docs/*.md`, or any subdir `CLAUDE.md` is stale, contradicts the code, or points to something that no longer exists — stop and surface it to the user with a proposed fix. Do not silently work around stale docs.
 - Filing rules for new content live in `docs/filing-rules.md`.
+
+---
+*Maintenance: this file is a letter — short, intent-only, grown one earned
+line at a time. Agent: as you work, watch for things this letter should
+learn — new or ambiguous vocabulary (glossary candidates), corrections the
+user has had to repeat, anything that changes the intent, rules, or routing
+written here. When you notice one, invoke the `estack-claude-md-optimizer`
+skill (quick capture): ask the user in one line whether to add it, and if yes do
+it right then — under 5 minutes, do it now — then return to your task.
+Never silently append, and never let a noticed improvement get lost. For
+humans: run the skill directly — refine to audit, session-capture after
+working sessions, scale-check before adding any routing.*

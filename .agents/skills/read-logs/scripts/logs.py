@@ -62,6 +62,11 @@ def format_detail(d, ts, channel):
         applied = replacements.get("applied", [])
         lines.append(f"  replacements: {', '.join(applied)}")
 
+    html_chars = d.get("clipboard_html_chars", 0)
+    if html_chars:
+        note = " (truncated in log)" if d.get("clipboard_html_truncated") else ""
+        lines.append(f"  clipboard_html: {html_chars} chars{note}")
+
     if d.get("error"):
         lines.append(f"  error: {d['error']}")
 
@@ -189,6 +194,10 @@ def main():
                              "Plain string searches input_text, output_text, and raw_ai_output (case-insensitive). "
                              "Use 'field:value' to scope to one field (e.g. output_text:Competitionetition).")
 
+    parser.add_argument("--has-html", action="store_true",
+                        help="Only spellcheck_detail rows whose selection carried a CF_HTML flavor. "
+                             "The markup itself is in the clipboard_html field; use --json to extract it.")
+
     args = parser.parse_args()
 
     log_dir = Path(args.log_dir) if args.log_dir else LOG_DIR
@@ -251,6 +260,16 @@ def main():
                     try:
                         detail = json.loads(rest)
                         if not _grep_detail_match(detail, args.grep_detail):
+                            continue
+                    except json.JSONDecodeError:
+                        continue
+
+                if args.has_html:
+                    if event != "spellcheck_detail":
+                        continue
+                    try:
+                        detail = json.loads(rest)
+                        if not detail.get("clipboard_html_chars", 0):
                             continue
                     except json.JSONDecodeError:
                         continue

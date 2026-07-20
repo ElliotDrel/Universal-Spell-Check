@@ -72,7 +72,7 @@ Thin `NativeWindow` subclass. Calls `RegisterHotKey` with `BuildChannel.HotkeyMo
 Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`guard_rejected reason=already_running`), never queued.
 
 1. `SetPhase(Copying)` — tray text changes, `LoadingOverlayForm` shows with "Copying text...".
-2. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text.
+2. **Capture** — `ClipboardLoop.CaptureSelectionAsync()`. Waits for hotkey keys to release, snapshots the clipboard sequence number, sends Ctrl+C, waits for the sequence number to change, then polls for changed Unicode text. It reads **both** clipboard flavors in that same window: `CF_UNICODETEXT` drives the run, and `CF_HTML` is captured alongside it into `RunRecord.CapturedHtml` (`""` when the source offers none). The HTML read must happen here — step 4 empties the clipboard and the source markup is gone for good. Nothing downstream consumes it yet; it is logged as `clipboard_html` and is the input to the rich-text pipeline in `.planning/rich-text-clipboard-pipeline.md`.
 3. On capture failure: restore original clipboard, notify user, log `capture_failed`, return.
 4. **Exclude captured text from history** — `ClipboardLoop.ExcludeTextFromHistory()` tags the captured (incorrect) text out of Windows clipboard history (Win+V) so only the corrected text persists there. Best-effort, never fails the run; logs `capture_history_excluded` / `capture_history_exclude_failed`. Mechanism and gotchas: `docs/watchlist.md` § Clipboard history exclusion.
 5. **Resolve target formatting** — `TargetFormattingPipeline` scans its short ordered rule list, freezes the first match, and runs its deterministic after-copy hook. The first rule is terminal normalization. No rule means the original string reference continues unchanged.
@@ -98,6 +98,9 @@ windows while rejecting another window or process with the same executable name.
 already requires a fresh, focused HTTP(S) browser snapshot and validates the same browser window,
 tab, and frozen rule before paste. The Chrome cache/extension that supplies such snapshots remains
 deferred until a named target requires real URL matching; no browser query occurs on the hot path.
+
+For the implemented file map, verified Phase 1 evidence, first-rule intake template, rule-authoring
+contract, and next-chat checklist, read `.planning/app-site-formatting-customizations.md`.
 
 ---
 

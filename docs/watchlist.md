@@ -50,6 +50,26 @@ Before adding app-specific timing rules: reproduce with a named target app and i
 
 ---
 
+## Target-formatting cold start vs. warmed timing
+
+`TerminalFormattingRule` uses three `RegexOptions.Compiled` expressions. Real Dev verification showed
+one-time first-use cost after each process start: `after_copy_format_ms` was 183 ms in one new process
+and 91 ms in another. Subsequent terminal runs in the same process logged 0 ms (whole-millisecond
+timing resolution). This is consistent with compiled-regex/JIT startup rather than steady-state rule
+cost.
+
+When measuring a new formatting rule:
+
+- Record the first matched run after process start and at least three warmed runs separately.
+- Do not report the cold value as steady-state or discard it entirely; both affect perceived speed.
+- Compare `target_formatting.operations` and exact transformed text so a fast no-op cannot look like a
+  successful performance result.
+- If cold cost becomes user-visible or repeats after startup, investigate source-generated regexes or
+  off-hot-path prewarming based on measurements. Do not add speculative warming work to unmatched
+  startup paths.
+
+---
+
 ## Clipboard history exclusion (Win+V)
 
 **Goal:** the corrected text must always be retained in Windows clipboard history; the captured incorrect text should be kept out.
@@ -58,6 +78,25 @@ Before adding app-specific timing rules: reproduce with a named target app and i
 - **Incorrect text out of history (best-effort):** `ClipboardLoop.ExcludeTextFromHistory` runs right after capture, on the STA thread. It takes clipboard ownership (`OpenClipboard(ownerHwnd)` → `EmptyClipboard` → re-place text → set `CanIncludeInClipboardHistory=0` + `CanUploadToCloudClipboard=0`). The owner HWND must be a **real window** (the hotkey window) — `OpenClipboard(NULL)` + `EmptyClipboard` sets the owner to NULL and makes `SetClipboardData` fail.
 - This **races the OS history snapshot** (the source Ctrl+C already produced one untagged update). It wins in practice — this mirrors the proven legacy AHK `SetClipboardHistoryPolicy`. The WinRT `Clipboard.DeleteItemFromHistory` scrub is **not** an option: `GetHistoryItemsAsync` returns `AccessDenied` unless the calling app is foreground, and this tray app never holds focus during a run.
 - Every run logs `captured_text_history_excluded=true|false` and an always-on `history_exclude_detail="text=… include=… upload=… cf_include=<id> cf_upload=<id> owner=0x…"`. `include=ok` means the incorrect text was tagged out of history; `include=fail(win32=…)` / `upload=fail(win32=…)` give the exact Win32 error to debug from. `open_clipboard_failed` / `empty_clipboard_failed` mean another process held the clipboard or the owner HWND was invalid.
+
+---
+
+## Clipboard fidelity — a correction flattens the selection's formatting
+
+We read `CF_UNICODETEXT` and write `CF_UNICODETEXT`. Everything the plain-text flavor cannot express is silently destroyed inside the corrected selection: bold/italic/underline, link hrefs, font family/size/color, list bullets and numbering, headings, blockquotes, and tables (which arrive tab-separated).
+
+The visible case is **paragraph spacing**. Measured against Chrome on 2026-07-20 by driving it over CDP and dumping both clipboard flavors:
+
+| Markup | `text/plain` | Gap survives |
+|---|---|---|
+| `<p style="margin:0 0 1em">A</p><p …>B</p>` | `A\r\n\r\nB` | yes |
+| `<div>A</div><div><br></div><div>B</div>` | `A\r\n\r\nB` | yes |
+| `<div>A</div><div>B</div>` | `A\r\nB` | n/a |
+| `<div style="margin-bottom:1em">A</div><div …>B</div>` | `A\r\nB` | **no** |
+
+A block boundary emits one newline, `</p>` emits two, an empty block contributes its own, and CSS margin emits nothing. So a paragraph gap produced by margin on a `<div>` is gone before our app sees the text — the run logs the flattened version as `input_text` and looks entirely healthy.
+
+**This is not app-specific and a `TargetFormatting` rule cannot fix it.** The information is destroyed by the browser before `AfterCopy` runs, and rules may not touch the clipboard. Do not accept a Gmail/Slack/Notion "spacing rule" as a fix; it would be guessing whether `A\nB` meant tight lines or paragraphs. The real answer is the `CF_HTML` round trip specced in `.planning/rich-text-clipboard-pipeline.md`.
 
 ---
 

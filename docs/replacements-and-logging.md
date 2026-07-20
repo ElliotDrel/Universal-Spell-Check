@@ -146,10 +146,27 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `clipboard_html` (see below), `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
 
 `target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
 path, query, fragment, page title, selected text, or extension message.
+
+### `clipboard_html`
+
+Every capture reads both clipboard flavors. `input_text` is the `CF_UNICODETEXT` flavor;
+`clipboard_html` is the `CF_HTML` flavor of the same selection, verbatim including its header, or
+`""` when the source offered none (Notepad, terminals, most code editors). Siblings
+`clipboard_html_chars` (true pre-truncation size) and `clipboard_html_truncated` accompany it; the
+logged field is capped at 512K chars so one pathological selection cannot produce a multi-megabyte
+log line.
+
+This is the input to the rich-text pipeline (`.planning/rich-text-clipboard-pipeline.md`). Nothing
+downstream consumes it yet — the plain-text path is unchanged — but it is logged from now on so the
+representation and model comparison runs against real captured markup.
+
+`logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
+`--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would
+match CSS noise on nearly every row) — scope it with `clipboard_html:<needle>`.
 
 ### Dashboard Activity feed
 

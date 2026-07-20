@@ -72,7 +72,13 @@ internal static class ClipboardLoop
                         $"copied_len={text?.Length ?? 0} mods_at_send=[{modsAtSend}] fg=[{DescribeForegroundWindow()}]");
                 }
 
-                return CaptureResult.Ok(text, Environment.TickCount64 - startedAt, attempt);
+                // Read the HTML flavor in the same clipboard window as the text.
+                // It must happen here: ExcludeTextFromHistory empties the
+                // clipboard moments later and the source markup is gone for good.
+                // Absence is normal (plain-text sources) and never fails a run.
+                TryGetHtml(out var html);
+
+                return CaptureResult.Ok(text, html, Environment.TickCount64 - startedAt, attempt);
             }
 
             lastFailureReason = "Clipboard did not change after Ctrl+C.";
@@ -385,6 +391,24 @@ internal static class ClipboardLoop
         return false;
     }
 
+    // CF_HTML as the source app wrote it, header and all. Best-effort: a source
+    // that offers no HTML flavor yields "".
+    private static bool TryGetHtml(out string html)
+    {
+        if (TryClipboardOperation(
+            () => Clipboard.ContainsText(TextDataFormat.Html)
+                ? Clipboard.GetText(TextDataFormat.Html)
+                : "",
+            out string? result))
+        {
+            html = result ?? "";
+            return html.Length > 0;
+        }
+
+        html = "";
+        return false;
+    }
+
     private static bool TryClipboardOperation<T>(Func<T> operation, out T? result)
     {
         for (var attempt = 1; attempt <= ClipboardRetryAttempts; attempt++)
@@ -488,6 +512,8 @@ internal sealed class CaptureResult
 {
     public bool Success { get; init; }
     public string? Text { get; init; }
+    // Raw CF_HTML flavor of the same selection, "" when the source offered none.
+    public string Html { get; init; } = "";
     public string? FailureReason { get; init; }
     // Per-attempt forensics (sequence numbers, modifier state, foreground
     // process + elevation). Populated only on failure.
@@ -495,10 +521,11 @@ internal sealed class CaptureResult
     public long DurationMs { get; init; }
     public int Attempts { get; init; }
 
-    public static CaptureResult Ok(string text, long durationMs, int attempts) => new()
+    public static CaptureResult Ok(string text, string html, long durationMs, int attempts) => new()
     {
         Success = true,
         Text = text,
+        Html = html,
         DurationMs = durationMs,
         Attempts = attempts
     };

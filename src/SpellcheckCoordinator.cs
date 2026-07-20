@@ -220,6 +220,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
 
             record.InputText = capture.Text;
+            record.CapturedHtml = capture.Html;
             record.Events.Add("capture_succeeded");
 
             // Re-tag the just-captured (incorrect) text as transient so it stays
@@ -437,11 +438,16 @@ internal sealed class SpellcheckCoordinator : IDisposable
         }
     }
 
+    // Guard against one pathological selection producing a multi-megabyte log
+    // line. Real styled email and document fragments land well under this.
+    private const int MaxLoggedHtmlChars = 512 * 1024;
+
     private void FinalizeAsync(RunRecord r)
     {
         try
         {
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
+            var htmlTruncated = r.CapturedHtml.Length > MaxLoggedHtmlChars;
             var afterCopyFormatMs = TicksToMs(r.T_AfterCopyFormatStart, r.T_AfterCopyFormatEnd);
             var beforePasteFormatMs = TicksToMs(r.T_BeforePasteFormatStart, r.T_BeforePasteFormatEnd);
             var terminalApplied = r.FormattingMatch?.Rule.Id == TerminalFormattingRule.RuleId
@@ -482,6 +488,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             _logger.Log(
                 $"run_completed status={statusName} " +
                 $"input_len={r.InputText?.Length ?? 0} " +
+                $"input_html_len={r.CapturedHtml.Length} " +
                 $"output_len={r.OutputText?.Length ?? 0} " +
                 $"total_ms={totalMs} " +
                 $"clipboard_ms={clipboardMs} " +
@@ -543,6 +550,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 output_text = r.OutputText ?? "",
                 output_chars = r.OutputText?.Length ?? 0,
                 raw_ai_output = r.RawAiOutput ?? "",
+                clipboard_html = htmlTruncated ? r.CapturedHtml[..MaxLoggedHtmlChars] : r.CapturedHtml,
+                clipboard_html_chars = r.CapturedHtml.Length,
+                clipboard_html_truncated = htmlTruncated,
                 raw_response = rawResponse,
                 request_payload = requestPayload,
                 tokens = new
