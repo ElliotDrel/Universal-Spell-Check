@@ -190,6 +190,51 @@ would silently disable the pipeline there. **The gate must treat NBSP and ordina
 equivalent when comparing**, while still preserving whichever character the source used when
 splicing. This is exactly the kind of thing the collection pass exists to find.
 
+### Second pass, with `clipboard_formats` (2026-07-20 Dev)
+
+Seven runs across Gmail, Slack, ChatGPT, and Windows Terminal. `clipboard_ms` ranged 226–272 ms
+against a 251–260 ms pre-change baseline — reading three flavors instead of one costs nothing
+measurable.
+
+**The bug reproduced in real captured data.** A Gmail reading-pane selection:
+
+```html
+<h1 style="... margin: 0px 0px 12px; ...">Your channel with fathom is ready</h1><div ...>
+```
+
+```text
+CF_UNICODETEXT: Your channel with fathom is ready\r\n#fathom-ios-beta was joined by ...
+```
+
+One `\r\n`. The 12 px gap under the heading exists only as CSS margin and is unrecoverable from the
+plain-text flavor. This is the fourth row of the measured Chrome table, observed in the wild rather
+than on a synthetic page.
+
+**Gmail compose itself is fine.** A re-typed version of the original Tim email uses `<br><br>`
+between paragraphs, which Chrome serializes as `\r\n\r\n`. The gap survives. So the draft that
+started this carried *pasted* margin-styled blocks, not Gmail's native structure — consistent with
+the original diagnosis. The pipeline is needed for pasted-in and rendered content, not for text typed
+directly into a compose box.
+
+**Slack confirmed: no HTML on the clipboard.** The format list settles it — Slack offers
+`UnicodeText,Chromium internal source RFH token,Chromium Web Custom MIME Data Format,Chromium internal source URL,Locale,Text,OEMText`
+and no `HTML Format`. Not a failed read on our side. Slack's own rich representation presumably lives
+in `Chromium Web Custom MIME Data Format`, but that is a Chromium-internal blob and the sibling
+`Chromium internal source URL` already proved to read back empty from another process, so assume the
+same until measured. **Slack is out of scope for the rich-text pipeline.**
+
+**Sources are inconsistent within one app.** ChatGPT produced 244 chars of `<p data-pm-slice>` on one
+run and no HTML at all on another. Whatever the pipeline does, it must degrade to the plain-text path
+per run, not per app.
+
+**Still no RTF sample.** No captured selection has offered it. The capture stays in — Word and
+desktop Outlook are the expected sources and neither has been exercised — but nothing yet depends
+on it.
+
+**Privacy note:** `clipboard_html` from an email carries remote asset URLs, including tracking pixels
+(`ci3.googleusercontent.com/...`). The logs already hold full message text, so this is not a new
+category of content, but it is the first time remote URLs land in the corpus.
+
 **Real editor copies are far leaner than the synthetic test suggested.** The option-A cost estimate
 originally claimed ~2 KB of inlined CSS per paragraph. That number came from copying a *rendered
 styled page*, where Chrome inlines every computed property. Copying from an editor gives almost
