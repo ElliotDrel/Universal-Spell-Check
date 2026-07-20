@@ -221,6 +221,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             record.InputText = capture.Text;
             record.CapturedHtml = capture.Html;
+            record.CapturedRtf = capture.Rtf;
+            record.ClipboardFormats = capture.Formats;
             record.Events.Add("capture_succeeded");
 
             // Re-tag the just-captured (incorrect) text as transient so it stays
@@ -448,6 +450,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         {
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var htmlTruncated = r.CapturedHtml.Length > MaxLoggedHtmlChars;
+            var rtfTruncated = r.CapturedRtf.Length > MaxLoggedHtmlChars;
             var afterCopyFormatMs = TicksToMs(r.T_AfterCopyFormatStart, r.T_AfterCopyFormatEnd);
             var beforePasteFormatMs = TicksToMs(r.T_BeforePasteFormatStart, r.T_BeforePasteFormatEnd);
             var terminalApplied = r.FormattingMatch?.Rule.Id == TerminalFormattingRule.RuleId
@@ -489,6 +492,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"run_completed status={statusName} " +
                 $"input_len={r.InputText?.Length ?? 0} " +
                 $"input_html_len={r.CapturedHtml.Length} " +
+                $"input_rtf_len={r.CapturedRtf.Length} " +
                 $"output_len={r.OutputText?.Length ?? 0} " +
                 $"total_ms={totalMs} " +
                 $"clipboard_ms={clipboardMs} " +
@@ -553,6 +557,10 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 clipboard_html = htmlTruncated ? r.CapturedHtml[..MaxLoggedHtmlChars] : r.CapturedHtml,
                 clipboard_html_chars = r.CapturedHtml.Length,
                 clipboard_html_truncated = htmlTruncated,
+                clipboard_rtf = rtfTruncated ? r.CapturedRtf[..MaxLoggedHtmlChars] : r.CapturedRtf,
+                clipboard_rtf_chars = r.CapturedRtf.Length,
+                clipboard_rtf_truncated = rtfTruncated,
+                clipboard_formats = r.ClipboardFormats,
                 raw_response = rawResponse,
                 request_payload = requestPayload,
                 tokens = new

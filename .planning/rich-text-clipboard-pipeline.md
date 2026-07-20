@@ -115,7 +115,7 @@ against them — if the measurement contradicts this choice, the choice changes.
 
 | Option | AI sees | Cost / latency | Risk |
 |---|---|---|---|
-| **A. Raw HTML in, corrected HTML out** | Full markup | Tokens balloon; a styled Gmail paragraph is ~2 KB of inlined CSS per block. Multi-second regression. | Model rewrites, drops, or invents tags. Prompt-leak guard and protected literals now have to survive markup. High. |
+| **A. Raw HTML in, corrected HTML out** | Full markup | Highly variable — see the note below. | Model rewrites, drops, or invents tags. Prompt-leak guard and protected literals now have to survive markup. High. |
 | **B. Plain text in, diff-aligned back onto the original runs** (recommended) | Exactly what it sees today | Identical token count. Added cost is local parse + diff, target sub-millisecond. | Alignment bugs, bounded by a strict verification gate and a plain-text fallback. |
 | **C. Text with inline formatting sentinels** | Text plus markers | Slightly more tokens | Model eats or moves the sentinels. Already a known failure mode from the protected-literal work. |
 | **D. HTML converted to Markdown, corrected, converted back** | Clean Markdown | Modest token increase over plain text; far cheaper than raw HTML | Models handle Markdown very well, so the correction quality should be high. The loss is in the conversion: Markdown cannot express font family, size, color, arbitrary inline styles, nested tables, or Gmail's exact block structure. HTML→MD→HTML is lossy in a way HTML→runs→HTML is not. |
@@ -166,6 +166,44 @@ disk and nothing else, and one log corpus beats two.
 
 Let it accumulate through normal use. Real Gmail, Slack, Docs, and Notion selections are worth far
 more than synthetic fixtures.
+
+### First findings from the corpus (2026-07-20)
+
+Four runs on v0.8.0 before the first review. Small sample, but two results already matter:
+
+**Slack offers no `CF_HTML` at all.** Three Slack runs, all `clipboard_html_chars=0`, including one
+selection containing a code span and an `@mention`. Both arrived as plain text. If this holds, the
+rich-text pipeline cannot help Slack — the formatting is destroyed by the source app before the
+clipboard, and no amount of reconstruction recovers it. Worth confirming against
+`clipboard_formats` now that it is captured; if Slack offers RTF instead, the picture changes.
+
+**Akiflow encodes every space as `&nbsp;`** while its plain-text flavor uses ordinary spaces:
+
+```text
+CF_HTML:          Meet&nbsp;at&nbsp;Middletown&nbsp;Plannet&nbsp;Fitness
+CF_UNICODETEXT:   Meet at Middletown Plannet Fitness
+```
+
+This breaks the serialization verification gate as specified. Decoding `&nbsp;` to ` ` and
+comparing byte-for-byte against the plain text yields `model_mismatch` on every Akiflow run, which
+would silently disable the pipeline there. **The gate must treat NBSP and ordinary space as
+equivalent when comparing**, while still preserving whichever character the source used when
+splicing. This is exactly the kind of thing the collection pass exists to find.
+
+**Real editor copies are far leaner than the synthetic test suggested.** The option-A cost estimate
+originally claimed ~2 KB of inlined CSS per paragraph. That number came from copying a *rendered
+styled page*, where Chrome inlines every computed property. Copying from an editor gives almost
+nothing:
+
+```html
+<!-- ChatGPT (ProseMirror), 244 chars including the CF_HTML header -->
+<p data-pm-slice="0 0 []">output the following as a md docuemnt</p>
+```
+
+So raw-HTML cost depends entirely on where the selection came from, and the corpus has to answer it
+per-source rather than in general. Gmail compose is the case that matters and is still unmeasured —
+**no Gmail run has been captured on v0.8.0 yet**, so the bug that started this work has not been
+observed through the new instrumentation.
 
 ### The comparison, once there is a corpus
 

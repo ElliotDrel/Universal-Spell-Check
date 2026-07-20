@@ -39,6 +39,12 @@ internal sealed class RunRecord
     // captured and logged but not yet consumed.
     // See .planning/rich-text-clipboard-pipeline.md.
     public string CapturedHtml { get; set; } = "";
+    // RTF flavor of the same selection, and every format name the source
+    // offered. The format list is what makes an empty CapturedHtml readable:
+    // "offered nothing" and "offered something we missed" are otherwise
+    // indistinguishable after the fact.
+    public string CapturedRtf { get; set; } = "";
+    public string ClipboardFormats { get; set; } = "";
     public string? OutputText { get; set; }
     public string? RawAiOutput { get; set; }
     public byte[]? RawResponseBytes { get; set; }

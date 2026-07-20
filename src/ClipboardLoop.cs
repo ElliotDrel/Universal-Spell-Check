@@ -72,13 +72,19 @@ internal static class ClipboardLoop
                         $"copied_len={text?.Length ?? 0} mods_at_send=[{modsAtSend}] fg=[{DescribeForegroundWindow()}]");
                 }
 
-                // Read the HTML flavor in the same clipboard window as the text.
-                // It must happen here: ExcludeTextFromHistory empties the
+                // Read the richer flavors in the same clipboard window as the
+                // text. It must happen here: ExcludeTextFromHistory empties the
                 // clipboard moments later and the source markup is gone for good.
                 // Absence is normal (plain-text sources) and never fails a run.
+                //
+                // The format list is what makes an empty html/rtf interpretable:
+                // without it, "no markup" and "markup we failed to read" look
+                // identical in the logs.
                 TryGetHtml(out var html);
+                TryGetRtf(out var rtf);
+                var formats = DescribeClipboardFormats();
 
-                return CaptureResult.Ok(text, html, Environment.TickCount64 - startedAt, attempt);
+                return CaptureResult.Ok(text, html, rtf, formats, Environment.TickCount64 - startedAt, attempt);
             }
 
             lastFailureReason = "Clipboard did not change after Ctrl+C.";
@@ -409,6 +415,45 @@ internal static class ClipboardLoop
         return false;
     }
 
+    // Rich Text Format flavor. Several Windows apps (Word, desktop Outlook,
+    // WordPad) offer RTF and no HTML, so an empty CF_HTML does not by itself
+    // mean the selection carried no formatting.
+    private static bool TryGetRtf(out string rtf)
+    {
+        if (TryClipboardOperation(
+            () => Clipboard.ContainsText(TextDataFormat.Rtf)
+                ? Clipboard.GetText(TextDataFormat.Rtf)
+                : "",
+            out string? result))
+        {
+            rtf = result ?? "";
+            return rtf.Length > 0;
+        }
+
+        rtf = "";
+        return false;
+    }
+
+    // Every format name the source placed on the clipboard, in the order the
+    // system reports them. This is the diagnostic that distinguishes "the app
+    // offered nothing but text" from "the app offered markup we did not read".
+    private static string DescribeClipboardFormats()
+    {
+        if (!TryClipboardOperation(Clipboard.GetDataObject, out IDataObject? data) || data is null)
+        {
+            return "";
+        }
+
+        try
+        {
+            return string.Join(",", data.GetFormats(false));
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
     private static bool TryClipboardOperation<T>(Func<T> operation, out T? result)
     {
         for (var attempt = 1; attempt <= ClipboardRetryAttempts; attempt++)
@@ -514,6 +559,10 @@ internal sealed class CaptureResult
     public string? Text { get; init; }
     // Raw CF_HTML flavor of the same selection, "" when the source offered none.
     public string Html { get; init; } = "";
+    // Raw RTF flavor, "" when absent.
+    public string Rtf { get; init; } = "";
+    // Comma-joined clipboard format names present at capture.
+    public string Formats { get; init; } = "";
     public string? FailureReason { get; init; }
     // Per-attempt forensics (sequence numbers, modifier state, foreground
     // process + elevation). Populated only on failure.
@@ -521,11 +570,14 @@ internal sealed class CaptureResult
     public long DurationMs { get; init; }
     public int Attempts { get; init; }
 
-    public static CaptureResult Ok(string text, string html, long durationMs, int attempts) => new()
+    public static CaptureResult Ok(
+        string text, string html, string rtf, string formats, long durationMs, int attempts) => new()
     {
         Success = true,
         Text = text,
         Html = html,
+        Rtf = rtf,
+        Formats = formats,
         DurationMs = durationMs,
         Attempts = attempts
     };

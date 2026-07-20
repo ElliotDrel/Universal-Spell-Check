@@ -63,9 +63,14 @@ def format_detail(d, ts, channel):
         lines.append(f"  replacements: {', '.join(applied)}")
 
     html_chars = d.get("clipboard_html_chars", 0)
-    if html_chars:
-        note = " (truncated in log)" if d.get("clipboard_html_truncated") else ""
-        lines.append(f"  clipboard_html: {html_chars} chars{note}")
+    rtf_chars = d.get("clipboard_rtf_chars", 0)
+    formats = d.get("clipboard_formats", "")
+    if html_chars or rtf_chars or formats:
+        html_note = " (truncated)" if d.get("clipboard_html_truncated") else ""
+        rtf_note = " (truncated)" if d.get("clipboard_rtf_truncated") else ""
+        lines.append(f"  clipboard: html={html_chars}{html_note} rtf={rtf_chars}{rtf_note}")
+        if formats:
+            lines.append(f"  formats: {formats}")
 
     if d.get("error"):
         lines.append(f"  error: {d['error']}")
@@ -197,6 +202,9 @@ def main():
     parser.add_argument("--has-html", action="store_true",
                         help="Only spellcheck_detail rows whose selection carried a CF_HTML flavor. "
                              "The markup itself is in the clipboard_html field; use --json to extract it.")
+    parser.add_argument("--has-rich", action="store_true",
+                        help="Rows whose selection carried ANY rich flavor (CF_HTML or RTF). "
+                             "Pair with clipboard_formats to see what the source actually offered.")
 
     args = parser.parse_args()
 
@@ -264,12 +272,16 @@ def main():
                     except json.JSONDecodeError:
                         continue
 
-                if args.has_html:
+                if args.has_html or args.has_rich:
                     if event != "spellcheck_detail":
                         continue
                     try:
                         detail = json.loads(rest)
-                        if not detail.get("clipboard_html_chars", 0):
+                        html = detail.get("clipboard_html_chars", 0)
+                        rtf = detail.get("clipboard_rtf_chars", 0)
+                        if args.has_html and not html:
+                            continue
+                        if args.has_rich and not (html or rtf):
                             continue
                     except json.JSONDecodeError:
                         continue

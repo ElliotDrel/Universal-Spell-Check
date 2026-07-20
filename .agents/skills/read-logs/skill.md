@@ -101,7 +101,7 @@ python .claude/skills/read-logs/scripts/logs.py --from 2026-07-20 --to 2026-07-3
 python .claude/skills/read-logs/scripts/logs.py --today --has-html --json   # includes the markup
 python .claude/skills/read-logs/scripts/logs.py --today --grep-detail clipboard_html:margin-bottom
 ```
-Every run logs the captured selection's `CF_HTML` flavor in `clipboard_html`, alongside `clipboard_html_chars` and `clipboard_html_truncated` (the field is capped at 512K chars). The formatted view prints only the size — use `--json` to get the markup itself. Plain `--grep-detail` does **not** search this field; scope it explicitly with `clipboard_html:...`. Background: `.planning/rich-text-clipboard-pipeline.md`.
+Every run logs what the source app offered: `clipboard_html` (CF_HTML verbatim), `clipboard_rtf`, each with `_chars` and `_truncated` siblings (capped at 512K), plus `clipboard_formats` listing every format name present. Use `--has-rich` for HTML **or** RTF. The formatted view prints sizes and the format list — use `--json` to get the markup itself. Plain `--grep-detail` does **not** search these fields; scope explicitly with `clipboard_html:...`. `clipboard_formats` is the field that tells you whether an empty `clipboard_html` means "no markup offered" or "markup we missed". Background: `.planning/rich-text-clipboard-pipeline.md`.
 
 ## All flags
 
@@ -120,6 +120,7 @@ Every run logs the captured selection's `CF_HTML` flavor in `clipboard_html`, al
 | `--json` | Output parsed JSON objects one per line |
 | `--grep-detail QUERY` | Filter spellcheck_detail by substring in input_text/output_text/raw_ai_output; `field:value` scopes to one field |
 | `--has-html` | Only runs whose selection carried a CF_HTML flavor; markup is in the `clipboard_html` field |
+| `--has-rich` | Runs whose selection carried any rich flavor (CF_HTML or RTF) |
 | `--log-dir PATH` | Override log directory |
 
 ## Error events caught by `--errors`

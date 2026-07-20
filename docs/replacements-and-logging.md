@@ -151,14 +151,24 @@ Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `m
 `target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
 path, query, fragment, page title, selected text, or extension message.
 
-### `clipboard_html`
+### `clipboard_html`, `clipboard_rtf`, `clipboard_formats`
 
-Every capture reads both clipboard flavors. `input_text` is the `CF_UNICODETEXT` flavor;
-`clipboard_html` is the `CF_HTML` flavor of the same selection, verbatim including its header, or
-`""` when the source offered none (Notepad, terminals, most code editors). Siblings
-`clipboard_html_chars` (true pre-truncation size) and `clipboard_html_truncated` accompany it; the
-logged field is capped at 512K chars so one pathological selection cannot produce a multi-megabyte
-log line.
+Every capture reads all the flavors the source offered. `input_text` is `CF_UNICODETEXT`;
+`clipboard_html` is `CF_HTML` verbatim including its header; `clipboard_rtf` is the RTF flavor. Both
+rich fields are `""` when absent, carry `_chars` (true pre-truncation size) and `_truncated` siblings,
+and are capped at 512K chars so one pathological selection cannot produce a multi-megabyte log line.
+
+`clipboard_formats` is the comma-joined list of every format name present at capture. **This is the
+field that makes an empty `clipboard_html` interpretable** — without it, "the app offered no markup"
+and "the app offered markup we failed to read" are indistinguishable after the fact. Chrome offers
+`HTML Format,UnicodeText,Chromium internal source RFH token,Chromium internal source URL,Locale,Text,OEMText`;
+a plain-text source offers only the text formats.
+
+Note on identifying the source page: `CF_HTML`'s header can carry a `SourceURL:` line, but it is
+**not reliable** — observed present on a `file://` copy and absent on a real ChatGPT copy from the
+same browser. The `Chromium internal source URL` format is also unusable: it reads back empty from
+another process. Neither replaces the Chrome extension bridge in
+`.planning/app-site-formatting-customizations.md`.
 
 This is the input to the rich-text pipeline (`.planning/rich-text-clipboard-pipeline.md`). Nothing
 downstream consumes it yet — the plain-text path is unchanged — but it is logged from now on so the
