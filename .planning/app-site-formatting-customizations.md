@@ -7,6 +7,212 @@ desktop destination identity, protected before-paste hook path, telemetry, tests
 microbenchmark are in place. Phases 2 and 3 remain intentionally gated on the first named target and
 its exact input/output examples; no Chrome bridge is built until a real URL-scoped rule requires it.
 
+Implementation commit: `269ce7f feat: add target-specific formatting pipeline`.
+
+## Next-Chat Handoff
+
+### What exists now
+
+Phase 1 is complete and committed. The production pipeline has one real rule,
+`TerminalFormattingRule`, registered in the explicit ordered list owned by
+`TargetFormattingPipeline`. No other app rule, site rule, Chrome extension, native-messaging host,
+or browser-context cache exists yet.
+
+The implemented runtime path is:
+
+```text
+capture PID/HWND/root-owner target identity
+  -> back up clipboard
+  -> copy selection
+  -> exclude captured text from clipboard history
+  -> resolve and freeze one formatting rule
+  -> guarded after-copy hook
+  -> protect literals
+  -> AI request
+  -> replacements/prompt guard/literal restoration
+  -> recapture and validate target identity
+  -> guarded before-paste hook with formatter-neutral literal protection
+  -> write corrected clipboard text
+  -> settle delay
+  -> final target validation
+  -> paste
+  -> asynchronous formatting telemetry
+```
+
+The target-formatting framework is not a dynamic plugin system. Adding a target means adding one
+small deterministic class and one explicit ordered-list entry, then extending the focused test
+executable. Do not add target-specific branches to `SpellcheckCoordinator`.
+
+### Implementation map
+
+| Concern | Current source of truth |
+|---|---|
+| Target and optional browser snapshots, process/hostname match helpers | `src/TargetFormatting/TargetContext.cs` |
+| Rule contract, result/failure shape, frozen match | `src/TargetFormatting/TargetFormattingRule.cs` |
+| Ordered matching, hook guards, destination validation, before-paste literal safety | `src/TargetFormatting/TargetFormattingPipeline.cs` |
+| Existing terminal transformation and counters | `src/TargetFormatting/TerminalFormattingRule.cs` |
+| Foreground PID/HWND/root-owner capture | `src/ActiveWindowInfo.cs` |
+| Four coordinator integration points and asynchronous telemetry | `src/SpellcheckCoordinator.cs` |
+| App-lifetime pipeline construction | `src/SpellCheckAppContext.cs` |
+| Standard and formatter-neutral literal placeholders | `src/ProtectedText.cs` |
+| Formatting timestamps and per-run metadata | `src/RunRecord.cs` |
+| Matching, precedence, hook, identity, literal, parity, and microbenchmark coverage | `tests/TargetFormattingTests/Program.cs` |
+| E2E benchmark fields and comparison support | `bench/` |
+
+### Proven behavior
+
+Automated verification completed during Phase 1:
+
+- Release product build passed.
+- Release bench build passed.
+- `TargetFormattingTests` passed matcher, precedence, hook-order, hook-failure, browser-freshness,
+  destination-identity, literal-safety, placeholder-corruption, and terminal-parity coverage.
+- The no-match resolver averaged 0.365 microseconds per call over 250,000 calls in the final run.
+- `ProtectedTextTests` passed 100,000 extraction/restoration iterations.
+- `--dashboard-smoke` and the Dev `--startup-smoke` passed.
+- The relevant text-postprocessor Python regression tests passed.
+
+Manual Dev verification used real Windows Terminal runs and the bundled `read-logs` skill:
+
+- Five terminal spellchecks across 2026-07-18 and 2026-07-19 all succeeded with no Dev failure
+  events.
+- The terminal rule emitted all three stable operations: `normalize_double_break`,
+  `normalize_list_item`, and `collapse_soft_wrap`.
+- URLs and Windows paths survived normalization, AI processing, and restoration byte-for-byte.
+- Clipboard-history exclusion, corrected-text clipboard state, and paste-back all succeeded.
+- First matched formatting in two newly started Dev processes cost 183 ms and 91 ms respectively;
+  subsequent warmed runs logged 0 ms. This is consistent with one-time compiled-regex/JIT startup
+  cost. Logging rounds phase timings to whole milliseconds, so 0 ms means below that resolution.
+
+The terminal integration proves the desktop executable matcher and after-copy production path. It
+does not manually prove a before-paste transformation or any Chrome integration. Before-paste
+behavior is currently proven by focused synthetic-rule tests, including protected-literal corruption
+failure. Chrome remains intentionally unimplemented.
+
+### Before writing the first new rule
+
+Collect all six inputs. Do not infer any of them:
+
+1. Desktop executable name or Chrome URL.
+2. A real copied-text sample, including the unwanted artifacts.
+3. The exact text that should reach the AI after `AfterCopy`.
+4. A representative corrected AI output.
+5. The exact text that should be pasted after `BeforePaste`.
+6. Whether the behavior applies to the whole app/site or only one page/editor/path.
+
+Then choose the smallest integration:
+
+| Target can be identified by | Required work |
+|---|---|
+| Desktop executable | Add one app rule; no browser work |
+| Chrome executable alone, with behavior valid on every site | Add one app rule; be explicit about the broad scope |
+| Real hostname or hostname + path | Build Phase 3 first; never infer the site from a Chrome title |
+
+Choose hooks from the transformation boundary, not convenience:
+
+- Use `AfterCopy` only for artifacts in captured source text that should not reach the AI.
+- Use `BeforePaste` only for destination syntax that should be added after AI correction.
+- Use both only when the target genuinely requires independent input cleanup and output adaptation.
+- Set `HasBeforePasteTransform` to `false` when the before-paste hook is inactive, so the run avoids
+  the second literal-protection scan.
+
+### Current rule contract
+
+The live interface is:
+
+```csharp
+internal interface ITargetFormattingRule
+{
+    string Id { get; }
+    TargetFormattingMatchType MatchType { get; }
+    bool HasBeforePasteTransform { get; }
+    bool Matches(TargetContext context);
+    FormattingResult AfterCopy(string text, TargetContext context);
+    FormattingResult BeforePaste(string text, TargetContext context);
+}
+```
+
+Rules must remain synchronous, deterministic, side-effect-free, and free of captured text in
+operation IDs or counters. They must not access files, clipboard, browser APIs, registry, network,
+logging, or UI. Return `FormattingResult.NotApplied(text)` when unchanged so the original string
+reference is retained.
+
+Register rules in precedence order inside `TargetFormattingPipeline`:
+
+1. Hostname + path site rules.
+2. Hostname-only site rules.
+3. Desktop executable rules.
+4. Existing terminal rule wherever its executable precedence is intended.
+
+If any site rule is registered, the pipeline constructor requires an explicit browser freshness
+limit. Do not invent that duration: measure extension-to-tray propagation during Phase 3 and pass the
+measured bound.
+
+### Required first-rule tests
+
+Add focused fixtures before implementation, then keep them beside the existing
+`TargetFormattingTests` cases:
+
+- Exact positive examples for every active hook.
+- Negative example for a different executable/hostname/path.
+- Case-insensitive executable matching or hostname label-boundary coverage as applicable.
+- Precedence coverage for every overlap introduced by the new ordered-list entry.
+- Unchanged input retains the original string reference.
+- Stable operation IDs and exact character/counter telemetry.
+- URL, Windows path, token, UUID, and opaque-ID preservation.
+- Hook exception retains the unmodified text.
+- Before-paste missing/duplicated placeholders abort safely when that hook is active.
+- Destination change prevents paste.
+
+### Verification gate for each new target
+
+Run, in order:
+
+```powershell
+dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
+dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextTests.csproj -c Release
+dotnet build src/UniversalSpellCheck.csproj -c Release
+dotnet build bench/UniversalSpellCheck.Bench.csproj -c Release
+dotnet run --project src/UniversalSpellCheck.csproj -c Release -- --dashboard-smoke
+```
+
+For startup smoke, stop an existing instance of the channel whose hotkey would collide, then run the
+built executable with `--startup-smoke`. For manual acceptance, rebuild and relaunch Dev, test a
+positive target example and an unmatched control app, then inspect the Dev logs only through the
+`read-logs` skill. Require:
+
+- Correct rule ID and match type.
+- Exact expected normalized/request/pasted text.
+- Expected stable operations and counters.
+- Protected literals restored byte-for-byte.
+- No hook failure, paste failure, or target-identity failure.
+- No measurable ordinary-target regression; a repeatable E2E regression at or above 5% blocks the
+  rule.
+
+### Copy-paste starter for the next chat
+
+Replace every bracketed field before sending this request:
+
+```text
+Implement the first real target-formatting rule using
+.planning/app-site-formatting-customizations.md as the authoritative handoff. Read the repo routing
+docs and current implementation before editing. Preserve the Phase 1 architecture: one isolated
+rule, one explicit ordered-list entry, no target-specific coordinator branches, deterministic hooks,
+literal safety, target identity validation, telemetry, focused tests, and manual Dev verification.
+
+Target: [desktop executable or exact Chrome URL]
+Scope: [whole app/site or exact editor/path]
+Copied input: [verbatim sample]
+Expected text sent to the AI: [verbatim sample]
+Representative corrected AI output: [verbatim sample]
+Expected pasted output: [verbatim sample]
+
+Decide whether the rule belongs in AfterCopy, BeforePaste, or both from those examples. If the target
+requires real hostname/path matching, implement the documented Chrome bridge first; otherwise do not
+add browser integration. Finish when focused tests, Release/bench builds, smoke checks, real Dev
+acceptance, log verification, and latency comparison pass. Keep unrelated files untouched.
+```
+
 ---
 
 ## Goal
@@ -71,9 +277,10 @@ Hotkey received
 The clipboard-history exclusion stays immediately after capture because it is timing-sensitive.
 Target-specific cleanup begins only after that step.
 
-The rule selected after copy is frozen in the run record. Before paste, the coordinator resolves
-the live target again and requires it to still represent the same destination and rule. A rule
-chosen for one Chrome site must never be applied after the user switches to another tab or site.
+The rule selected after copy is frozen in the run record. Before paste, the coordinator recaptures
+the live target and re-evaluates that frozen rule; it does not select a different rule mid-run. The
+live context must still represent the same destination and rule. A rule chosen for one Chrome site
+must never be applied after the user switches to another tab or site.
 
 ---
 
@@ -81,13 +288,14 @@ chosen for one Chrome site must never be applied after the user switches to anot
 
 ### Directory
 
-Start with three small files under `src/TargetFormatting/`:
+The implemented Phase 1 directory contains:
 
 ```text
 src/TargetFormatting/
 |-- TargetContext.cs
 |-- TargetFormattingRule.cs
-`-- TargetFormattingPipeline.cs
+|-- TargetFormattingPipeline.cs
+`-- TerminalFormattingRule.cs
 ```
 
 Future rule examples:
@@ -107,11 +315,13 @@ internal sealed record TargetContext(
     string ProcessName,
     int ProcessId,
     IntPtr WindowHandle,
+    IntPtr RootOwnerWindowHandle,
     string WindowTitle,
     BrowserTargetContext? Browser);
 
 internal sealed record BrowserTargetContext(
     string Browser,
+    bool Focused,
     int WindowId,
     int TabId,
     string Scheme,
@@ -140,6 +350,8 @@ Rules are small, deterministic classes:
 internal interface ITargetFormattingRule
 {
     string Id { get; }
+    TargetFormattingMatchType MatchType { get; }
+    bool HasBeforePasteTransform { get; }
     bool Matches(TargetContext context);
     FormattingResult AfterCopy(string text, TargetContext context);
     FormattingResult BeforePaste(string text, TargetContext context);
@@ -164,7 +376,10 @@ internal sealed record FormattingResult(
     int CharsAdded,
     int CharsRemoved,
     IReadOnlyList<string> Operations,
-    IReadOnlyDictionary<string, int>? Counters = null);
+    IReadOnlyDictionary<string, int>? Counters = null,
+    string? FailureCode = null,
+    string? FailureType = null,
+    bool AbortPaste = false);
 ```
 
 `Operations` contains stable identifiers such as `collapse_soft_wrap` or
@@ -178,8 +393,8 @@ the common result for every future rule.
 linear scan. The expected rule count is tiny, so dictionary indexes, reflection, assembly scanning,
 duplicate-matcher validation, and a separate registry type are deferred until measured need exists.
 
-The first version contains only the terminal rule plus the first named app/site rules. Do not build a
-plugin platform before those rules exist.
+The current version contains only the terminal rule. Add named app/site rules individually; do not
+build a plugin platform before measured need exists.
 
 Precedence:
 
@@ -215,8 +430,9 @@ paste and restore the original clipboard using the existing failure path.
 
 ## Existing Terminal Behavior
 
-Move the behavior of `TerminalInputNormalizer` behind `TerminalFormattingRule` before adding new
-rules. Preserve its current process list, transformation order, output, and telemetry exactly.
+Phase 1 moved the behavior of the former `TerminalInputNormalizer` into
+`TerminalFormattingRule`; the old file no longer exists. Its process list, transformation order,
+output, and telemetry were preserved.
 
 This migration proves the framework against a real customization and prevents two parallel
 app-specific systems from existing in `SpellcheckCoordinator`.
@@ -556,10 +772,11 @@ Cover:
 
 ## Implementation Sequence
 
-### Phase 1: Minimal two-hook seam plus terminal rule
+### Phase 1: Minimal two-hook seam plus terminal rule (implemented)
 
 - Add `TargetContext`, the rule/result contract, and the pipeline with one short ordered list.
-- Keep `TerminalInputNormalizer` as the first real rule instead of building an empty framework.
+- Move `TerminalInputNormalizer` behavior into `TerminalFormattingRule` as the first real rule instead
+  of building an empty framework or retaining a parallel coordinator path.
 - Preserve its output and all existing per-pass telemetry through `FormattingResult.Counters`.
 - Enrich `ActiveWindowInfo` with PID, window handle, and root-owner resolution.
 - Integrate both hooks into the coordinator.
@@ -571,7 +788,7 @@ Cover:
 Exit condition: terminal behavior remains byte-for-byte and telemetry-equivalent, ordinary app
 behavior is unchanged, and the performance gate is green.
 
-### Phase 2: First named app/site rules
+### Phase 2: First named app/site rules (deferred pending target inputs)
 
 For each requested target:
 
@@ -587,7 +804,7 @@ a title. If it genuinely requires hostname/path matching, proceed to Phase 3 bef
 
 Do not bundle unrelated targets into one transformation file.
 
-### Phase 3: Chrome context bridge, only when required
+### Phase 3: Chrome context bridge, only when required (not implemented)
 
 - Add the Manifest V3 extension.
 - Pin and verify the extension ID before writing either native-host manifest.
@@ -600,7 +817,7 @@ Do not bundle unrelated targets into one transformation file.
 Exit condition: a Dev run reliably matches the actual active host/path in memory and validates tab
 identity without logging raw paths/page content or delaying capture.
 
-### Phase 4: Documentation and release readiness
+### Phase 4: Documentation and release readiness (partially complete)
 
 - Update `docs/architecture.md` with the final pipeline and Chrome bridge.
 - Update `docs/replacements-and-logging.md` with hook semantics and JSONL fields.
@@ -612,6 +829,23 @@ identity without logging raw paths/page content or delaying capture.
 ---
 
 ## Definition of Done
+
+Current status is intentionally split because the original definition spans conditional future work:
+
+| Requirement | Status |
+|---|---|
+| Shared after-copy/before-paste framework | Implemented |
+| Explicit ordered rule list | Implemented with terminal rule only |
+| No target branches in coordinator | Implemented |
+| PID + root-owner desktop destination validation | Implemented and unit tested |
+| Before-paste formatter-neutral literal protection | Implemented and unit tested with synthetic rules |
+| Terminal migration and parity telemetry | Implemented, automated and manually verified |
+| Per-hook telemetry and benchmark fields | Implemented |
+| No-match microbenchmark | Implemented and green |
+| First named non-terminal app/site rule | Deferred until target inputs are supplied |
+| Chrome extension/native-host/cache | Deferred until a URL-scoped rule requires it |
+| Manual before-paste rule acceptance | Deferred until the first such rule exists |
+| Post-change E2E comparison for a named target | Deferred until that rule is implemented |
 
 - Both formatting hooks exist at the specified pipeline boundaries.
 - App and Chrome-site rules use one common short ordered list and pipeline.
