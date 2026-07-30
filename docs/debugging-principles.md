@@ -46,7 +46,7 @@ A spell-check run is clean when:
 
 - `capture_succeeded` with `copy_attempts=1` (or a clearly logged retry reason).
 - `request_succeeded` implied by `replace_succeeded` appearing with `request_attempts=1`.
-- `replace_succeeded` shows matching `active_process` from capture through paste.
+- `replace_succeeded` records both the capture app and the app active at paste time; they may differ.
 - No-selection produces `capture_failed` and no paste occurs.
 - Rapid double-press produces `guard_rejected reason=already_running` for the second press.
 

@@ -83,7 +83,7 @@ Per trial, the harness captures:
 | `request_ms` | ✓ | ✓ | OpenAI API round-trip |
 | `post_process_ms` | ✓ | ✓ | `TextPostProcessor.Process` (replacements + prompt-leak guard) |
 | `after_copy_format_ms` | 0 | ✓ | Target rule resolution plus after-copy hook |
-| `before_paste_format_ms` | 0 | ✓ | Before-paste target validation and hook |
+| `before_paste_format_ms` | 0 | ✓ | Before-paste target hook |
 | `paste_ms` | 0 | ✓ | Clipboard write + `SendInput` Ctrl+V |
 
 Per-phase stats reported: median, p95, mean, stddev, min, max. Only successful trials are included in stats — failed trials are counted separately.

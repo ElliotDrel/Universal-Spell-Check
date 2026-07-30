@@ -301,11 +301,10 @@ hotkey
   -> replacements / prompt guard / literal restoration
   -> align corrected Markdown onto the run list                       [NEW]
   -> re-serialize the run list to HTML                                [NEW]
-  -> recapture + validate destination identity
+  -> recapture current destination context
   -> BeforePaste hook
   -> write CF_HTML + CF_UNICODETEXT together                          [NEW]
   -> settle delay
-  -> final destination validation
   -> Ctrl+V
   -> async telemetry
 ```

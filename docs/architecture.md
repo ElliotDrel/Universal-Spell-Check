@@ -80,8 +80,8 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 7. **Request** — the overlay reads "Sending to AI..." while the request body is written, then "Waiting for AI..." until response headers arrive. `OpenAiSpellcheckService` records separate send, wait, and response-download timings.
 8. On request failure: restore clipboard, notify user, log `request_failed`, return.
 9. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
-10. **Validate and format destination** — recapture the foreground PID and root-owner window, require the frozen target/rule identity to remain valid, then run the optional before-paste hook. Before-paste rules receive formatter-neutral, private-use placeholders; a missing or duplicated placeholder aborts the paste.
-11. **Paste** — write corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), wait for the existing settle delay, validate the destination once more, then send Ctrl+V. A destination mismatch restores the original clipboard through the existing failure path. On success the corrected text is intentionally left on the clipboard.
+10. **Format for paste** — recapture the current foreground context and run the optional frozen before-paste hook. Before-paste rules receive formatter-neutral, private-use placeholders; a missing or duplicated placeholder aborts the paste.
+11. **Paste** — write corrected text to the clipboard (`Clipboard.SetText`, **untagged** so it IS kept in history), wait for the existing settle delay, then send Ctrl+V to whichever app is active. Switching apps while the request runs never stops the paste. On success the corrected text is intentionally left on the clipboard.
 12. Log `replace_succeeded` with target-formatting metadata and separate hook timings.
 13. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
 
@@ -93,10 +93,9 @@ of deterministic rules and catches optional hook failures so formatting cannot t
 spellcheck into a failed request. `TerminalFormattingRule` preserves the former terminal normalizer's
 process list, transformation order, output, and counters.
 
-Desktop destination identity is PID plus root-owner HWND, which permits IME/autocomplete owned
-windows while rejecting another window or process with the same executable name. Site-rule support
-already requires a fresh, focused HTTP(S) browser snapshot and validates the same browser window,
-tab, and frozen rule before paste. The Chrome cache/extension that supplies such snapshots remains
+Site-rule resolution requires a fresh, focused HTTP(S) browser snapshot when the run starts. The
+selected rule remains frozen for the run, but changing the active window or tab does not cancel
+the eventual paste. The Chrome cache/extension that supplies such snapshots remains
 deferred until a named target requires real URL matching; no browser query occurs on the hot path.
 
 For the implemented file map, verified Phase 1 evidence, first-rule intake template, rule-authoring

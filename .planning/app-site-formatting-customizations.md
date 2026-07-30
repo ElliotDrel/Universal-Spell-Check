@@ -2,10 +2,14 @@
 
 ## Status
 
-Phase 1 implemented on 2026-07-17. The shared two-hook pipeline, terminal-rule migration, stronger
-desktop destination identity, protected before-paste hook path, telemetry, tests, and no-match
+Phase 1 implemented on 2026-07-17. The shared two-hook pipeline, terminal-rule migration,
+protected before-paste hook path, telemetry, tests, and no-match
 microbenchmark are in place. Phases 2 and 3 remain intentionally gated on the first named target and
 its exact input/output examples; no Chrome bridge is built until a real URL-scoped rule requires it.
+
+On 2026-07-29, paste-time destination validation was intentionally removed. A run now pastes into
+whichever app is active when the correction is ready, even if it differs from the app where capture
+started. The initially selected formatting rule remains frozen for that run.
 
 Implementation commit: `269ce7f feat: add target-specific formatting pipeline`.
 
@@ -30,11 +34,10 @@ capture PID/HWND/root-owner target identity
   -> protect literals
   -> AI request
   -> replacements/prompt guard/literal restoration
-  -> recapture and validate target identity
+  -> recapture current target context
   -> guarded before-paste hook with formatter-neutral literal protection
   -> write corrected clipboard text
   -> settle delay
-  -> final target validation
   -> paste
   -> asynchronous formatting telemetry
 ```
@@ -49,7 +52,7 @@ executable. Do not add target-specific branches to `SpellcheckCoordinator`.
 |---|---|
 | Target and optional browser snapshots, process/hostname match helpers | `src/TargetFormatting/TargetContext.cs` |
 | Rule contract, result/failure shape, frozen match | `src/TargetFormatting/TargetFormattingRule.cs` |
-| Ordered matching, hook guards, destination validation, before-paste literal safety | `src/TargetFormatting/TargetFormattingPipeline.cs` |
+| Ordered matching, hook guards, before-paste literal safety | `src/TargetFormatting/TargetFormattingPipeline.cs` |
 | Existing terminal transformation and counters | `src/TargetFormatting/TerminalFormattingRule.cs` |
 | Foreground PID/HWND/root-owner capture | `src/ActiveWindowInfo.cs` |
 | Four coordinator integration points and asynchronous telemetry | `src/SpellcheckCoordinator.cs` |
@@ -66,7 +69,7 @@ Automated verification completed during Phase 1:
 - Release product build passed.
 - Release bench build passed.
 - `TargetFormattingTests` passed matcher, precedence, hook-order, hook-failure, browser-freshness,
-  destination-identity, literal-safety, placeholder-corruption, and terminal-parity coverage.
+  literal-safety, placeholder-corruption, and terminal-parity coverage.
 - The no-match resolver averaged 0.365 microseconds per call over 250,000 calls in the final run.
 - `ProtectedTextTests` passed 100,000 extraction/restoration iterations.
 - `--dashboard-smoke` and the Dev `--startup-smoke` passed.
@@ -198,7 +201,7 @@ Implement the first real target-formatting rule using
 .planning/app-site-formatting-customizations.md as the authoritative handoff. Read the repo routing
 docs and current implementation before editing. Preserve the Phase 1 architecture: one isolated
 rule, one explicit ordered-list entry, no target-specific coordinator branches, deterministic hooks,
-literal safety, target identity validation, telemetry, focused tests, and manual Dev verification.
+literal safety, telemetry, focused tests, and manual Dev verification.
 
 Target: [desktop executable or exact Chrome URL]
 Scope: [whole app/site or exact editor/path]
@@ -265,11 +268,10 @@ Hotkey received
   -> AI request
   -> existing replacements and prompt-leak cleanup
   -> restore protected literals
-  -> recapture and validate destination context
+  -> recapture current destination context
   -> BEFORE-PASTE hook
   -> write final text to clipboard
   -> existing clipboard-settle delay
-  -> final destination validation
   -> Ctrl+V
   -> asynchronous logging/finalization
 ```
@@ -278,9 +280,8 @@ The clipboard-history exclusion stays immediately after capture because it is ti
 Target-specific cleanup begins only after that step.
 
 The rule selected after copy is frozen in the run record. Before paste, the coordinator recaptures
-the live target and re-evaluates that frozen rule; it does not select a different rule mid-run. The
-live context must still represent the same destination and rule. A rule chosen for one Chrome site
-must never be applied after the user switches to another tab or site.
+the live target for the hook, but it does not select a different rule mid-run. A window, app, or tab
+change does not cancel the paste.
 
 ---
 
@@ -364,7 +365,7 @@ Rules:
 - Hooks may not perform file, clipboard, browser, network, registry, logging, or UI operations.
 - A hook that has nothing to change returns `FormattingResult.NotApplied(text)`.
 - An unchanged result must retain the original string reference when practical.
-- Rules own transformation logic only. They do not own capture, target validation, literal
+- Rules own transformation logic only. They do not own capture, literal
   protection, clipboard writes, or paste behavior.
 
 ### `FormattingResult`
@@ -564,18 +565,7 @@ A Chrome site rule is eligible after copy only when:
   initial resolution.
 - The URL is an allowed `http` or `https` URL.
 
-Before paste, do not require a new wall-clock-fresh event. A normal multi-second AI request may
-produce no tab event while the user remains on the same page. Instead, read the latest cached
-snapshot and require it to remain focused with the same Chrome window ID, tab ID, and matching rule
-identity. If a newer event exists, it must still describe that same destination. Initial freshness
-answers "was this context trustworthy when the run began"; paste-time identity answers "did the
-destination change during the run."
-
 If initial resolution fails, skip site-specific formatting and continue with ordinary spellchecking.
-If a site rule was already applied after copy and paste-time identity changes, abort the paste rather
-than asymmetrically dropping the before-paste hook. Never guess. Log a small reason code
-asynchronously, such as `missing`, `stale_at_start`, `not_focused`, `identity_changed`, or
-`unsupported_url`.
 
 ---
 
@@ -590,25 +580,11 @@ Update `SpellcheckCoordinator.ExecuteHotPathAsync` in four narrow locations:
 1. Capture the richer starting `TargetContext` before Ctrl+C.
 2. After successful capture and clipboard-history exclusion, resolve the rule and run
    `AfterCopy`.
-3. After the existing `TextPostProcessor.Process`, recapture the destination and run target
-   validation plus `BeforePaste`.
-4. After the clipboard-settle delay, perform one final cheap destination validation before Ctrl+V.
+3. After the existing `TextPostProcessor.Process`, recapture the current destination and run
+   `BeforePaste`.
+4. After the clipboard-settle delay, send Ctrl+V to the currently active app.
 
 Do not add app/site conditionals directly to the coordinator.
-
-### Target identity
-
-Desktop validation requires the same process ID and root-owner window. Resolve both captured HWNDs
-through `GetAncestor(hwnd, GA_ROOTOWNER)` before comparing them so IME, autocomplete, and transient
-owned windows do not cause false target-change failures. Browser validation additionally requires
-the same matched rule, Chrome window ID, and active tab ID. A browser navigation that stays inside
-the same rule's allowed hostname/path may remain valid; switching to a different rule or unmatched
-site must abort.
-
-This intentionally strengthens the current process-name-only check, which cannot distinguish two
-windows or tabs owned by the same executable.
-
----
 
 ## Literal Safety
 
@@ -705,10 +681,10 @@ Acceptance gate:
 | No rule matches | Continue existing pipeline unchanged |
 | Chrome extension unavailable | Skip site customization; continue generic spellcheck |
 | Browser context missing/stale at initial resolution | Skip site customization; continue generic spellcheck |
-| Browser snapshot ages during an unchanged AI request | Keep the frozen rule; validate latest identity, not timestamp |
+| Browser snapshot ages during an AI request | Keep the frozen rule |
 | Formatting hook throws | Keep input text unchanged; record failure asynchronously |
 | Before-paste literal restore fails | Abort paste using protected-text failure behavior |
-| Window/tab/site changes during request | Abort paste and restore original clipboard |
+| Window/tab/site changes during request | Paste into whichever app is active when ready |
 | Native messaging disconnects | Reconnect in background; never delay hotkey |
 | Malformed native message | Reject message, preserve last valid cache snapshot, log bounded diagnostic |
 | Chrome tab switch event is still propagating at paste time | Accept the bounded same-window formatting race; do not add a synchronous browser round trip that violates the latency contract |
@@ -734,11 +710,10 @@ Cover:
 7. Each hook can be independently inactive.
 8. A thrown hook retains unchanged text.
 9. Missing/stale Chrome context never triggers a site rule.
-10. Switching tabs or rules before paste fails target validation.
-11. Navigating within an allowed path remains valid when the rule permits it.
-12. Protected literals survive before-paste formatting byte-for-byte.
-13. Duplicate/missing protected placeholders abort before paste.
-14. Terminal rule output matches the current normalizer fixtures.
+10. Switching apps or tabs before paste does not stop the paste.
+11. Protected literals survive before-paste formatting byte-for-byte.
+12. Duplicate/missing protected placeholders abort before paste.
+13. Terminal rule output matches the current normalizer fixtures.
 
 ### Chrome integration tests
 
@@ -781,7 +756,7 @@ Cover:
 - Enrich `ActiveWindowInfo` with PID, window handle, and root-owner resolution.
 - Integrate both hooks into the coordinator.
 - Add run-record fields and asynchronous telemetry.
-- Add matcher, hook-order, focus-validation, and literal-safety tests.
+- Add matcher, hook-order, destination-switch, and literal-safety tests.
 - Add the no-match microbenchmark.
 - Update replacements/logging and architecture docs to describe the generalized hooks.
 
@@ -837,7 +812,7 @@ Current status is intentionally split because the original definition spans cond
 | Shared after-copy/before-paste framework | Implemented |
 | Explicit ordered rule list | Implemented with terminal rule only |
 | No target branches in coordinator | Implemented |
-| PID + root-owner desktop destination validation | Implemented and unit tested |
+| Paste into the currently active app after a destination switch | Implemented and unit tested |
 | Before-paste formatter-neutral literal protection | Implemented and unit tested with synthetic rules |
 | Terminal migration and parity telemetry | Implemented, automated and manually verified |
 | Per-hook telemetry and benchmark fields | Implemented |
@@ -853,7 +828,7 @@ Current status is intentionally split because the original definition spans cond
 - Chrome rules that need URL scoping use the real active URL from an extension-fed in-memory cache.
 - No browser, disk, network, registry, reflection, or logging work occurs synchronously on the
   ordinary hotkey path.
-- Switching the destination window, Chrome tab, or formatting rule prevents a wrong-target paste.
+- Switching the destination window or Chrome tab does not stop the paste.
 - Existing terminal normalization is represented as a rule with parity coverage.
 - Protected literals survive both hooks byte-for-byte.
 - Missing browser integration degrades to normal generic spellchecking.

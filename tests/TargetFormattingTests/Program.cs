@@ -6,7 +6,6 @@ const long freshness = 1_000;
 
 var desktop = Context("Code", processId: 10, hwnd: 100, rootOwner: 90);
 var sameDesktop = Context("CODE", processId: 10, hwnd: 101, rootOwner: 90);
-var otherDesktop = Context("Code", processId: 11, hwnd: 102, rootOwner: 91);
 
 var terminalPipeline = new TargetFormattingPipeline();
 Assert(terminalPipeline.Resolve(desktop)?.Rule.Id == TerminalFormattingRule.RuleId,
@@ -61,6 +60,10 @@ var after = hookPipeline.ApplyAfterCopy(hookMatch, "text");
 var before = hookPipeline.ApplyBeforePaste(hookMatch, after.Text, sameDesktop);
 Assert(hookOrder.SequenceEqual(new[] { "after_copy", "before_paste" }), "hooks ran out of order");
 Assert(before.Text == "text after before", "both hook transformations were not retained");
+var switchedApp = Context("notepad", processId: 11, hwnd: 102, rootOwner: 91);
+var afterSwitch = hookPipeline.ApplyBeforePaste(hookMatch, "text", switchedApp);
+Assert(afterSwitch.Text == "text before",
+    "switching apps must not stop the frozen before-paste hook");
 
 var inactiveRule = Rule(
     "inactive",
@@ -100,23 +103,6 @@ Assert(Pipeline(new[] { hostRule }).Resolve(missingBrowser) is null,
     "missing browser context must not trigger a site rule");
 Assert(Pipeline(new[] { hostRule }).Resolve(staleBrowser) is null,
     "stale browser context must not trigger a site rule");
-
-Assert(hookPipeline.ValidateDestination(hookMatch, desktop, sameDesktop),
-    "owned child windows with the same PID and root owner must remain valid");
-Assert(!hookPipeline.ValidateDestination(hookMatch, desktop, otherDesktop),
-    "different process/root-owner identity must fail validation");
-
-var sitePipeline = Pipeline(new[] { pathRule });
-var siteMatch = sitePipeline.Resolve(browserContext)!;
-var switchedTab = browserContext with { Browser = exactBrowser with { TabId = 8 } };
-var sameRuleNavigation = browserContext with
-{
-    Browser = exactBrowser with { Path = "/document/d/other/edit", ReceivedAtStopwatchTicks = now + 100 }
-};
-Assert(!sitePipeline.ValidateDestination(siteMatch, browserContext, switchedTab),
-    "switching browser tabs must fail destination validation");
-Assert(sitePipeline.ValidateDestination(siteMatch, browserContext, sameRuleNavigation),
-    "navigation that remains inside the frozen rule must stay valid");
 
 const string literals = "Keep https://example.com/a_b and C:\\work\\notes.md byte-for-byte.";
 var markdownRule = Rule(

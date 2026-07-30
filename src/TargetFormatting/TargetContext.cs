@@ -6,16 +6,7 @@ internal sealed record TargetContext(
     IntPtr WindowHandle,
     IntPtr RootOwnerWindowHandle,
     string WindowTitle,
-    BrowserTargetContext? Browser)
-{
-    public bool HasSameDesktopDestination(TargetContext other)
-    {
-        return ProcessId != 0
-            && RootOwnerWindowHandle != IntPtr.Zero
-            && ProcessId == other.ProcessId
-            && RootOwnerWindowHandle == other.RootOwnerWindowHandle;
-    }
-}
+    BrowserTargetContext? Browser);
 
 internal sealed record BrowserTargetContext(
     string Browser,

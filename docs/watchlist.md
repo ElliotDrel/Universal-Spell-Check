@@ -44,7 +44,7 @@ The migration is copy-only and checkpointed. It preserves any surviving legacy f
 - `capture_failed reason="Copied selection was empty."` when text was actually selected — same timing issue, or the app uses a non-clipboard copy path.
 - Unexpectedly high `clipboard_ms`.
 - Repeated `copy_attempts=2`.
-- `paste_failed` with `expected_process` ≠ `actual_process` — the target app lost focus during the API request; this is not a capture failure, do not treat it as one.
+- A different paste target than capture target is expected when the user switches apps during the API request. Do not classify it as a paste or capture failure.
 
 Before adding app-specific timing rules: reproduce with a named target app and inspect the log timing fields. Don't adjust constants blindly. Every capture failure now logs per-attempt forensics — see § Capture-failure forensics at the top of this file.
 

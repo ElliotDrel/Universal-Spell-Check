@@ -28,8 +28,8 @@ Tabs are matched alongside spaces in all three passes. Bare `\r\n` without trail
 - If not applied (non-terminal process or no artifacts found), `terminal_normalization.applied = false` and `chars_removed = 0`.
 
 Full pipeline order: **resolve target** → **after-copy format** → **protect literals** → API call →
-post-process (replacements + prompt-leak guard) → **restore literals** → **validate target** →
-**before-paste format with protected literals** → **final target validation**.
+post-process (replacements + prompt-leak guard) → **restore literals** →
+**before-paste format with protected literals** → **paste into the currently active app**.
 
 ## Protected literals
 
@@ -135,7 +135,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 | `guard_rejected reason=already_running` | Overlapping hotkey press |
 | `request_failed` / `request_retrying` | API errors |
 | `replace_succeeded` | Full pipeline success; includes all timing fields |
-| `paste_failed` | Focus changed before paste, or Ctrl+V failed |
+| `paste_failed` | Clipboard setup or Ctrl+V failed |
 | `spellcheck_detail` | JSON blob with full input/output/tokens/timings on every run |
 | `replacements_reloaded` / `replacements_reload_failed` | Replacements file change detection |
 | `update_check_start` / `update_download_done` / `update_apply_now` | UpdateService flow |

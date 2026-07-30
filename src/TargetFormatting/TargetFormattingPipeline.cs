@@ -76,11 +76,6 @@ internal sealed class TargetFormattingPipeline
         string text,
         TargetContext liveContext)
     {
-        if (!IsSameDestination(match.StartingContext, liveContext, match.Rule))
-        {
-            return FormattingResult.Unsafe(text, "identity_changed");
-        }
-
         if (!match.Rule.HasBeforePasteTransform)
         {
             return FormattingResult.NotApplied(text);
@@ -111,34 +106,5 @@ internal sealed class TargetFormattingPipeline
         }
 
         return formatted with { Text = restored.Text };
-    }
-
-    public bool ValidateDestination(FormattingMatch? match, TargetContext start, TargetContext live)
-    {
-        return match is null
-            ? start.HasSameDesktopDestination(live)
-            : IsSameDestination(match.StartingContext, live, match.Rule);
-    }
-
-    private static bool IsSameDestination(
-        TargetContext start,
-        TargetContext live,
-        ITargetFormattingRule rule)
-    {
-        if (!start.HasSameDesktopDestination(live) || !rule.Matches(live))
-        {
-            return false;
-        }
-
-        if (rule.MatchType != TargetFormattingMatchType.Site)
-        {
-            return true;
-        }
-
-        return start.Browser is { } startBrowser
-            && live.Browser is { } liveBrowser
-            && TargetMatch.IsSupportedWebContext(liveBrowser)
-            && startBrowser.WindowId == liveBrowser.WindowId
-            && startBrowser.TabId == liveBrowser.TabId;
     }
 }

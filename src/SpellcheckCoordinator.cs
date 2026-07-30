@@ -193,7 +193,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
         try
         {
             record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
-            // Capture target identity before any clipboard work can yield, then
+            // Capture the starting target before any clipboard work can yield, then
             // back up the clipboard before Ctrl+C so failed runs can restore it.
             record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
             record.Events.Add("run_started");
@@ -321,34 +321,22 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 : _formattingPipeline.ApplyBeforePaste(record.FormattingMatch, pp.Text, beforePasteContext);
             record.T_BeforePasteFormatEnd = Stopwatch.GetTimestamp();
 
-            if (!_formattingPipeline.ValidateDestination(
-                    record.FormattingMatch,
-                    record.ActiveWindowAtStart.ToTargetContext(),
-                    beforePasteContext)
-                || record.BeforePasteFormatting.AbortPaste)
+            if (record.BeforePasteFormatting.AbortPaste)
             {
                 var literalRestoreFailed = string.Equals(
                     record.BeforePasteFormatting.FailureCode,
                     "literal_restore_failed",
                     StringComparison.Ordinal);
-                record.Status = literalRestoreFailed ? RunStatus.RunFailed : RunStatus.PasteFailed;
+                record.Status = RunStatus.RunFailed;
                 record.ErrorCode = literalRestoreFailed
                     ? SpellcheckErrorCodes.ProtectedTextRestoreFailed
                     : record.BeforePasteFormatting.FailureCode;
                 record.ErrorMessage = literalRestoreFailed
                     ? "Target formatting changed a protected placeholder."
-                    : "Target app changed before paste.";
-                record.PasteFailurePhase = literalRestoreFailed
-                    ? "before_paste_literal_restore"
-                    : "target_changed_before_format";
-                record.Events.Add(literalRestoreFailed
-                    ? "target_format_literal_restore_failed"
-                    : "paste_failed");
-                _notify(
-                    literalRestoreFailed ? "Spell check failed" : "Paste failed",
-                    literalRestoreFailed
-                        ? "Protected text could not be restored safely."
-                        : $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
+                    : "Target formatting could not be applied safely.";
+                record.PasteFailurePhase = "before_paste_literal_restore";
+                record.Events.Add("target_format_literal_restore_failed");
+                _notify("Spell check failed", "Protected text could not be restored safely.");
                 record.T_HotPathReturned = Stopwatch.GetTimestamp();
                 return record;
             }
@@ -361,7 +349,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var finalText = record.BeforePasteFormatting.Text;
             record.OutputText = finalText;
 
-            // Paste: set clipboard, let it settle, validate once more, then send Ctrl+V.
+            // Paste into whichever app is active when the correction is ready.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
             if (await ClipboardLoop.TrySetReplacementTextAsync(finalText))
             {
@@ -383,26 +371,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             await Task.Delay(50);
 
             record.T_PasteTargetCheck = Stopwatch.GetTimestamp();
-            var pasteTarget = ActiveWindowInfo.Capture();
-            record.ActiveWindowAtPaste = pasteTarget;
-
-            if (!_formattingPipeline.ValidateDestination(
-                    record.FormattingMatch,
-                    record.ActiveWindowAtStart.ToTargetContext(),
-                    pasteTarget.ToTargetContext()))
-            {
-                record.Status = RunStatus.PasteFailed;
-                record.ErrorMessage = "Target app changed before paste.";
-                record.PasteFailurePhase = "target_changed";
-                record.Events.Add("paste_failed");
-                record.CorrectedTextOnClipboard = false;
-                _notify(
-                    "Paste failed",
-                    $"{record.ActiveWindowAtStart.ProcessName} lost focus before the corrected text could be pasted.");
-                record.T_PasteAck = Stopwatch.GetTimestamp();
-                record.T_HotPathReturned = Stopwatch.GetTimestamp();
-                return record;
-            }
+            record.ActiveWindowAtPaste = ActiveWindowInfo.Capture();
 
             try
             {
