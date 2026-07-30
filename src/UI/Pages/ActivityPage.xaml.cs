@@ -326,9 +326,12 @@ internal partial class ActivityPage : Page
         row.Children.Add(metadata);
 
         var inlineBlock = CreateInlineDiffBlock(entry);
+        var originalBlock = CreateOriginalTextBlock(entry.InputText);
+        originalBlock.Visibility = Visibility.Collapsed;
 
         var diffBody = new StackPanel();
         diffBody.Children.Add(inlineBlock);
+        diffBody.Children.Add(originalBlock);
 
         var diffHost = new Border
         {
@@ -362,16 +365,27 @@ internal partial class ActivityPage : Page
             actions.Opacity = 0;
         };
 
+        var isShowingOriginal = false;
         DispatcherTimer? copyResetTimer = null;
         var copyButton = CreateIconButton(FeedActionIcons.Copy(), "Copy corrected text");
 
-        void CopyCorrectedText()
+        string CopyToolTip() => isShowingOriginal ? "Copy original text" : "Copy corrected text";
+
+        void UpdateCopyTarget(bool showOriginal)
         {
-            if (!TryCopyOutputText(entry.OutputText))
+            isShowingOriginal = showOriginal;
+            diffHost.ToolTip = showOriginal ? "Click to copy original text" : "Click to copy corrected text";
+            copyButton.ToolTip = CopyToolTip();
+        }
+
+        void CopyDisplayedText()
+        {
+            var copiedOriginal = isShowingOriginal;
+            if (!TryCopyText(copiedOriginal ? entry.InputText : entry.OutputText))
                 return;
 
             copyButton.Content = FeedActionIcons.Check();
-            copyButton.ToolTip = "Copied";
+            copyButton.ToolTip = copiedOriginal ? "Copied original text" : "Copied corrected text";
 
             copyResetTimer?.Stop();
             copyResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
@@ -380,14 +394,14 @@ internal partial class ActivityPage : Page
                 copyResetTimer?.Stop();
                 copyResetTimer = null;
                 copyButton.Content = FeedActionIcons.Copy();
-                copyButton.ToolTip = "Copy corrected text";
+                copyButton.ToolTip = CopyToolTip();
             };
             copyResetTimer.Start();
         }
 
         copyButton.Click += (_, e) =>
         {
-            CopyCorrectedText();
+            CopyDisplayedText();
             e.Handled = true;
         };
         actions.Children.Add(copyButton);
@@ -396,11 +410,18 @@ internal partial class ActivityPage : Page
             actions.Children.Add(CreateTimingButton(rowHost, entry.Timings));
 
         if (entry.TextChanged)
-            actions.Children.Add(CreateDiffViewMenuButton(inlineBlock, diffBody, entry));
+        {
+            actions.Children.Add(CreateDiffViewMenuButton(
+                inlineBlock,
+                originalBlock,
+                diffBody,
+                entry,
+                UpdateCopyTarget));
+        }
 
         diffHost.MouseLeftButtonUp += (_, e) =>
         {
-            CopyCorrectedText();
+            CopyDisplayedText();
             e.Handled = true;
         };
 
@@ -412,6 +433,20 @@ internal partial class ActivityPage : Page
         });
 
         return rowWrap;
+    }
+
+    private FrameworkElement CreateOriginalTextBlock(string originalText)
+    {
+        var block = new StackPanel();
+        block.Children.Add(new TextBlock
+        {
+            Style = (Style)FindResource("Caption"),
+            Text = "ORIGINAL TEXT - NOT SPELL-CHECKED",
+            Margin = new Thickness(8, 0, 8, 4),
+            ToolTip = "This is the original text, not the spell-checked text."
+        });
+        block.Children.Add(CreatePlainTextLine(originalText));
+        return block;
     }
 
     private WpfButton CreateTimingButton(System.Windows.Controls.Panel rowHost, ActivityTimings timings)
@@ -864,8 +899,10 @@ internal partial class ActivityPage : Page
 
     private WpfButton CreateDiffViewMenuButton(
         FrameworkElement inlineBlock,
+        FrameworkElement originalBlock,
         System.Windows.Controls.Panel diffBody,
-        ActivityEntry entry)
+        ActivityEntry entry,
+        Action<bool> onOriginalViewChanged)
     {
         var inlineItem = new WpfMenuItem
         {
@@ -878,10 +915,15 @@ internal partial class ActivityPage : Page
             Header = "Side by side",
             IsCheckable = true
         };
+        var originalItem = new WpfMenuItem
+        {
+            Header = "See original"
+        };
 
         FrameworkElement? splitBlock = null;
+        var isShowingOriginal = false;
 
-        void SetDiffView(bool sideBySide)
+        void SetDiffView(bool sideBySide, bool showOriginal)
         {
             if (sideBySide && splitBlock is null)
             {
@@ -889,15 +931,20 @@ internal partial class ActivityPage : Page
                 diffBody.Children.Add(splitBlock);
             }
 
-            inlineBlock.Visibility = sideBySide ? Visibility.Collapsed : Visibility.Visible;
+            inlineBlock.Visibility = sideBySide || showOriginal ? Visibility.Collapsed : Visibility.Visible;
+            originalBlock.Visibility = showOriginal ? Visibility.Visible : Visibility.Collapsed;
             if (splitBlock is not null)
-                splitBlock.Visibility = sideBySide ? Visibility.Visible : Visibility.Collapsed;
-            inlineItem.IsChecked = !sideBySide;
+                splitBlock.Visibility = sideBySide && !showOriginal ? Visibility.Visible : Visibility.Collapsed;
+            inlineItem.IsChecked = !sideBySide && !showOriginal;
             sideBySideItem.IsChecked = sideBySide;
+            isShowingOriginal = showOriginal;
+            originalItem.Header = showOriginal ? "See corrected" : "See original";
+            onOriginalViewChanged(showOriginal);
         }
 
-        inlineItem.Click += (_, _) => SetDiffView(sideBySide: false);
-        sideBySideItem.Click += (_, _) => SetDiffView(sideBySide: true);
+        inlineItem.Click += (_, _) => SetDiffView(sideBySide: false, showOriginal: false);
+        sideBySideItem.Click += (_, _) => SetDiffView(sideBySide: true, showOriginal: false);
+        originalItem.Click += (_, _) => SetDiffView(sideBySide: false, showOriginal: !isShowingOriginal);
 
         var menu = new WpfContextMenu
         {
@@ -906,6 +953,8 @@ internal partial class ActivityPage : Page
         };
         menu.Items.Add(inlineItem);
         menu.Items.Add(sideBySideItem);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(originalItem);
 
         var button = CreateIconButton(FeedActionIcons.MoreVertical(), "Diff view options");
         button.ContextMenu = menu;
@@ -918,7 +967,7 @@ internal partial class ActivityPage : Page
         return button;
     }
 
-    private static bool TryCopyOutputText(string text)
+    private static bool TryCopyText(string text)
     {
         try
         {

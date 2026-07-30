@@ -37,6 +37,7 @@ UI/
 
 - **Logs:** `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
 - **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
+- **Original-text view:** changed rows expose **See original** in the existing `⋮` diff-options menu. It replaces the diff in place with marked original text; the row body and copy icon then copy the original and use original-specific tooltips until **See corrected** restores the normal view.
 - **Threading:** file reads and all-time stats run off-dispatcher. The UI renders one 30-entry page, yields through a completed layout pass, then loads another page only if the measured viewport is still empty or the user scrolls.
 - **Diff cost:** inline diff renders first; side-by-side diff is lazy. LCS work is bounded so a large historical entry cannot freeze the dashboard.
 - **UI:** Flat rows (time + model | diff | hover actions), expandable per-row timing breakdowns, day headers (`TODAY` / `YESTERDAY` / date), all-time stats bar, bottom spinner while paginating.
@@ -68,6 +69,7 @@ Model selection is persisted through `SettingsStore` and applies to the next req
 8. On a `text_changed` row, ⋮ → toggle inline vs side-by-side diff.
 9. Trackpad scroll feels smooth; mouse wheel scrolls normally.
 10. Run the Release `--dashboard-smoke` mode against the real log corpus; it must exit 0 without rendering more than the first page or tripping the dispatcher watchdog.
+11. On a changed row, open `⋮` and click **See original**. Verify the marker appears in the row, hover the copy icon to see `Copy original text`, and verify both copy paths place the original text on the clipboard. Open `⋮` again, click **See corrected**, and verify corrected copying resumes.
 
 ---
 
