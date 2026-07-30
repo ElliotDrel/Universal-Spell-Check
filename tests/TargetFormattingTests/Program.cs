@@ -145,6 +145,7 @@ var terminalCases = new[]
     ("double breaks", "one\r\n\r\n  two", "one\n\ntwo"),
     ("list items", "one\r\n  - two\r\n\t3. three", "one\n- two\n3. three"),
     ("soft wrap", "one \r\n  two", "one two"),
+    ("terminal markers", "one\r\n  \u258E two\r\n  \u258E\r\n  \u258E three", "one two\n\nthree"),
     ("URL and path", "See https://x.com/a\r\n  and C:\\foo\\bar", "See https://x.com/a and C:\\foo\\bar")
 };
 foreach (var (name, input, expected) in terminalCases)
@@ -153,6 +154,10 @@ foreach (var (name, input, expected) in terminalCases)
     var result = terminalPipeline.ApplyAfterCopy(match, input);
     Assert(result.Text == expected, $"terminal parity failed for {name}");
 }
+var markerResult = terminalPipeline.ApplyAfterCopy(terminalPipeline.Resolve(desktop)!, "one\r\n  \u258E two");
+Assert(markerResult.Operations.Contains("remove_terminal_marker")
+    && markerResult.Counters![TerminalFormattingRule.TerminalMarkerCounter] == 1,
+    "terminal marker normalization must report a stable operation and counter");
 var bareCrLf = "one\r\ntwo";
 var bareResult = terminalPipeline.ApplyAfterCopy(terminalPipeline.Resolve(desktop)!, bareCrLf);
 Assert(!bareResult.Applied && ReferenceEquals(bareCrLf, bareResult.Text),

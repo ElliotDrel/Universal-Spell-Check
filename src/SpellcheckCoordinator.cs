@@ -429,6 +429,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var doubleBreakCount = GetCounter(terminalCounters, TerminalFormattingRule.DoubleBreakCounter);
             var listItemCount = GetCounter(terminalCounters, TerminalFormattingRule.ListItemCounter);
             var softWrapCount = GetCounter(terminalCounters, TerminalFormattingRule.SoftWrapCounter);
+            var terminalMarkerCount = GetCounter(terminalCounters, TerminalFormattingRule.TerminalMarkerCounter);
             var requestMs = TicksToMs(r.T_RequestSendStart, r.T_ResponseEnd);
             var requestSendMs = TicksToMs(r.RequestSendTicks);
             var requestWaitMs = TicksToMs(r.RequestWaitTicks);
@@ -483,7 +484,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 $"active_process=\"{Escape(r.ActiveWindowAtStart.ProcessName)}\" " +
                 (terminalApplied
                     ? $"terminal_normalized=true terminal_norm_ms={normMs} terminal_norm_chars_removed={r.AfterCopyFormatting.CharsRemoved} " +
-                      $"terminal_norm_double_break={doubleBreakCount} terminal_norm_list_item={listItemCount} terminal_norm_soft_wrap={softWrapCount} "
+                      $"terminal_norm_double_break={doubleBreakCount} terminal_norm_list_item={listItemCount} terminal_norm_soft_wrap={softWrapCount} terminal_norm_marker={terminalMarkerCount} "
                     : "") +
                 $"target_formatting_rule={r.FormattingMatch?.Rule.Id ?? "none"} " +
                 $"corrected_text_on_clipboard={r.CorrectedTextOnClipboard.ToString().ToLowerInvariant()} " +
@@ -589,7 +590,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     {
                         double_break_count = doubleBreakCount,
                         list_item_count = listItemCount,
-                        soft_wrap_count = softWrapCount
+                        soft_wrap_count = softWrapCount,
+                        terminal_marker_count = terminalMarkerCount
                     }
                 },
                 target_formatting = new

@@ -14,13 +14,14 @@ target context.
 
 ## Terminal input normalization (pre-processing)
 
-Before the API call, `TerminalFormattingRule.AfterCopy` is invoked when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
+Before the API call, `TerminalFormattingRule.AfterCopy` is invoked when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It removes Windows Terminal's `▎` wrap marker, then runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
 
-1. **Double CRLF** (`\r\n\r\n[ \t]*`) → `\n\n` — preserves paragraph/section breaks.
-2. **List items** (`\r\n[ \t]+` before `-`, `*`, `•`, or `N.`) → `\n` — preserves bullet and numbered list structure.
-3. **Soft-wrap continuation** (` *\r\n[ \t]+`) → ` ` — collapses lines that wrapped purely due to terminal width.
+1. **Terminal marker** (`▎`) → empty — removes the copied terminal UI marker before line handling.
+2. **Double CRLF** (`\r\n\r\n[ \t]*`) → `\n\n` — preserves paragraph/section breaks.
+3. **List items** (`\r\n[ \t]+` before `-`, `*`, `•`, or `N.`) → `\n` — preserves bullet and numbered list structure.
+4. **Soft-wrap continuation** (` *\r\n[ \t]+`) → ` ` — collapses lines that wrapped purely due to terminal width.
 
-Tabs are matched alongside spaces in all three passes. Bare `\r\n` without trailing whitespace is left untouched.
+Tabs are matched alongside spaces in the three line-handling passes. Bare `\r\n` without trailing whitespace is left untouched.
 
 - Applied on the **hot path only** (`ExecuteHotPathAsync`). Headless/bench runs are unaffected.
 - Bare `\r\n` without trailing whitespace is left untouched.
