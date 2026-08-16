@@ -14,12 +14,13 @@ target context.
 
 ## Terminal input normalization (pre-processing)
 
-Before the API call, `TerminalFormattingRule.AfterCopy` is invoked when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It removes Windows Terminal's `▎` wrap marker, then runs three ordered passes to remove soft-wrap artifacts while preserving intentional structure:
+Before the API call, `TerminalFormattingRule.AfterCopy` is invoked when the active process is a terminal (`WindowsTerminal`, `Code`, `powershell`, `pwsh`, `cmd`, `bash`). It removes Windows Terminal's `▎` wrap marker, then repairs wrapped literals before normalizing soft-wrap artifacts while preserving intentional structure:
 
 1. **Terminal marker** (`▎`) → empty — removes the copied terminal UI marker before line handling.
 2. **Double CRLF** (`\r\n\r\n[ \t]*`) → `\n\n` — preserves paragraph/section breaks.
 3. **List items** (`\r\n[ \t]+` before `-`, `*`, `•`, or `N.`) → `\n` — preserves bullet and numbered list structure.
-4. **Soft-wrap continuation** (` *\r\n[ \t]+`) → ` ` — collapses lines that wrapped purely due to terminal width.
+4. **Wrapped file paths** — a soft wrap inside a recognized file path is removed before generic line handling, so the path stays continuous and is protected from the model.
+5. **Soft-wrap continuation** (` *\r\n[ \t]+`) → ` ` — collapses lines that wrapped purely due to terminal width.
 
 Tabs are matched alongside spaces in the three line-handling passes. Bare `\r\n` without trailing whitespace is left untouched.
 

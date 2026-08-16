@@ -20,6 +20,16 @@ internal sealed class TerminalFormattingRule : ITargetFormattingRule
         @"\r\n[ \t]+(?=[-*•][ \t]|\d+\.[ \t])",
         RegexOptions.Compiled);
     private static readonly Regex SoftWrapRegex = new(@" *\r\n[ \t]+", RegexOptions.Compiled);
+    private static readonly Regex WrappedFilePathRegex = new(
+        """
+        (?:
+            [A-Za-z]:\\
+            |
+            \\\\[^\\\s]+\\
+        )
+        (?:[^\r\n\"'<>|:*?]|\r\n[ \t])+
+        """,
+        RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
     private static readonly Regex StandaloneTerminalMarkerLineRegex = new(
         @"\r\n[ \t]*\u258E[ \t]*\r\n",
         RegexOptions.Compiled);
@@ -37,6 +47,7 @@ internal sealed class TerminalFormattingRule : ITargetFormattingRule
         var listItemCount = 0;
         var softWrapCount = 0;
         var terminalMarkerCount = 0;
+        var literalSoftWrapCount = 0;
 
         var normalized = StandaloneTerminalMarkerLineRegex.Replace(text, _ =>
         {
@@ -48,6 +59,7 @@ internal sealed class TerminalFormattingRule : ITargetFormattingRule
             terminalMarkerCount++;
             return string.Empty;
         });
+        normalized = RepairWrappedLiterals(normalized, out literalSoftWrapCount);
         normalized = DoubleBreakRegex.Replace(normalized, _ =>
         {
             doubleBreakCount++;
@@ -72,6 +84,7 @@ internal sealed class TerminalFormattingRule : ITargetFormattingRule
 
         var operations = new List<string>(4);
         if (terminalMarkerCount > 0) operations.Add("remove_terminal_marker");
+        if (literalSoftWrapCount > 0) operations.Add("repair_wrapped_literal");
         if (doubleBreakCount > 0) operations.Add("normalize_double_break");
         if (listItemCount > 0) operations.Add("normalize_list_item");
         if (softWrapCount > 0) operations.Add("collapse_soft_wrap");
@@ -94,5 +107,20 @@ internal sealed class TerminalFormattingRule : ITargetFormattingRule
     public FormattingResult BeforePaste(string text, TargetContext context)
     {
         return FormattingResult.NotApplied(text);
+    }
+
+    private static string RepairWrappedLiterals(string text, out int literalSoftWrapCount)
+    {
+        var count = 0;
+
+        string RemoveSoftWraps(string literal) => SoftWrapRegex.Replace(literal, _ =>
+        {
+            count++;
+            return string.Empty;
+        });
+
+        text = WrappedFilePathRegex.Replace(text, match => RemoveSoftWraps(match.Value));
+        literalSoftWrapCount = count;
+        return text;
     }
 }

@@ -146,7 +146,8 @@ var terminalCases = new[]
     ("list items", "one\r\n  - two\r\n\t3. three", "one\n- two\n3. three"),
     ("soft wrap", "one \r\n  two", "one two"),
     ("terminal markers", "one\r\n  \u258E two\r\n  \u258E\r\n  \u258E three", "one two\n\nthree"),
-    ("URL and path", "See https://x.com/a\r\n  and C:\\foo\\bar", "See https://x.com/a and C:\\foo\\bar")
+    ("URL and path", "See https://x.com/a\r\n  and C:\\foo\\bar", "See https://x.com/a and C:\\foo\\bar"),
+    ("wrapped file path", "Open \"C:\\Users\\Elliot\\Downloads\\buildpurdue-meeting-t\r\n  ranscript.txt\".", "Open \"C:\\Users\\Elliot\\Downloads\\buildpurdue-meeting-transcript.txt\".")
 };
 foreach (var (name, input, expected) in terminalCases)
 {
@@ -154,6 +155,16 @@ foreach (var (name, input, expected) in terminalCases)
     var result = terminalPipeline.ApplyAfterCopy(match, input);
     Assert(result.Text == expected, $"terminal parity failed for {name}");
 }
+var wrappedPathResult = terminalPipeline.ApplyAfterCopy(
+    terminalPipeline.Resolve(desktop)!,
+    "Open \"C:\\Users\\Elliot\\Downloads\\buildpurdue-meeting-t\r\n  ranscript.txt\".");
+var wrappedPathProtection = ProtectedText.Protect(wrappedPathResult.Text);
+Assert(wrappedPathProtection.Entries.Count == 1
+    && wrappedPathProtection.Entries[0].Kind == ProtectedLiteralKind.FilePath
+    && wrappedPathProtection.Entries[0].Value == "\"C:\\Users\\Elliot\\Downloads\\buildpurdue-meeting-transcript.txt\"",
+    "terminal normalization must repair wrapped file paths before literal protection");
+Assert(ProtectedText.Restore(wrappedPathProtection.Text, wrappedPathProtection).Text == wrappedPathResult.Text,
+    "repaired file paths must restore byte-for-byte after the model response");
 var markerResult = terminalPipeline.ApplyAfterCopy(terminalPipeline.Resolve(desktop)!, "one\r\n  \u258E two");
 Assert(markerResult.Operations.Contains("remove_terminal_marker")
     && markerResult.Counters![TerminalFormattingRule.TerminalMarkerCounter] == 1,
