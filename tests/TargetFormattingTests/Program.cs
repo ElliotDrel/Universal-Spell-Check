@@ -1,8 +1,45 @@
 using System.Diagnostics;
+using System.Text;
 using UniversalSpellCheck;
 
 const long now = 10_000;
 const long freshness = 1_000;
+
+const string chatGptSourceText = "make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  \n\n\n\nmake image 1 rn (4 versions like always)";
+const string chatGptCorrectedText = "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nmake image 1 right now (4 versions like always)";
+const string chatGptFragment = "<p data-pm-slice=\"1 1 []\">make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  </p><p></p><p>make image 1 rn (4 versions like always)</p>";
+var richTextReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(chatGptFragment),
+    chatGptSourceText,
+    chatGptCorrectedText);
+Assert(richTextReplacement.Applied,
+    "simple ChatGPT ProseMirror paragraphs must retain their HTML structure on replacement");
+Assert(richTextReplacement.Html.Contains(
+    "</p><p></p><p>make image 1 right now (4 versions like always)</p>",
+    StringComparison.Ordinal),
+    "the empty ChatGPT paragraph must not become four plain-text newlines on paste");
+Assert(richTextReplacement.Html.Contains(
+    "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d</p>",
+    StringComparison.Ordinal),
+    "the corrected first paragraph must be written into the source HTML");
+Assert(Fragment(richTextReplacement.Html).Contains(
+    "</p><p></p><p>make image 1 right now (4 versions like always)</p>",
+    StringComparison.Ordinal),
+    "CF_HTML offsets must locate the UTF-8 fragment after multi-byte text");
+
+var nestedMarkup = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"1 1 []\">one <strong>two</strong></p>"),
+    "one two",
+    "one too");
+Assert(!nestedMarkup.Applied && nestedMarkup.Reason == "unsupported_fragment",
+    "rich-text paste must fall back rather than flattening or guessing nested markup");
+
+var structureChanged = RichTextClipboard.TryCreateReplacement(
+    CfHtml(chatGptFragment),
+    chatGptSourceText,
+    "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nextra paragraph\n\nmake image 1 right now (4 versions like always)");
+Assert(!structureChanged.Applied && structureChanged.Reason == "model_mismatch",
+    "a model output with a different paragraph count must safely use the plain-text fallback");
 
 var desktop = Context("Code", processId: 10, hwnd: 100, rootOwner: 90);
 var sameDesktop = Context("CODE", processId: 10, hwnd: 101, rootOwner: 90);
@@ -205,6 +242,33 @@ BrowserTargetContext Browser(string host, string path, long receivedAt)
 
 FormattingResult Applied(string text, string operation)
     => new(text, true, 0, 0, new[] { operation });
+
+string CfHtml(string fragment)
+{
+    const string prefix = "<html>\r\n<body>\r\n<!--StartFragment-->";
+    const string suffix = "<!--EndFragment-->\r\n</body>\r\n</html>";
+    var html = prefix + fragment + suffix;
+    const int headerLength = 105;
+    var startFragment = headerLength + Encoding.UTF8.GetByteCount(prefix);
+    var endFragment = startFragment + Encoding.UTF8.GetByteCount(fragment);
+    var endHtml = headerLength + Encoding.UTF8.GetByteCount(html);
+    return $"Version:0.9\r\nStartHTML:{headerLength:D10}\r\nEndHTML:{endHtml:D10}\r\nStartFragment:{startFragment:D10}\r\nEndFragment:{endFragment:D10}\r\n{html}";
+}
+
+string Fragment(string cfHtml)
+{
+    var start = HeaderOffset(cfHtml, "StartFragment:");
+    var end = HeaderOffset(cfHtml, "EndFragment:");
+    var bytes = Encoding.UTF8.GetBytes(cfHtml);
+    return Encoding.UTF8.GetString(bytes, start, end - start);
+}
+
+int HeaderOffset(string cfHtml, string name)
+{
+    var start = cfHtml.IndexOf(name, StringComparison.Ordinal) + name.Length;
+    var end = cfHtml.IndexOf("\r\n", start, StringComparison.Ordinal);
+    return int.Parse(cfHtml[start..end]);
+}
 
 DelegateRule Rule(
     string id,

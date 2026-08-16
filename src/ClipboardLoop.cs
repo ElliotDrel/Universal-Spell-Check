@@ -203,9 +203,9 @@ internal static class ClipboardLoop
         }, out _);
     }
 
-    public static Task<bool> TrySetReplacementTextAsync(string replacementText)
+    public static Task<bool> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "")
     {
-        return TrySetTextAsync(replacementText);
+        return TrySetTextAsync(replacementText, richTextHtml);
     }
 
     // Re-asserts the just-captured (pre-correction) selection onto the
@@ -354,13 +354,23 @@ internal static class ClipboardLoop
         return true;
     }
 
-    private static async Task<bool> TrySetTextAsync(string text)
+    private static async Task<bool> TrySetTextAsync(string text, string richTextHtml = "")
     {
         for (var attempt = 1; attempt <= ClipboardRetryAttempts; attempt++)
         {
             try
             {
-                Clipboard.SetText(text, TextDataFormat.UnicodeText);
+                if (richTextHtml.Length == 0)
+                {
+                    Clipboard.SetText(text, TextDataFormat.UnicodeText);
+                }
+                else
+                {
+                    var data = new DataObject();
+                    data.SetData(DataFormats.UnicodeText, text);
+                    data.SetData(DataFormats.Html, richTextHtml);
+                    Clipboard.SetDataObject(data, true);
+                }
                 return true;
             }
             catch (System.Runtime.InteropServices.ExternalException) when (attempt < ClipboardRetryAttempts)

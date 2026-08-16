@@ -3,8 +3,17 @@
 ## Status
 
 **Stage 1 implemented 2026-07-20: dual-flavor capture.** Every run now reads both `CF_UNICODETEXT`
-and `CF_HTML` and logs both. Nothing downstream consumes the HTML yet, so behavior is unchanged, but
-the capture path is permanently the two-flavor shape the rest of this spec builds on.
+and `CF_HTML` and logs both. The capture path is permanently the two-flavor shape the rest of this
+spec builds on.
+
+**Narrow production fix implemented 2026-08-16: ChatGPT simple-paragraph re-emission.**
+`RichTextClipboard` accepts only `data-pm-slice` fragments made exclusively of simple `<p>` text
+nodes. It verifies that the non-empty source paragraphs exactly equal the copied Unicode sections and
+that the corrected output keeps their count, then changes only those text nodes and writes `CF_HTML`
+plus Unicode text. This prevents ChatGPT's copied four-newline representation of an empty paragraph
+from becoming extra pasted lines. It is intentionally not the full Markdown/alignment pipeline: nested
+markup, malformed offsets, changed structure, and every other producer retain the exact plain-text
+fallback.
 
 **Decided:** the AI-facing representation is Markdown; the reconstruction mechanism is splicing
 corrections back onto the original HTML runs. See § Chosen Approach.

@@ -35,8 +35,8 @@ internal sealed class RunRecord
     // Text (refs only — strings are not copied on the hot path)
     public string? InputText { get; set; }
     // The same selection as InputText, in its CF_HTML flavor. "" when the source
-    // offered no HTML. This is the input to the rich-text pipeline; today it is
-    // captured and logged but not yet consumed.
+    // offered no HTML. The rich-text pipeline uses it only when it can safely
+    // preserve the source editor's paragraph structure.
     // See .planning/rich-text-clipboard-pipeline.md.
     public string CapturedHtml { get; set; } = "";
     // RTF flavor of the same selection, and every format name the source
@@ -45,6 +45,7 @@ internal sealed class RunRecord
     // indistinguishable after the fact.
     public string CapturedRtf { get; set; } = "";
     public string ClipboardFormats { get; set; } = "";
+    public RichTextReplacementResult RichTextReplacement { get; set; } = RichTextReplacementResult.NotApplied("not_attempted");
     public string? OutputText { get; set; }
     public string? RawAiOutput { get; set; }
     public byte[]? RawResponseBytes { get; set; }

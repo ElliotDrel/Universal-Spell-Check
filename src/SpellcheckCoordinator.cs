@@ -348,10 +348,14 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             var finalText = record.BeforePasteFormatting.Text;
             record.OutputText = finalText;
+            record.RichTextReplacement = RichTextClipboard.TryCreateReplacement(
+                record.CapturedHtml,
+                capture.Text!,
+                finalText);
 
             // Paste into whichever app is active when the correction is ready.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
-            if (await ClipboardLoop.TrySetReplacementTextAsync(finalText))
+            if (await ClipboardLoop.TrySetReplacementTextAsync(finalText, record.RichTextReplacement.Html))
             {
                 record.CorrectedTextOnClipboard = true;
             }
@@ -531,6 +535,14 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 clipboard_rtf_chars = r.CapturedRtf.Length,
                 clipboard_rtf_truncated = rtfTruncated,
                 clipboard_formats = r.ClipboardFormats,
+                rich_text = new
+                {
+                    source_html_present = r.CapturedHtml.Length > 0,
+                    attempted = r.RichTextReplacement.Attempted,
+                    applied = r.RichTextReplacement.Applied,
+                    reason = r.RichTextReplacement.Reason,
+                    paragraph_count = r.RichTextReplacement.ParagraphCount
+                },
                 raw_response = rawResponse,
                 request_payload = requestPayload,
                 tokens = new

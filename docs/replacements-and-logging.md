@@ -148,7 +148,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `clipboard_html` (see below), `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `clipboard_html` (see below), `rich_text` (source HTML presence, safe-rewrite attempt/result, reason, and paragraph count), `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
 
 `target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
 path, query, fragment, page title, selected text, or extension message.
@@ -172,9 +172,13 @@ same browser. The `Chromium internal source URL` format is also unusable: it rea
 another process. Neither replaces the Chrome extension bridge in
 `.planning/app-site-formatting-customizations.md`.
 
-This is the input to the rich-text pipeline (`.planning/rich-text-clipboard-pipeline.md`). Nothing
-downstream consumes it yet — the plain-text path is unchanged — but it is logged from now on so the
-representation and model comparison runs against real captured markup.
+This is the input to the rich-text pipeline (`.planning/rich-text-clipboard-pipeline.md`). A narrow
+safe path now handles ChatGPT's simple `data-pm-slice` paragraph fragments: if every non-empty source
+paragraph exactly maps to the copied text and the corrected output has the same paragraph count, the
+app replaces only text-node contents and writes both `CF_HTML` and Unicode text. Empty paragraphs stay
+as markup, preventing their browser plain-text serialization from becoming extra pasted lines. Any
+other source, nested markup, malformed header, or changed paragraph count uses the existing plain-text
+path; `rich_text.reason` records why.
 
 `logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
 `--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would
