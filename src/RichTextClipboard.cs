@@ -72,9 +72,9 @@ internal static partial class RichTextClipboard
         // that Unicode flavor would make ChatGPT paste a nested list. Accept
         // only the exact one-item shape and replace its body with a neutral
         // paragraph slice.
-        var orderedListItem = false;
+        var listItem = false;
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
-            && TryNormalizeOrderedListItem(
+            && TryNormalizeListItem(
                 fragment,
                 paragraphs.Count,
                 sourceParagraphs,
@@ -85,7 +85,7 @@ internal static partial class RichTextClipboard
         {
             sourceSections = normalizedSourceSections;
             correctedSections = normalizedCorrectedSections;
-            orderedListItem = true;
+            listItem = true;
         }
 
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
@@ -94,7 +94,7 @@ internal static partial class RichTextClipboard
             return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
         }
 
-        if (orderedListItem)
+        if (listItem)
         {
             // ChatGPT treats every HTML paragraph/list slice as a new block
             // when pasted over selected list-item text. Paste only the body as
@@ -282,7 +282,7 @@ internal static partial class RichTextClipboard
         return SectionBreakRegex().Split(text.Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
-    private static bool TryNormalizeOrderedListItem(
+    private static bool TryNormalizeListItem(
         string fragment,
         int paragraphCount,
         string[] sourceParagraphs,
@@ -298,9 +298,10 @@ internal static partial class RichTextClipboard
             || sourceParagraphs.Length != 1
             || sourceSections.Length != 1
             || correctedSections.Length != 1
-            || !fragment.Contains("&quot;ordered_list&quot;", StringComparison.Ordinal)
-            || !TrySplitOrderedListMarker(sourceSections[0], out var sourceMarker, out var sourceBody)
-            || !TrySplitOrderedListMarker(correctedSections[0], out var correctedMarker, out var correctedBody)
+            || (!fragment.Contains("&quot;ordered_list&quot;", StringComparison.Ordinal)
+                && !fragment.Contains("&quot;list&quot;", StringComparison.Ordinal))
+            || !TrySplitGeneratedListPrefix(sourceSections[0], out var sourceMarker, out var sourceBody)
+            || !TrySplitGeneratedListPrefix(correctedSections[0], out var correctedMarker, out var correctedBody)
             || !string.Equals(sourceMarker, correctedMarker, StringComparison.Ordinal)
             || !string.Equals(sourceParagraphs[0], sourceBody, StringComparison.Ordinal))
         {
@@ -310,6 +311,12 @@ internal static partial class RichTextClipboard
         normalizedSourceSections = new[] { sourceBody };
         normalizedCorrectedSections = new[] { correctedBody };
         return true;
+    }
+
+    private static bool TrySplitGeneratedListPrefix(string value, out string prefix, out string body)
+    {
+        SplitGeneratedListPrefix(value, out prefix, out body);
+        return prefix.Length > 0;
     }
 
     private static bool TrySplitOrderedListMarker(string value, out string marker, out string body)

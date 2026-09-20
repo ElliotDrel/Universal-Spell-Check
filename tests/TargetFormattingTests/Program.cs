@@ -79,6 +79,28 @@ Assert(nestedOrderedListReplacement.Applied
     && nestedOrderedListReplacement.Text == "changed nested item",
     "an indented nested list marker must be stripped before the body-only replacement");
 
+const string bulletFragment = "<p data-pm-slice=\"1 1 [&quot;list&quot;,{&quot;spread&quot;:false,&quot;start&quot;:626,&quot;end&quot;:716},&quot;regular_list_item&quot;,{&quot;start&quot;:626,&quot;end&quot;:671}]\"><span>test buallet not naumber</span></p>";
+var bulletReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(bulletFragment),
+    "- test buallet not naumber",
+    "- Test bullet not number");
+Assert(bulletReplacement.Applied
+    && bulletReplacement.Mode == "list_body_text"
+    && bulletReplacement.Html.Length == 0
+    && bulletReplacement.Text == "Test bullet not number",
+    "a single unordered bullet must strip its generated marker and use body-only text");
+
+const string nestedBulletFragment = "<p data-pm-slice=\"1 1 [&quot;list&quot;,{&quot;spread&quot;:false,&quot;start&quot;:626,&quot;end&quot;:716},&quot;regular_list_item&quot;,{&quot;start&quot;:626,&quot;end&quot;:671},&quot;list&quot;,{&quot;spread&quot;:false,&quot;start&quot;:654,&quot;end&quot;:671},&quot;regular_list_item&quot;,{&quot;start&quot;:654,&quot;end&quot;:671}]\"><span>taest sub buallet</span></p>";
+var nestedBulletReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(nestedBulletFragment),
+    "  - taest sub buallet",
+    "  - test sub bullet");
+Assert(nestedBulletReplacement.Applied
+    && nestedBulletReplacement.Mode == "list_body_text"
+    && nestedBulletReplacement.Html.Length == 0
+    && nestedBulletReplacement.Text == "test sub bullet",
+    "a single nested unordered bullet must strip indentation and its generated marker");
+
 const string parentWithChildFragment = "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:618}]\"><p><span>teast parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>chanaged child</span></p></li></ol></li>";
 var parentWithChildReplacement = RichTextClipboard.TryCreateReplacement(
     CfHtml(parentWithChildFragment),
