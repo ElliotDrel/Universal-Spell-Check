@@ -79,6 +79,17 @@ Assert(nestedOrderedListReplacement.Applied
     && nestedOrderedListReplacement.Text == "changed nested item",
     "an indented nested list marker must be stripped before the body-only replacement");
 
+const string parentWithChildFragment = "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:618}]\"><p><span>teast parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>chanaged child</span></p></li></ol></li>";
+var parentWithChildReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(parentWithChildFragment),
+    "1. teast parent\n   1. chanaged child",
+    "1. test parent\n   1. changed child");
+Assert(parentWithChildReplacement.Applied
+    && parentWithChildReplacement.Mode == "nested_list_html"
+    && parentWithChildReplacement.Text == "1. test parent\n   1. changed child"
+    && Fragment(parentWithChildReplacement.Html) == "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:618}]\"><p><span>test parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>changed child</span></p></li></ol></li>",
+    "a selected parent and child must retain the native nested-list subtree while replacing both bodies");
+
 var changedListMarker = RichTextClipboard.TryCreateReplacement(
     CfHtml(orderedListFragment),
     orderedListSourceText,

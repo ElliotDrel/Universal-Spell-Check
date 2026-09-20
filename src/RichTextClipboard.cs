@@ -36,6 +36,15 @@ internal static partial class RichTextClipboard
             return RichTextReplacementResult.NotApplied("unsupported_editor", correctedText);
         }
 
+        if (TryCreateNestedOrderedListReplacement(
+                fragment,
+                sourceText,
+                correctedText,
+                out var nestedListReplacement))
+        {
+            return nestedListReplacement;
+        }
+
         var paragraphs = ParagraphRegex().Matches(fragment);
         if (paragraphs.Count == 0 || !string.IsNullOrWhiteSpace(ParagraphRegex().Replace(fragment, "")))
         {
@@ -109,6 +118,51 @@ internal static partial class RichTextClipboard
             correctedText,
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
+    }
+
+    private static bool TryCreateNestedOrderedListReplacement(
+        string fragment,
+        string sourceText,
+        string correctedText,
+        out RichTextReplacementResult replacement)
+    {
+        replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
+
+        var match = NestedOrderedListRegex().Match(fragment);
+        if (!match.Success || match.Length != fragment.Length)
+        {
+            return false;
+        }
+
+        var sourceLines = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var correctedLines = correctedText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        if (sourceLines.Length != 2
+            || correctedLines.Length != 2
+            || !TrySplitOrderedListMarker(sourceLines[0], out var sourceParentMarker, out var sourceParentBody)
+            || !TrySplitOrderedListMarker(sourceLines[1], out var sourceChildMarker, out var sourceChildBody)
+            || !TrySplitOrderedListMarker(correctedLines[0], out var correctedParentMarker, out var correctedParentBody)
+            || !TrySplitOrderedListMarker(correctedLines[1], out var correctedChildMarker, out var correctedChildBody)
+            || !string.Equals(sourceParentMarker, correctedParentMarker, StringComparison.Ordinal)
+            || !string.Equals(sourceChildMarker, correctedChildMarker, StringComparison.Ordinal)
+            || !string.Equals(WebUtility.HtmlDecode(match.Groups["parent"].Value), sourceParentBody, StringComparison.Ordinal)
+            || !string.Equals(WebUtility.HtmlDecode(match.Groups["child"].Value), sourceChildBody, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parent = match.Groups["parent"];
+        var child = match.Groups["child"];
+        var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
+        rebuilt.Append(fragment, 0, parent.Index);
+        rebuilt.Append(WebUtility.HtmlEncode(correctedParentBody));
+        rebuilt.Append(fragment, parent.Index + parent.Length, child.Index - parent.Index - parent.Length);
+        rebuilt.Append(WebUtility.HtmlEncode(correctedChildBody));
+        rebuilt.Append(fragment, child.Index + child.Length, fragment.Length - child.Index - child.Length);
+
+        replacement = RichTextReplacementResult.CreateNestedListHtml(
+            correctedText,
+            BuildCfHtml(rebuilt.ToString()));
+        return true;
     }
 
     private static string[] SplitSections(string text)
@@ -217,6 +271,9 @@ internal static partial class RichTextClipboard
     [GeneratedRegex("<p\\b[^>]*>(?:(?<text>[^<]*)|<span\\b[^>]*>(?<text>[^<]*)</span>)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ParagraphRegex();
 
+    [GeneratedRegex("<li\\b[^>]*data-pm-slice=\\\"[^\\\"]+\\\"[^>]*><p><span\\b[^>]*>(?<parent>[^<]*)</span></p><ol\\b[^>]*><li><p><span\\b[^>]*>(?<child>[^<]*)</span></p></li></ol></li>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex NestedOrderedListRegex();
+
     [GeneratedRegex("\\n{2,}", RegexOptions.CultureInvariant)]
     private static partial Regex SectionBreakRegex();
 
@@ -268,4 +325,13 @@ internal sealed record RichTextReplacementResult(
         Applied: true,
         Reason: "",
         ParagraphCount: paragraphCount);
+
+    public static RichTextReplacementResult CreateNestedListHtml(string text, string html) => new(
+        Text: text,
+        Html: html,
+        Mode: "nested_list_html",
+        Attempted: true,
+        Applied: true,
+        Reason: "",
+        ParagraphCount: 2);
 }
