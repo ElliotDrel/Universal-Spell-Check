@@ -90,6 +90,17 @@ Assert(parentWithChildReplacement.Applied
     && Fragment(parentWithChildReplacement.Html) == "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:618}]\"><p><span>test parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>changed child</span></p></li></ol></li>",
     "a selected parent and child must retain the native nested-list subtree while replacing both bodies");
 
+const string bareParentWithChildFragment = "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1}]\"><p>teast parent</p><ol data-spread=\"false\" start=\"1\"><li><p>chanaged child</p></li></ol></li>";
+var bareParentWithChildReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(bareParentWithChildFragment),
+    "1. teast parent\n   1. chanaged child",
+    "1. test parent\n   1. changed child");
+Assert(bareParentWithChildReplacement.Applied
+    && bareParentWithChildReplacement.Mode == "structured_list_html"
+    && bareParentWithChildReplacement.Text == "1. test parent\n   1. changed child"
+    && Fragment(bareParentWithChildReplacement.Html) == "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1}]\"><p>test parent</p><ol data-spread=\"false\" start=\"1\"><li><p>changed child</p></li></ol></li>",
+    "a bare-paragraph parent and child slice must use structural HTML instead of the indenting text fallback");
+
 const string complexListFragment = "<ol data-spread=\"true\" start=\"1\" data-pm-slice=\"0 0 []\"><li><p><span>teast parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>chanaged child</span></p></li><li><p></p></li></ol></li><li><p><span>second parent</span></p></li></ol><p></p><ul data-spread=\"false\"><li><p>test bullet</p><ul data-spread=\"false\"><li><p>test sub bullet</p></li></ul></li><li><p>hi level 1</p><ul data-spread=\"false\"><li><p>hi level 2</p><ul data-spread=\"false\"><li><p>hi level 3</p></li></ul></li></ul></li></ul>";
 const string complexListSource = "1. teast parent\n   1. chanaged child\n   2. \n2. second parent\n\n- test bullet\n  - test sub bullet\n- hi level 1\n  - hi level 2\n    - hi level 3";
 const string complexListModelOutput = "1. test parent\n   1. changed child\n   2. \n\n2. second parent\n\n- test bullet\n  - test sub bullet\n- hi level 1\n  - hi level 2\n    - hi level 3";

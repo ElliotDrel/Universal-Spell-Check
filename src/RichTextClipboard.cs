@@ -137,7 +137,8 @@ internal static partial class RichTextClipboard
     {
         replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
         if (!fragment.StartsWith("<ol", StringComparison.OrdinalIgnoreCase)
-            && !fragment.StartsWith("<ul", StringComparison.OrdinalIgnoreCase))
+            && !fragment.StartsWith("<ul", StringComparison.OrdinalIgnoreCase)
+            && !fragment.StartsWith("<li", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
