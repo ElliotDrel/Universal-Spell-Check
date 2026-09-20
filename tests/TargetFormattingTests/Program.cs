@@ -90,6 +90,23 @@ Assert(parentWithChildReplacement.Applied
     && Fragment(parentWithChildReplacement.Html) == "<li data-pm-slice=\"2 4 [&quot;ordered_list&quot;,{&quot;spread&quot;:true,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:618}]\"><p><span>test parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>changed child</span></p></li></ol></li>",
     "a selected parent and child must retain the native nested-list subtree while replacing both bodies");
 
+const string complexListFragment = "<ol data-spread=\"true\" start=\"1\" data-pm-slice=\"0 0 []\"><li><p><span>teast parent</span></p><ol data-spread=\"false\" start=\"1\"><li><p><span>chanaged child</span></p></li><li><p></p></li></ol></li><li><p><span>second parent</span></p></li></ol><p></p><ul data-spread=\"false\"><li><p>test bullet</p><ul data-spread=\"false\"><li><p>test sub bullet</p></li></ul></li><li><p>hi level 1</p><ul data-spread=\"false\"><li><p>hi level 2</p><ul data-spread=\"false\"><li><p>hi level 3</p></li></ul></li></ul></li></ul>";
+const string complexListSource = "1. teast parent\n   1. chanaged child\n   2. \n2. second parent\n\n- test bullet\n  - test sub bullet\n- hi level 1\n  - hi level 2\n    - hi level 3";
+const string complexListModelOutput = "1. test parent\n   1. changed child\n   2. \n\n2. second parent\n\n- test bullet\n  - test sub bullet\n- hi level 1\n  - hi level 2\n    - hi level 3";
+const string complexListNormalized = "1. test parent\n   1. changed child\n   2. \n2. second parent\n\n- test bullet\n  - test sub bullet\n- hi level 1\n  - hi level 2\n    - hi level 3";
+var complexListReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(complexListFragment),
+    complexListSource,
+    complexListModelOutput);
+Assert(complexListReplacement.Applied
+    && complexListReplacement.Mode == "structured_list_html"
+    && complexListReplacement.ParagraphCount == 10
+    && complexListReplacement.Text == complexListNormalized
+    && Fragment(complexListReplacement.Html).Contains("<p><span>test parent</span></p>", StringComparison.Ordinal)
+    && Fragment(complexListReplacement.Html).Contains("<p><span>changed child</span></p>", StringComparison.Ordinal)
+    && Fragment(complexListReplacement.Html).Contains("</ol><p></p><ul", StringComparison.Ordinal),
+    "a complex list selection must discard a surplus model newline and retain its original HTML hierarchy");
+
 var changedListMarker = RichTextClipboard.TryCreateReplacement(
     CfHtml(orderedListFragment),
     orderedListSourceText,

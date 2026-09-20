@@ -45,6 +45,15 @@ internal static partial class RichTextClipboard
             return nestedListReplacement;
         }
 
+        if (TryCreateStructuredListReplacement(
+                fragment,
+                sourceText,
+                correctedText,
+                out var structuredListReplacement))
+        {
+            return structuredListReplacement;
+        }
+
         var paragraphs = ParagraphRegex().Matches(fragment);
         if (paragraphs.Count == 0 || !string.IsNullOrWhiteSpace(ParagraphRegex().Replace(fragment, "")))
         {
@@ -118,6 +127,108 @@ internal static partial class RichTextClipboard
             correctedText,
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
+    }
+
+    private static bool TryCreateStructuredListReplacement(
+        string fragment,
+        string sourceText,
+        string correctedText,
+        out RichTextReplacementResult replacement)
+    {
+        replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
+        if (!fragment.StartsWith("<ol", StringComparison.OrdinalIgnoreCase)
+            && !fragment.StartsWith("<ul", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var paragraphs = ParagraphRegex().Matches(fragment);
+        if (paragraphs.Count < 2)
+        {
+            return false;
+        }
+
+        var structureOnly = ParagraphRegex().Replace(fragment, "");
+        if (!string.IsNullOrWhiteSpace(ListStructureTagRegex().Replace(structureOnly, "")))
+        {
+            return false;
+        }
+
+        var sourceLines = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        if (sourceLines.Length != paragraphs.Count)
+        {
+            return false;
+        }
+
+        var prefixes = new string[sourceLines.Length];
+        for (var i = 0; i < sourceLines.Length; i++)
+        {
+            SplitGeneratedListPrefix(sourceLines[i], out prefixes[i], out var sourceBody);
+            if (!string.Equals(
+                    WebUtility.HtmlDecode(paragraphs[i].Groups["text"].Value),
+                    sourceBody,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        var correctedLines = correctedText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var correctedBodies = new string[sourceLines.Length];
+        var correctedIndex = 0;
+        for (var i = 0; i < sourceLines.Length; i++)
+        {
+            while (correctedIndex < correctedLines.Length
+                && correctedLines[correctedIndex].Length == 0
+                && prefixes[i].Length > 0)
+            {
+                correctedIndex++;
+            }
+
+            if (correctedIndex >= correctedLines.Length)
+            {
+                return false;
+            }
+
+            SplitGeneratedListPrefix(
+                correctedLines[correctedIndex++],
+                out var correctedPrefix,
+                out correctedBodies[i]);
+            if (!string.Equals(prefixes[i], correctedPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        while (correctedIndex < correctedLines.Length && correctedLines[correctedIndex].Length == 0)
+        {
+            correctedIndex++;
+        }
+
+        if (correctedIndex != correctedLines.Length)
+        {
+            return false;
+        }
+
+        var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
+        var cursor = 0;
+        for (var i = 0; i < paragraphs.Count; i++)
+        {
+            var text = paragraphs[i].Groups["text"];
+            rebuilt.Append(fragment, cursor, text.Index - cursor);
+            rebuilt.Append(WebUtility.HtmlEncode(correctedBodies[i]));
+            cursor = text.Index + text.Length;
+        }
+        rebuilt.Append(fragment, cursor, fragment.Length - cursor);
+
+        var normalizedText = string.Join(
+            "\n",
+            prefixes.Zip(correctedBodies, (prefix, body) => prefix + body));
+        replacement = RichTextReplacementResult.CreateStructuredListHtml(
+            normalizedText,
+            BuildCfHtml(rebuilt.ToString()),
+            paragraphs.Count);
+        return true;
     }
 
     private static bool TryCreateNestedOrderedListReplacement(
@@ -230,6 +341,30 @@ internal static partial class RichTextClipboard
         return true;
     }
 
+    private static void SplitGeneratedListPrefix(string value, out string prefix, out string body)
+    {
+        if (TrySplitOrderedListMarker(value, out prefix, out body))
+        {
+            return;
+        }
+
+        var index = 0;
+        while (index < value.Length && value[index] is ' ' or '\t')
+        {
+            index++;
+        }
+
+        if (index + 1 < value.Length && value[index] == '-' && value[index + 1] == ' ')
+        {
+            prefix = value[..(index + 2)];
+            body = value[(index + 2)..];
+            return;
+        }
+
+        prefix = "";
+        body = value;
+    }
+
     private static bool TryExtractFragment(string cfHtml, out string fragment)
     {
         var startMatch = StartFragmentRegex().Match(cfHtml);
@@ -273,6 +408,9 @@ internal static partial class RichTextClipboard
 
     [GeneratedRegex("<li\\b[^>]*data-pm-slice=\\\"[^\\\"]+\\\"[^>]*><p><span\\b[^>]*>(?<parent>[^<]*)</span></p><ol\\b[^>]*><li><p><span\\b[^>]*>(?<child>[^<]*)</span></p></li></ol></li>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex NestedOrderedListRegex();
+
+    [GeneratedRegex("</?(?:ol|ul|li)\\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ListStructureTagRegex();
 
     [GeneratedRegex("\\n{2,}", RegexOptions.CultureInvariant)]
     private static partial Regex SectionBreakRegex();
@@ -334,4 +472,16 @@ internal sealed record RichTextReplacementResult(
         Applied: true,
         Reason: "",
         ParagraphCount: 2);
+
+    public static RichTextReplacementResult CreateStructuredListHtml(
+        string text,
+        string html,
+        int paragraphCount) => new(
+        Text: text,
+        Html: html,
+        Mode: "structured_list_html",
+        Attempted: true,
+        Applied: true,
+        Reason: "",
+        ParagraphCount: paragraphCount);
 }

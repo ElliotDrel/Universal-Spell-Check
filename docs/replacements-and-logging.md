@@ -186,6 +186,11 @@ count uses the existing plain-text path; `rich_text.reason` records why. `rich_t
 ordinary HTML re-emission from the `list_body_text` path. The exact two-level fragment produced when
 a parent item and its one nested child are selected is reconstructed as `nested_list_html`; both
 generated prefixes and both source bodies must match before either HTML text node is replaced.
+Larger simple list trees use `structured_list_html`: every HTML paragraph must map exactly to one
+generated Unicode line, and the corrected output must retain the same ordered or unordered prefix at
+each position. The app removes surplus blank lines inserted between prefixed items, reconstructs the
+source newline sequence, and replaces only paragraph text in the original HTML tree. Unknown markup,
+changed prefixes, missing lines, and nonblank extra lines still fall back instead of being guessed.
 
 Dev rich-text runs also read the replacement clipboard back immediately before the paste. The
 `rich_text` object records requested HTML size, whether the clipboard contained the exact generated
