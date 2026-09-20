@@ -52,8 +52,9 @@ internal static partial class RichTextClipboard
         // ProseMirror serializes a selected ordered-list item as a bare <p>
         // while its Unicode flavor adds the generated "1. " marker. Retaining
         // that Unicode flavor would make ChatGPT paste a nested list. Accept
-        // only the exact one-item shape and splice the body back into its
-        // original list slice.
+        // only the exact one-item shape and replace its body with a neutral
+        // paragraph slice.
+        var orderedListItem = false;
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
             && TryNormalizeOrderedListItem(
                 fragment,
@@ -66,12 +67,25 @@ internal static partial class RichTextClipboard
         {
             sourceSections = normalizedSourceSections;
             correctedSections = normalizedCorrectedSections;
+            orderedListItem = true;
         }
 
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
             || correctedSections.Length != sourceParagraphs.Length)
         {
             return RichTextReplacementResult.NotApplied("model_mismatch", paragraphs.Count);
+        }
+
+        if (orderedListItem)
+        {
+            // The copied list slice describes a complete nested list. Pasting
+            // it over selected text in an existing ChatGPT list item creates a
+            // sub-list, even when Windows preserved CF_HTML exactly. A neutral
+            // ProseMirror paragraph replaces the selected item body in place.
+            var replacement = "<p data-pm-slice=\"0 0 []\">" +
+                WebUtility.HtmlEncode(correctedSections[0]) +
+                "</p>";
+            return RichTextReplacementResult.CreateApplied(BuildCfHtml(replacement), paragraphs.Count);
         }
 
         var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
@@ -191,7 +205,7 @@ internal static partial class RichTextClipboard
             : throw new InvalidOperationException("CF_HTML header length changed.");
     }
 
-    [GeneratedRegex("<p\\b[^>]*>(?<text>[^<]*)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("<p\\b[^>]*>(?:(?<text>[^<]*)|<span\\b[^>]*>(?<text>[^<]*)</span>)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ParagraphRegex();
 
     [GeneratedRegex("\\n{2,}", RegexOptions.CultureInvariant)]

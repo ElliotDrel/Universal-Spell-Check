@@ -12,10 +12,12 @@ nodes. It verifies that the non-empty source paragraphs exactly equal the copied
 that the corrected output keeps their count, then changes only those text nodes and writes `CF_HTML`
 plus Unicode text. This prevents ChatGPT's copied four-newline representation of an empty paragraph
 from becoming extra pasted lines. It also accepts one ordered-list item when ProseMirror adds its
-generated `1. ` marker to Unicode text but keeps only the item body in HTML. It preserves the original
-list slice only when both markers match. It is intentionally not the full Markdown/alignment pipeline:
-nested markup, malformed offsets, changed structure, and every other producer retain the exact
-plain-text fallback.
+generated `1. ` marker to Unicode text but keeps only the item body in HTML. It accepts a single
+inline `<span>` wrapper, then emits a neutral `data-pm-slice="0 0 []"` paragraph instead of the copied
+list slice. The copied list slice represents a full nested list and creates a subbullet when pasted
+over text in an existing item. It is intentionally not the full Markdown/alignment pipeline: nested
+markup, malformed offsets, changed structure, and every other producer retain the exact plain-text
+fallback.
 
 **Decided:** the AI-facing representation is Markdown; the reconstruction mechanism is splicing
 corrections back onto the original HTML runs. See § Chosen Approach.
