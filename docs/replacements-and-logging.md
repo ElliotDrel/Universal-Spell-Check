@@ -177,9 +177,10 @@ safe path now handles ChatGPT's simple `data-pm-slice` paragraph fragments: if e
 paragraph exactly maps to the copied text and the corrected output has the same paragraph count, the
 app replaces only text-node contents and writes both `CF_HTML` and Unicode text. Empty paragraphs stay
 as markup, preventing their browser plain-text serialization from becoming extra pasted lines. One
-ordered-list item also qualifies only when the generated Unicode list marker is identical before and
-after correction. The generated marker is stripped and only the corrected item body is pasted as
-Unicode text because ChatGPT inserts any HTML block as a nested item. A single inline `<span>` is
+ordered-list item, including an indented nested item, also qualifies only when the generated Unicode
+indentation and list marker are identical before and after correction. The generated prefix is
+stripped and only the corrected item body is pasted as Unicode text because ChatGPT inserts any HTML
+block as a nested item. A single inline `<span>` is
 accepted around the item body. Any other source, nested markup, malformed header, or changed paragraph
 count uses the existing plain-text path; `rich_text.reason` records why. `rich_text.mode` distinguishes
 ordinary HTML re-emission from the `list_body_text` path.

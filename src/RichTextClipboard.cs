@@ -152,12 +152,21 @@ internal static partial class RichTextClipboard
         body = "";
 
         var index = 0;
+        while (index < value.Length && value[index] is ' ' or '\t')
+        {
+            index++;
+        }
+
+        var digitStart = index;
         while (index < value.Length && char.IsAsciiDigit(value[index]))
         {
             index++;
         }
 
-        if (index == 0 || index + 1 >= value.Length || value[index] != '.' || value[index + 1] != ' ')
+        if (index == digitStart
+            || index + 1 >= value.Length
+            || value[index] != '.'
+            || value[index + 1] != ' ')
         {
             return false;
         }

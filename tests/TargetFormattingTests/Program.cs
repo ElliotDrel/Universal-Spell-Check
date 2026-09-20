@@ -68,6 +68,17 @@ Assert(orderedListSpanReplacement.Applied
     && orderedListSpanReplacement.Text == "Because direct labor cost is high.",
     "a simple span-wrapped list item must use the same body-only replacement");
 
+const string nestedOrderedListFragment = "<p data-pm-slice=\"1 1 [&quot;ordered_list&quot;,{&quot;spread&quot;:false,&quot;startingNumber&quot;:1,&quot;end&quot;:297},&quot;regular_list_item&quot;,{&quot;end&quot;:297},&quot;ordered_list&quot;,null,&quot;regular_list_item&quot;,{&quot;end&quot;:297}]\"><span>chanaged nested item</span></p>";
+var nestedOrderedListReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(nestedOrderedListFragment),
+    "   1. chanaged nested item",
+    "   1. changed nested item");
+Assert(nestedOrderedListReplacement.Applied
+    && nestedOrderedListReplacement.Mode == "list_body_text"
+    && nestedOrderedListReplacement.Html.Length == 0
+    && nestedOrderedListReplacement.Text == "changed nested item",
+    "an indented nested list marker must be stripped before the body-only replacement");
+
 var changedListMarker = RichTextClipboard.TryCreateReplacement(
     CfHtml(orderedListFragment),
     orderedListSourceText,
