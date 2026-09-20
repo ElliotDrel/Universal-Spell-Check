@@ -178,10 +178,11 @@ paragraph exactly maps to the copied text and the corrected output has the same 
 app replaces only text-node contents and writes both `CF_HTML` and Unicode text. Empty paragraphs stay
 as markup, preventing their browser plain-text serialization from becoming extra pasted lines. One
 ordered-list item also qualifies only when the generated Unicode list marker is identical before and
-after correction. Its list wrapper is replaced by a neutral ChatGPT paragraph because that wrapper
-describes a complete list and would otherwise nest on paste. A single inline `<span>` is accepted
-around the item body. Any other source, nested markup, malformed header, or changed paragraph count
-uses the existing plain-text path; `rich_text.reason` records why.
+after correction. The generated marker is stripped and only the corrected item body is pasted as
+Unicode text because ChatGPT inserts any HTML block as a nested item. A single inline `<span>` is
+accepted around the item body. Any other source, nested markup, malformed header, or changed paragraph
+count uses the existing plain-text path; `rich_text.reason` records why. `rich_text.mode` distinguishes
+ordinary HTML re-emission from the `list_body_text` path.
 
 Dev rich-text runs also read the replacement clipboard back immediately before the paste. The
 `rich_text` object records requested HTML size, whether the clipboard contained the exact generated

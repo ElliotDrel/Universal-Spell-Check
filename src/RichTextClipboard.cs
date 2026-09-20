@@ -21,25 +21,25 @@ internal static partial class RichTextClipboard
     {
         if (sourceHtml.Length == 0)
         {
-            return RichTextReplacementResult.NotApplied("no_html");
+            return RichTextReplacementResult.NotApplied("no_html", correctedText);
         }
 
         if (!TryExtractFragment(sourceHtml, out var fragment))
         {
-            return RichTextReplacementResult.NotApplied("invalid_cf_html");
+            return RichTextReplacementResult.NotApplied("invalid_cf_html", correctedText);
         }
 
         // data-pm-slice is the stable marker in the captured ChatGPT selection.
         // Do not apply a structural assumption to a different HTML producer.
         if (!fragment.Contains("data-pm-slice", StringComparison.Ordinal))
         {
-            return RichTextReplacementResult.NotApplied("unsupported_editor");
+            return RichTextReplacementResult.NotApplied("unsupported_editor", correctedText);
         }
 
         var paragraphs = ParagraphRegex().Matches(fragment);
         if (paragraphs.Count == 0 || !string.IsNullOrWhiteSpace(ParagraphRegex().Replace(fragment, "")))
         {
-            return RichTextReplacementResult.NotApplied("unsupported_fragment");
+            return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
         }
 
         var sourceParagraphs = paragraphs
@@ -73,19 +73,16 @@ internal static partial class RichTextClipboard
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
             || correctedSections.Length != sourceParagraphs.Length)
         {
-            return RichTextReplacementResult.NotApplied("model_mismatch", paragraphs.Count);
+            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
         }
 
         if (orderedListItem)
         {
-            // The copied list slice describes a complete nested list. Pasting
-            // it over selected text in an existing ChatGPT list item creates a
-            // sub-list, even when Windows preserved CF_HTML exactly. A neutral
-            // ProseMirror paragraph replaces the selected item body in place.
-            var replacement = "<p data-pm-slice=\"0 0 []\">" +
-                WebUtility.HtmlEncode(correctedSections[0]) +
-                "</p>";
-            return RichTextReplacementResult.CreateApplied(BuildCfHtml(replacement), paragraphs.Count);
+            // ChatGPT treats every HTML paragraph/list slice as a new block
+            // when pasted over selected list-item text. Paste only the body as
+            // Unicode text so it replaces the selection inside the existing
+            // item instead of creating another list node.
+            return RichTextReplacementResult.CreatePlainText(correctedSections[0], paragraphs.Count);
         }
 
         var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
@@ -108,7 +105,10 @@ internal static partial class RichTextClipboard
         }
         rebuilt.Append(fragment, cursor, fragment.Length - cursor);
 
-        return RichTextReplacementResult.CreateApplied(BuildCfHtml(rebuilt.ToString()), paragraphs.Count);
+        return RichTextReplacementResult.CreateHtml(
+            correctedText,
+            BuildCfHtml(rebuilt.ToString()),
+            paragraphs.Count);
     }
 
     private static string[] SplitSections(string text)
@@ -219,21 +219,42 @@ internal static partial class RichTextClipboard
 }
 
 internal sealed record RichTextReplacementResult(
+    string Text,
     string Html,
+    string Mode,
     bool Attempted,
     bool Applied,
     string Reason,
     int ParagraphCount)
 {
-    public static RichTextReplacementResult NotApplied(string reason, int paragraphCount = 0) => new(
+    public static RichTextReplacementResult NotApplied(
+        string reason,
+        string text = "",
+        int paragraphCount = 0) => new(
+        Text: text,
         Html: "",
+        Mode: "none",
         Attempted: reason is not "no_html" and not "not_attempted",
         Applied: false,
         Reason: reason,
         ParagraphCount: paragraphCount);
 
-    public static RichTextReplacementResult CreateApplied(string html, int paragraphCount) => new(
+    public static RichTextReplacementResult CreateHtml(
+        string text,
+        string html,
+        int paragraphCount) => new(
+        Text: text,
         Html: html,
+        Mode: "html",
+        Attempted: true,
+        Applied: true,
+        Reason: "",
+        ParagraphCount: paragraphCount);
+
+    public static RichTextReplacementResult CreatePlainText(string text, int paragraphCount) => new(
+        Text: text,
+        Html: "",
+        Mode: "list_body_text",
         Attempted: true,
         Applied: true,
         Reason: "",

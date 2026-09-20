@@ -14,6 +14,8 @@ var richTextReplacement = RichTextClipboard.TryCreateReplacement(
     chatGptCorrectedText);
 Assert(richTextReplacement.Applied,
     "simple ChatGPT ProseMirror paragraphs must retain their HTML structure on replacement");
+Assert(richTextReplacement.Text == chatGptCorrectedText && richTextReplacement.Mode == "html",
+    "ordinary paragraph replacement must retain corrected Unicode text alongside HTML");
 Assert(richTextReplacement.Html.Contains(
     "</p><p></p><p>make image 1 right now (4 versions like always)</p>",
     StringComparison.Ordinal),
@@ -49,12 +51,11 @@ var orderedListReplacement = RichTextClipboard.TryCreateReplacement(
     orderedListSourceText,
     orderedListCorrectedText);
 Assert(orderedListReplacement.Applied,
-    "a ChatGPT ordered-list slice with its generated Unicode marker must use a neutral replacement paragraph");
-Assert(Fragment(orderedListReplacement.Html).Contains(
-    "<p data-pm-slice=\"0 0 []\">Actual cycle time is how long it takes to pop out each item per flow unit.</p>",
-    StringComparison.Ordinal)
-    && !Fragment(orderedListReplacement.Html).Contains("ordered_list", StringComparison.Ordinal),
-    "the replacement must not reintroduce the nested list wrapper");
+    "a ChatGPT ordered-list slice with its generated Unicode marker must use a body-only replacement");
+Assert(orderedListReplacement.Mode == "list_body_text"
+    && orderedListReplacement.Html.Length == 0
+    && orderedListReplacement.Text == "Actual cycle time is how long it takes to pop out each item per flow unit.",
+    "the replacement must contain no generated marker or HTML block structure");
 
 const string orderedListSpanFragment = "<p data-pm-slice=\"1 1 [&quot;ordered_list&quot;,{&quot;spread&quot;:false,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:500},&quot;regular_list_item&quot;,{&quot;start&quot;:202,&quot;end&quot;:500}]\"><span>because direct labor cost is high</span></p>";
 var orderedListSpanReplacement = RichTextClipboard.TryCreateReplacement(
@@ -62,10 +63,10 @@ var orderedListSpanReplacement = RichTextClipboard.TryCreateReplacement(
     "1. because direct labor cost is high",
     "1. Because direct labor cost is high.");
 Assert(orderedListSpanReplacement.Applied
-    && Fragment(orderedListSpanReplacement.Html).Contains(
-        "<p data-pm-slice=\"0 0 []\">Because direct labor cost is high.</p>",
-        StringComparison.Ordinal),
-    "a simple span-wrapped list item must use the same neutral replacement paragraph");
+    && orderedListSpanReplacement.Mode == "list_body_text"
+    && orderedListSpanReplacement.Html.Length == 0
+    && orderedListSpanReplacement.Text == "Because direct labor cost is high.",
+    "a simple span-wrapped list item must use the same body-only replacement");
 
 var changedListMarker = RichTextClipboard.TryCreateReplacement(
     CfHtml(orderedListFragment),
