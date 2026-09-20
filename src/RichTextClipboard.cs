@@ -49,6 +49,25 @@ internal static partial class RichTextClipboard
         var sourceSections = SplitSections(sourceText);
         var correctedSections = SplitSections(correctedText);
 
+        // ProseMirror serializes a selected ordered-list item as a bare <p>
+        // while its Unicode flavor adds the generated "1. " marker. Retaining
+        // that Unicode flavor would make ChatGPT paste a nested list. Accept
+        // only the exact one-item shape and splice the body back into its
+        // original list slice.
+        if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
+            && TryNormalizeOrderedListItem(
+                fragment,
+                paragraphs.Count,
+                sourceParagraphs,
+                sourceSections,
+                correctedSections,
+                out var normalizedSourceSections,
+                out var normalizedCorrectedSections))
+        {
+            sourceSections = normalizedSourceSections;
+            correctedSections = normalizedCorrectedSections;
+        }
+
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
             || correctedSections.Length != sourceParagraphs.Length)
         {
@@ -81,6 +100,57 @@ internal static partial class RichTextClipboard
     private static string[] SplitSections(string text)
     {
         return SectionBreakRegex().Split(text.Replace("\r\n", "\n", StringComparison.Ordinal));
+    }
+
+    private static bool TryNormalizeOrderedListItem(
+        string fragment,
+        int paragraphCount,
+        string[] sourceParagraphs,
+        string[] sourceSections,
+        string[] correctedSections,
+        out string[] normalizedSourceSections,
+        out string[] normalizedCorrectedSections)
+    {
+        normalizedSourceSections = Array.Empty<string>();
+        normalizedCorrectedSections = Array.Empty<string>();
+
+        if (paragraphCount != 1
+            || sourceParagraphs.Length != 1
+            || sourceSections.Length != 1
+            || correctedSections.Length != 1
+            || !fragment.Contains("&quot;ordered_list&quot;", StringComparison.Ordinal)
+            || !TrySplitOrderedListMarker(sourceSections[0], out var sourceMarker, out var sourceBody)
+            || !TrySplitOrderedListMarker(correctedSections[0], out var correctedMarker, out var correctedBody)
+            || !string.Equals(sourceMarker, correctedMarker, StringComparison.Ordinal)
+            || !string.Equals(sourceParagraphs[0], sourceBody, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        normalizedSourceSections = new[] { sourceBody };
+        normalizedCorrectedSections = new[] { correctedBody };
+        return true;
+    }
+
+    private static bool TrySplitOrderedListMarker(string value, out string marker, out string body)
+    {
+        marker = "";
+        body = "";
+
+        var index = 0;
+        while (index < value.Length && char.IsAsciiDigit(value[index]))
+        {
+            index++;
+        }
+
+        if (index == 0 || index + 1 >= value.Length || value[index] != '.' || value[index + 1] != ' ')
+        {
+            return false;
+        }
+
+        marker = value[..(index + 2)];
+        body = value[(index + 2)..];
+        return true;
     }
 
     private static bool TryExtractFragment(string cfHtml, out string fragment)

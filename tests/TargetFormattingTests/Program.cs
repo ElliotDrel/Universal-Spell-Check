@@ -41,6 +41,30 @@ var structureChanged = RichTextClipboard.TryCreateReplacement(
 Assert(!structureChanged.Applied && structureChanged.Reason == "model_mismatch",
     "a model output with a different paragraph count must safely use the plain-text fallback");
 
+const string orderedListSourceText = "1. actaull cycle time is how time it takes to pop out each item per flow unit.";
+const string orderedListCorrectedText = "1. Actual cycle time is how long it takes to pop out each item per flow unit.";
+const string orderedListFragment = "<p data-pm-slice=\"1 1 [&quot;ordered_list&quot;,{&quot;spread&quot;:false,&quot;startingNumber&quot;:1,&quot;start&quot;:0,&quot;end&quot;:245},&quot;regular_list_item&quot;,{&quot;start&quot;:0,&quot;end&quot;:245}]\">actaull cycle time is how time it takes to pop out each item per flow unit.</p>";
+var orderedListReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(orderedListFragment),
+    orderedListSourceText,
+    orderedListCorrectedText);
+Assert(orderedListReplacement.Applied,
+    "a ChatGPT ordered-list slice with its generated Unicode marker must retain its HTML structure");
+Assert(Fragment(orderedListReplacement.Html).Contains(
+    "data-pm-slice=\"1 1 [&quot;ordered_list&quot;",
+    StringComparison.Ordinal)
+    && Fragment(orderedListReplacement.Html).Contains(
+        ">Actual cycle time is how long it takes to pop out each item per flow unit.</p>",
+        StringComparison.Ordinal),
+    "the ordered-list slice must keep its metadata while replacing only the item body");
+
+var changedListMarker = RichTextClipboard.TryCreateReplacement(
+    CfHtml(orderedListFragment),
+    orderedListSourceText,
+    "2. Actual cycle time is how long it takes to pop out each item per flow unit.");
+Assert(!changedListMarker.Applied && changedListMarker.Reason == "model_mismatch",
+    "a changed generated list marker must fall back rather than attach to the wrong list item");
+
 var desktop = Context("Code", processId: 10, hwnd: 100, rootOwner: 90);
 var sameDesktop = Context("CODE", processId: 10, hwnd: 101, rootOwner: 90);
 

@@ -176,9 +176,11 @@ This is the input to the rich-text pipeline (`.planning/rich-text-clipboard-pipe
 safe path now handles ChatGPT's simple `data-pm-slice` paragraph fragments: if every non-empty source
 paragraph exactly maps to the copied text and the corrected output has the same paragraph count, the
 app replaces only text-node contents and writes both `CF_HTML` and Unicode text. Empty paragraphs stay
-as markup, preventing their browser plain-text serialization from becoming extra pasted lines. Any
-other source, nested markup, malformed header, or changed paragraph count uses the existing plain-text
-path; `rich_text.reason` records why.
+as markup, preventing their browser plain-text serialization from becoming extra pasted lines. One
+ordered-list item also qualifies only when the generated Unicode list marker is identical before and
+after correction, so the original list slice remains intact. Any other source, nested markup,
+malformed header, or changed paragraph count uses the existing plain-text path; `rich_text.reason`
+records why.
 
 `logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
 `--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would
