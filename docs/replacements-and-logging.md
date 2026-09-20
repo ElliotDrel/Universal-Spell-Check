@@ -182,6 +182,11 @@ after correction, so the original list slice remains intact. Any other source, n
 malformed header, or changed paragraph count uses the existing plain-text path; `rich_text.reason`
 records why.
 
+Dev rich-text runs also read the replacement clipboard back immediately before the paste. The
+`rich_text` object records requested HTML size, whether the clipboard contained the exact generated
+CF_HTML (`exact_match`, `missing_html`, or `mismatch`), its readback size, and its post-write formats.
+Prod skips this diagnostic readback so it adds no production hot-path work.
+
 `logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
 `--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would
 match CSS noise on nearly every row) — scope it with `clipboard_html:<needle>`.

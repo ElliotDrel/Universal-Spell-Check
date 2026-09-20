@@ -203,9 +203,21 @@ internal static class ClipboardLoop
         }, out _);
     }
 
-    public static Task<bool> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "")
+    public static async Task<ReplacementClipboardResult> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "")
     {
-        return TrySetTextAsync(replacementText, richTextHtml);
+        if (!await TrySetTextAsync(replacementText, richTextHtml))
+        {
+            return ReplacementClipboardResult.Failed();
+        }
+
+#if DEV
+        if (richTextHtml.Length > 0)
+        {
+            return VerifyRichTextClipboardWrite(richTextHtml);
+        }
+#endif
+
+        return ReplacementClipboardResult.Succeeded(richTextHtml.Length);
     }
 
     // Re-asserts the just-captured (pre-correction) selection onto the
@@ -425,6 +437,31 @@ internal static class ClipboardLoop
         return false;
     }
 
+#if DEV
+    // Dev-only post-write readback. It establishes whether Windows retained the
+    // exact CF_HTML flavor we generated before Ctrl+V reaches ChatGPT. The
+    // visual result remains app-owned, but this separates clipboard loss from
+    // editor interpretation without adding production hot-path work.
+    private static ReplacementClipboardResult VerifyRichTextClipboardWrite(string expectedHtml)
+    {
+        var formats = DescribeClipboardFormats();
+        if (!TryGetHtml(out var actualHtml))
+        {
+            return ReplacementClipboardResult.Succeeded(
+                expectedHtml.Length,
+                "missing_html",
+                0,
+                formats);
+        }
+
+        return ReplacementClipboardResult.Succeeded(
+            expectedHtml.Length,
+            string.Equals(expectedHtml, actualHtml, StringComparison.Ordinal) ? "exact_match" : "mismatch",
+            actualHtml.Length,
+            formats);
+    }
+#endif
+
     // Rich Text Format flavor. Several Windows apps (Word, desktop Outlook,
     // WordPad) offer RTF and no HTML, so an empty CF_HTML does not by itself
     // mean the selection carried no formatting.
@@ -620,4 +657,32 @@ internal sealed class ReplaceResult
         FailureReason = reason,
         DurationMs = durationMs
     };
+}
+
+internal sealed record ReplacementClipboardResult(
+    bool Success,
+    int RequestedHtmlChars,
+    string HtmlVerification,
+    int VerifiedHtmlChars,
+    string VerifiedFormats)
+{
+    public static ReplacementClipboardResult Failed() => new(false, 0, "write_failed", 0, "");
+
+    public static ReplacementClipboardResult Succeeded(int requestedHtmlChars) => new(
+        true,
+        requestedHtmlChars,
+        requestedHtmlChars == 0 ? "not_requested" : "not_checked",
+        0,
+        "");
+
+    public static ReplacementClipboardResult Succeeded(
+        int requestedHtmlChars,
+        string htmlVerification,
+        int verifiedHtmlChars,
+        string verifiedFormats) => new(
+        true,
+        requestedHtmlChars,
+        htmlVerification,
+        verifiedHtmlChars,
+        verifiedFormats);
 }

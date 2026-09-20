@@ -46,6 +46,7 @@ internal sealed class RunRecord
     public string CapturedRtf { get; set; } = "";
     public string ClipboardFormats { get; set; } = "";
     public RichTextReplacementResult RichTextReplacement { get; set; } = RichTextReplacementResult.NotApplied("not_attempted");
+    public ReplacementClipboardResult ReplacementClipboard { get; set; } = ReplacementClipboardResult.Succeeded(0);
     public string? OutputText { get; set; }
     public string? RawAiOutput { get; set; }
     public byte[]? RawResponseBytes { get; set; }
