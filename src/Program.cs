@@ -218,6 +218,21 @@ static class Program
             if (window.ActivityPage.LoadedEntryCount > 30)
                 throw new InvalidOperationException("Activity feed loaded additional pages without user scrolling.");
 
+            if (window.ActivityPage.HasMoreEntries)
+            {
+                Task? nextPage = null;
+                wpfApp.Dispatcher.BeginInvoke(new Action(() =>
+                    nextPage = window.ActivityPage.LoadNextPageForSmokeAsync()));
+                PumpDispatcherUntil(wpfApp.Dispatcher, () => nextPage?.IsCompleted == true, TimeSpan.FromSeconds(5));
+                if (nextPage?.IsCompleted != true)
+                    throw new TimeoutException("Activity feed did not complete its next page within 5 seconds.");
+                nextPage.GetAwaiter().GetResult();
+                var timestamps = window.ActivityPage.RenderedTimestamps;
+                if (timestamps.Count > 30
+                    && !timestamps.SequenceEqual(timestamps.OrderByDescending(timestamp => timestamp)))
+                    throw new InvalidOperationException("Activity feed reversed a paginated page.");
+            }
+
             VerifyDiffComplexityGuard();
             window.Close();
             PumpDispatcher(wpfApp.Dispatcher, TimeSpan.FromMilliseconds(250));

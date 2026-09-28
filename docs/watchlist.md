@@ -102,6 +102,12 @@ Recent log evidence (2026-09-24 through 2026-09-27): mixed text/list selections 
 
 ---
 
+## Activity feed pagination order
+
+On 2026-09-28, the shared logs contained 29 successful spell checks between 2026-09-27 2:27 PM and 9:59 PM (America/Indianapolis), even though the dashboard appeared to jump between those times. `NativeActivityLogReader` returned entries newest first, but `ActivityPage.AppendEntries` reversed both day groups and rows inside each subsequent 30-entry page. The runs were on disk; the history display was out of order. Keep both initial and appended pages in descending order, and run `--dashboard-smoke` against the real corpus to verify chronology across at least two pages. No log backfill is needed for this incident.
+
+---
+
 ## Loading overlay UI-thread marshalling
 
 `SetPhase` is called from the async spell-check pipeline (not a UI thread). `OverlayHost` owns a dedicated STA background thread with its own message loop; the form and its Win32 handle are created on that thread at startup and every `SetPhase` is queued onto it via `BeginInvoke`, returning immediately. If you move or defer form/handle creation off that thread, the marshalling breaks and the overlay crashes or silently stops updating.

@@ -37,6 +37,7 @@ UI/
 
 - **Logs:** `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-*.jsonl` (unified across channels). Filter via per-line `channel` when needed for tooling; the feed shows all successful runs.
 - **Reader:** `NativeActivityLogReader.ReadEntries(30, cursor)` + `ReadAllTimeStats()` in `ActivityPage.xaml.cs`.
+- **Order:** every page, including pages appended during scrolling, renders newest to oldest. The dashboard smoke check loads a second page and verifies the combined timestamps remain descending.
 - **Original-text view:** changed rows expose **See original** in the existing `⋮` diff-options menu. It replaces the diff in place with marked original text; the row body and copy icon then copy the original and use original-specific tooltips until **See corrected** restores the normal view.
 - **Threading:** file reads and all-time stats run off-dispatcher. The UI renders one 30-entry page, yields through a completed layout pass, then loads another page only if the measured viewport is still empty or the user scrolls.
 - **Diff cost:** inline diff renders first; side-by-side diff is lazy. LCS work is bounded so a large historical entry cannot freeze the dashboard.

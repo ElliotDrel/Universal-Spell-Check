@@ -38,6 +38,13 @@ internal partial class ActivityPage : Page
     internal Task InitialLoadCompleted => _initialLoadCompleted.Task;
     internal int InitialPageEntryCount { get; private set; }
     internal int LoadedEntryCount { get; private set; }
+    internal bool HasMoreEntries => _hasMoreEntries;
+    internal Task LoadNextPageForSmokeAsync() => LoadNextPageAsync(isInitial: false, _loadGeneration);
+    internal IReadOnlyList<DateTimeOffset> RenderedTimestamps => FeedItems.Children
+        .OfType<FrameworkElement>()
+        .Where(child => child.Tag is DateTimeOffset)
+        .Select(child => (DateTimeOffset)child.Tag)
+        .ToArray();
 
     public ActivityPage(DiagnosticsLogger logger)
     {
@@ -217,12 +224,12 @@ internal partial class ActivityPage : Page
 
         foreach (var dayGroup in entries
                      .GroupBy(e => e.Timestamp.ToLocalTime().Date)
-                     .OrderBy(g => g.Key))
+                     .OrderByDescending(g => g.Key))
         {
             if (_renderedDays.Add(dayGroup.Key))
                 FeedItems.Children.Add(CreateDayHeader(dayGroup.Key, today, isFirstInFeed: false));
 
-            foreach (var entry in dayGroup.OrderBy(e => e.Timestamp))
+            foreach (var entry in dayGroup.OrderByDescending(e => e.Timestamp))
                 FeedItems.Children.Add(CreateDiffRow(entry));
         }
     }
@@ -280,7 +287,7 @@ internal partial class ActivityPage : Page
 
     private FrameworkElement CreateDiffRow(ActivityEntry entry)
     {
-        var rowWrap = new StackPanel();
+        var rowWrap = new StackPanel { Tag = entry.Timestamp };
 
         var rowChrome = new Border
         {

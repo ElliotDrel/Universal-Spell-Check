@@ -154,7 +154,7 @@ This separation is a responsiveness contract. The WinForms message loop and WPF 
 
 | Concern | Implementation |
 |---|---|
-| Feed order | Newest first: daily files descending by date, lines within a file from EOF toward BOF |
+| Feed order | Newest first: daily files descending by date, lines within a file from EOF toward BOF; appended pages retain descending day and entry order |
 | Pagination | 30 entries per page; `ActivityLogCursor` (file index + line index); infinite scroll near bottom + viewport fill |
 | Stats bar | All-time checks, corrections, accuracy, day streak — full scan of all daily files |
 | Diff UI | `InlineTextDiff` (line align + char LCS); optional side-by-side per row |
