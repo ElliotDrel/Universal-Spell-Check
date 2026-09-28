@@ -1,5 +1,7 @@
 # OpenAI API log backfill audit
 
+**Outcome (2026-09-23):** No specific missing local spell-check record was confirmed. No API records were imported. A complete ID-by-ID comparison was unavailable, and Elliot chose to stop the backfill investigation. This is a historical audit, not an open claim that local history is missing.
+
 Checked the authenticated OpenAI Platform Logs page on 2026-09-22.
 
 - The `Universal Computer Spell Check` project showed 1,545 Responses records.
@@ -10,7 +12,7 @@ Checked the authenticated OpenAI Platform Logs page on 2026-09-22.
 - Existing appdata logs cover 2026-07-03 through 2026-09-22. The local reader reports 4,118 runs, 4,047 successful checks, and 3,954 changed-text corrections overall.
 - For 2026-08-24 through 2026-09-22, the local reader reports 1,567 runs, 1,542 successes, and 1,494 changed-text corrections. This is close to the Platform's 1,545 Responses records, but IDs and records could not be bulk-exported for exact reconciliation.
 
-No API records were appended. The three-record difference is unresolved, so importing anything without the actual records would risk duplication or incorrect timestamps. The app's current statistics continue to come from its existing local log corpus.
+No API records were appended. The three-record count difference was not reconciled, but counts alone do not establish missing records; importing anything without the actual records would risk duplication or incorrect timestamps. The app's current statistics continue to come from its existing local log corpus.
 
 Recommended extraction scope: `Universal Computer Spell Check` → Responses only. Exclude the other projects and every Completions source because the review showed no records there.
 
@@ -46,3 +48,7 @@ The official List Chat Completions endpoint can page through Chat Completions sa
 - Queried 2026-09-23 alone. The local corpus has 26 runs and 26 successes.
 - Checked one full response ID from a dashboard detail view against the local `spellcheck_detail` output. The ID is present locally.
 - These counts do not prove complete or missing records because run counts are not an ID-level comparison and may include local failures or records outside the dashboard's exact filter window. No specific missing dashboard record is confirmed. A full reconciliation still requires all dashboard response IDs or an OpenAI bulk export.
+
+## 2026-09-28 clarification
+
+The later apparent gap in the dashboard activity feed was a separate display-order issue fixed in commit `7981db3`; its underlying local spell-check log entries were present. It did not require an API log backfill.
