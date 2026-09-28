@@ -712,7 +712,7 @@ Cover:
 9. Missing/stale Chrome context never triggers a site rule.
 10. Switching apps or tabs before paste does not stop the paste.
 11. Protected literals survive before-paste formatting byte-for-byte.
-12. Duplicate/missing protected placeholders abort before paste.
+12. Duplicate/missing model-output placeholders abort; duplicate/missing optional formatter placeholders fall back to the corrected text.
 13. Terminal rule output matches the current normalizer fixtures.
 
 ### Chrome integration tests

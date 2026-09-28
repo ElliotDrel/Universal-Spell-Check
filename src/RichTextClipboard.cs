@@ -57,6 +57,8 @@ internal static partial class RichTextClipboard
         var paragraphs = ParagraphRegex().Matches(fragment);
         if (paragraphs.Count == 0 || !string.IsNullOrWhiteSpace(ParagraphRegex().Replace(fragment, "")))
         {
+            if (TryAlignTextNodes(fragment, sourceText, correctedText, out var aligned))
+                return aligned;
             return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
         }
 
@@ -91,6 +93,8 @@ internal static partial class RichTextClipboard
         if (!sourceParagraphs.SequenceEqual(sourceSections, StringComparer.Ordinal)
             || correctedSections.Length != sourceParagraphs.Length)
         {
+            if (TryAlignTextNodes(fragment, sourceText, correctedText, out var aligned))
+                return aligned;
             return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
         }
 
@@ -144,6 +148,141 @@ internal static partial class RichTextClipboard
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
     }
+
+    // Align edits to the original HTML text nodes. The clipboard's Unicode
+    // flavor adds list markers and Markdown-style link wrappers that are not
+    // present in CF_HTML, so only edits whose source characters map to an
+    // actual node may be written back into markup.
+    private static bool TryAlignTextNodes(
+        string fragment,
+        string sourceText,
+        string correctedText,
+        out RichTextReplacementResult replacement)
+    {
+        replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
+        var nodes = new List<HtmlTextNode>();
+        var sourceCursor = 0;
+        for (var i = 0; i < fragment.Length;)
+        {
+            if (fragment[i] == '<')
+            {
+                var tagEnd = FindTagEnd(fragment, i);
+                if (tagEnd < 0)
+                    return false;
+                i = tagEnd + 1;
+                continue;
+            }
+
+            var htmlStart = i;
+            while (i < fragment.Length && fragment[i] != '<')
+                i++;
+            var decoded = WebUtility.HtmlDecode(fragment[htmlStart..i]);
+            if (decoded.Length == 0)
+                continue;
+            var textStart = sourceText.IndexOf(decoded, sourceCursor, StringComparison.Ordinal);
+            if (textStart < 0)
+                return false;
+            nodes.Add(new HtmlTextNode(htmlStart, i - htmlStart, textStart, decoded));
+            sourceCursor = textStart + decoded.Length;
+        }
+
+        if (nodes.Count == 0)
+            return false;
+
+        var output = nodes.Select(_ => new StringBuilder()).ToArray();
+        var sourcePosition = 0;
+        foreach (var edit in UI.InlineTextDiff.ComputeChars(sourceText, correctedText))
+        {
+            switch (edit.Kind)
+            {
+                case UI.TextDiffKind.Equal:
+                    foreach (var character in edit.Text)
+                    {
+                        var owner = FindTextNode(nodes, sourcePosition++);
+                        if (owner >= 0)
+                            output[owner].Append(character);
+                    }
+                    break;
+                case UI.TextDiffKind.Delete:
+                    foreach (var character in edit.Text)
+                    {
+                        if (FindTextNode(nodes, sourcePosition++) < 0)
+                            return false;
+                    }
+                    break;
+                case UI.TextDiffKind.Insert:
+                    if (edit.Text.Contains('\n') || edit.Text.Contains('\r'))
+                        return false;
+                    var target = FindInsertionNode(nodes, sourcePosition);
+                    if (target < 0)
+                        return false;
+                    output[target].Append(edit.Text);
+                    break;
+            }
+        }
+
+        if (sourcePosition != sourceText.Length)
+            return false;
+
+        var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
+        var htmlCursor = 0;
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            var node = nodes[i];
+            rebuilt.Append(fragment, htmlCursor, node.HtmlStart - htmlCursor);
+            rebuilt.Append(output[i].ToString() == node.Text
+                ? fragment.Substring(node.HtmlStart, node.HtmlLength)
+                : WebUtility.HtmlEncode(output[i].ToString()));
+            htmlCursor = node.HtmlStart + node.HtmlLength;
+        }
+        rebuilt.Append(fragment, htmlCursor, fragment.Length - htmlCursor);
+
+        replacement = RichTextReplacementResult.CreateAlignedHtml(
+            correctedText,
+            BuildCfHtml(rebuilt.ToString()),
+            ParagraphRegex().Matches(fragment).Count);
+        return true;
+    }
+
+    private static int FindTextNode(IReadOnlyList<HtmlTextNode> nodes, int position)
+    {
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (position >= nodes[i].TextStart && position < nodes[i].TextStart + nodes[i].Text.Length)
+                return i;
+        }
+        return -1;
+    }
+
+    private static int FindInsertionNode(IReadOnlyList<HtmlTextNode> nodes, int position)
+    {
+        var atStart = FindTextNode(nodes, position);
+        if (atStart >= 0)
+            return atStart;
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (position == nodes[i].TextStart + nodes[i].Text.Length)
+                return i;
+        }
+        return -1;
+    }
+
+    private static int FindTagEnd(string html, int start)
+    {
+        var quote = '\0';
+        for (var i = start + 1; i < html.Length; i++)
+        {
+            if (quote == '\0' && html[i] is '\'' or '"')
+                quote = html[i];
+            else if (html[i] == quote)
+                quote = '\0';
+            else if (html[i] == '>' && quote == '\0')
+                return i;
+        }
+        return -1;
+    }
+
+    private sealed record HtmlTextNode(int HtmlStart, int HtmlLength, int TextStart, string Text);
 
     private static bool TryCreateStructuredListReplacement(
         string fragment,
@@ -474,6 +613,18 @@ internal sealed record RichTextReplacementResult(
         Text: text,
         Html: html,
         Mode: "html",
+        Attempted: true,
+        Applied: true,
+        Reason: "",
+        ParagraphCount: paragraphCount);
+
+    public static RichTextReplacementResult CreateAlignedHtml(
+        string text,
+        string html,
+        int paragraphCount) => new(
+        Text: text,
+        Html: html,
+        Mode: "aligned_html",
         Attempted: true,
         Applied: true,
         Reason: "",

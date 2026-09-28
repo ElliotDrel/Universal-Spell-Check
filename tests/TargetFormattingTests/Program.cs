@@ -5,6 +5,20 @@ using UniversalSpellCheck;
 const long now = 10_000;
 const long freshness = 1_000;
 
+const string echoedInput = "I need to fxi the list.";
+Assert(TextPostProcessor.StripEchoedInput(
+        echoedInput + "\n\n---\n\nCorrected text:\n\nI need to fix the list.",
+        echoedInput) == "I need to fix the list.",
+    "a complete echoed input followed by a labeled correction must not be pasted twice");
+Assert(TextPostProcessor.StripEchoedInput(
+        echoedInput + "\r\n\r\n---\r\n\r\nI need to fix the list.",
+        echoedInput) == "I need to fix the list.",
+    "a complete echoed input followed by a Windows-line-ending divider must be removed");
+Assert(TextPostProcessor.StripEchoedInput(
+        echoedInput + "\n\nA legitimate continuation.",
+        echoedInput) == echoedInput + "\n\nA legitimate continuation.",
+    "content without the observed correction divider must remain untouched");
+
 const string chatGptSourceText = "make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  \n\n\n\nmake image 1 rn (4 versions like always)";
 const string chatGptCorrectedText = "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nmake image 1 right now (4 versions like always)";
 const string chatGptFragment = "<p data-pm-slice=\"1 1 []\">make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  </p><p></p><p>make image 1 rn (4 versions like always)</p>";
@@ -43,8 +57,29 @@ var nestedMarkup = RichTextClipboard.TryCreateReplacement(
     CfHtml("<p data-pm-slice=\"1 1 []\">one <strong>two</strong></p>"),
     "one two",
     "one too");
-Assert(!nestedMarkup.Applied && nestedMarkup.Reason == "unsupported_fragment",
-    "rich-text paste must fall back rather than flattening or guessing nested markup");
+Assert(nestedMarkup.Applied && nestedMarkup.Mode == "aligned_html"
+    && Fragment(nestedMarkup.Html) == "<p data-pm-slice=\"1 1 []\">one <strong>too</strong></p>",
+    "a correction inside a styled text node must preserve the original markup");
+
+const string link = "https://example.com/task";
+const string richListFragment = "<p data-pm-slice=\"0 0 []\">githbu: <span class=\"mention\"><span>https://example.com/task</span></span></p><ol start=\"1\"><li><p>trest linee 1</p></li><li><p>testsst line 2</p></li></ol>";
+var richListReplacement = RichTextClipboard.TryCreateReplacement(
+    CfHtml(richListFragment),
+    $"githbu: [{link}]({link})\n1. trest linee 1\n2. testsst line 2",
+    $"GitHub: [{link}]({link})\n1. test line 1\n2. test line 2");
+Assert(richListReplacement.Applied && richListReplacement.Mode == "aligned_html"
+    && richListReplacement.Html.Contains("<span class=\"mention\"><span>https://example.com/task</span></span>", StringComparison.Ordinal)
+    && Fragment(richListReplacement.Html).Contains("<li><p>test line 1</p></li><li><p>test line 2</p></li>", StringComparison.Ordinal),
+    "mixed links and numbered lists must retain their HTML structure while correcting text nodes");
+
+var brokenUpParagraph = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><span data-prompt-literal-paste=\"\">intro<br><br>githbu: </span><span class=\"mention\"><span>https://example.com/task</span></span><span><br><br>To do:</span></p><ol start=\"1\"><li><p>trest linee 1</p></li></ol>"),
+    $"intro\n\ngithbu: [{link}]({link})\n\nTo do:\n1. trest linee 1",
+    $"intro\n\nGitHub: [{link}]({link})\n\nTo do:\n1. test line 1");
+Assert(brokenUpParagraph.Applied && brokenUpParagraph.Mode == "aligned_html"
+    && Fragment(brokenUpParagraph.Html).Contains("<br><br>GitHub: </span>", StringComparison.Ordinal)
+    && Fragment(brokenUpParagraph.Html).Contains("<li><p>test line 1</p></li>", StringComparison.Ordinal),
+    "line breaks inside styled spans must not force a plain-text fallback");
 
 var structureChanged = RichTextClipboard.TryCreateReplacement(
     CfHtml(chatGptFragment),
@@ -52,6 +87,9 @@ var structureChanged = RichTextClipboard.TryCreateReplacement(
     "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nextra paragraph\n\nmake image 1 right now (4 versions like always)");
 Assert(!structureChanged.Applied && structureChanged.Reason == "model_mismatch",
     "a model output with a different paragraph count must safely use the plain-text fallback");
+Assert(structureChanged.Text == "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nextra paragraph\n\nmake image 1 right now (4 versions like always)"
+    && structureChanged.Html.Length == 0,
+    "a rich-text mismatch must still carry the complete corrected text for paste");
 
 const string orderedListSourceText = "1. actaull cycle time is how time it takes to pop out each item per flow unit.";
 const string orderedListCorrectedText = "1. Actual cycle time is how long it takes to pop out each item per flow unit.";
@@ -290,7 +328,7 @@ foreach (var corruption in new[] { "missing", "duplicate" })
     var corruptPipeline = Pipeline(new[] { corruptRule });
     var result = corruptPipeline.ApplyBeforePaste(corruptPipeline.Resolve(desktop)!, literals, sameDesktop);
     Assert(result.AbortPaste && result.FailureCode == "literal_restore_failed",
-        $"{corruption} formatting placeholder must abort before paste");
+        $"{corruption} formatting placeholder must reject the optional transform");
 }
 
 var terminalCases = new[]

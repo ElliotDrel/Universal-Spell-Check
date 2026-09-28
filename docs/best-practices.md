@@ -8,6 +8,7 @@ windows, processes, or browser tabs after capture must not cancel the run.
 - Freeze target-specific formatting selection at capture time so the request remains deterministic.
 - Recapture the foreground context before the optional before-paste hook for telemetry and hook
   context, without treating a changed destination as an error.
-- Keep protected-placeholder validation. Missing or duplicated placeholders indicate corrupted
-  output and still abort the paste.
+- Keep protected-placeholder validation. Missing or duplicated placeholders in the model output
+  indicate an unsafe correction. If only the optional formatting hook damages its placeholders,
+  paste the corrected text without that formatting.
 - Record both capture and paste targets in telemetry because they may intentionally differ.

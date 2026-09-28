@@ -41,6 +41,7 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 12. In Windows Terminal or VS Code's terminal, select soft-wrapped text containing a URL and file path. Verify terminal wrapping and any copied `▎` wrap markers are removed while both literals remain byte-identical, and confirm `target_formatting.rule_id=terminal` plus the legacy `terminal_normalization` counters in `spellcheck_detail`.
 13. Correct a styled selection in Gmail or Slack. Verify `clipboard_html_chars > 0` and that `clipboard_html` holds the source markup (`logs.py --has-html`). Then correct a selection in Notepad and verify `clipboard_html_chars=0`. Capturing the second flavor must never change the corrected text, the paste, or `clipboard_ms`.
 14. Start a correction, switch to a different app before the request completes, and verify the corrected text pastes into the app that is active when the response is ready.
+15. In ChatGPT, correct a selection spanning an inline link and an ordered list. Verify the corrected text pastes, the link and list remain intact when `rich_text.mode=aligned_html`, and any unmappable selection still pastes corrected Unicode text instead of refusing the correction.
 
 ## Top-of-mind reminders
 

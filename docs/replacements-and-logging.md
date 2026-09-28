@@ -5,7 +5,7 @@
 `TargetFormattingPipeline` resolves one rule from its explicit ordered list after clipboard-history
 exclusion. Its after-copy hook runs before literal protection and the API request. After the existing
 post-processing restores protected literals, the optional before-paste hook runs against a second set
-of formatter-neutral private-use placeholders. Missing or duplicated placeholders abort the paste;
+of formatter-neutral private-use placeholders. Missing or duplicated placeholders skip that optional hook and paste the corrected text;
 an unexpected hook exception retains the unmodified text and is recorded asynchronously.
 
 Unmatched runs perform only the short resolver scan and a null branch. They do not perform the second
@@ -181,9 +181,13 @@ ordered or unordered list item, including an indented nested item, also qualifie
 generated Unicode indentation and list marker are identical before and after correction. The generated prefix is
 stripped and only the corrected item body is pasted as Unicode text because ChatGPT inserts any HTML
 block as a nested item. A single inline `<span>` is
-accepted around the item body. Any other source, nested markup, malformed header, or changed paragraph
-count uses the existing plain-text path; `rich_text.reason` records why. `rich_text.mode` distinguishes
-ordinary HTML re-emission from the `list_body_text` path. The exact two-level fragment produced when
+accepted around the item body. Mixed spans, links, and lists next use text-node alignment: each original
+HTML text node must map in order to the copied Unicode text, and every model edit must belong to a
+mapped node. The output retains the original tags and attributes. `rich_text.mode=aligned_html`
+identifies this path, while `html` and `list_body_text` identify the narrower paths. If alignment
+declines or throws, corrected Unicode text still pastes and `rich_text.reason` records why. An exact
+model echo followed by `---` and a corrected copy is removed before replacements and placeholder
+restoration; the run records `echoed_original_removed`. The exact two-level fragment produced when
 a parent item and its one nested child are selected is reconstructed as `nested_list_html`; both
 generated prefixes and both source bodies must match before either HTML text node is replaced.
 Larger simple list trees and bare `<li data-pm-slice>` subtrees use `structured_list_html`: every HTML

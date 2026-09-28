@@ -24,7 +24,8 @@ internal sealed class TextPostProcessor
     public PostProcessResult Process(string outputText, ProtectionResult protection)
     {
         var pairs = _pairs;
-        var replacements = ApplyReplacements(outputText, pairs);
+        var deEchoed = StripEchoedInput(outputText, protection.Text);
+        var replacements = ApplyReplacements(deEchoed, pairs);
         var promptGuard = StripPromptLeak(replacements.Text);
         var restored = ProtectedText.Restore(promptGuard.Text, protection);
 
@@ -34,8 +35,35 @@ internal sealed class TextPostProcessor
             ReplacementsApplied = replacements.Applied,
             ProtectionRestored = restored.Success,
             InvalidPlaceholder = restored.InvalidPlaceholder,
-            PromptLeak = promptGuard
+            PromptLeak = promptGuard,
+            EchoedOriginalRemoved = !string.Equals(deEchoed, outputText, StringComparison.Ordinal)
         };
+    }
+
+    // Some responses repeat the complete request text, then append a divider
+    // and a corrected copy. Only remove a byte-for-byte echo with the observed
+    // divider; a partial match could be legitimate corrected content.
+    internal static string StripEchoedInput(string outputText, string inputText)
+    {
+        if (inputText.Length == 0 || !outputText.StartsWith(inputText, StringComparison.Ordinal))
+            return outputText;
+
+        var suffix = outputText[inputText.Length..];
+        const string unixDivider = "\n\n---\n\n";
+        const string windowsDivider = "\r\n\r\n---\r\n\r\n";
+        var divider = suffix.StartsWith(unixDivider, StringComparison.Ordinal)
+            ? unixDivider
+            : suffix.StartsWith(windowsDivider, StringComparison.Ordinal)
+                ? windowsDivider
+                : null;
+        if (divider is null)
+            return outputText;
+
+        var corrected = suffix[divider.Length..];
+        const string label = "Corrected text:";
+        if (corrected.StartsWith(label, StringComparison.OrdinalIgnoreCase))
+            corrected = corrected[label.Length..].TrimStart('\r', '\n');
+        return corrected.Length == 0 ? outputText : corrected;
     }
 
     // Off-hot-path refresh: called from FinalizeAsync after the paste lands.
@@ -223,6 +251,7 @@ internal sealed class PostProcessResult
     public bool ProtectionRestored { get; init; } = true;
     public string? InvalidPlaceholder { get; init; }
     public PromptLeakResult PromptLeak { get; init; } = PromptLeakResult.NotTriggered("");
+    public bool EchoedOriginalRemoved { get; init; }
 }
 
 internal sealed class PromptLeakResult

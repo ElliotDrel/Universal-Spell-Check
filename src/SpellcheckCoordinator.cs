@@ -161,6 +161,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.OutputText = pp.Text;
             record.ReplacementsApplied = pp.ReplacementsApplied;
             record.PromptLeak = pp.PromptLeak;
+            if (pp.EchoedOriginalRemoved)
+                record.Events.Add("echoed_original_removed");
             if (!pp.ProtectionRestored)
             {
                 record.Status = RunStatus.RunFailed;
@@ -300,6 +302,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             }
             record.ReplacementsApplied = pp.ReplacementsApplied;
             record.PromptLeak = pp.PromptLeak;
+            if (pp.EchoedOriginalRemoved)
+                record.Events.Add("echoed_original_removed");
             if (!pp.ProtectionRestored)
             {
                 record.Status = RunStatus.RunFailed;
@@ -323,22 +327,16 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             if (record.BeforePasteFormatting.AbortPaste)
             {
-                var literalRestoreFailed = string.Equals(
-                    record.BeforePasteFormatting.FailureCode,
-                    "literal_restore_failed",
-                    StringComparison.Ordinal);
-                record.Status = RunStatus.RunFailed;
-                record.ErrorCode = literalRestoreFailed
-                    ? SpellcheckErrorCodes.ProtectedTextRestoreFailed
-                    : record.BeforePasteFormatting.FailureCode;
-                record.ErrorMessage = literalRestoreFailed
-                    ? "Target formatting changed a protected placeholder."
-                    : "Target formatting could not be applied safely.";
-                record.PasteFailurePhase = "before_paste_literal_restore";
-                record.Events.Add("target_format_literal_restore_failed");
-                _notify("Spell check failed", "Protected text could not be restored safely.");
-                record.T_HotPathReturned = Stopwatch.GetTimestamp();
-                return record;
+                // The optional formatter receives a protected copy of pp.Text.
+                // Fall back to the original, already-restored correction when
+                // that formatter cannot return a trustworthy result.
+                record.Events.Add($"target_format_fallback reason={record.BeforePasteFormatting.FailureCode}");
+                record.BeforePasteFormatting = record.BeforePasteFormatting with
+                {
+                    Text = pp.Text,
+                    Applied = false,
+                    AbortPaste = false
+                };
             }
 
             if (record.BeforePasteFormatting.FailureCode is not null)
@@ -348,10 +346,18 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             var finalText = record.BeforePasteFormatting.Text;
             record.OutputText = finalText;
-            record.RichTextReplacement = RichTextClipboard.TryCreateReplacement(
-                record.CapturedHtml,
-                capture.Text!,
-                finalText);
+            try
+            {
+                record.RichTextReplacement = RichTextClipboard.TryCreateReplacement(
+                    record.CapturedHtml,
+                    capture.Text!,
+                    finalText);
+            }
+            catch (Exception ex)
+            {
+                record.RichTextReplacement = RichTextReplacementResult.NotApplied("rich_text_failed", finalText);
+                record.Events.Add($"rich_text_failed error_type={ex.GetType().Name}");
+            }
 
             // Paste into whichever app is active when the correction is ready.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
@@ -370,23 +376,6 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 record.PasteFailurePhase = "set_corrected_clipboard";
                 record.Events.Add("paste_failed");
                 _notify("Paste failed", "The corrected text could not be copied to the clipboard.");
-                record.T_PasteAck = Stopwatch.GetTimestamp();
-                record.T_HotPathReturned = Stopwatch.GetTimestamp();
-                return record;
-            }
-
-            // Plain text would flatten links, inline styling, and list nodes in
-            // a ChatGPT selection we could not safely reconstruct. Leave the
-            // editor untouched and make the correction available for review.
-            if (!record.RichTextReplacement.Applied
-                && record.CapturedHtml.Contains("data-pm-slice", StringComparison.Ordinal)
-                && record.RichTextReplacement.Reason is "unsupported_fragment" or "model_mismatch")
-            {
-                record.Status = RunStatus.PasteFailed;
-                record.ErrorCode = "rich_text_unsupported";
-                record.PasteFailurePhase = "rich_text_guard";
-                record.Events.Add("rich_text_paste_skipped");
-                _notify("Formatting preserved", "This selection contains formatting the spell checker could not safely replace. The corrected text is on the clipboard; the original selection was not changed.");
                 record.T_PasteAck = Stopwatch.GetTimestamp();
                 record.T_HotPathReturned = Stopwatch.GetTimestamp();
                 return record;
