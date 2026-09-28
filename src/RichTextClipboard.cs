@@ -94,6 +94,22 @@ internal static partial class RichTextClipboard
             return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
         }
 
+        // The model often trims spaces at paragraph edges. Those spaces belong
+        // to the selected text, so keep them while changing only its words.
+        for (var i = 0; i < correctedSections.Length; i++)
+        {
+            var source = sourceParagraphs[i];
+            var leading = source.Length - source.TrimStart(' ', '\t').Length;
+            var trailing = source.Length - source.TrimEnd(' ', '\t').Length;
+            correctedSections[i] = source[..leading]
+                + correctedSections[i].Trim(' ', '\t')
+                + source[(source.Length - trailing)..];
+        }
+
+        var breaks = SectionBreakRegex().Matches(correctedText.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var normalizedText = string.Join("", correctedSections.Select((section, i) =>
+            i < breaks.Count ? section + breaks[i].Value : section));
+
         if (listItem)
         {
             // ChatGPT treats every HTML paragraph/list slice as a new block
@@ -124,7 +140,7 @@ internal static partial class RichTextClipboard
         rebuilt.Append(fragment, cursor, fragment.Length - cursor);
 
         return RichTextReplacementResult.CreateHtml(
-            correctedText,
+            normalizedText,
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
     }

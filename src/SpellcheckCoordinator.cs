@@ -375,6 +375,23 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 return record;
             }
 
+            // Plain text would flatten links, inline styling, and list nodes in
+            // a ChatGPT selection we could not safely reconstruct. Leave the
+            // editor untouched and make the correction available for review.
+            if (!record.RichTextReplacement.Applied
+                && record.CapturedHtml.Contains("data-pm-slice", StringComparison.Ordinal)
+                && record.RichTextReplacement.Reason is "unsupported_fragment" or "model_mismatch")
+            {
+                record.Status = RunStatus.PasteFailed;
+                record.ErrorCode = "rich_text_unsupported";
+                record.PasteFailurePhase = "rich_text_guard";
+                record.Events.Add("rich_text_paste_skipped");
+                _notify("Formatting preserved", "This selection contains formatting the spell checker could not safely replace. The corrected text is on the clipboard; the original selection was not changed.");
+                record.T_PasteAck = Stopwatch.GetTimestamp();
+                record.T_HotPathReturned = Stopwatch.GetTimestamp();
+                return record;
+            }
+
             await Task.Delay(50);
 
             record.T_PasteTargetCheck = Stopwatch.GetTimestamp();

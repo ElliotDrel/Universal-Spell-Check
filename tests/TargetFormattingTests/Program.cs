@@ -14,20 +14,30 @@ var richTextReplacement = RichTextClipboard.TryCreateReplacement(
     chatGptCorrectedText);
 Assert(richTextReplacement.Applied,
     "simple ChatGPT ProseMirror paragraphs must retain their HTML structure on replacement");
-Assert(richTextReplacement.Text == chatGptCorrectedText && richTextReplacement.Mode == "html",
+Assert(richTextReplacement.Text == "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d  \n\nmake image 1 right now (4 versions like always)"
+    && richTextReplacement.Mode == "html",
     "ordinary paragraph replacement must retain corrected Unicode text alongside HTML");
 Assert(richTextReplacement.Html.Contains(
     "</p><p></p><p>make image 1 right now (4 versions like always)</p>",
     StringComparison.Ordinal),
     "the empty ChatGPT paragraph must not become four plain-text newlines on paste");
 Assert(richTextReplacement.Html.Contains(
-    "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d</p>",
+    "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d  </p>",
     StringComparison.Ordinal),
     "the corrected first paragraph must be written into the source HTML");
 Assert(Fragment(richTextReplacement.Html).Contains(
     "</p><p></p><p>make image 1 right now (4 versions like always)</p>",
     StringComparison.Ordinal),
     "CF_HTML offsets must locate the UTF-8 fragment after multi-byte text");
+
+var edgeWhitespace = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\">  mistkae </p><p></p><p>last eror </p>"),
+    "  mistkae \n\nlast eror ",
+    "mistake\n\nlast error");
+Assert(edgeWhitespace.Applied
+    && edgeWhitespace.Text == "  mistake \n\nlast error "
+    && Fragment(edgeWhitespace.Html) == "<p data-pm-slice=\"0 0 []\">  mistake </p><p></p><p>last error </p>",
+    "the model's edge-space trimming must not alter selected paragraph spacing");
 
 var nestedMarkup = RichTextClipboard.TryCreateReplacement(
     CfHtml("<p data-pm-slice=\"1 1 []\">one <strong>two</strong></p>"),
