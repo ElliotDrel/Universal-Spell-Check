@@ -100,6 +100,10 @@ A block boundary emits one newline, `</p>` emits two, an empty block contributes
 
 Recent log evidence (2026-09-24 through 2026-09-27): mixed text/list selections at 2026-09-24 13:51 and 2026-09-27 21:57, inline spans at 2026-09-27 16:18, and an explicit ordered list at 2026-09-27 22:00 all reported `rich_text.reason=unsupported_fragment` while the old path still pasted Unicode text. The 2026-09-27 21:59 multi-paragraph selection used HTML, but the model removed spaces at two paragraph edges. The corrected text and HTML now retain those spaces together. Timestamps are local (`America/Indianapolis`).
 
+At 2026-09-28 09:48, ChatGPT copied a selected heading (`test`) and horizontal rule in `CF_HTML` but omitted the heading from `CF_UNICODETEXT`. Two Dev runs used plain-text fallback and pasted a correction without that heading, deleting it from the editor. Text-node alignment now preserves HTML nodes absent from Unicode and inserts their text into the Unicode replacement, including when rich alignment declines. The horizontal rule survives when ChatGPT consumes the HTML flavor; plain text cannot represent it. The same runs exposed a URL-protection regex that consumed the whole Markdown link as a bare URL, letting the model add an extra closing bracket; Markdown links are now protected as one literal. These findings and fixes are from the 2026-09-28 09:48:26 and 09:48:38 Dev `spellcheck_detail` entries.
+
+The 09:48:26 log replay now selects `aligned_html` and restores the omitted heading in Unicode. The 09:48:38 replay with its original malformed model output still uses Unicode fallback, but also restores the omitted heading; replaying it with the corrected link punctuation selects `aligned_html`. Live ChatGPT paste behavior still needs a Dev retest.
+
 ---
 
 ## Activity feed pagination order

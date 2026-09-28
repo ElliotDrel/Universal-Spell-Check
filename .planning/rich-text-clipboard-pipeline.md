@@ -4,6 +4,8 @@
 
 **2026-09-28:** Mixed ChatGPT spans, links, line breaks, and lists now have a bounded text-node alignment path. It maps each source HTML text node to the copied Unicode text, applies only edits owned by those nodes, and emits corrected HTML with original tags intact. Unmappable edits and any reconstruction exception fall back to corrected Unicode paste. The temporary refusal to paste unsupported ChatGPT formatting was removed: spell-check completion takes priority over formatting fidelity. An optional before-paste formatting failure also falls back to the corrected text.
 
+**2026-09-28 follow-up:** A real Dev run proved that ChatGPT can omit a visible selected heading from `CF_UNICODETEXT` while retaining it in `CF_HTML`. The alignment path now keeps unmatched HTML text nodes and reinserts their text in the Unicode replacement, even on structural fallback. Markdown links are protected as one literal before the model request so their closing punctuation cannot be duplicated.
+
 **Stage 1 implemented 2026-07-20: dual-flavor capture.** Every run now reads both `CF_UNICODETEXT`
 and `CF_HTML` and logs both. The capture path is permanently the two-flavor shape the rest of this
 spec builds on.

@@ -35,6 +35,14 @@ Assert(mixed.Entries.Count == 3, "mixed input: expected three protected literals
 Assert(ProtectedText.Restore(mixed.Text.Replace("teh", "the", StringComparison.Ordinal), mixed).Text
     == mixedInput.Replace("teh", "the", StringComparison.Ordinal), "mixed input: correction did not round trip");
 
+const string linkedInput = "github: [https://github.com/pmxi/purdue-sso](https://github.com/pmxi/purdue-sso)";
+var linked = ProtectedText.Protect(linkedInput);
+Assert(linked.Entries.Count == 1 && linked.Entries[0].Value.StartsWith("[https://", StringComparison.Ordinal),
+    "a Markdown link must be protected as one literal rather than consuming its closing punctuation");
+Assert(ProtectedText.Restore(linked.Text.Replace("github", "GitHub", StringComparison.Ordinal), linked).Text
+    == "GitHub: [https://github.com/pmxi/purdue-sso](https://github.com/pmxi/purdue-sso)",
+    "a Markdown link must restore without an extra closing bracket");
+
 var collision = ProtectedText.Protect("Keep __USC_LITERAL_0_1__ and https://example.com.");
 Assert(!collision.Entries[0].Placeholder.StartsWith("__USC_LITERAL_0_", StringComparison.Ordinal),
     "placeholder collision: namespace was not advanced");

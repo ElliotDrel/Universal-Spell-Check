@@ -59,7 +59,7 @@ internal static partial class RichTextClipboard
         {
             if (TryAlignTextNodes(fragment, sourceText, correctedText, out var aligned))
                 return aligned;
-            return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
+            return RichTextReplacementResult.NotApplied("unsupported_fragment", aligned.Text);
         }
 
         var sourceParagraphs = paragraphs
@@ -95,7 +95,7 @@ internal static partial class RichTextClipboard
         {
             if (TryAlignTextNodes(fragment, sourceText, correctedText, out var aligned))
                 return aligned;
-            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+            return RichTextReplacementResult.NotApplied("model_mismatch", aligned.Text, paragraphs.Count);
         }
 
         // The model often trims spaces at paragraph edges. Those spaces belong
@@ -161,7 +161,6 @@ internal static partial class RichTextClipboard
     {
         replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
         var nodes = new List<HtmlTextNode>();
-        var sourceCursor = 0;
         for (var i = 0; i < fragment.Length;)
         {
             if (fragment[i] == '<')
@@ -179,15 +178,38 @@ internal static partial class RichTextClipboard
             var decoded = WebUtility.HtmlDecode(fragment[htmlStart..i]);
             if (decoded.Length == 0)
                 continue;
-            var textStart = sourceText.IndexOf(decoded, sourceCursor, StringComparison.Ordinal);
-            if (textStart < 0)
-                return false;
-            nodes.Add(new HtmlTextNode(htmlStart, i - htmlStart, textStart, decoded));
-            sourceCursor = textStart + decoded.Length;
+            nodes.Add(new HtmlTextNode(htmlStart, i - htmlStart, -1, decoded));
         }
 
         if (nodes.Count == 0)
             return false;
+
+        var sourceCursor = 0;
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            var candidate = sourceText.IndexOf(nodes[i].Text, sourceCursor, StringComparison.Ordinal);
+            var next = -1;
+            for (var j = i + 1; j < nodes.Count; j++)
+            {
+                var future = sourceText.IndexOf(nodes[j].Text, sourceCursor, StringComparison.Ordinal);
+                if (future >= 0 && (next < 0 || future < next))
+                    next = future;
+            }
+
+            // ChatGPT can omit visible headings from its Unicode clipboard
+            // flavor. Keep such HTML nodes untouched instead of mapping a
+            // repeated word in a later list item to the missing heading.
+            if (candidate < 0 || (next >= 0 && next < candidate))
+                continue;
+            nodes[i] = nodes[i] with { TextStart = candidate };
+            sourceCursor = candidate + nodes[i].Text.Length;
+        }
+
+        if (nodes.All(node => node.TextStart < 0))
+            return false;
+
+        var completeCorrectedText = RecoverMissingHtmlText(correctedText, sourceText, nodes);
+        replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", completeCorrectedText);
 
         var output = nodes.Select(_ => new StringBuilder()).ToArray();
         var sourcePosition = 0;
@@ -206,15 +228,19 @@ internal static partial class RichTextClipboard
                 case UI.TextDiffKind.Delete:
                     foreach (var character in edit.Text)
                     {
-                        if (FindTextNode(nodes, sourcePosition++) < 0)
+                        if (FindTextNode(nodes, sourcePosition++) < 0 && !char.IsWhiteSpace(character))
                             return false;
                     }
                     break;
                 case UI.TextDiffKind.Insert:
-                    if (edit.Text.Contains('\n') || edit.Text.Contains('\r'))
-                        return false;
                     var target = FindInsertionNode(nodes, sourcePosition);
                     if (target < 0)
+                    {
+                        if (edit.Text.All(char.IsWhiteSpace))
+                            break;
+                        return false;
+                    }
+                    if (edit.Text.Contains('\n') || edit.Text.Contains('\r'))
                         return false;
                     output[target].Append(edit.Text);
                     break;
@@ -224,13 +250,26 @@ internal static partial class RichTextClipboard
         if (sourcePosition != sourceText.Length)
             return false;
 
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i].TextStart >= 0
+                && !string.IsNullOrWhiteSpace(nodes[i].Text)
+                && string.IsNullOrWhiteSpace(output[i].ToString()))
+            {
+                // A spelling correction cannot erase a whole visible node.
+                // Preserve it in HTML and recover it in the Unicode flavor.
+                nodes[i] = nodes[i] with { TextStart = -1 };
+            }
+        }
+        completeCorrectedText = RecoverMissingHtmlText(correctedText, sourceText, nodes);
+
         var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
         var htmlCursor = 0;
         for (var i = 0; i < nodes.Count; i++)
         {
             var node = nodes[i];
             rebuilt.Append(fragment, htmlCursor, node.HtmlStart - htmlCursor);
-            rebuilt.Append(output[i].ToString() == node.Text
+            rebuilt.Append(node.TextStart < 0 || output[i].ToString() == node.Text
                 ? fragment.Substring(node.HtmlStart, node.HtmlLength)
                 : WebUtility.HtmlEncode(output[i].ToString()));
             htmlCursor = node.HtmlStart + node.HtmlLength;
@@ -238,7 +277,7 @@ internal static partial class RichTextClipboard
         rebuilt.Append(fragment, htmlCursor, fragment.Length - htmlCursor);
 
         replacement = RichTextReplacementResult.CreateAlignedHtml(
-            correctedText,
+            completeCorrectedText,
             BuildCfHtml(rebuilt.ToString()),
             ParagraphRegex().Matches(fragment).Count);
         return true;
@@ -248,7 +287,8 @@ internal static partial class RichTextClipboard
     {
         for (var i = 0; i < nodes.Count; i++)
         {
-            if (position >= nodes[i].TextStart && position < nodes[i].TextStart + nodes[i].Text.Length)
+            if (nodes[i].TextStart >= 0
+                && position >= nodes[i].TextStart && position < nodes[i].TextStart + nodes[i].Text.Length)
                 return i;
         }
         return -1;
@@ -261,10 +301,59 @@ internal static partial class RichTextClipboard
             return atStart;
         for (var i = nodes.Count - 1; i >= 0; i--)
         {
-            if (position == nodes[i].TextStart + nodes[i].Text.Length)
+            if (nodes[i].TextStart >= 0
+                && position == nodes[i].TextStart + nodes[i].Text.Length)
                 return i;
         }
         return -1;
+    }
+
+    private static string RecoverMissingHtmlText(
+        string correctedText,
+        string sourceText,
+        IReadOnlyList<HtmlTextNode> nodes)
+    {
+        var recovered = correctedText;
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            if (nodes[i].TextStart >= 0 || string.IsNullOrWhiteSpace(nodes[i].Text))
+                continue;
+
+            var nextSourcePosition = sourceText.Length;
+            for (var j = i + 1; j < nodes.Count; j++)
+            {
+                if (nodes[j].TextStart >= 0)
+                {
+                    nextSourcePosition = nodes[j].TextStart;
+                    break;
+                }
+            }
+            var correctedPosition = MapSourceOffset(sourceText, correctedText, nextSourcePosition);
+            recovered = recovered.Insert(correctedPosition, nodes[i].Text + "\n\n");
+        }
+        return recovered;
+    }
+
+    private static int MapSourceOffset(string sourceText, string correctedText, int targetPosition)
+    {
+        var sourcePosition = 0;
+        var correctedPosition = 0;
+        foreach (var edit in UI.InlineTextDiff.ComputeChars(sourceText, correctedText))
+        {
+            if (edit.Kind == UI.TextDiffKind.Insert)
+            {
+                correctedPosition += edit.Text.Length;
+                continue;
+            }
+            if (targetPosition <= sourcePosition + edit.Text.Length)
+                return correctedPosition + (edit.Kind == UI.TextDiffKind.Equal
+                    ? targetPosition - sourcePosition
+                    : 0);
+            sourcePosition += edit.Text.Length;
+            if (edit.Kind == UI.TextDiffKind.Equal)
+                correctedPosition += edit.Text.Length;
+        }
+        return correctedPosition;
     }
 
     private static int FindTagEnd(string html, int start)

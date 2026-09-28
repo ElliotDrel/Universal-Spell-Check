@@ -8,7 +8,7 @@ internal static partial class ProtectedText
 
     [GeneratedRegex(
         """
-        (?<url>https?://[^\s"'<>]+)
+        (?<url>\[[^\]\r\n]+\]\(https?://[^\s)]+\)|https?://[^\s"'<>\[\]()]+)
         |
         (?<api_key>
             \b(?:sk|pk|rk)-(?:proj-)?[A-Za-z0-9_-]{16,}\b

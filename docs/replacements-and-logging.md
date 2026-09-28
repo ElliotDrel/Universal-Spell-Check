@@ -185,7 +185,9 @@ accepted around the item body. Mixed spans, links, and lists next use text-node 
 HTML text node must map in order to the copied Unicode text, and every model edit must belong to a
 mapped node. The output retains the original tags and attributes. `rich_text.mode=aligned_html`
 identifies this path, while `html` and `list_body_text` identify the narrower paths. If alignment
-declines or throws, corrected Unicode text still pastes and `rich_text.reason` records why. An exact
+declines, corrected Unicode text still pastes with any HTML text nodes omitted from the source Unicode flavor,
+and `rich_text.reason` records why. If reconstruction throws, the corrected Unicode text still pastes.
+An exact
 model echo followed by `---` and a corrected copy is removed before replacements and placeholder
 restoration; the run records `echoed_original_removed`. The exact two-level fragment produced when
 a parent item and its one nested child are selected is reconstructed as `nested_list_html`; both

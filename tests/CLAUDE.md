@@ -44,6 +44,10 @@ dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextT
 dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
 ```
 
+To replay one captured `spellcheck_detail` record against the rich-text mapper without a live paste,
+pipe one JSON object from the `read-logs` skill into `TargetFormattingTests` with `--replay-stdin`.
+The replay prints the selected mode and replacement Unicode text; it does not send an API request.
+
 Outputs from real (non-test) runs land in `benchmark_runs/` and `fine_tune_runs/` under dated subfolders — never commit those run artifacts.
 
 ## Top-of-mind reminders

@@ -1,6 +1,20 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using UniversalSpellCheck;
+
+if (args is ["--replay-stdin"])
+{
+    var log = JsonDocument.Parse(Console.In.ReadToEnd());
+    var detail = log.RootElement.GetProperty("detail");
+    var replay = RichTextClipboard.TryCreateReplacement(
+        detail.GetProperty("clipboard_html").GetString()!,
+        detail.GetProperty("input_text").GetString()!,
+        detail.GetProperty("output_text").GetString()!);
+    Console.WriteLine($"Replay mode={replay.Mode} reason={replay.Reason} html={replay.Html.Length} text={replay.Text.Length}");
+    Console.WriteLine(replay.Text);
+    return;
+}
 
 const long now = 10_000;
 const long freshness = 1_000;
@@ -80,6 +94,25 @@ Assert(brokenUpParagraph.Applied && brokenUpParagraph.Mode == "aligned_html"
     && Fragment(brokenUpParagraph.Html).Contains("<br><br>GitHub: </span>", StringComparison.Ordinal)
     && Fragment(brokenUpParagraph.Html).Contains("<li><p>test line 1</p></li>", StringComparison.Ordinal),
     "line breaks inside styled spans must not force a plain-text fallback");
+
+var omittedHeading = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\">intro</p><p></p><div><hr></div><p></p><h1>heading omitted by Unicode</h1><p></p><p><span>fix teh<br><br>github: </span><span class=\"mention\"><span>https://example.com/task</span></span><span><br><br>To do:</span></p><ol><li><p>trest linee 1</p></li></ol>"),
+    $"intro\n\n\n\nfix teh\n\ngithub: [{link}]({link})\n\nTo do:\n1. trest linee 1",
+    $"intro\n\n\n\nfix the\n\nGitHub: [{link}]({link})\n\nTo do:\n1. test line 1");
+Assert(omittedHeading.Applied && omittedHeading.Mode == "aligned_html"
+    && Fragment(omittedHeading.Html).Contains("<h1>heading omitted by Unicode</h1>", StringComparison.Ordinal)
+    && Fragment(omittedHeading.Html).Contains("fix the<br><br>GitHub: ", StringComparison.Ordinal)
+    && Fragment(omittedHeading.Html).Contains("<li><p>test line 1</p></li>", StringComparison.Ordinal)
+    && omittedHeading.Text.Contains("heading omitted by Unicode", StringComparison.Ordinal),
+    "HTML text omitted from ChatGPT's Unicode flavor must survive in both replacement flavors");
+
+var changedStructureWithOmittedHeading = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\">intro</p><h1>heading omitted by Unicode</h1><p>mistkae</p>"),
+    "intro\n\nmistkae",
+    "intro\n\nnew paragraph\n\n mistake");
+Assert(!changedStructureWithOmittedHeading.Applied
+    && changedStructureWithOmittedHeading.Text.Contains("heading omitted by Unicode", StringComparison.Ordinal),
+    "even a plain-text fallback must recover source text absent from the copied Unicode flavor");
 
 var structureChanged = RichTextClipboard.TryCreateReplacement(
     CfHtml(chatGptFragment),
