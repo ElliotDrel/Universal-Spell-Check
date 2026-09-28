@@ -41,6 +41,7 @@ def format_detail(d, ts, channel):
     status = d.get("status", "?")
     model = d.get("model", "?")
     app = d.get("active_exe", "?")
+    title = d.get("active_app", "").replace("\r", " ").replace("\n", " ")[:100]
     input_chars = d.get("input_chars", 0)
     output_chars = d.get("output_chars", 0)
     changed = d.get("text_changed", False)
@@ -53,9 +54,21 @@ def format_detail(d, ts, channel):
     changed_icon = "changed" if changed else "no-change"
 
     lines = [
-        f"[{ts[:19]}] [{status_icon}] {channel} | {model} | {app} | {changed_icon}",
+        f"[{ts[:19]}] [{status_icon}] {channel} | {model} | {app} | {changed_icon} | status={status}",
         f"  {input_chars}->{output_chars} chars | {total_ms}ms total ({request_ms}ms API) | {tokens.get('total', 0)} tokens",
     ]
+    if title:
+        lines.append(f"  window: {title}")
+
+    rich = d.get("rich_text", {})
+    if rich:
+        paste_chars = d.get("paste_text_chars", rich.get("paste_text_chars", 0))
+        html_chars = d.get("paste_html_chars", rich.get("replacement_html_chars", 0))
+        lines.append(
+            f"  rich_text: mode={rich.get('mode', '?')} reason={rich.get('reason', '')} "
+            f"paste_text={paste_chars} chars paste_html={html_chars} chars "
+            f"html_verification={rich.get('clipboard_html_verification', '?')}"
+        )
 
     replacements = d.get("replacements", {})
     if replacements.get("count", 0) > 0:
@@ -160,7 +173,7 @@ def main():
   python logs.py --today --stats
   python logs.py --today --errors
   python logs.py --today --event spellcheck_detail --app chrome
-  python logs.py --today --event spellcheck_detail --last 5
+  python logs.py --event spellcheck_detail --last 2
   python logs.py --from 2026-05-20 --to 2026-05-24 --stats
   python logs.py --today --channel dev
   python logs.py --today --raw --event run_completed
@@ -187,7 +200,7 @@ def main():
     parser.add_argument("--stats", "-s", action="store_true",
                         help="Print aggregate stats for spellcheck_detail events")
     parser.add_argument("--last", "-n", type=int, metavar="N",
-                        help="Show last N matching lines")
+                        help="Show last N matching lines; without dates, search the past 30 days")
     parser.add_argument("--raw", action="store_true",
                         help="Print raw log lines (no formatting)")
     parser.add_argument("--json", dest="json_out", action="store_true",
@@ -216,7 +229,9 @@ def main():
     if args.today:
         from_date = to_date = today
     else:
-        from_date = date.fromisoformat(args.from_date) if args.from_date else today
+        from_date = date.fromisoformat(args.from_date) if args.from_date else (
+            today - timedelta(days=30) if args.last and not args.to_date else today
+        )
         to_date = date.fromisoformat(args.to_date) if args.to_date else today
 
     files = collect_files(log_dir, from_date, to_date)

@@ -148,7 +148,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 
 ### `spellcheck_detail` fields
 
-Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `raw_ai_output`, `clipboard_html` (see below), `rich_text` (source HTML presence, safe-rewrite attempt/result, reason, and paragraph count), `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
+Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `model`, `active_app`, `active_exe`, `paste_target_app`, `paste_target_exe`, `paste_method`, `corrected_text_on_clipboard`, `original_clipboard_restored`, `captured_text_history_excluded`, `history_exclude_detail`, `text_changed`, `input_text`, `input_chars`, `output_text`, `output_chars`, `paste_text`, `paste_html` (see below), `raw_ai_output`, `clipboard_html` (see below), `rich_text` (source HTML presence, safe-rewrite attempt/result, reason, and paragraph count), `raw_response`, `request_payload`, `tokens` (input/output/total/cached/reasoning), `timings` (clipboard_ms, after_copy_format_ms, before_paste_format_ms, payload_ms, request_ms, api_ms, request_send_ms, request_wait_ms, response_download_ms, parse_ms, replacements_ms, prompt_guard_ms, paste_ms, total_ms), `replacements` (count/applied/protected_values plus per-kind protected counts), `prompt_leak` (triggered/occurrences/text_input_removed/removed_chars/before_length/after_length), the backward-compatible `terminal_normalization` object, `target_formatting` (rule/match identity plus per-hook application, character counts, stable operations, and failures), and `events[]`.
 
 `target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
 path, query, fragment, page title, selected text, or extension message.
@@ -203,6 +203,13 @@ Dev rich-text runs also read the replacement clipboard back immediately before t
 `rich_text` object records requested HTML size, whether the clipboard contained the exact generated
 CF_HTML (`exact_match`, `missing_html`, or `mismatch`), its readback size, and its post-write formats.
 Prod skips this diagnostic readback so it adds no production hot-path work.
+
+`output_text` is the corrected text before rich-text replacement. `paste_text` and `paste_html` are
+the final Unicode and CF_HTML strings requested in the clipboard write, including any text recovered
+from source HTML. Each has `_chars` (full length) and `_truncated` siblings; the logged strings are
+capped at 512K characters. An empty `paste_html` means the app requested a plain-text paste. These
+fields describe the requested payload, even if the write or paste later fails. They do not prove how
+the destination editor rendered the result. Older runs lack these fields.
 
 `logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
 `--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would

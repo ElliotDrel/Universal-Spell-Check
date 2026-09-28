@@ -433,6 +433,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var htmlTruncated = r.CapturedHtml.Length > MaxLoggedHtmlChars;
             var rtfTruncated = r.CapturedRtf.Length > MaxLoggedHtmlChars;
+            var pasteTextTruncated = r.RichTextReplacement.Text.Length > MaxLoggedHtmlChars;
+            var pasteHtmlTruncated = r.RichTextReplacement.Html.Length > MaxLoggedHtmlChars;
             var afterCopyFormatMs = TicksToMs(r.T_AfterCopyFormatStart, r.T_AfterCopyFormatEnd);
             var beforePasteFormatMs = TicksToMs(r.T_BeforePasteFormatStart, r.T_BeforePasteFormatEnd);
             var terminalApplied = r.FormattingMatch?.Rule.Id == TerminalFormattingRule.RuleId
@@ -536,6 +538,12 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 input_chars = r.InputText?.Length ?? 0,
                 output_text = r.OutputText ?? "",
                 output_chars = r.OutputText?.Length ?? 0,
+                paste_text = pasteTextTruncated ? r.RichTextReplacement.Text[..MaxLoggedHtmlChars] : r.RichTextReplacement.Text,
+                paste_text_chars = r.RichTextReplacement.Text.Length,
+                paste_text_truncated = pasteTextTruncated,
+                paste_html = pasteHtmlTruncated ? r.RichTextReplacement.Html[..MaxLoggedHtmlChars] : r.RichTextReplacement.Html,
+                paste_html_chars = r.RichTextReplacement.Html.Length,
+                paste_html_truncated = pasteHtmlTruncated,
                 raw_ai_output = r.RawAiOutput ?? "",
                 clipboard_html = htmlTruncated ? r.CapturedHtml[..MaxLoggedHtmlChars] : r.CapturedHtml,
                 clipboard_html_chars = r.CapturedHtml.Length,

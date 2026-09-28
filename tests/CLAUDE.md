@@ -5,7 +5,7 @@
 Three kinds of regression suites live here:
 
 1. **Python fine-tune dataset + benchmark scripts** under `.agents/skills/finetune-cycle/scripts/` — protecting the dataset/eval tooling that consumes the unified JSONL log corpus. The whole reason logs are unified across Prod and Dev (with per-line `channel`/`app_version` stamps) is to feed this pipeline cleanly.
-2. **Regression tests for C# product logic**, reimplemented in Python to keep the feedback loop fast (`test_text_post_processor.py`). The first of these guards the `TextPostProcessor` replacement algorithm — see `docs/tooling-gaps.md` § 2. We backfill these slowly as bugs surface; we are *not* aiming for blanket coverage of the C# product here.
+2. **Python regression tests** for the log reader (`test_read_logs.py`) and for C# product logic reimplemented in Python (`test_text_post_processor.py`). We add these when a specific bug surfaces; we are *not* aiming for blanket coverage of the C# product here.
 3. **Package-free C# executable tests** for hot-path logic where matching the production implementation exactly matters (`ProtectedTextTests/` and `TargetFormattingTests/`).
 
 ## Read first
@@ -20,6 +20,7 @@ tests/
 |-- TargetFormattingTests/                 # Rule matching, hooks, identity, literal safety, resolver microbench
 |-- test_benchmark_spellcheck_models.py    # Tests for benchmark_spellcheck_models.py
 |-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
+|-- test_read_logs.py                       # Cross-midnight last-run lookup
 |-- test-replacements.py                   # Replacements dry-run helper
 `-- test_text_post_processor.py            # C# TextPostProcessor regression (via tests/test-replacements.py)
 ```

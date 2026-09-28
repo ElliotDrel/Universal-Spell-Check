@@ -1,5 +1,3 @@
 # Tooling Gaps — Debugging Workflow
 
-Living backlog of friction points in the debugging/dev workflow and concrete ideas for solving them. Add a section per gap: the friction, why it matters, and options to fix. Remove a section once it ships (the rationale lives on in git history).
-
-**No open gaps right now.** The three surfaced during the `Competitionetition` bug investigation (2026-05-30) — log-reader content search, `TextPostProcessor` regression tests, and a replacements dry-run — all shipped on 2026-06-01. See `git log` for the details, the `read-logs` skill for `--grep-detail`, `tests/test-replacements.py` for the dry-run, and `tests/test_text_post_processor.py` for the regression tests.
+The three gaps from the `Competitionetition` investigation shipped on 2026-06-01. The two gaps from the 2026-09-28 ChatGPT formatting incident are now addressed: `logs.py --event spellcheck_detail --last 2` searches across midnight and shows the rich-text decision, while `spellcheck_detail` records the final requested `paste_text` and `paste_html` payloads. The log still cannot prove how a destination website rendered a paste. Add further instrumentation only if a real incident shows a remaining gap.

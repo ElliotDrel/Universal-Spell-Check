@@ -36,7 +36,7 @@ broken build.
 
 ---
 
-## Step 3 — Launch Dev channel and run acceptance checks
+## Step 3 — Verify the affected behavior
 
 Start the Dev channel:
 
@@ -44,32 +44,18 @@ Start the Dev channel:
 dotnet run --project src/UniversalSpellCheck.csproj -c Dev
 ```
 
-Then walk through all 10 manual acceptance checks. The user must physically
-interact with the running app — the AI cannot automate them.
+`src/CLAUDE.md` holds the current manual acceptance checklist. Run the checks
+relevant to the changed behavior, plus focused automated tests. For a logging
+or log-reader-only change, verify the reader against a date-boundary fixture
+and inspect one Dev run's new fields when a live run is available. Do not claim
+that unrun manual checks passed. If a relevant check fails, fix it, rebuild,
+and retest before pushing.
 
-> **Note:** This checklist is reproduced from `src/CLAUDE.md` ("Manual Acceptance
-> Checks" section). If `src/CLAUDE.md` is updated, update this list to match.
-
-**Acceptance checklist:**
-
-1. Launch with no saved API key → trigger hotkey → verify Settings opens (no paste).
-2. Save a valid API key in Settings.
-3. Select misspelled text in Notepad → press Ctrl+Alt+D → verify corrected text replaces selection.
-4. Select misspelled text in a browser textarea → press Ctrl+Alt+D → verify replacement.
-5. During a request, verify the bottom-center loading overlay appears after copy, does NOT steal focus, and disappears after replacement or failure.
-6. Press the hotkey with no selected text → verify stale clipboard text is NOT pasted.
-7. Press the hotkey twice rapidly → verify only one replacement attempt runs (`guard_rejected reason=already_running` appears in log).
-8. Select `open ai and github` → press Ctrl+Alt+D → verify output contains `OpenAI` and `GitHub`, and `replacements_count > 0` in log.
-9. Quit from the tray menu → verify the hotkey stops firing.
-10. Run Prod (Ctrl+Alt+U) and Dev (Ctrl+Alt+D) simultaneously → verify both appear in the tray with distinct icons and hotkeys, and both write entries to the same daily log with correct `channel=` stamps.
-
-Use `AskUserQuestion` to confirm all 10 checks pass before proceeding:
-
-> "Have you run through all 10 acceptance checks and they all pass?"
-
-If any check fails, stop. Do not push failing code. Fix the issue, rebuild
-(`dotnet run --project src/UniversalSpellCheck.csproj -c Dev`), retest the
-failed check, then resume.
+Confirm a new `started` event appears in the shared log after launch. A Dev
+process started from a restricted workspace sandbox may run without permission
+to write the normal log directory; a running process alone does not verify
+logging. Stop that test process and use a launch with normal filesystem access
+for a live-log check.
 
 ---
 
@@ -95,7 +81,7 @@ land — do not declare done.
 
 A good dev deploy satisfies all of the following:
 - Build succeeded with no errors or warnings that weren't present before.
-- All 10 acceptance checks passed, confirmed via `AskUserQuestion`.
+- Relevant acceptance checks passed; report any manual checks that were not run.
 - The branch was `main` with a clean working tree before push.
 - `git log origin/main --oneline -1` SHA matches local HEAD after push.
 
