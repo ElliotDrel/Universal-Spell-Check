@@ -17,6 +17,30 @@ Full project context. Routed from root `AGENTS.md` when overview, stack, or repo
 - Python 3 used only for fine-tune dataset tooling under `tests/`
 - Build: `dotnet build src/UniversalSpellCheck.csproj`
 
+## Developer setup
+
+Install the .NET 10 SDK selected by `global.json`, Python 3.14.8, and uv. The native app needs no Node.js, npm, AutoHotkey, or separately installed Windows workload. Its NuGet dependency restores during the build.
+
+From the checkout root:
+
+```powershell
+uv venv --python 3.14.8 .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
+dotnet build src/UniversalSpellCheck.csproj -c Dev
+.venv/Scripts/python.exe -m pytest tests/ bench/ -q
+```
+
+Keep Python tooling in the ignored `.venv/`, never an agent's Python environment. `requirements-dev.txt` pins the direct test and fine-tune dependencies. Tests use mocked transports and need no API keys. Enter a key through the app's Settings only when testing live corrections.
+
+When using the portable SDK in the outer project folder on this machine, prepend it for the current PowerShell session:
+
+```powershell
+$env:DOTNET_ROOT = (Resolve-Path ../.dotnet).Path
+$env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+```
+
+The SDK includes the Windows Desktop runtime. Keep the Velopack library and release-packaging CLI on the same version. Repository-level regression gaps are recorded in `docs/tooling-gaps.md`; installing packages does not repair missing project functions.
+
 ## Channels
 
 - **Prod** (`Release` config) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck.Data\`. Auto-updates from GitHub Releases.

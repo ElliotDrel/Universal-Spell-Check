@@ -65,7 +65,7 @@ jobs:
           Write-Host "Startup smoke passed (exit 0)."
 
       - name: Install vpk
-        run: dotnet tool install --global vpk
+        run: dotnet tool install --global vpk --version 1.2.161
 
       - name: Pack
         shell: pwsh

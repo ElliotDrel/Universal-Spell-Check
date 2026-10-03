@@ -16,7 +16,8 @@ publish/
 logs/*.jsonl
 logs/viewer.html
 
-# Ignore Python cache
+# Ignore Python environment and cache
+.venv/
 __pycache__/
 .pytest_cache/
 

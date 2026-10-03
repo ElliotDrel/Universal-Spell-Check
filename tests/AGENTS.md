@@ -40,7 +40,9 @@ The scripts under test:
 ## Run
 
 ```powershell
-python -m pytest tests/ -v
+uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
+.venv/Scripts/python.exe -m pytest tests/ bench/ -v
+dotnet run --project tests/ApiKeyStoreTests/UniversalSpellCheck.ApiKeyStoreTests.csproj -c Release
 dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextTests.csproj -c Release
 dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
 ```
