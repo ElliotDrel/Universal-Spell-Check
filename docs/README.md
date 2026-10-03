@@ -1,6 +1,6 @@
 # Documentation Index
 
-Use the root `agent.md` routing table to choose task-specific context. This index lists the durable
+Use the root `AGENTS.md` routing table to choose task-specific context. This index lists the durable
 documentation under `docs/`.
 
 | Document | Purpose |

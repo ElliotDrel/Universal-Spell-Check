@@ -10,7 +10,7 @@ Three kinds of regression suites live here:
 
 ## Read first
 
-> Before changing anything here, read root `agent.md` for routing + hard rules, and `docs/replacements-and-logging.md` for the JSONL log schema these scripts consume. The actual scripts under test live in `.agents/skills/finetune-cycle/scripts/` — read the script before changing the test.
+> Before changing anything here, read root `AGENTS.md` for routing + hard rules, and `docs/replacements-and-logging.md` for the JSONL log schema these scripts consume. The actual scripts under test live in `.agents/skills/finetune-cycle/scripts/` — read the script before changing the test.
 
 ## What's here
 

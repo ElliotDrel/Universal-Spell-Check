@@ -797,8 +797,8 @@ identity without logging raw paths/page content or delaying capture.
 - Update `docs/architecture.md` with the final pipeline and Chrome bridge.
 - Update `docs/replacements-and-logging.md` with hook semantics and JSONL fields.
 - Add Chrome extension/native-host failure cases to `docs/watchlist.md`.
-- Update `src/agent.md` with manual acceptance checks.
-- Add a routing row to root `agent.md` if a permanent focused subsystem doc is created.
+- Update `src/AGENTS.md` with manual acceptance checks.
+- Add a routing row to root `AGENTS.md` if a permanent focused subsystem doc is created.
 - Run Release build, product tests, startup smoke, E2E benchmark, and manual Dev acceptance.
 
 ---

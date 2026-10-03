@@ -1,6 +1,6 @@
 # Project Overview
 
-Full project context. Routed from root `agent.md` when overview, stack, or repo map is needed.
+Full project context. Routed from root `AGENTS.md` when overview, stack, or repo map is needed.
 
 ## What this is
 
@@ -73,9 +73,9 @@ Universal Spell Check/
 |-- benchmark_runs/                   # Dated benchmark outputs (gitignored content; structure preserved)
 |-- fine_tune_runs/                   # Dated fine-tune dataset/eval outputs
 |-- tests/                            # Python fine-tune dataset + benchmark tooling
-|-- docs/                             # Focused context docs - load via root agent.md routing
+|-- docs/                             # Focused context docs - load via root AGENTS.md routing
 |-- DESIGN.md                         # WPF dashboard visual design - read before visual changes
-`-- agent.md                         # Root resolver - routing table, not encyclopedia
+`-- AGENTS.md                         # Root resolver - routing table, not encyclopedia
 ```
 
 ## Tone when collaborating

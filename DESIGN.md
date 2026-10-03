@@ -232,7 +232,7 @@ src/UI/
     └── SettingsPage.xaml.cs
 ```
 
-Bundled fonts live under `src/UI/Fonts/` (Instrument Serif/Sans, JetBrains Mono). See `src/UI/agent.md` for font verification steps.
+Bundled fonts live under `src/UI/Fonts/` (Instrument Serif/Sans, JetBrains Mono). See `src/UI/AGENTS.md` for font verification steps.
 
 ### Wiring into existing tray app
 `SpellCheckAppContext.cs` opens the WPF `MainWindow` from the tray's `Open Dashboard` menu item. The WPF window's lifecycle is owned by the tray context; quit disposes it with the tray app.

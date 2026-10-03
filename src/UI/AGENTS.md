@@ -6,7 +6,7 @@ WPF dashboard for the tray app. Opened via the `Open Dashboard` tray menu item. 
 
 ## Read first
 
-> **Always read `DESIGN.md` (repo root) before any visual change.** It is the canonical visual contract: colors, fonts, spacing, layout. Then check root `agent.md` for routing and `docs/architecture.md` § WPF dashboard for pagination and log wiring.
+> **Always read `DESIGN.md` (repo root) before any visual change.** It is the canonical visual contract: colors, fonts, spacing, layout. Then check root `AGENTS.md` for routing and `docs/architecture.md` § WPF dashboard for pagination and log wiring.
 
 ## What's here
 

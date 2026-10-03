@@ -44,7 +44,7 @@ Start the Dev channel:
 dotnet run --project src/UniversalSpellCheck.csproj -c Dev
 ```
 
-`src/agent.md` holds the current manual acceptance checklist. Run the checks
+`src/AGENTS.md` holds the current manual acceptance checklist. Run the checks
 relevant to the changed behavior, plus focused automated tests. For a logging
 or log-reader-only change, verify the reader against a date-boundary fixture
 and inspect one Dev run's new fields when a live run is available. Do not claim
