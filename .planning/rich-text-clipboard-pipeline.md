@@ -395,7 +395,7 @@ source of "paste produces garbage" bugs.
 
 `ExcludeTextFromHistory` already owns a manual `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`
 session. The final write becomes the same shape: one session placing `CF_HTML`, `CF_UNICODETEXT`, and
-no history-exclusion DWORDs (the corrected text is meant to stay in Win+V — see root `CLAUDE.md`).
+no history-exclusion DWORDs (the corrected text is meant to stay in Win+V — see root `agent.md`).
 `Clipboard.SetText` is no longer sufficient.
 
 ### Protected literals
@@ -492,4 +492,4 @@ Gate commands are the existing ones from `.planning/app-site-formatting-customiz
    Log the diff between what would be pasted and what is pasted.
 5. Dual-flavor clipboard write behind a setting, default off. Answer D2 and D3 here.
 6. Default on. Update `docs/architecture.md`, `docs/replacements-and-logging.md`,
-   `docs/watchlist.md`, `src/CLAUDE.md`, and the root routing table.
+   `docs/watchlist.md`, `src/agent.md`, and the root routing table.

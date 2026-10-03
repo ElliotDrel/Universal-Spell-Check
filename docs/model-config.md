@@ -25,7 +25,7 @@ The collection, including names and active-key selection, is never written to `s
 | `text.verbosity` | `"medium"` | `"low"` |
 | API shape | Responses API | Responses API |
 
-This is a hard rule (see `CLAUDE.md` §2). Reasoning models return a 4xx API error when `temperature` is sent — always verify parameter compatibility, not just model name.
+This is a hard rule (see `agent.md` §2). Reasoning models return a 4xx API error when `temperature` is sent — always verify parameter compatibility, not just model name.
 
 ---
 

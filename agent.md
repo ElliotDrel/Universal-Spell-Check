@@ -1,4 +1,4 @@
-# CLAUDE.md — Master System Resolver
+# agent.md — Master System Resolver
 
 > **CRITICAL MANDATE:** Do not invent logic or guess. Before editing code, answering detailed questions, or running a skill, match the user's intent to the routing table below and **read the referenced doc FIRST**. Do not rely on memory from prior sessions — docs evolve. If a task spans multiple rows, load each relevant doc before writing code.
 
@@ -38,9 +38,9 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Clipboard/hotkey edge cases, loading overlay checks, cache pitfalls | `docs/watchlist.md` |
 | Naming, style, error-handling, comments, C#/Python conventions | `docs/conventions.md` |
 | Dashboard UI / WPF / colors / fonts / mockups / visual changes | `DESIGN.md` (always, before any visual change) |
-| Working inside the WPF dashboard folder | `src/UI/CLAUDE.md` + `DESIGN.md` |
-| Running, building, manual acceptance-testing the native app | `src/CLAUDE.md` |
-| Python fine-tune dataset tooling, benchmarks, eval runs | `tests/CLAUDE.md` |
+| Working inside the WPF dashboard folder | `src/UI/agent.md` + `DESIGN.md` |
+| Running, building, manual acceptance-testing the native app | `src/agent.md` |
+| Python fine-tune dataset tooling, benchmarks, eval runs | `tests/agent.md` |
 | Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
 | Dry-running text through replacements.json without the live app | `python tests/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
 | Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
@@ -78,10 +78,10 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 This routing table is only useful if it reflects reality. **Treat doc drift as a bug.**
 
 - When you add/rename/delete a file referenced here, update the routing row in the same change.
-- When a new subsystem, doc, or `CLAUDE.md` appears, add a routing row.
+- When a new subsystem, doc, or `agent.md` appears, add a routing row.
 - When a Hard Rule is superseded by code (e.g., a constant moves), update the rule.
 - When the Grounding header no longer matches what the project is doing (channel rename, stack change, new top-of-mind concern), revise it.
-- **Flag drift proactively.** If during any task you notice this file, `docs/*.md`, or any subdir `CLAUDE.md` is stale, contradicts the code, or points to something that no longer exists — stop and surface it to the user with a proposed fix. Do not silently work around stale docs.
+- **Flag drift proactively.** If during any task you notice this file, `docs/*.md`, or any subdir `agent.md` is stale, contradicts the code, or points to something that no longer exists — stop and surface it to the user with a proposed fix. Do not silently work around stale docs.
 - Filing rules for new content live in `docs/filing-rules.md`.
 
 ---

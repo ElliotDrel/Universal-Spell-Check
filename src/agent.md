@@ -6,7 +6,7 @@ This is **the product**: a C#/.NET 10 WinForms tray app + WPF dashboard. Select 
 
 ## Read first
 
-> Before editing code here, read root `CLAUDE.md` for routing + hard rules. For architecture (tray lifetime, hotkey, pipeline, overlay), read `docs/architecture.md`. For visual/WPF dashboard work, read `DESIGN.md` and `src/UI/CLAUDE.md`.
+> Before editing code here, read root `agent.md` for routing + hard rules. For architecture (tray lifetime, hotkey, pipeline, overlay), read `docs/architecture.md`. For visual/WPF dashboard work, read `DESIGN.md` and `src/UI/agent.md`.
 
 ## Run (Dev channel)
 
