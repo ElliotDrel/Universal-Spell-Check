@@ -215,6 +215,10 @@
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionHeader}" Text="Logs"/>
+                    <CheckBox x:Name="DeveloperLoggingCheckBox" Content="Developer logging"
+                              Checked="OnDeveloperLoggingToggled" Unchecked="OnDeveloperLoggingToggled"/>
+                    <TextBlock Style="{StaticResource BodyMuted}" TextWrapping="Wrap" Margin="0,8,0,16"
+                               Text="Automatically save clipboard formatting, editor text and window images locally for troubleshooting. Applies to the next correction."/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

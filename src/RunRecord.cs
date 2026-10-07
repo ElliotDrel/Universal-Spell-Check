@@ -11,6 +11,11 @@ internal enum RunStatus
 
 internal sealed class RunRecord
 {
+    public string RunId { get; } = Guid.NewGuid().ToString("N");
+    public DateTimeOffset? SourceClipboardCapturedAt { get; set; }
+    public bool DeveloperLoggingEnabled { get; set; }
+    public DeveloperEvidence? Evidence { get; set; }
+
     // Status
     public RunStatus Status { get; set; } = RunStatus.Success;
     public string? ErrorCode { get; set; }

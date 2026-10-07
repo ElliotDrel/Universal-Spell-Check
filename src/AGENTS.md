@@ -55,3 +55,13 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 ## Keeping this file current
 
 If the run commands, channel constants, manual checks, or Top-of-mind reminders drift from the code, fix this file in the same change. **If you notice drift while doing other work — stale step, removed file, wrong hotkey — flag it to the user and propose the fix.** Do not silently work around it.
+
+## Developer evidence verification
+
+Build `Dev` then run `src/bin/Dev/net10.0-windows/UniversalSpellCheck.exe --developer-evidence-smoke`
+via `Start-Process -PassThru -Wait -WindowStyle Hidden`; check exit code. This disposable native
+editor fixture exercises automatic screenshots/UIA, supported rich clipboard capture, actual paste,
+enabled/disabled readback, live setting updates and sidecars beyond the inline cap. Run independently
+of model access. For a complete integration test, enable Developer logging in the Dev dashboard,
+correct a disposable selection with Ctrl+Alt+D, and inspect that run's manifest and requested/readback
+payloads. The final destination-editor rendering acceptance remains Elliot's original-place retest.

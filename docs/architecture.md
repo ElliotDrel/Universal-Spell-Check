@@ -165,7 +165,11 @@ Successful rows require `status=success` with non-empty `input_text` and `output
 
 ### Settings (`SettingsPage`)
 
-Adds, selects, and removes named API keys; only masked identifiers are displayed. Selection refreshes `CachedSettings`, so the next request uses the chosen key. It also opens the log folder and `replacements.json`. The Updates card shows current version, last updated, last checked, and calls `UpdateService.CheckAsync(ManualDashboard)`. The sidebar reload icon uses the same action.
+Adds, selects, and removes named API keys; only masked identifiers are displayed. Selection refreshes `CachedSettings`, so the next request uses the chosen key. It also opens the log folder and `replacements.json`. The Logs card exposes an optional developer
+logging toggle, off by default; `CachedSettings` refreshes its value after a settings change so the
+next correction can capture full clipboard sidecars and bounded native editor/window evidence.
+Evidence serialization and worker waits are off the correction thread. The schema and limits are
+in `docs/replacements-and-logging.md`. The Updates card shows current version, last updated, last checked, and calls `UpdateService.CheckAsync(ManualDashboard)`. The sidebar reload icon uses the same action.
 
 ---
 
