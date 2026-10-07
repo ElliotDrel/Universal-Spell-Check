@@ -459,7 +459,11 @@ def main():
                 except json.JSONDecodeError:
                     obj["rest"] = rest
             else:
-                obj["fields"] = parse_kv(rest)
+                try:
+                    fields = json.loads(rest)
+                except json.JSONDecodeError:
+                    fields = None
+                obj["fields"] = fields if isinstance(fields, dict) else parse_kv(rest)
             print(json.dumps(obj))
         elif event == "spellcheck_detail":
             try:
