@@ -234,15 +234,19 @@ Changing it applies to the next correction without restarting. Disabled correcti
 existing clipboard and diagnostic behavior. Headless/benchmark requests do not capture the desktop.
 
 Each detail record has `run_id` and `developer_logging_enabled`. Enabled runs add `developer_evidence` with `schema_version`,
-`manifest_path` relative to the shared log directory, and `status`. Busy evidence admission is reported explicitly. The app writes evidence after
-the correction returns, so a reader may need to retry briefly while finalization runs.
+`manifest_path` relative to the shared log directory, and `status`. Busy evidence admission is reported explicitly. Ordinary `run_completed` and the single `spellcheck_detail` are written before optional evidence
+provider/storage waits, with a `pending` manifest reference. The app then writes evidence and a separate
+`developer_evidence_completed` event with the final reference and readback summary. A reader may need
+to retry briefly if the manifest is not present; a pending reference can be read once its manifest exists.
+There are no duplicate detail records and no added shutdown waits. Quitting can leave optional
+evidence incomplete without holding the ordinary run logs behind its completion.
 
 Evidence lives in `logs/developer-evidence/<run_id>/manifest.json`. `payloads` contains full
 UTF-8 sidecars for `input_text`, `clipboard_html`, `clipboard_rtf`, `clipboard_formats`,
 `raw_ai_output`, `output_text` (the rich mapper input), `paste_text`, `paste_html`, and
 `readback_text/html/rtf/formats`. Entries expose relative `path`, SHA-256 `sha256`, UTF-8 `bytes`,
-.NET UTF-16 `chars`, `complete` and `status`. Empty source markup is a complete empty payload;
-null unavailable values are incomplete. Inline 512K markup caps remain, but the sidecars preserve
+.NET UTF-16 `chars`, `complete` and `status`. Empty source markup is complete only when the format list confirms that flavor is absent.
+An offered-but-empty flavor or an unavailable format list is explicitly incomplete, as are null values. Inline 512K markup caps remain, but the sidecars preserve
 larger ordinary selections. A 16MiB per-payload cap and 256MiB total evidence store cap explicitly
 return `size_limit` / `storage_limit` instead of deleting existing data. Evidence is local and can
 contain selected text and surrounding editor content; API key/settings files are never included.

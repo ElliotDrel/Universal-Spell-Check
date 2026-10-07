@@ -214,7 +214,7 @@ internal static class ClipboardLoop
         {
             return ReplacementClipboardResult.Succeeded(richTextHtml.Length) with
             {
-                ReadbackCapture = BeginReadback()
+                HtmlVerification = "pending", ReadbackCapture = BeginReadback()
             };
         }
 #if DEV

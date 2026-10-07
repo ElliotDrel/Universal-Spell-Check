@@ -53,6 +53,37 @@ internal static class DeveloperEvidenceTests
             var admitted2 = DeveloperEvidence.TryCreate("test2", root)!;
             Check(DeveloperEvidence.TryCreate("test3", root) is null, "Optional evidence must have bounded admission.");
             admitted1.Save(new RunRecord()); admitted2.Save(new RunRecord());
+            var orderingRoot = Path.Combine(root, "ordering");
+            var orderingLog = Path.Combine(orderingRoot, "spellcheck-ordering.jsonl");
+            var orderingLogger = new DiagnosticsLogger(orderingLog);
+            var settings = new SettingsStore(orderingLogger, orderingRoot, Path.Combine(orderingRoot, "unused-api-key"));
+            using var service = new OpenAiSpellcheckService(new CachedSettings(settings), orderingLogger);
+            using var coordinator = new SpellcheckCoordinator(orderingLogger, service, new TextPostProcessor(orderingLogger),
+                new TargetFormattingPipeline(), (_, _) => { }, _ => { }, () => { });
+            var ordering = new RunRecord { InputText = "teh", OutputText = "the", DeveloperLoggingEnabled = true };
+            ordering.Evidence = DeveloperEvidence.TryCreate(ordering.RunId, orderingRoot)!;
+            using var heldQuota = new Mutex(false, BuildChannel.DeveloperEvidenceMutexName);
+            heldQuota.WaitOne();
+            Task finalization;
+            try
+            {
+                finalization = Task.Run(() => typeof(SpellcheckCoordinator)
+                    .GetMethod("FinalizeAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .Invoke(coordinator, [ordering]));
+                var deadline = System.Diagnostics.Stopwatch.StartNew();
+                while (deadline.ElapsedMilliseconds < 700 &&
+                    (!File.Exists(orderingLog) || !File.ReadAllText(orderingLog).Contains("spellcheck_detail"))) Thread.Sleep(10);
+                var ordinaryLogs = File.Exists(orderingLog) ? File.ReadAllText(orderingLog) : "";
+                Check(ordinaryLogs.Contains("run_completed") && ordinaryLogs.Contains("spellcheck_detail"),
+                    "Ordinary logs must precede optional storage waits.");
+                Check(ordinaryLogs.Contains("\"status\":\"pending\""), "Detail must link pending evidence.");
+                Check(!finalization.IsCompleted, "Test must hold optional evidence storage pending.");
+            }
+            finally { heldQuota.ReleaseMutex(); }
+            Check(finalization.Wait(5000), "Evidence finalization must complete after quota release.");
+            var completeLogs = File.ReadAllText(orderingLog);
+            Check(completeLogs.Contains("developer_evidence_completed"), "Final evidence status event missing.");
+            Check(completeLogs.Split("spellcheck_detail").Length == 2, "Ordinary detail must not be duplicated.");
             logger.Log("developer_evidence_tests_ok");
             return 0;
         }

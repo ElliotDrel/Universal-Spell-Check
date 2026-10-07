@@ -159,6 +159,8 @@ internal sealed class DeveloperEvidence
         return finished == completion.Task ? await completion.Task.ConfigureAwait(false) : new { status = "timeout", timeout_ms = 750 };
     }
 
+    public object PendingReference => new { schema_version = 1, manifest_path = $"developer-evidence/{_runId}/manifest.json", status = "pending" };
+
     public object Save(RunRecord run)
     {
         var manifestPath = $"developer-evidence/{_runId}/manifest.json";

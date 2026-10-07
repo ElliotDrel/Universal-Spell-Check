@@ -7,6 +7,7 @@ Each line: {ISO8601} channel={prod|dev} app_version={semver} pid={int} {event} {
 spellcheck_detail lines have a JSON blob after the event name.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,106 @@ ERROR_EVENTS = {
     "replacements_reload_failed", "guard_rejected", "connection_warm_failed",
     "data_migration_failed", "activity_load_failed",
 }
+
+
+def _utf16_chars(value):
+    return len(value.encode("utf-16-le", errors="surrogatepass")) // 2
+
+
+def _contained_path(base, relative):
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("Evidence path must be a nonempty string")
+    path = (base / relative).resolve()
+    if not path.is_relative_to(base.resolve()):
+        raise ValueError("Evidence path escapes its evidence directory")
+    return path
+
+
+def make_replay_case(entry, log_dir):
+    """Freeze complete mapper inputs, preferring integrity-checked developer evidence."""
+    detail = entry["detail"]
+    if not isinstance(detail, dict):
+        raise ValueError("Replay detail must be an object")
+    if detail.get("status") not in ("success", "paste_failed"):
+        raise ValueError("Run did not reach a replayable correction")
+    developer = detail.get("developer_evidence")
+    manifest = None
+    evidence_warning = None
+    manifest_pending = False
+    if developer:
+        if not isinstance(developer, dict) or developer.get("schema_version") != 1:
+            raise ValueError("Unsupported developer evidence schema")
+        if developer.get("status") in ("storage_limit", "storage_busy", "busy", "failed"):
+            evidence_warning = "Developer evidence save failed; replay uses validated complete inline inputs only"
+        else:
+            path = _contained_path(Path(log_dir), developer["manifest_path"])
+            try:
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError as exc:
+                if developer.get("status") != "pending":
+                    raise ValueError("Developer evidence is not saved yet; retry after capture finishes") from exc
+                manifest_pending = True
+                evidence_warning = "Developer evidence is pending; replay uses validated complete inline inputs only"
+            if manifest is not None and (not isinstance(manifest, dict)
+                    or manifest.get("schema_version") != 1 or manifest.get("run_id") != detail.get("run_id")):
+                raise ValueError("Developer evidence schema or run identity does not match")
+
+    def payload(field, required):
+        if manifest is not None:
+            payloads = manifest.get("payloads", {})
+            if not isinstance(payloads, dict):
+                raise ValueError("Developer payloads must be an object")
+            item = payloads.get(field, {})
+            if not isinstance(item, dict):
+                raise ValueError(f"Invalid developer evidence: {field}")
+            if item.get("complete") is not True or item.get("status") != "ok":
+                if required:
+                    raise ValueError(f"Incomplete developer evidence: {field}")
+                return None
+            raw = _contained_path(path.parent, item["path"]).read_bytes()
+            if len(raw) != item.get("bytes") or hashlib.sha256(raw).hexdigest() != item.get("sha256"):
+                raise ValueError(f"Developer evidence integrity check failed: {field}")
+            value = raw.decode("utf-8")
+            if _utf16_chars(value) != item.get("chars"):
+                raise ValueError(f"Developer evidence character count mismatch: {field}")
+            return value
+        value = detail.get(field)
+        count_key = {"input_text": "input_chars", "output_text": "output_chars"}.get(field, field + "_chars")
+        if (not isinstance(value, str) or detail.get(field + "_truncated")
+                or detail.get(count_key, _utf16_chars(value) if isinstance(value, str) else -1) != _utf16_chars(value or "")):
+            if required:
+                note = "; developer evidence is pending, retry after capture finishes" if manifest_pending else ""
+                raise ValueError(f"Missing or truncated replay evidence: {field}{note}")
+            return None
+        return value
+
+    frozen = {field: payload(field, True) for field in ("input_text", "clipboard_html", "output_text")}
+    formats = payload("clipboard_formats", False)
+    if formats is None:
+        formats = detail.get("clipboard_formats", "")
+    if manifest is None and not frozen["clipboard_html"]:
+        if isinstance(formats, str) and "html format" in formats.lower():
+            raise ValueError("Source HTML was offered but its empty capture is unconfirmed; cannot replay missing formatting")
+        if not isinstance(formats, str) or not formats:
+            note = "Source HTML availability is unknown because clipboard formats were not captured"
+            evidence_warning = f"{evidence_warning}; {note}" if evidence_warning else note
+    frozen["clipboard_formats"] = formats if isinstance(formats, str) else ""
+    frozen.update({"input_chars": _utf16_chars(frozen["input_text"]),
+                   "output_chars": _utf16_chars(frozen["output_text"]),
+                   "clipboard_html_chars": _utf16_chars(frozen["clipboard_html"]),
+                   "clipboard_html_truncated": False})
+    for field in ("paste_text", "paste_html"):
+        value = payload(field, False)
+        if value is not None:
+            frozen[field] = value
+    frozen["rich_text"] = detail.get("rich_text", {})
+    return {"schema_version": 1, "kind": "formatting_replay_case", "source": {
+        key: entry.get(key) for key in ("ts", "channel", "version", "pid")
+    } | {"run_id": detail.get("run_id"), "active_app": detail.get("active_app"),
+         "active_exe": detail.get("active_exe"),
+         "evidence_origin": "developer_manifest" if manifest else "inline_log",
+         "evidence_warning": evidence_warning},
+        "detail": frozen}
 
 
 def parse_kv(s):
@@ -219,7 +320,15 @@ def main():
                         help="Rows whose selection carried ANY rich flavor (CF_HTML or RTF). "
                              "Pair with clipboard_formats to see what the source actually offered.")
 
+    parser.add_argument("--save-replay-case", metavar="PATH",
+                        help="Save exactly one matching correction as a complete local replay case")
     args = parser.parse_args()
+    if args.save_replay_case and (args.stats or args.raw or args.json_out or args.errors):
+        parser.error("--save-replay-case cannot be combined with output modes or --errors")
+    if args.save_replay_case:
+        if args.event and args.event != "spellcheck_detail":
+            parser.error("Replay export requires spellcheck_detail")
+        args.event = "spellcheck_detail"
 
     log_dir = Path(args.log_dir) if args.log_dir else LOG_DIR
     if not log_dir.exists():
@@ -235,6 +344,8 @@ def main():
         to_date = date.fromisoformat(args.to_date) if args.to_date else today
 
     files = collect_files(log_dir, from_date, to_date)
+    if not files and args.save_replay_case:
+        parser.error("No log files found for replay export")
     if not files:
         print(f"No log files found for {from_date} to {to_date}")
         sys.exit(0)
@@ -305,6 +416,22 @@ def main():
 
     if args.last:
         results = results[-args.last:]
+
+    if args.save_replay_case:
+        if len(results) != 1:
+            parser.error(f"Replay export requires exactly one run; matched {len(results)}. Narrow filters or use --last 1.")
+        ts, channel, version, pid, event, rest, raw = results[0]
+        try:
+            entry = {"ts": ts, "channel": channel, "version": version, "pid": pid,
+                     "detail": json.loads(rest)}
+            case = make_replay_case(entry, log_dir)
+            with open(args.save_replay_case, "x", encoding="utf-8") as output:
+                json.dump(case, output, ensure_ascii=True, indent=2)
+                output.write("\n")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            parser.error(str(exc))
+        print(f"Saved replay case: {args.save_replay_case}")
+        return
 
     if args.stats:
         details = []

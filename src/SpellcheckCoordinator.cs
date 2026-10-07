@@ -443,7 +443,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
     {
         try
         {
-            var developerEvidence = r.Evidence?.Save(r) ??
+            var developerEvidence = r.Evidence?.PendingReference ??
                 (r.DeveloperLoggingEnabled ? (object)new { schema_version = 1, status = "busy", manifest_path = "" } : null);
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var htmlTruncated = r.CapturedHtml.Length > MaxLoggedHtmlChars;
@@ -698,6 +698,25 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     $"stack=\"{Escape(ex.ToString())}\"");
             }
             catch { /* swallow — finalize must never affect the next hotkey */ }
+        }
+        finally
+        {
+            // Optional evidence cannot hold ordinary telemetry behind provider/storage waits.
+            if (r.Evidence is not null)
+            {
+                try
+                {
+                    var completedEvidence = r.Evidence.Save(r);
+                    _logger.LogData("developer_evidence_completed", new
+                    {
+                        run_id = r.RunId, developer_evidence = completedEvidence,
+                        clipboard_html_verification = r.ReplacementClipboard.HtmlVerification,
+                        clipboard_html_verified_chars = r.ReplacementClipboard.VerifiedHtmlChars,
+                        clipboard_formats_after_write = r.ReplacementClipboard.VerifiedFormats
+                    });
+                }
+                catch { /* ordinary telemetry already attempted; optional evidence stays isolated */ }
+            }
         }
     }
 
