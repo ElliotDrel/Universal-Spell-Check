@@ -45,3 +45,6 @@ benchmark_data/
 fine_tune_runs/
 fine_tune_data/
 bench/results/
+
+# Formatting replay evidence (may contain private copied content)
+formatting_replay_runs/
