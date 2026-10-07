@@ -122,6 +122,7 @@ Every run logs what the source app offered: `clipboard_html` (CF_HTML verbatim),
 | `--has-html` | Only runs whose selection carried a CF_HTML flavor; markup is in the `clipboard_html` field |
 | `--has-rich` | Runs whose selection carried any rich flavor (CF_HTML or RTF) |
 | `--log-dir PATH` | Override log directory |
+| `--save-replay-case PATH` | Export exactly one matching correction with complete mapper inputs; refuses overwrite or incomplete evidence |
 
 ## Error events caught by `--errors`
 
@@ -152,4 +153,5 @@ can still represent wrong or missing text; `--errors` cannot detect that.
 1. For "last spell check" or "one before that," run `--event spellcheck_detail --last 2` without `--today`. It searches across midnight. Use the timestamp, channel, process, and window title to select the run; add `--json` to inspect exact text and HTML.
 2. Compare `input_text` with `clipboard_html`, then `raw_ai_output`, `output_text`, `paste_text`, `paste_html`, `rich_text.mode/reason`, and `clipboard_html_verification`. A successful status confirms the pipeline returned, not the destination's rendered layout. Older runs do not have `paste_text` or `paste_html`.
 3. Check `--errors` and `finalize_failed` when the run failed or is missing; match events by timestamp, channel, and PID. Use `--stats` only when looking for a pattern across runs.
-4. Reproduce the rich-text decision without a live paste by piping one `--json` row into `dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Dev --no-restore -- --replay-stdin`. This uses the current mapper, so identify the original build before interpreting a historical replay.
+4. For a repeatable case, use `--event spellcheck_detail --last 1 --save-replay-case formatting_replay_runs/case.json` after creating the output directory. Narrow the filters to the reported run first. Complete developer payloads are read from the manifest and checked by SHA-256, byte length, and UTF-16 character length. Missing/pending/limited evidence produces an explicit error; source logs and existing case files are never overwritten. Saved cases embed the mapper inputs and remain usable after original sidecars are removed.
+5. Reproduce the rich-text decision without a live paste by piping one `--json` row into `dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Dev --no-restore -- --replay-stdin`. Or pass the saved case with `--replay-file formatting_replay_runs/case.json`. This emits JSON with full text/HTML, decision, current build, and recorded comparison. It uses the current mapper and recorded post-processed output, not a new AI response. Identify the original build before interpreting a historical replay. See `docs/debugging-principles.md` for expected-result regression checks.
