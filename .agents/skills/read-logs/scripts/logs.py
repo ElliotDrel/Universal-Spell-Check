@@ -54,7 +54,7 @@ def make_replay_case(entry, log_dir):
     if developer:
         if not isinstance(developer, dict) or developer.get("schema_version") != 1:
             raise ValueError("Unsupported developer evidence schema")
-        if developer.get("status") in ("storage_limit", "failed"):
+        if developer.get("status") in ("storage_limit", "storage_busy", "failed"):
             evidence_warning = "Developer evidence save failed; replay uses validated complete inline inputs only"
         else:
             path = _contained_path(Path(log_dir), developer["manifest_path"])
@@ -94,6 +94,14 @@ def make_replay_case(entry, log_dir):
         return value
 
     frozen = {field: payload(field, True) for field in ("input_text", "clipboard_html", "output_text")}
+    formats = detail.get("clipboard_formats", "")
+    if manifest is None and not frozen["clipboard_html"]:
+        if isinstance(formats, str) and "html format" in formats.lower():
+            raise ValueError("Source HTML was offered but its empty capture is unconfirmed; cannot replay missing formatting")
+        if not isinstance(formats, str) or not formats:
+            note = "Source HTML availability is unknown because clipboard formats were not captured"
+            evidence_warning = f"{evidence_warning}; {note}" if evidence_warning else note
+    frozen["clipboard_formats"] = formats if isinstance(formats, str) else ""
     frozen.update({"input_chars": _utf16_chars(frozen["input_text"]),
                    "output_chars": _utf16_chars(frozen["output_text"]),
                    "clipboard_html_chars": _utf16_chars(frozen["clipboard_html"]),

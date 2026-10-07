@@ -106,9 +106,10 @@ Select the reported correction using time/app/channel/content filters before exp
 exactly one run and refuses to overwrite a case. It supports complete legacy inline records. With
 `developer_evidence`, it reads full sidecars, checks manifest run identity, SHA-256, byte and UTF-16
 character counts, and embeds the inputs in the saved case. Pending, unavailable, truncated, corrupt,
-or size-limited required inputs fail explicitly. If developer saving reports `failed` or `storage_limit`,
+or size-limited required inputs fail explicitly. If developer saving reports `failed`, `storage_limit`, or `storage_busy`,
 complete inline inputs remain usable, with an explicit source warning. Existing corrupt manifests
-never silently fall back. Evidence paths must stay inside the evidence directory.
+never silently fall back. Inline replay rejects an empty source HTML capture when the source offered
+`HTML Format`; missing format enumeration produces an explicit availability warning. Evidence paths must stay inside the evidence directory.
 
 The JSON result contains complete `result.text` and `result.html` (including CF_HTML header), mode,
 reason, attempt/application flags, paragraph count, current app version/build, and source identity.

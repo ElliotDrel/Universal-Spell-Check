@@ -33,6 +33,10 @@ internal static class FormattingReplayTests
             "rich replay must return the full corrected CF_HTML payload using the actual mapper");
         detail["clipboard_html"] = "";
         detail["clipboard_html_chars"] = 0;
+        detail["clipboard_formats"] = "UnicodeText, HTML Format";
+        Reject(detail, "offered HTML with an empty capture must not be mistaken for plain-text-only source");
+        detail["clipboard_formats"] = "UnicodeText";
+        Check(Replay(detail).result.reason == "no_html", "confirmed absence of source HTML supports plain replay");
         detail["clipboard_html_truncated"] = true;
         Reject(detail, "truncated HTML must not become a false reproduction");
         detail["clipboard_html_truncated"] = false;

@@ -40,6 +40,10 @@ internal static class FormattingReplay
         if (!root.TryGetProperty("detail", out var detail) || detail.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("Expected one read-logs JSON row or saved replay case.");
         var sourceHtml = RequiredText(detail, "clipboard_html", "clipboard_html_chars");
+        var formats = detail.TryGetProperty("clipboard_formats", out var formatValue)
+            && formatValue.ValueKind == JsonValueKind.String ? formatValue.GetString() ?? "" : "";
+        if (sourceHtml.Length == 0 && formats.Contains("HTML Format", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Source HTML was offered but its empty capture is unconfirmed.");
         var sourceText = RequiredText(detail, "input_text", "input_chars");
         var correctedText = RequiredText(detail, "output_text", "output_chars");
         var replacement = RichTextClipboard.TryCreateReplacement(sourceHtml, sourceText, correctedText);
@@ -68,6 +72,8 @@ internal static class FormattingReplay
             "Replays the rich-text mapper using recorded post-processed output; no API, clipboard write, or destination paste.",
             "RTF and destination rendering are not replayed. Retest the updated app in the original editor."
         };
+        if (sourceHtml.Length == 0 && formats.Length == 0)
+            warnings.Add("Source HTML availability is unknown because clipboard formats were not captured.");
         if (recordedMatches is null)
             warnings.Add("Complete recorded paste payloads are unavailable; historical comparison was skipped.");
         if (detail.TryGetProperty("developer_evidence", out _))

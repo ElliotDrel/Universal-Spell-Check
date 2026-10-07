@@ -182,3 +182,20 @@ def test_export_malformed_manifest_fails_explicitly(tmp_path):
     path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="object"):
         _reader().make_replay_case(entry, tmp_path)
+
+
+def test_busy_storage_fallback_rejects_offered_but_missing_html(tmp_path):
+    import pytest
+    entry = _replay_entry()
+    entry["detail"]["developer_evidence"] = {
+        "schema_version": 1, "status": "storage_busy", "manifest_path": "missing.json"}
+    entry["detail"]["clipboard_formats"] = "UnicodeText, HTML Format, Rich Text Format"
+    with pytest.raises(ValueError, match="offered"):
+        _reader().make_replay_case(entry, tmp_path)
+    entry["detail"]["clipboard_formats"] = "UnicodeText"
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert case["detail"]["clipboard_html"] == ""
+    assert "save failed" in case["source"]["evidence_warning"]
+    entry["detail"].pop("clipboard_formats")
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert "availability is unknown" in case["source"]["evidence_warning"]
