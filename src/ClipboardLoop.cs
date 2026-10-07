@@ -203,13 +203,20 @@ internal static class ClipboardLoop
         }, out _);
     }
 
-    public static async Task<ReplacementClipboardResult> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "")
+    public static async Task<ReplacementClipboardResult> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "", bool developerLogging = false)
     {
         if (!await TrySetTextAsync(replacementText, richTextHtml))
         {
             return ReplacementClipboardResult.Failed();
         }
 
+        if (developerLogging)
+        {
+            return ReplacementClipboardResult.Succeeded(richTextHtml.Length) with
+            {
+                HtmlVerification = "pending", ReadbackCapture = BeginReadback()
+            };
+        }
 #if DEV
         if (richTextHtml.Length > 0)
         {
@@ -437,8 +444,73 @@ internal static class ClipboardLoop
         return false;
     }
 
-#if DEV
-    // Dev-only post-write readback. It establishes whether Windows retained the
+    private static int _readbackBusy;
+    private static Task<ClipboardReadback> BeginReadback()
+    {
+        var sequence = GetClipboardSequenceNumber();
+        if (Interlocked.CompareExchange(ref _readbackBusy, 1, 0) != 0)
+            return Task.FromResult(ClipboardReadback.Failed("busy_or_previous_read_stuck"));
+        var completion = new TaskCompletionSource<ClipboardReadback>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                if (GetClipboardSequenceNumber() != sequence)
+                { completion.TrySetResult(ClipboardReadback.Failed("clipboard_changed")); return; }
+                var result = CaptureReadback();
+                completion.TrySetResult(GetClipboardSequenceNumber() == sequence
+                    ? result with { Sequence = sequence }
+                    : ClipboardReadback.Failed("clipboard_changed_during_read"));
+            }
+            catch { completion.TrySetResult(ClipboardReadback.Failed("failed")); }
+            finally { Volatile.Write(ref _readbackBusy, 0); }
+        }) { IsBackground = true, Name = "Formatting clipboard readback" };
+        try
+        {
+            worker.SetApartmentState(ApartmentState.STA);
+            worker.Start();
+            return WithReadbackDeadline(completion.Task);
+        }
+        catch
+        {
+            Volatile.Write(ref _readbackBusy, 0);
+            return Task.FromResult(ClipboardReadback.Failed("worker_start_failed"));
+        }
+    }
+
+    private static async Task<ClipboardReadback> WithReadbackDeadline(Task<ClipboardReadback> task)
+    {
+        var finished = await Task.WhenAny(task, Task.Delay(500)).ConfigureAwait(false);
+        return finished == task ? await task.ConfigureAwait(false) : ClipboardReadback.Failed("timeout");
+    }
+
+    internal static ClipboardReadback CaptureReadback()
+    {
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data is null) return new(null, null, null, null, "failed", "failed", "failed");
+            string? Read(string format, out string status)
+            {
+                try
+                {
+                    if (!data.GetDataPresent(format, false)) { status = "absent"; return ""; }
+                    var value = data.GetData(format, false) as string;
+                    status = value is null ? "failed" : "ok";
+                    return value;
+                }
+                catch { status = "failed"; return null; }
+            }
+            var text = Read(DataFormats.UnicodeText, out var textStatus);
+            var html = Read(DataFormats.Html, out var htmlStatus);
+            var rtf = Read(DataFormats.Rtf, out var rtfStatus);
+            return new(text, html, rtf, string.Join(",", data.GetFormats(false)), textStatus, htmlStatus, rtfStatus);
+        }
+        catch { return new(null, null, null, null, "failed", "failed", "failed"); }
+    }
+
+    // Existing Dev post-write verification. Developer evidence uses a bounded STA worker.
+    // It establishes whether Windows retained the
     // exact CF_HTML flavor we generated before Ctrl+V reaches ChatGPT. The
     // visual result remains app-owned, but this separates clipboard loss from
     // editor interpretation without adding production hot-path work.
@@ -460,7 +532,6 @@ internal static class ClipboardLoop
             actualHtml.Length,
             formats);
     }
-#endif
 
     // Rich Text Format flavor. Several Windows apps (Word, desktop Outlook,
     // WordPad) offer RTF and no HTML, so an empty CF_HTML does not by itself
@@ -666,6 +737,8 @@ internal sealed record ReplacementClipboardResult(
     int VerifiedHtmlChars,
     string VerifiedFormats)
 {
+    public ClipboardReadback? Readback { get; init; }
+    public Task<ClipboardReadback>? ReadbackCapture { get; init; }
     public static ReplacementClipboardResult Failed() => new(false, 0, "write_failed", 0, "");
 
     public static ReplacementClipboardResult Succeeded(int requestedHtmlChars) => new(
@@ -685,4 +758,12 @@ internal sealed record ReplacementClipboardResult(
         htmlVerification,
         verifiedHtmlChars,
         verifiedFormats);
+}
+
+internal sealed record ClipboardReadback(string? Text, string? Html, string? Rtf, string? Formats, string TextStatus, string HtmlStatus, string RtfStatus)
+{
+    public DateTimeOffset CapturedAt { get; } = DateTimeOffset.UtcNow;
+    public uint Sequence { get; init; }
+    public string Status { get; init; } = "ok";
+    public static ClipboardReadback Failed(string status) => new(null, null, null, null, status, status, status) { Status = status };
 }

@@ -195,7 +195,7 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 3. **Replacements** — "Edit list" button → opens replacements editor; shows entry count
 4. **Startup** — "Start on login" toggle
 5. **API key** — masked password input with "Save" button; helper text "Stored encrypted for this Windows user with DPAPI"
-6. **Logs** — log path in Mono + "Open folder" ghost button
+6. **Logs** — developer logging toggle (off by default), short local capture description, log path in Mono + "Open folder" ghost button
 
 ### Insights (deferred to v2)
 Mockup at `docs/design-mockups/insights-deferred.png`. Shows: 4 stat cards top row, 30-day usage bar chart, model performance table, top corrections list. Build only after the activity feed proves valuable enough to warrant deeper analytics.

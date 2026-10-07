@@ -9,6 +9,7 @@ internal sealed class SettingsStore
     private readonly DiagnosticsLogger _logger;
     private readonly string _appDataDirectory;
     private readonly string _apiKeyPath;
+    private readonly string _settingsPath;
     private readonly object _apiKeyLock = new();
 
     public event Action? ApiKeyChanged;
@@ -22,6 +23,7 @@ internal sealed class SettingsStore
         _logger = logger;
         _appDataDirectory = appDataDirectory ?? AppPaths.AppDataDirectory;
         _apiKeyPath = apiKeyPath ?? AppPaths.ApiKeyPath;
+        _settingsPath = Path.Combine(_appDataDirectory, Path.GetFileName(AppPaths.SettingsPath));
         Directory.CreateDirectory(_appDataDirectory);
     }
 
@@ -29,12 +31,12 @@ internal sealed class SettingsStore
     {
         try
         {
-            if (!File.Exists(AppPaths.SettingsPath))
+            if (!File.Exists(_settingsPath))
             {
                 return new AppSettings();
             }
 
-            var json = File.ReadAllText(AppPaths.SettingsPath);
+            var json = File.ReadAllText(_settingsPath);
             return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
         }
         catch (Exception ex)
@@ -46,12 +48,12 @@ internal sealed class SettingsStore
 
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(AppPaths.AppDataDirectory);
+        Directory.CreateDirectory(_appDataDirectory);
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
         {
             WriteIndented = true
         });
-        File.WriteAllText(AppPaths.SettingsPath, json);
+        File.WriteAllText(_settingsPath, json);
         SettingsChanged?.Invoke();
     }
 

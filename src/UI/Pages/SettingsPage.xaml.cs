@@ -9,6 +9,7 @@ internal partial class SettingsPage : Page
     private readonly DiagnosticsLogger _logger;
     private readonly UpdateService? _updateService;
     private bool _suppressStartupToggle;
+    private bool _suppressDeveloperToggle = true;
     private bool _suppressModelSelection = true;
     private bool _suppressApiKeySelection;
 
@@ -37,6 +38,8 @@ internal partial class SettingsPage : Page
         }
         _suppressStartupToggle = false;
         RefreshApiKeys();
+        DeveloperLoggingCheckBox.IsChecked = _settingsStore.Load().DeveloperLogging;
+        _suppressDeveloperToggle = false;
     }
 
     private void OnCheckForUpdatesClicked(object sender, System.Windows.RoutedEventArgs e)
@@ -177,6 +180,21 @@ internal partial class SettingsPage : Page
         ApiKeyComboBox.SelectedItem = keys.FirstOrDefault(key => key.IsActive) ?? keys.FirstOrDefault();
         _suppressApiKeySelection = false;
         ApiKeyComboBox.IsEnabled = keys.Count > 0;
+    }
+
+    private void OnDeveloperLoggingToggled(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_suppressDeveloperToggle) return;
+        var settings = _settingsStore.Load();
+        settings.DeveloperLogging = DeveloperLoggingCheckBox.IsChecked == true;
+        try { _settingsStore.Save(settings); }
+        catch (Exception ex)
+        {
+            _suppressDeveloperToggle = true;
+            DeveloperLoggingCheckBox.IsChecked = _settingsStore.Load().DeveloperLogging;
+            _suppressDeveloperToggle = false;
+            _logger.Log($"developer_logging_save_failed error_type={ex.GetType().Name}");
+        }
     }
 
     private void OnOpenLogsClicked(object sender, System.Windows.RoutedEventArgs e)

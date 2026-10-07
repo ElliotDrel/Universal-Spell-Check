@@ -4,6 +4,7 @@ namespace UniversalSpellCheck;
 
 internal static class BuildChannel
 {
+    public const string DeveloperEvidenceMutexName = "Local\\UniversalSpellCheck.DeveloperEvidence";
     public const string SharedDataFolder = "UniversalSpellCheck.Data";
     public const string LegacyInstallFolder = "UniversalSpellCheck";
 

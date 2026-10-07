@@ -226,3 +226,78 @@ The WPF **Home** page (`ActivityPage`) renders successful `spellcheck_detail` ro
 - **Pagination:** 30 entries per page, newest first; not a live tail — refresh or scroll to see new/historical data
 
 For visual layout and interaction (hover actions, inline diff, infinite scroll), see `DESIGN.md` § Home (Activity) and `docs/architecture.md` § WPF dashboard.
+
+## Optional developer evidence (schema 1)
+
+Settings → Logs → Developer logging is off by default in both channels, including Production.
+Changing it applies to the next correction without restarting. Disabled corrections keep their
+existing clipboard and diagnostic behavior. Headless/benchmark requests do not capture the desktop.
+
+Each detail record has `run_id` and `developer_logging_enabled`. Enabled runs add `developer_evidence` with `schema_version`,
+`manifest_path` relative to the shared log directory, and `status`. Busy evidence admission is reported explicitly. Ordinary `run_completed` and the single `spellcheck_detail` are written before optional evidence
+provider/storage waits, with a `pending` manifest reference. The app then writes evidence and a separate
+`developer_evidence_completed` event with the final reference and readback summary. A reader may need
+to retry briefly if the manifest is not present; a pending reference can be read once its manifest exists.
+There are no duplicate detail records and no added shutdown waits. Quitting can leave optional
+evidence incomplete without holding the ordinary run logs behind its completion.
+
+Evidence lives in `logs/developer-evidence/<run_id>/manifest.json`. `payloads` contains full
+UTF-8 sidecars for `input_text`, `clipboard_html`, `clipboard_rtf`, `clipboard_formats`,
+`raw_ai_output`, `output_text` (the rich mapper input), `paste_text`, `paste_html`, and
+`readback_text/html/rtf/formats`. Entries expose relative `path`, SHA-256 `sha256`, UTF-8 `bytes`,
+.NET UTF-16 `chars`, `complete` and `status`. Empty source markup is complete only when the format list confirms that flavor is absent.
+An offered-but-empty flavor or an unavailable format list is explicitly incomplete, as are null values. Inline 512K markup caps remain, but the sidecars preserve
+larger ordinary selections. A 16MiB per-payload cap and 256MiB total evidence store cap explicitly
+return `size_limit` / `storage_limit` instead of deleting existing data. Evidence is local and can
+contain selected text and surrounding editor content; API key/settings files are never included.
+
+`contexts` links automatic `before-source` and `after-paste` captures with requested/captured/completed
+timestamps and target process/PID/HWND/title. Images contain visible screen pixels within the
+foreground window bounds (screen-clipped), and can include overlays; they are not DOM snapshots.
+The after capture requests a 150ms settling delay, which does not prove editor rendering is finished.
+Foreground changes and late source captures are explicitly labeled. UIA reports focused control
+identity, up to 32768 characters of document text and 8 selected ranges of up to 8193 characters.
+Changed paste destinations explicitly label unavailable destination-before context.
+Text/range truncation, unsupported selection, password controls, provider errors, busy workers and
+750ms timeouts are explicit. Selection offsets are not reconstructed.
+
+UIA runs on a dedicated MTA background thread, with at most one outstanding provider call in this
+process. A stuck provider causes later captures to be skipped, preventing accumulating orphan workers.
+Image capture/encoding/storage also runs off the correction thread and accepts only one image job
+at a time. The correction never waits for UIA or screenshot completion. Clipboard readback uses one
+best-effort background STA worker with a 500ms deadline and clipboard sequence checks. A stuck read
+blocks later readback jobs rather than accumulating workers. Absent formats, failures and races are
+explicit; a successful read proves the clipboard state at its timestamp, not the editor rendering.
+Evidence admission permits at most two in-flight runs. Shared cross-channel quota reservations
+are serialized with a named mutex; a failed write may conservatively overcount space.
+
+`--developer-evidence-smoke` runs the rebuilt native executable with a disposable RichTextBox,
+real Ctrl+C/Ctrl+V, enabled readback and automatic images, disabled readback, live settings cache
+updates using disposable settings, and a 600000-character sidecar check. It restores the prior
+clipboard and exits 0/1. It does not call the model or modify a live user document. Evidence remains
+in the shared logs for inspection, as it would for an ordinary enabled run.
+
+`--developer-evidence-tests` runs deterministic payload integrity, UTF-16 character counts,
+large sidecar, offered-but-unreadable source markup, per-payload limit, full-store and bounded-admission
+checks in a disposable temporary directory, without interacting with the desktop.
+
+### Verified on 2026-10-07
+
+- Both Dev and Release compiled with the pinned .NET 10.0.401 SDK.
+- Release `--developer-evidence-tests` passed UTF8/SHA256 full sidecar roundtrip (600000+
+  characters and emoji), UTF16 counts, source-read incompleteness, 16MiB size limit,
+  exhausted 256MiB store and two-run admission checks.
+- Native Dev disposable RichTextBox smoke passed actual Ctrl+C/Ctrl+V, RTF source capture,
+  before/after screenshots, readback and live enable/disable cache checks (PID 21332).
+  Later fixture attempts correctly failed when desktop focus/selection was unavailable;
+  the fixture reports these as errors rather than silently claiming a paste occurred.
+- The actual Dev dashboard enabled the setting and the normal coordinator corrected a disposable
+  Notepad selection using Ctrl+Alt+D (PID 24924, run `ea496bc4082448c2ba8a4a9fcd5da874`).
+  The manifest contained timely before/after images, original/corrected UIA document text,
+  original selection, correct readback and complete empty source HTML/RTF where absent.
+  The visible Notepad result changed `teh` to `the`.
+
+The final rebuilt Dev native smoke passed again (PID 13196, run
+`7deef858b13a4cd3b05d77ba20abce96`, capture scheduling 3ms). The actual Dev dashboard then
+disabled the setting and a second normal Notepad correction succeeded without developer evidence
+(run `7ad4a5999ea54a93ab2bfee465f87bf6`). Dev settings were left disabled.

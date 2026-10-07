@@ -51,6 +51,7 @@ def make_replay_case(entry, log_dir):
     developer = detail.get("developer_evidence")
     manifest = None
     evidence_warning = None
+    manifest_pending = False
     if developer:
         if not isinstance(developer, dict) or developer.get("schema_version") != 1:
             raise ValueError("Unsupported developer evidence schema")
@@ -61,8 +62,12 @@ def make_replay_case(entry, log_dir):
             try:
                 manifest = json.loads(path.read_text(encoding="utf-8"))
             except FileNotFoundError as exc:
-                raise ValueError("Developer evidence is not saved yet; retry after capture finishes") from exc
-            if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("run_id") != detail.get("run_id"):
+                if developer.get("status") != "pending":
+                    raise ValueError("Developer evidence is not saved yet; retry after capture finishes") from exc
+                manifest_pending = True
+                evidence_warning = "Developer evidence is pending; replay uses validated complete inline inputs only"
+            if manifest is not None and (not isinstance(manifest, dict)
+                    or manifest.get("schema_version") != 1 or manifest.get("run_id") != detail.get("run_id")):
                 raise ValueError("Developer evidence schema or run identity does not match")
 
     def payload(field, required):
@@ -89,12 +94,15 @@ def make_replay_case(entry, log_dir):
         if (not isinstance(value, str) or detail.get(field + "_truncated")
                 or detail.get(count_key, _utf16_chars(value) if isinstance(value, str) else -1) != _utf16_chars(value or "")):
             if required:
-                raise ValueError(f"Missing or truncated replay evidence: {field}")
+                note = "; developer evidence is pending, retry after capture finishes" if manifest_pending else ""
+                raise ValueError(f"Missing or truncated replay evidence: {field}{note}")
             return None
         return value
 
     frozen = {field: payload(field, True) for field in ("input_text", "clipboard_html", "output_text")}
-    formats = detail.get("clipboard_formats", "")
+    formats = payload("clipboard_formats", False)
+    if formats is None:
+        formats = detail.get("clipboard_formats", "")
     if manifest is None and not frozen["clipboard_html"]:
         if isinstance(formats, str) and "html format" in formats.lower():
             raise ValueError("Source HTML was offered but its empty capture is unconfirmed; cannot replay missing formatting")

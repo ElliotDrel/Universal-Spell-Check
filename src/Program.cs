@@ -21,6 +21,16 @@ static class Program
             return RunDashboardSmoke();
         }
 
+        if (args.Contains("--developer-evidence-tests", StringComparer.OrdinalIgnoreCase))
+        {
+            return DeveloperEvidenceTests.Run();
+        }
+
+        if (args.Contains("--developer-evidence-smoke", StringComparer.OrdinalIgnoreCase))
+        {
+            return DeveloperEvidenceSmoke.Run();
+        }
+
         var startupLogger = new DiagnosticsLogger(() => AppPaths.LogPath);
         startupLogger.Log(migrationResult);
 

@@ -209,3 +209,36 @@ def test_capture_admission_busy_uses_complete_inline_inputs(tmp_path):
     assert case["source"]["evidence_origin"] == "inline_log"
     assert "save failed" in case["source"]["evidence_warning"]
     assert case["detail"]["output_text"] == "the 😀"
+
+
+def test_pending_missing_manifest_uses_complete_inline_but_rejects_truncated(tmp_path):
+    import pytest
+    entry = _replay_entry()
+    entry["detail"].update({"clipboard_formats": "UnicodeText", "developer_evidence": {
+        "schema_version": 1, "status": "pending", "manifest_path": "not-saved/manifest.json"}})
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert case["source"]["evidence_origin"] == "inline_log"
+    assert "pending" in case["source"]["evidence_warning"]
+    assert case["detail"]["clipboard_formats"] == "UnicodeText"
+    entry["detail"]["clipboard_html_truncated"] = True
+    with pytest.raises(ValueError, match="pending, retry"):
+        _reader().make_replay_case(entry, tmp_path)
+
+
+def test_full_manifest_preserves_confirmed_source_formats_in_portable_case(tmp_path):
+    import hashlib
+    entry, path, manifest = _developer_entry(tmp_path)
+    formats = "UnicodeText, Rich Text Format"
+    raw = formats.encode("utf-8")
+    (path.parent / "clipboard_formats.txt").write_bytes(raw)
+    manifest["payloads"]["clipboard_formats"] = {
+        "path": "clipboard_formats.txt", "sha256": hashlib.sha256(raw).hexdigest(),
+        "bytes": len(raw), "chars": len(formats), "complete": True, "status": "ok"}
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    # The pending inline record may predate evidence completion and omit format enumeration.
+    entry["detail"].pop("clipboard_formats", None)
+    case = _reader().make_replay_case(entry, tmp_path)
+    restored = json.loads(json.dumps(case))
+    assert restored["detail"]["clipboard_formats"] == formats
+    assert restored["detail"]["clipboard_html"] == ""
+    assert restored["source"]["evidence_origin"] == "developer_manifest"

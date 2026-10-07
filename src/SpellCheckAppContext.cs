@@ -46,7 +46,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             ShowSettings,
             // Owner window for the clipboard-history exclusion. Lazy because the
             // hotkey window is created just below, after the coordinator.
-            () => _hotkeyWindow.Handle);
+            () => _hotkeyWindow.Handle,
+            () => _cachedSettings.DeveloperLogging);
 
         // Must exist before BuildMenu(): the version line dereferences
         // _updateService.State. Constructing it here only needs _logger; the

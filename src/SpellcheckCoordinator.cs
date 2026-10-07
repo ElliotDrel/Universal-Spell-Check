@@ -6,6 +6,7 @@ namespace UniversalSpellCheck;
 internal sealed class SpellcheckCoordinator : IDisposable
 {
     private readonly DiagnosticsLogger _logger;
+    private readonly Func<bool> _developerLogging;
     private readonly OpenAiSpellcheckService _spellcheckService;
     private readonly TextPostProcessor _postProcessor;
     private readonly TargetFormattingPipeline _formattingPipeline;
@@ -23,9 +24,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
         Action<string, string> notify,
         Action<SpellcheckPhase> setPhase,
         Action showSettings,
-        Func<IntPtr>? clipboardOwnerHandle = null)
+        Func<IntPtr>? clipboardOwnerHandle = null,
+        Func<bool>? developerLogging = null)
     {
         _logger = logger;
+        _developerLogging = developerLogging ?? (() => false);
         _spellcheckService = spellcheckService;
         _postProcessor = postProcessor;
         _formattingPipeline = formattingPipeline;
@@ -195,6 +198,13 @@ internal sealed class SpellcheckCoordinator : IDisposable
         try
         {
             record.ActiveWindowAtStart = ActiveWindowInfo.Capture();
+            record.DeveloperLoggingEnabled = _developerLogging();
+            if (record.DeveloperLoggingEnabled)
+            {
+                record.Evidence = DeveloperEvidence.TryCreate(record.RunId);
+                if (record.Evidence is null) record.Events.Add("developer_evidence_skipped reason=busy");
+                record.Evidence?.CaptureContext("before-source", record.ActiveWindowAtStart);
+            }
             // Capture the starting target before any clipboard work can yield, then
             // back up the clipboard before Ctrl+C so failed runs can restore it.
             record.OriginalClipboard = ClipboardLoop.TryGetClipboardDataObject();
@@ -221,6 +231,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 return record;
             }
 
+            record.SourceClipboardCapturedAt = DateTimeOffset.UtcNow;
             record.InputText = capture.Text;
             record.CapturedHtml = capture.Html;
             record.CapturedRtf = capture.Rtf;
@@ -363,7 +374,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.T_PasteIssued = Stopwatch.GetTimestamp();
             record.ReplacementClipboard = await ClipboardLoop.TrySetReplacementTextAsync(
                 record.RichTextReplacement.Text,
-                record.RichTextReplacement.Html);
+                record.RichTextReplacement.Html, record.Evidence is not null);
             if (record.ReplacementClipboard.Success)
             {
                 record.CorrectedTextOnClipboard = true;
@@ -385,6 +396,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             record.T_PasteTargetCheck = Stopwatch.GetTimestamp();
             record.ActiveWindowAtPaste = ActiveWindowInfo.Capture();
+            record.Evidence?.MarkPasteIssued();
 
             try
             {
@@ -403,6 +415,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 return record;
             }
             record.T_PasteAck = Stopwatch.GetTimestamp();
+            record.Evidence?.CaptureContext("after-paste", record.ActiveWindowAtPaste!, afterPaste: true);
 
             record.TextChanged = !string.Equals(capture.Text, finalText, StringComparison.Ordinal);
             record.Status = RunStatus.Success;
@@ -430,6 +443,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
     {
         try
         {
+            var developerEvidence = r.Evidence?.PendingReference ??
+                (r.DeveloperLoggingEnabled ? (object)new { schema_version = 1, status = "busy", manifest_path = "" } : null);
             var clipboardMs = TicksToMs(r.T_CaptureStart, r.T_CaptureEnd);
             var htmlTruncated = r.CapturedHtml.Length > MaxLoggedHtmlChars;
             var rtfTruncated = r.CapturedRtf.Length > MaxLoggedHtmlChars;
@@ -474,7 +489,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             // Human-readable line
             _logger.Log(
-                $"run_completed status={statusName} " +
+                $"run_completed run_id={r.RunId} status={statusName} " +
                 $"input_len={r.InputText?.Length ?? 0} " +
                 $"input_html_len={r.CapturedHtml.Length} " +
                 $"input_rtf_len={r.CapturedRtf.Length} " +
@@ -513,6 +528,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             _logger.LogData("spellcheck_detail", new
             {
+                run_id = r.RunId,
+                developer_logging_enabled = r.DeveloperLoggingEnabled,
+                developer_evidence = developerEvidence,
                 status = statusName,
                 error = r.ErrorMessage ?? "",
                 error_code = r.ErrorCode,
@@ -680,6 +698,25 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     $"stack=\"{Escape(ex.ToString())}\"");
             }
             catch { /* swallow — finalize must never affect the next hotkey */ }
+        }
+        finally
+        {
+            // Optional evidence cannot hold ordinary telemetry behind provider/storage waits.
+            if (r.Evidence is not null)
+            {
+                try
+                {
+                    var completedEvidence = r.Evidence.Save(r);
+                    _logger.LogData("developer_evidence_completed", new
+                    {
+                        run_id = r.RunId, developer_evidence = completedEvidence,
+                        clipboard_html_verification = r.ReplacementClipboard.HtmlVerification,
+                        clipboard_html_verified_chars = r.ReplacementClipboard.VerifiedHtmlChars,
+                        clipboard_formats_after_write = r.ReplacementClipboard.VerifiedFormats
+                    });
+                }
+                catch { /* ordinary telemetry already attempted; optional evidence stays isolated */ }
+            }
         }
     }
 
