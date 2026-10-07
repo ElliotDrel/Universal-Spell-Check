@@ -43,6 +43,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Python fine-tune dataset tooling, benchmarks, eval runs | `tests/AGENTS.md` |
 | Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
 | Dry-running text through replacements.json without the live app | `python tests/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
+| Investigating a reported formatting problem with captured evidence and local replay | `.agents/skills/formatting-troubleshoot/SKILL.md` |
 | Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
 | Autonomous speed optimization loop (`/autoopt N`), behavioral contracts, worktree workflow | `docs/autoopt.md` |
 | CI workflows, release tag automation | `.github/workflows/` (read the YAML) |
