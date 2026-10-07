@@ -46,6 +46,15 @@ internal static class FormattingReplayTests
         detail.Remove("output_text");
         Reject(detail, "missing mapper output must fail rather than replay raw model output");
         detail["output_text"] = corrected;
+        using (var failingCase = JsonDocument.Parse(JsonSerializer.Serialize(new { detail })))
+        {
+            var fallback = FormattingReplay.Replay(failingCase.RootElement,
+                (_, _, _) => throw new InvalidOperationException("unexpected mapper failure"));
+            Check(fallback.result.text == corrected && fallback.result.html == ""
+                && fallback.result.mode == "none" && fallback.result.reason == "rich_text_failed"
+                && fallback.recorded_matches is true && fallback.mapper_exception_type == "InvalidOperationException",
+                "unexpected mapper exceptions must reproduce production fallback without losing structured output");
+        }
         detail["paste_text_truncated"] = true;
         Check(Replay(detail).recorded_matches is null, "truncated historical paste must not claim equality");
         using var testCase = JsonDocument.Parse(JsonSerializer.Serialize(new

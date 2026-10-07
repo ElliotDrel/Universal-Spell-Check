@@ -54,7 +54,7 @@ def make_replay_case(entry, log_dir):
     if developer:
         if not isinstance(developer, dict) or developer.get("schema_version") != 1:
             raise ValueError("Unsupported developer evidence schema")
-        if developer.get("status") in ("storage_limit", "storage_busy", "failed"):
+        if developer.get("status") in ("storage_limit", "storage_busy", "busy", "failed"):
             evidence_warning = "Developer evidence save failed; replay uses validated complete inline inputs only"
         else:
             path = _contained_path(Path(log_dir), developer["manifest_path"])

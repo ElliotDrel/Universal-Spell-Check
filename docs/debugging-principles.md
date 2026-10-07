@@ -106,7 +106,7 @@ Select the reported correction using time/app/channel/content filters before exp
 exactly one run and refuses to overwrite a case. It supports complete legacy inline records. With
 `developer_evidence`, it reads full sidecars, checks manifest run identity, SHA-256, byte and UTF-16
 character counts, and embeds the inputs in the saved case. Pending, unavailable, truncated, corrupt,
-or size-limited required inputs fail explicitly. If developer saving reports `failed`, `storage_limit`, or `storage_busy`,
+or size-limited required inputs fail explicitly. If developer saving reports `failed`, `storage_limit`, `storage_busy`, or capture-admission `busy`,
 complete inline inputs remain usable, with an explicit source warning. Existing corrupt manifests
 never silently fall back. Inline replay rejects an empty source HTML capture when the source offered
 `HTML Format`; missing format enumeration produces an explicit availability warning. Evidence paths must stay inside the evidence directory.
@@ -122,7 +122,9 @@ For a regression case, add an `expected` object alongside `detail` in the saved 
 exit `0` means replay succeeded and any supplied expectation matched; exit `1` means expectation
 mismatch; exit `2` means invalid arguments or incomplete/unreadable evidence. Direct `--replay-stdin`
 accepts one JSON row from `read-logs --json`; use saved-case export for full developer sidecar hydration.
-Build separately, then use `--no-build` for clean machine-readable stdout.
+Unexpected mapper exceptions reproduce the production `rich_text_failed` plain-text fallback;
+`mapper_exception_type` and a warning retain the diagnostic cause. Input-validation failures still
+produce exit `2`. Build separately, then use `--no-build` for clean machine-readable stdout.
 
 `formatting_replay_runs/` is ignored because real captured content may be private. Only deliberately
 sanitized regression cases belong in version control. No visual preview is introduced: our mapper's

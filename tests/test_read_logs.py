@@ -199,3 +199,13 @@ def test_busy_storage_fallback_rejects_offered_but_missing_html(tmp_path):
     entry["detail"].pop("clipboard_formats")
     case = _reader().make_replay_case(entry, tmp_path)
     assert "availability is unknown" in case["source"]["evidence_warning"]
+
+
+def test_capture_admission_busy_uses_complete_inline_inputs(tmp_path):
+    entry = _replay_entry()
+    entry["detail"]["developer_evidence"] = {
+        "schema_version": 1, "status": "busy", "manifest_path": ""}
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert case["source"]["evidence_origin"] == "inline_log"
+    assert "save failed" in case["source"]["evidence_warning"]
+    assert case["detail"]["output_text"] == "the 😀"

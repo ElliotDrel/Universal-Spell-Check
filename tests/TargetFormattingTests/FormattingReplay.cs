@@ -29,7 +29,8 @@ internal static class FormattingReplay
         }
     }
 
-    public static ReplayOutput Replay(JsonElement root)
+    public static ReplayOutput Replay(JsonElement root,
+        Func<string, string, string, RichTextReplacementResult>? mapper = null)
     {
         if (root.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("Replay input must be one JSON object.");
@@ -46,7 +47,17 @@ internal static class FormattingReplay
             throw new InvalidDataException("Source HTML was offered but its empty capture is unconfirmed.");
         var sourceText = RequiredText(detail, "input_text", "input_chars");
         var correctedText = RequiredText(detail, "output_text", "output_chars");
-        var replacement = RichTextClipboard.TryCreateReplacement(sourceHtml, sourceText, correctedText);
+        RichTextReplacementResult replacement;
+        string? mapperExceptionType = null;
+        try
+        {
+            replacement = (mapper ?? RichTextClipboard.TryCreateReplacement)(sourceHtml, sourceText, correctedText);
+        }
+        catch (Exception ex)
+        {
+            replacement = RichTextReplacementResult.NotApplied("rich_text_failed", correctedText);
+            mapperExceptionType = ex.GetType().Name;
+        }
         var current = new ReplayResult(replacement.Text, replacement.Html, replacement.Mode, replacement.Reason,
             replacement.Attempted, replacement.Applied, replacement.ParagraphCount);
         bool? recordedMatches = null;
@@ -72,6 +83,8 @@ internal static class FormattingReplay
             "Replays the rich-text mapper using recorded post-processed output; no API, clipboard write, or destination paste.",
             "RTF and destination rendering are not replayed. Retest the updated app in the original editor."
         };
+        if (mapperExceptionType is not null)
+            warnings.Add($"Mapper threw {mapperExceptionType}; reproduced production rich_text_failed plain-text fallback.");
         if (sourceHtml.Length == 0 && formats.Length == 0)
             warnings.Add("Source HTML availability is unknown because clipboard formats were not captured.");
         if (recordedMatches is null)
@@ -80,7 +93,7 @@ internal static class FormattingReplay
             warnings.Add("Inline log replay only. Use read-logs --save-replay-case to load full developer evidence.");
         return new ReplayOutput(1, "rich_text_mapper", BuildChannel.AppVersion,
             typeof(RichTextClipboard).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
-            source, current, recordedMatches, expectedMatches, warnings);
+            source, current, recordedMatches, expectedMatches, mapperExceptionType, warnings);
     }
 
     private static string RequiredText(JsonElement detail, string field, string? countField = null)
@@ -110,4 +123,4 @@ internal sealed record ReplayResult(string text, string html, string mode, strin
     bool attempted, bool applied, int paragraph_count);
 internal sealed record ReplayOutput(int schema_version, string scope, string current_app_version,
     string? current_build, JsonElement source, ReplayResult result, bool? recorded_matches,
-    bool? expected_matches, List<string> warnings);
+    bool? expected_matches, string? mapper_exception_type, List<string> warnings);
