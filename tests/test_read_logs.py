@@ -242,3 +242,25 @@ def test_full_manifest_preserves_confirmed_source_formats_in_portable_case(tmp_p
     assert restored["detail"]["clipboard_formats"] == formats
     assert restored["detail"]["clipboard_html"] == ""
     assert restored["source"]["evidence_origin"] == "developer_manifest"
+
+
+def test_structured_completion_event_retains_fields_in_json_output(tmp_path):
+    today = date.today()
+    fields = {
+        "run_id": "test-run",
+        "developer_evidence": {"status": "ok", "manifest_path": "developer-evidence/test-run/manifest.json"},
+        "clipboard_html_verification": "exact_match",
+    }
+    (tmp_path / f"spellcheck-{today}.jsonl").write_text(
+        f"{today}T12:00:00 channel=prod app_version=0.10.0 pid=1 "
+        f"developer_evidence_completed {json.dumps(fields)}\n"
+        f"{today}T12:00:01 channel=prod app_version=0.10.0 pid=1 run_completed status=success\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--log-dir", str(tmp_path), "--json"],
+        capture_output=True, text=True, check=True,
+    )
+    rows = [json.loads(line) for line in result.stdout.splitlines()]
+    assert rows[0]["fields"] == fields
+    assert rows[1]["fields"] == {"status": "success"}
