@@ -3,18 +3,13 @@ using System.Text;
 using System.Text.Json;
 using UniversalSpellCheck;
 
-if (args is ["--replay-stdin"])
+if (args.Length > 0 && args[0].StartsWith("--replay", StringComparison.Ordinal))
 {
-    var log = JsonDocument.Parse(Console.In.ReadToEnd());
-    var detail = log.RootElement.GetProperty("detail");
-    var replay = RichTextClipboard.TryCreateReplacement(
-        detail.GetProperty("clipboard_html").GetString()!,
-        detail.GetProperty("input_text").GetString()!,
-        detail.GetProperty("output_text").GetString()!);
-    Console.WriteLine($"Replay mode={replay.Mode} reason={replay.Reason} html={replay.Html.Length} text={replay.Text.Length}");
-    Console.WriteLine(replay.Text);
+    Environment.ExitCode = FormattingReplay.Run(args);
     return;
 }
+
+FormattingReplayTests.Run();
 
 const long now = 10_000;
 const long freshness = 1_000;

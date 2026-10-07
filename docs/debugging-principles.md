@@ -86,3 +86,50 @@ Use full JSON parse when many nested fields are needed or structure varies. Keep
 - `update_check_skipped reason=in_progress` — concurrent check already running; not an error.
 - `update_check_failed` — network issue or GitHub API error; check `error` field.
 - `update_apply_failed` — Velopack couldn't apply the downloaded update; check `error` field and whether the download actually completed (`update_download_done` present).
+
+
+## Local formatting replay
+
+Formatting incidents can be frozen and replayed through the actual `RichTextClipboard` implementation
+without an API request, live clipboard write, running editor, or server. The replay scope is the
+rich-text mapper: original `input_text` + `clipboard_html` + recorded post-processed `output_text`.
+It does not rerun AI, replacements, target hooks, RTF, or the destination's rendering behavior.
+
+```powershell
+New-Item -ItemType Directory -Force formatting_replay_runs
+python .agents/skills/read-logs/scripts/logs.py --event spellcheck_detail --last 1 --save-replay-case formatting_replay_runs/case.json
+dotnet build tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
+dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release --no-build -- --replay-file formatting_replay_runs/case.json
+```
+
+Select the reported correction using time/app/channel/content filters before exporting. Export requires
+exactly one run and refuses to overwrite a case. It supports complete legacy inline records. With
+`developer_evidence`, it reads full sidecars, checks manifest run identity, SHA-256, byte and UTF-16
+character counts, and embeds the inputs in the saved case. Pending, unavailable, truncated, corrupt,
+or size-limited required inputs fail explicitly. If developer saving reports `failed` or `storage_limit`,
+complete inline inputs remain usable, with an explicit source warning. Existing corrupt manifests
+never silently fall back. Evidence paths must stay inside the evidence directory.
+
+The JSON result contains complete `result.text` and `result.html` (including CF_HTML header), mode,
+reason, attempt/application flags, paragraph count, current app version/build, and source identity.
+`recorded_matches` compares current text/HTML to the historical requested clipboard payloads when
+both are complete. A mismatch is useful diagnostic evidence, not automatically a regression: current
+code may already contain a fix. Missing historical payloads are flagged and the comparison is `null`.
+
+For a regression case, add an `expected` object alongside `detail` in the saved JSON containing
+`text`, `html`, `mode`, and `reason` from the verified correct result. Replay checks all four exactly:
+exit `0` means replay succeeded and any supplied expectation matched; exit `1` means expectation
+mismatch; exit `2` means invalid arguments or incomplete/unreadable evidence. Direct `--replay-stdin`
+accepts one JSON row from `read-logs --json`; use saved-case export for full developer sidecar hydration.
+Build separately, then use `--no-build` for clean machine-readable stdout.
+
+`formatting_replay_runs/` is ignored because real captured content may be private. Only deliberately
+sanitized regression cases belong in version control. No visual preview is introduced: our mapper's
+HTML is not proof of the original editor's paste behavior. Final acceptance remains a retest of the
+updated application in the original location.
+
+Validation: exporter tests cover supplementary Unicode, clipped inline/full sidecar recovery,
+corruption, missing evidence, mismatched run identity, path escape rejection, ambiguous run selection,
+and overwrite protection. Native replay tests cover missing/truncated inputs, fallback output,
+historical comparison availability, and expected-result mismatch, alongside the existing real-mapper
+formatting fixtures. The temporary Python environment and pinned SDK stay outside committed files.

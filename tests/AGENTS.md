@@ -49,7 +49,10 @@ dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetForma
 
 To replay one captured `spellcheck_detail` record against the rich-text mapper without a live paste,
 pipe one JSON object from the `read-logs` skill into `TargetFormattingTests` with `--replay-stdin`.
-The replay prints the selected mode and replacement Unicode text; it does not send an API request.
+The replay emits structured JSON with complete replacement Unicode/CF_HTML, mode, reason, current build,
+and optional historical/expected comparison. It rejects missing or truncated mapper inputs, does not
+send an API request, and never changes the clipboard. Saved cases use `--replay-file PATH`.
+For full evidence export and regression expectations, see `docs/debugging-principles.md` § Local formatting replay.
 
 Outputs from real (non-test) runs land in `benchmark_runs/` and `fine_tune_runs/` under dated subfolders â€” never commit those run artifacts.
 
