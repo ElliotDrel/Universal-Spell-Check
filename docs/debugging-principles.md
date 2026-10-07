@@ -105,8 +105,9 @@ dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetForma
 Select the reported correction using time/app/channel/content filters before exporting. Export requires
 exactly one run and refuses to overwrite a case. It supports complete legacy inline records. With
 `developer_evidence`, it reads full sidecars, checks manifest run identity, SHA-256, byte and UTF-16
-character counts, and embeds the inputs in the saved case. Pending, unavailable, truncated, corrupt,
-or size-limited required inputs fail explicitly. If developer saving reports `failed`, `storage_limit`, `storage_busy`, or capture-admission `busy`,
+character counts, and embeds the inputs in the saved case. Truncated, corrupt, or size-limited required inputs fail explicitly. A pending reference whose
+manifest is not available yet permits validated complete inline inputs with a warning;
+larger truncated inputs require retry after evidence completion. If developer saving reports `failed`, `storage_limit`, `storage_busy`, or capture-admission `busy`,
 complete inline inputs remain usable, with an explicit source warning. Existing corrupt manifests
 never silently fall back. Inline replay rejects an empty source HTML capture when the source offered
 `HTML Format`; missing format enumeration produces an explicit availability warning. Evidence paths must stay inside the evidence directory.
