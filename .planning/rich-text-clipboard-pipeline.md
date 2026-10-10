@@ -12,6 +12,12 @@ one empty block. Release formatting regressions and the Dev build pass; the rebu
 native clipboard/evidence smoke exits 0. The original editor retest remains the
 rendering acceptance gate.
 
+**Original-editor acceptance:** Dev run `7dc89838439d4406a53fa316975e7cea`
+(2026-10-10 13:04 Eastern, PID 17952) pasted into the same LinkedIn messaging editor
+with `mode=html`, three original paragraphs, exact 3843-character CF_HTML readback,
+and the intended two Unicode line breaks. Elliot confirmed the spacing works.
+Developer evidence was disabled for this retest; visible acceptance is his confirmation.
+
 **2026-10-09:** Captured ChatGPT skill selections exposed two alignment boundaries: final punctuation inserted after removal of a copied trailing newline had no HTML owner, and long selections exceeded the diff matrix budget even when much of the text was unchanged. The mapper now anchors that final insertion at the deleted whitespace suffix and excludes identical selection edges from the bounded diff. Original skill spans, attributes, list structure, and empty paragraphs remain intact when alignment succeeds. Changed paragraph structure still falls back. Mapper regression and original-editor acceptance are separate checks.
 
 Verification: both captured selections replay as `aligned_html` with unchanged source tags/attributes and exact corrected Unicode. The native formatting suite passes, Dev builds, and the disposable Dev clipboard/evidence smoke exits 0. The original ChatGPT retest succeeded after the follow-up fix below.
