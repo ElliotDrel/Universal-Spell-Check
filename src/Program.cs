@@ -61,9 +61,23 @@ static class Program
             return RunStartupSmoke(startupLogger);
         }
 
+        var updateRequested = args.Contains("--update", StringComparer.OrdinalIgnoreCase);
+        if (updateRequested && BuildChannel.IsDev)
+        {
+            startupLogger.Log("update_command_rejected reason=dev_channel");
+            return 1;
+        }
+
         using var appMutex = new Mutex(true, BuildChannel.MutexName, out var createdNew);
         if (!createdNew)
         {
+            if (updateRequested)
+            {
+                var accepted = HotkeyWindow.RequestUpdate();
+                startupLogger.Log($"update_command_forwarded accepted={accepted}");
+                return accepted ? 0 : 1;
+            }
+
             System.Windows.Forms.MessageBox.Show(
                 $"{BuildChannel.DisplayName} is already running.",
                 BuildChannel.DisplayName,
@@ -89,7 +103,7 @@ static class Program
             LoadGlobalWpfResources(wpfApp, startupLogger);
             startupLogger.Log("wpf_app_initialized");
 
-            System.Windows.Forms.Application.Run(new SpellCheckAppContext());
+            System.Windows.Forms.Application.Run(new SpellCheckAppContext(updateRequested));
             return 0;
         }
         catch (Exception ex)

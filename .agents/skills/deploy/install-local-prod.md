@@ -1,42 +1,36 @@
 # Install local production after publishing
 
-Publishing includes updating the installed production app on this computer.
 After the approved release workflow completes successfully and the release is
-public, run the programmatic installer:
+published, invoke the installed production executable with its native command:
 
 ```powershell
-.agents/skills/deploy/scripts/install-local-prod.ps1 -ExpectedVersion 0.10.2
+& "$env:LOCALAPPDATA/UniversalSpellCheck/current/UniversalSpellCheck.exe" --update
 ```
 
-Substitute the approved release version. Use normal machine access; sandbox
-LocalAppData redirection is not the installed app's location. Pass `-InstallRoot`
-when the actual installation is elsewhere.
+Use the actual installed path with normal machine access; sandbox LocalAppData
+redirection is not the installation. The command asks the existing instance to
+check/download through `UpdateService.CheckAsync(CommandLine)` and automatically
+apply/restart through `ApplyUpdatesAndRestartAsync`. If no instance is running,
+it starts the app with the same update intent. An already-current app remains
+running. No repository script, GitHub CLI, Python, or UI automation is needed to
+trigger the update; those remain deployment verification tools only.
 
-The command verifies the public release and successful workflow, identifies the
-installed Prod process, and restarts it to invoke the existing
-`UpdateService.CheckAsync(Launch)` download. It waits up to five minutes for the
-staged full package and verifies its size/SHA256 against GitHub's release asset.
-It then stops only that installed process, applies the staged package with the
-installed `Update.exe apply --silent --package`, and verifies the restarted
-binary/process and fresh Prod startup log through the read-logs skill.
+For a running instance, exit 0 means the request was acknowledged, not that
+installation has finished. Exit 1 means delivery failed or the Dev channel was
+invoked. Observe completion through the shared logs with the read-logs skill:
+`update_command_received`, `update_download_done`, `update_apply_now`, and a fresh
+Prod `started` event at the expected release version. Verify the installed process
+PID/path and binary version match that startup event. An up-to-date check requires
+no restart. Poll in bounded intervals; after five minutes without convergence,
+inspect update failure logs and report local installation as incomplete.
 
-This uses the app's existing downloader and Velopack staged-update mechanism;
-it does not copy checkout builds into the install root, reinstall over user data,
-or introduce a second download/feed path. An already-current installation is
-verified and left running. A newer installed version is never downgraded.
+Do not independently download releases, hash staged packages, stop/restart the
+app from PowerShell, or invoke `Update.exe` during normal publishing. The app owns
+that sequence. Complete closeout after verifying installation: leave Prod running,
+stop Dev/helpers, and remove session scratch.
 
-The script waits for Update.exe itself, not its restarted app's entire process
-tree. Keep giving progress updates while it runs. If it fails, inspect the app's
-update/startup logs and report local installation as incomplete, even if the
-public release succeeded. Do not delete staged packages or user data as cleanup.
-
-For a separate read-only check, run:
-
-```powershell
-.agents/skills/deploy/scripts/verify-local-prod.ps1 -ExpectedVersion 0.10.2
-```
-
-After a restart, also supply `-StartedAfter` with its install start time and check
-that the fresh Prod `started` event matches the version/PID. Complete publishing
-closeout after installation: leave updated Prod running, stop Dev/helpers, and
-remove only session-created scratch.
+**Bootstrap:** installed versions through 0.10.2 do not recognize `--update`.
+For the one release that introduces it, use the existing app's downloaded update
+prompt (or the installed updater to apply its already-staged package) once. Never
+pass `--update` to an older binary and claim it performed an update. Subsequent
+publishes use only the native command above.

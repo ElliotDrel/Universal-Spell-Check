@@ -10,7 +10,7 @@ The product is a C#/.NET 10 WinForms tray app with an embedded WPF dashboard, li
 
 1. `VelopackApp.Build().Run()` — **must be the very first line of `Main`**. Handles first-run hooks and restart-after-update. Safe no-op when running via `dotnet run`.
 2. `AppPaths.EnsureDataMigration()` creates the safe data roots and copies or merges legacy Velopack-directory data newer than the previous migration checkpoint before any logger or settings service opens a file.
-3. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0.
+3. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0. With `--update`, it sends a bounded, channel-specific Windows message to the running instance instead and exits 0 only when acknowledged (1 if unavailable). Dev rejects `--update` with exit 1.
 4. Instantiate `System.Windows.Application` with `ShutdownMode.OnExplicitShutdown`. Merge `UI/Styles.xaml` and `UI/Components.xaml` into `app.Resources`. **Without this step**, WPF `DynamicResource` lookups crash (see watchlist).
 5. `Application.Run(new SpellCheckAppContext())` — starts the WinForms message loop.
 
@@ -115,7 +115,7 @@ Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the
 
 ## Update service (`src/UpdateService.cs`)
 
-Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboard }`.
+Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboard, CommandLine }`.
 
 State machine: `Idle | Checking | Downloading(version) | UpdateReady(version) | UpToDate | Failed(reason)`.
 
@@ -128,6 +128,8 @@ Flow:
 6. Download via `DownloadUpdatesAsync`. Set `UpdateReady`.
 7. Notify only after the package is downloaded. Clicking the notification opens the small `UpdatePromptForm`; its single `Install now` action applies the pending package and restarts.
 8. If the user does nothing, Velopack applies the pending package on the next launch.
+
+The installed executable accepts `--update` from PowerShell or any terminal. The existing `HotkeyWindow` receives the registered message named by `BuildChannel.UpdateRequestMessage`, using `BuildChannel.HotkeyWindowTitle` to locate only its own channel. `SpellCheckAppContext` requests `CheckAsync(CommandLine)` and applies/restarts automatically when the active check finishes with `UpdateReady`. A command received during another check keeps that install intent until completion; up-to-date or failed checks clear it. No separate downloader or installer is involved. With no running instance, `--update` starts the normal app with the same install intent. The command acknowledges the request, not completion: verify the new process/version and startup log after restarting.
 
 Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev channel skips all update activity.
 

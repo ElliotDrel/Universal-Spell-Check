@@ -6,6 +6,15 @@ A Windows-wide AI spell checker. Select text anywhere, press **Ctrl+Alt+U**, and
 
 Download the latest `Setup.exe` from the [Releases](https://github.com/ElliotDrel/Universal-Spell-Check/releases) page and run it. No admin prompt, no code signing — Windows SmartScreen may warn on first install. The app checks GitHub Releases on launch and every ~4 hours, downloads an available update, and offers a one-click restart to install it.
 
+Technical users can trigger the same update flow from PowerShell (available after v0.10.2):
+
+```powershell
+& "$env:LOCALAPPDATA/UniversalSpellCheck/current/UniversalSpellCheck.exe" --update
+```
+
+The running app checks, downloads, and restarts to install an available update. If already current, it stays running. The launcher acknowledges a request; installation completes asynchronously.
+
+
 You'll need an OpenAI API key. Open the dashboard from the tray icon, add a named key, and select it. You can store multiple keys and switch the active key without restarting.
 
 ## Use

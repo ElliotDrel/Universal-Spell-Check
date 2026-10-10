@@ -10,6 +10,7 @@ internal enum UpdateTrigger
     Periodic,
     ManualTray,
     ManualDashboard,
+    CommandLine,
 }
 
 internal sealed record CheckCompletedEventArgs(UpdateTrigger Trigger, UpdateState Result);

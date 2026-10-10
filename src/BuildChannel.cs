@@ -30,6 +30,9 @@ internal static class BuildChannel
     public const uint HotkeyVk = 0x55; // VK_U
 #endif
 
+    public const string HotkeyWindowTitle = MutexName + ".HotkeyWindow";
+    public const string UpdateRequestMessage = MutexName + ".UpdateRequested";
+
     public const uint HotkeyModAlt = 0x0001;
     public const uint HotkeyModControl = 0x0002;
     public const uint HotkeyModNoRepeat = 0x4000;

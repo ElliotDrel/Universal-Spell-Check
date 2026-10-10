@@ -18,14 +18,17 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly TargetFormattingPipeline _formattingPipeline;
     private readonly OverlayHost _overlayHost = new();
     private readonly UpdateService _updateService;
+    private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private DashboardWindow? _dashboardWindow;
     private UpdatePromptForm? _updatePrompt;
     private Forms.ToolStripMenuItem _versionItem = null!;
     private Forms.ToolStripMenuItem _checkForUpdatesItem = null!;
     private bool _updateNotificationActive;
+    private bool _installRequested;
 
-    public SpellCheckAppContext()
+    public SpellCheckAppContext(bool updateRequested = false)
     {
+        _installRequested = updateRequested;
         _logger = new DiagnosticsLogger(() => AppPaths.LogPath);
         Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
         _settingsStore = new SettingsStore(_logger);
@@ -65,12 +68,13 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
         _hotkeyWindow = new HotkeyWindow();
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
+        _hotkeyWindow.UpdateRequested += OnUpdateRequested;
         _hotkeyWindow.Register(BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk);
 
         _updateService.StateChanged += OnUpdateStateChanged;
         _updateService.CheckCompleted += OnUpdateCheckCompleted;
         OnUpdateStateChanged(_updateService, _updateService.State);
-        _ = _updateService.CheckAsync(UpdateTrigger.Launch);
+        _ = _updateService.CheckAsync(updateRequested ? UpdateTrigger.CommandLine : UpdateTrigger.Launch);
 
         StartupRegistration.EnsureFirstRunRegistered(_logger);
 
@@ -148,16 +152,37 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             : $"v{BuildChannel.AppVersion} · Checked {FormatLastChecked(_updateService.LastCheckedAt)}";
     }
 
+    private void OnUpdateRequested(object? sender, EventArgs e)
+    {
+        // Keep intent until the active check completes, including a check that
+        // began before the command; the service already serializes downloads.
+        _installRequested = true;
+        _logger.Log("update_command_received");
+        _ = _updateService.CheckAsync(UpdateTrigger.CommandLine);
+    }
+
     private void OnUpdateCheckCompleted(object? sender, CheckCompletedEventArgs e)
     {
-        // Marshal to UI thread for ShowBalloonTip.
-        if (_notifyIcon.ContextMenuStrip is { } menu && menu.InvokeRequired)
+        // Keep command intent and restart on the startup dispatcher even before
+        // the tray menu has created a handle.
+        if (!_dispatcher.CheckAccess())
         {
-            menu.BeginInvoke(new Action(() => OnUpdateCheckCompleted(sender, e)));
+            _dispatcher.BeginInvoke(new Action(() => OnUpdateCheckCompleted(sender, e)));
             return;
         }
 
-        if (e.Trigger is not (UpdateTrigger.ManualTray or UpdateTrigger.ManualDashboard) &&
+        // A newer check may have started while this completion was queued.
+        if (_installRequested && e.Result == _updateService.State)
+        {
+            _installRequested = false;
+            if (e.Result is UpdateState.UpdateReady)
+            {
+                _ = _updateService.ApplyUpdatesAndRestartAsync();
+                return;
+            }
+        }
+
+        if (e.Trigger is not (UpdateTrigger.ManualTray or UpdateTrigger.ManualDashboard or UpdateTrigger.CommandLine) &&
             e.Result is not UpdateState.UpdateReady) return;
 
         switch (e.Result)
@@ -370,6 +395,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _logger.Log("stopping");
         Dispatcher.CurrentDispatcher.UnhandledException -= OnDispatcherUnhandledException;
         _hotkeyWindow.HotkeyPressed -= OnHotkeyPressed;
+        _hotkeyWindow.UpdateRequested -= OnUpdateRequested;
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
         _notifyIcon.BalloonTipClicked -= OnBalloonTipClicked;

@@ -25,6 +25,14 @@ publish\UniversalSpellCheck.exe
 
 Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 
+## Trigger an installed production update
+
+```powershell
+& "$env:LOCALAPPDATA/UniversalSpellCheck/current/UniversalSpellCheck.exe" --update
+```
+
+The running Prod app checks, downloads, installs, and restarts through its existing updater. If already current, it stays running. A second invocation exits `0` when the request is accepted and `1` if it cannot reach the running app. Dev rejects the command. Wait for a new Prod `started` event and verify the installed version before reporting an upgrade complete.
+
 ## Manual Acceptance Checks
 
 1. Launch with no saved API key, trigger the hotkey, and verify Settings opens without replacing selected text.
@@ -46,6 +54,8 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 17. In ChatGPT desktop, correct a list selection containing a skill mention, a copied trailing newline, and missing final punctuation. Verify the skill remains a chip and list/paragraph formatting survives. Repeat with a longer selection containing unchanged paragraphs; confirm `rich_text.mode=aligned_html` for both.
 
 18. In LinkedIn messaging, select a message containing one blank paragraph between text blocks, correct it with Dev, and verify the blank-line count stays unchanged. Confirm `rich_text.mode=html`; repeat with a single-line message as a control. Do not send the test message.
+
+19. In an installed Prod build, invoke `--update` while running and while closed. With an available release, verify download, apply, and a fresh process at that version. Invoke during an active check and verify one apply/restart; invoke when current and verify no reinstall. Dev must return exit `1` without launching.
 
 ## Top-of-mind reminders
 

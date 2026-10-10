@@ -7,17 +7,28 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
 {
     private const int HotkeyId = 1;
     private const int WmHotkey = 0x0312;
+    private const uint SmtoAbortIfHung = 0x0002;
 
+    private static readonly uint UpdateMessage = RegisterWindowMessage(BuildChannel.UpdateRequestMessage);
     private bool _registered;
 
     public event EventHandler? HotkeyPressed;
+    public event EventHandler? UpdateRequested;
 
     public HotkeyWindow()
     {
         CreateHandle(new CreateParams
         {
-            Caption = "UniversalSpellCheckHotkeyWindow"
+            Caption = BuildChannel.HotkeyWindowTitle
         });
+    }
+
+    public static bool RequestUpdate()
+    {
+        var window = FindWindow(null, BuildChannel.HotkeyWindowTitle);
+        return window != IntPtr.Zero && UpdateMessage != 0
+            && SendMessageTimeout(window, UpdateMessage, IntPtr.Zero, IntPtr.Zero,
+                SmtoAbortIfHung, 2000, out var accepted) != IntPtr.Zero && accepted == new IntPtr(1);
     }
 
     public void Register(uint modifiers, uint vk)
@@ -56,6 +67,17 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
             return;
         }
 
+        if (UpdateMessage != 0 && (uint)m.Msg == UpdateMessage)
+        {
+            m.Result = IntPtr.Zero;
+            if (UpdateRequested is not null)
+            {
+                UpdateRequested.Invoke(this, EventArgs.Empty);
+                m.Result = new IntPtr(1);
+            }
+            return;
+        }
+
         base.WndProc(ref m);
     }
 
@@ -64,6 +86,16 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
         Unregister();
         DestroyHandle();
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string message);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string? className, string windowName);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window, uint message,
+        IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);

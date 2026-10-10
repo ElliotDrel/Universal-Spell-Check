@@ -64,6 +64,9 @@ jobs:
           }
           Write-Host "Startup smoke passed (exit 0)."
 
+      - name: Native update command regression tests
+        run: dotnet run --project tests/UpdateCommandTests/UniversalSpellCheck.UpdateCommandTests.csproj -c Release
+
       - name: Install vpk
         run: dotnet tool install --global vpk --version 1.2.161
 

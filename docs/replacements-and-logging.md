@@ -141,6 +141,7 @@ Every line written by `DiagnosticsLogger.Log()`:
 | `spellcheck_detail` | JSON blob with full input/output/tokens/timings on every run |
 | `replacements_reloaded` / `replacements_reload_failed` | Replacements file change detection |
 | `update_check_start` / `update_download_done` / `update_apply_now` | UpdateService flow |
+| `update_command_received` / `update_command_forwarded` / `update_command_rejected` | Native `--update` request received, acknowledgement (`accepted`), or Dev rejection |
 | `finalize_failed` | The post-run finalize step threw — the run's `run_completed`/`spellcheck_detail` lines were **lost**. Logs status, active process, and full stack. Treat as a missing-telemetry bug |
 | `dashboard_open step=construct|show|activate|done` | Dashboard lifecycle |
 | `loading_overlay_show` / `loading_overlay_hide` | Overlay visibility |
