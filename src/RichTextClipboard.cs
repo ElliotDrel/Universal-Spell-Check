@@ -188,18 +188,25 @@ internal static partial class RichTextClipboard
         for (var i = 0; i < nodes.Count; i++)
         {
             var candidate = sourceText.IndexOf(nodes[i].Text, sourceCursor, StringComparison.Ordinal);
-            var next = -1;
+            var belongsToLaterNode = false;
             for (var j = i + 1; j < nodes.Count; j++)
             {
                 var future = sourceText.IndexOf(nodes[j].Text, sourceCursor, StringComparison.Ordinal);
-                if (future >= 0 && (next < 0 || future < next))
-                    next = future;
+                if (future >= 0 && future < candidate
+                    && future + nodes[j].Text.Length >= candidate + nodes[i].Text.Length)
+                {
+                    belongsToLaterNode = true;
+                    break;
+                }
             }
 
             // ChatGPT can omit visible headings from its Unicode clipboard
             // flavor. Keep such HTML nodes untouched instead of mapping a
             // repeated word in a later list item to the missing heading.
-            if (candidate < 0 || (next >= 0 && next < candidate))
+            // A later standalone space or typo can occur earlier in Unicode;
+            // that is not evidence that this whole node was omitted. Only a
+            // later node containing the candidate can claim its characters.
+            if (candidate < 0 || belongsToLaterNode)
                 continue;
             nodes[i] = nodes[i] with { TextStart = candidate };
             sourceCursor = candidate + nodes[i].Text.Length;
@@ -267,19 +274,6 @@ internal static partial class RichTextClipboard
 
         if (sourcePosition != sourceText.Length)
             return false;
-
-        for (var i = 0; i < nodes.Count; i++)
-        {
-            if (nodes[i].TextStart >= 0
-                && !string.IsNullOrWhiteSpace(nodes[i].Text)
-                && string.IsNullOrWhiteSpace(output[i].ToString()))
-            {
-                // A spelling correction cannot erase a whole visible node.
-                // Preserve it in HTML and recover it in the Unicode flavor.
-                nodes[i] = nodes[i] with { TextStart = -1 };
-            }
-        }
-        completeCorrectedText = RecoverMissingHtmlText(correctedText, sourceText, nodes);
 
         var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
         var htmlCursor = 0;

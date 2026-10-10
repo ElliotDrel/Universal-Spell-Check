@@ -184,7 +184,10 @@ block as a nested item. A single inline `<span>` is
 accepted around the item body. Mixed spans, links, and lists next use text-node alignment: each original
 HTML text node must map in order to the copied Unicode text, and every model edit must belong to a
 mapped node. The output retains the original tags and attributes. `rich_text.mode=aligned_html`
-identifies this path, while `html` and `list_body_text` identify the narrower paths. If alignment
+identifies this path. Future text nodes may claim an earlier candidate only when their complete
+source match contains it; a later standalone space or typo cannot mark existing Unicode text as
+missing. Recovery restores only nodes absent from the source alignment, never nodes deleted by
+the model's correction. `html` and `list_body_text` identify the narrower paths. If alignment
 removes copied trailing whitespace before inserting final punctuation, that insertion is owned by
 the text node at the start of the removed suffix. Large alignment diffs omit identical prefix/suffix
 text before applying the existing bounded matrix limit. Skill mentions retain their original spans

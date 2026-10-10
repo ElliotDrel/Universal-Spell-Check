@@ -91,6 +91,27 @@ var trailingStructuralEdit = RichTextClipboard.TryCreateReplacement(
 Assert(!trailingStructuralEdit.Applied,
     "new paragraph content beyond an HTML node must continue to decline rich reconstruction");
 var unchangedTail = new string('x', 1400);
+var splitSkillSelection = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><span>Genaeral Notes:</span></p><ul><li><p><span>Fix teh message</span></p></li><li><p><span>Use </span>" + skillChip + " <span>then chek this.</span>a</p></li></ul>"),
+    "Genaeral Notes:\n- Fix teh message\n- Use Sample Skill then chek this.a",
+    "General Notes:\n- Fix the message\n- Use Sample Skill then check this.");
+Assert(splitSkillSelection.Applied && splitSkillSelection.Text
+    == "General Notes:\n- Fix the message\n- Use Sample Skill then check this."
+    && Fragment(splitSkillSelection.Html)
+    == "<p data-pm-slice=\"0 0 []\"><span>General Notes:</span></p><ul><li><p><span>Fix the message</span></p></li><li><p><span>Use </span>" + skillChip + " <span>then check this.</span></p></li></ul>",
+    "later standalone spaces and deleted typo nodes must not cause corrected source nodes to be recovered twice");
+var splitSkillFallback = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><span>Fix teh message</span> <span>next</span>a</p>"),
+    "Fix teh message nexta", "Fix the message\nnew paragraph next");
+Assert(!splitSkillFallback.Applied && splitSkillFallback.Text == "Fix the message\nnew paragraph next",
+    "a reconstruction fallback must not reinsert original text already captured in Unicode");
+var repeatedOmittedHeading = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<h1 data-pm-slice=\"0 0 []\">heading</h1><p><span>fix heading typo</span></p>"),
+    "fix heading typo", "fix heading error");
+Assert(repeatedOmittedHeading.Applied && repeatedOmittedHeading.Text == "heading\n\nfix heading error"
+    && Fragment(repeatedOmittedHeading.Html)
+    == "<h1 data-pm-slice=\"0 0 []\">heading</h1><p><span>fix heading error</span></p>",
+    "a genuinely omitted heading repeated within a later source node must still be recovered exactly once");
 var largeSkillSelection = RichTextClipboard.TryCreateReplacement(
     CfHtml("<p data-pm-slice=\"0 0 []\">use " + skillChip + " to chek</p><p>" + unchangedTail + "</p>"),
     "use Sample Skill to chek\n\n" + unchangedTail,
