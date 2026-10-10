@@ -2,6 +2,38 @@
 
 ## Status
 
+### LinkedIn comment character encoding (2026-10-10)
+
+Prod 0.10.1 runs `e4b40ced28a34fdd830443e0610b2fd9` and
+`70bacc2ed81b4a1bb94c3c34f68ca039` returned normal apostrophes from the AI.
+The mapper emitted `&#39;` and `&#160;`; exact clipboard readback confirmed those
+payloads, but the destination captures showed `#39;` and `#160;` as visible text.
+The later run used a literal curly apostrophe and avoided that corruption.
+Text-node encoding now escapes only `&`, `<`, and `>` and retains apostrophes,
+NBSP, accents and emoji as literal Unicode, with UTF-8 CF_HTML byte offsets.
+This applies to every reconstruction path; tags and attributes are unchanged.
+Verification: the Release formatting suite passes, Dev builds, and both full-evidence
+incident replays emit literal apostrophes (and literal NBSP for the tagged run) with
+no `&#39;` or `&#160;`. Validation used installed SDK 10.0.204; the repository pin
+remains 10.0.401. The native developer-evidence smoke stopped at its pre-paste
+RTF-source assertion (`Rich editor source must expose RTF.`), so it does not
+establish paste acceptance. The original LinkedIn editor retest remains required.
+
+### Future request: preserve tags in place (deferred 2026-10-10)
+
+Elliot wants to select an entire LinkedIn comment and correct the text around tags
+while leaving the original mention nodes untouched, including multiple tags in the
+middle of a comment. This is explicitly out of the current encoding fix's scope.
+The captured mention HTML retained its display name but contained no profile
+identifier; re-pasting that markup flattened the active tag into plain text.
+A future implementation must replace only the editable text segments, preserve
+mention identity and order, and never replace or recreate the tag nodes.
+Investigate reliable selection/edit support before choosing keyboard automation,
+Windows accessibility ranges, or browser integration; no mechanism is verified yet.
+Verify multiple/repeated names, adjacent tags, partial selections, punctuation,
+Unicode, selection changes during requests, and a safe failure that leaves tags intact.
+Acceptance requires the real LinkedIn editor, with no test comment posted.
+
 **2026-10-10 LinkedIn:** The captured messaging incident showed one empty HTML paragraph
 copied as four CRLF sequences. The plain fallback pasted three LF characters and the
 before/after screenshots confirmed an added blank line. A narrow producer-URL-gated

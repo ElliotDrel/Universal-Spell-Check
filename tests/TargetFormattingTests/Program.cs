@@ -47,8 +47,30 @@ var linkedIn = RichTextClipboard.TryCreateReplacement(
     "Please chek this. \r\n\r\n\r\n\r\nThanks!", "Please check this.\n\n\nThanks!");
 Assert(linkedIn.Applied && linkedIn.ParagraphCount == 3
     && linkedIn.Text == "Please check this. \n\nThanks!"
-    && Fragment(linkedIn.Html) == linkedInFragment.Replace("chek", "check").Replace("\u00a0", "&#160;"),
+    && Fragment(linkedIn.Html) == linkedInFragment.Replace("chek", "check"),
     "LinkedIn empty paragraphs and NBSP must survive without doubled paste newlines");
+const string entitySource = "Iv tried café & <tea> \"today\".\u00a0😀";
+const string entityCorrected = "I've tried café & <tea> \"today\".\u00a0😀";
+const string entityExpected = "I've tried café &amp; &lt;tea&gt; \"today\".\u00a0😀";
+var commentEntities = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"1 1 []\">Iv tried café &amp; &lt;tea&gt; \"today\".\u00a0😀</p>"),
+    entitySource, entityCorrected);
+Assert(commentEntities.Applied
+    && Fragment(commentEntities.Html) == "<p data-pm-slice=\"1 1 []\">" + entityExpected + "</p>"
+    && commentEntities.Text == entityCorrected,
+    "comment paste must retain literal apostrophes, NBSP and Unicode while escaping HTML syntax");
+var messagingEntities = RichTextClipboard.TryCreateReplacement(
+    WithProducer("<p>Iv tried café &amp; &lt;tea&gt; \"today\".\u00a0😀</p>", "https://www.linkedin.com/messaging/"),
+    entitySource, entityCorrected);
+Assert(messagingEntities.Applied && Fragment(messagingEntities.Html) == "<p>" + entityExpected + "</p>",
+    "messaging paste must use the same text-node encoding");
+var alignedEntities = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><strong>Name</strong>&nbsp;Iv tried café.</p>"),
+    "Name\u00a0Iv tried café.", "Name\u00a0I've tried café.");
+Assert(alignedEntities.Applied && alignedEntities.Mode == "aligned_html"
+    && Fragment(alignedEntities.Html) == "<p data-pm-slice=\"0 0 []\"><strong>Name</strong>\u00a0I've tried café.</p>",
+    "aligned text-node paste must avoid apostrophe and NBSP numeric entities");
+
 var linkedInAdjacent = RichTextClipboard.TryCreateReplacement(
     WithProducer("<p>teh first</p><p>last</p>", "https://www.linkedin.com/messaging/"),
     "teh first\r\n\r\nlast", "the first\n\nlast");

@@ -139,7 +139,7 @@ internal static partial class RichTextClipboard
             }
             else
             {
-                rebuilt.Append(WebUtility.HtmlEncode(correctedSections[sectionIndex++]));
+                rebuilt.Append(EncodeTextNode(correctedSections[sectionIndex++]));
             }
 
             cursor = text.Index + text.Length;
@@ -151,6 +151,14 @@ internal static partial class RichTextClipboard
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
     }
+
+    // Text nodes need only HTML syntax escaped. Numeric entities emitted by
+    // HtmlEncode for apostrophes/NBSP are mangled by LinkedIn's paste handler.
+    // Keep Unicode literal; CF_HTML offsets are computed from UTF-8 bytes.
+    private static string EncodeTextNode(string text) => text
+        .Replace("&", "&amp;", StringComparison.Ordinal)
+        .Replace("<", "&lt;", StringComparison.Ordinal)
+        .Replace(">", "&gt;", StringComparison.Ordinal);
 
     private static bool IsLinkedInMessagingSource(string sourceHtml)
     {
@@ -207,7 +215,7 @@ internal static partial class RichTextClipboard
             var corrected = original[..leading] + sections[section++].Trim(' ', '\t', '\u00a0')
                 + original[(original.Length - trailing)..];
             rebuilt.Append(fragment, cursor, text.Index - cursor);
-            rebuilt.Append(WebUtility.HtmlEncode(corrected));
+            rebuilt.Append(EncodeTextNode(corrected));
             cursor = text.Index + text.Length;
             pastedBodies.Add(corrected.Replace('\u00a0', ' '));
         }
@@ -350,7 +358,7 @@ internal static partial class RichTextClipboard
             rebuilt.Append(fragment, htmlCursor, node.HtmlStart - htmlCursor);
             rebuilt.Append(node.TextStart < 0 || output[i].ToString() == node.Text
                 ? fragment.Substring(node.HtmlStart, node.HtmlLength)
-                : WebUtility.HtmlEncode(output[i].ToString()));
+                : EncodeTextNode(output[i].ToString()));
             htmlCursor = node.HtmlStart + node.HtmlLength;
         }
         rebuilt.Append(fragment, htmlCursor, fragment.Length - htmlCursor);
@@ -567,7 +575,7 @@ internal static partial class RichTextClipboard
         {
             var text = paragraphs[i].Groups["text"];
             rebuilt.Append(fragment, cursor, text.Index - cursor);
-            rebuilt.Append(WebUtility.HtmlEncode(correctedBodies[i]));
+            rebuilt.Append(EncodeTextNode(correctedBodies[i]));
             cursor = text.Index + text.Length;
         }
         rebuilt.Append(fragment, cursor, fragment.Length - cursor);
@@ -616,9 +624,9 @@ internal static partial class RichTextClipboard
         var child = match.Groups["child"];
         var rebuilt = new StringBuilder(fragment.Length + correctedText.Length - sourceText.Length);
         rebuilt.Append(fragment, 0, parent.Index);
-        rebuilt.Append(WebUtility.HtmlEncode(correctedParentBody));
+        rebuilt.Append(EncodeTextNode(correctedParentBody));
         rebuilt.Append(fragment, parent.Index + parent.Length, child.Index - parent.Index - parent.Length);
-        rebuilt.Append(WebUtility.HtmlEncode(correctedChildBody));
+        rebuilt.Append(EncodeTextNode(correctedChildBody));
         rebuilt.Append(fragment, child.Index + child.Length, fragment.Length - child.Index - child.Length);
 
         replacement = RichTextReplacementResult.CreateNestedListHtml(
