@@ -4,8 +4,8 @@ using System.Text.RegularExpressions;
 
 namespace UniversalSpellCheck;
 
-// Re-emits the small, unambiguous subset of CF_HTML that ChatGPT's ProseMirror
-// editor places on the clipboard. Plain-text paste turns its paragraph
+// Re-emits verified LinkedIn messaging paragraphs and the supported subset
+// of CF_HTML from ChatGPT's ProseMirror editor. Plain-text paste turns its paragraph
 // separators into extra empty paragraphs, so preserve the original paragraph
 // structure when the corrected text maps to it exactly.
 internal static partial class RichTextClipboard
@@ -28,6 +28,9 @@ internal static partial class RichTextClipboard
         {
             return RichTextReplacementResult.NotApplied("invalid_cf_html", correctedText);
         }
+
+        if (IsLinkedInMessagingSource(sourceHtml))
+            return CreateLinkedInParagraphReplacement(fragment, sourceText, correctedText);
 
         // data-pm-slice is the stable marker in the captured ChatGPT selection.
         // Do not apply a structural assumption to a different HTML producer.
@@ -147,6 +150,70 @@ internal static partial class RichTextClipboard
             normalizedText,
             BuildCfHtml(rebuilt.ToString()),
             paragraphs.Count);
+    }
+
+    private static bool IsLinkedInMessagingSource(string sourceHtml)
+    {
+        // Use the captured producer URL, never a window title or substring host match.
+        var headerEnd = sourceHtml.IndexOf("<", StringComparison.Ordinal);
+        if (headerEnd < 0)
+            return false;
+        foreach (var line in sourceHtml[..headerEnd].Split('\n'))
+        {
+            if (!line.StartsWith("SourceURL:", StringComparison.Ordinal))
+                continue;
+            return Uri.TryCreate(line[10..].TrimEnd('\r'), UriKind.Absolute, out var uri)
+                && uri.Scheme == Uri.UriSchemeHttps
+                && (uri.Host.Equals("www.linkedin.com", StringComparison.OrdinalIgnoreCase)
+                    || uri.Host.Equals("linkedin.com", StringComparison.OrdinalIgnoreCase))
+                && uri.AbsolutePath.StartsWith("/messaging/", StringComparison.Ordinal);
+        }
+        return false;
+    }
+
+    private static RichTextReplacementResult CreateLinkedInParagraphReplacement(
+        string fragment, string sourceText, string correctedText)
+    {
+        var paragraphs = LinkedInParagraphRegex().Matches(fragment);
+        if (paragraphs.Count == 0
+            || !string.IsNullOrWhiteSpace(LinkedInParagraphRegex().Replace(fragment, "")))
+            return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
+
+        var bodies = paragraphs.Select(p => WebUtility.HtmlDecode(p.Groups["text"].Value)).ToArray();
+        // Chrome copies each paragraph boundary as two newlines, including the empty
+        // <p><br></p>. Re-pasting those as text creates extra editor paragraphs.
+        var copied = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        if (copied != string.Join("\n\n", bodies).Replace('\u00a0', ' '))
+            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+        var sections = SplitSections(correctedText);
+        if (sections.Length != bodies.Count(b => b.Length > 0) || sections.Any(s => s.Contains('\n')))
+            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+
+        var rebuilt = new StringBuilder(fragment.Length + correctedText.Length);
+        var cursor = 0;
+        var section = 0;
+        var pastedBodies = new List<string>();
+        foreach (Match paragraph in paragraphs)
+        {
+            var text = paragraph.Groups["text"];
+            if (text.Length == 0)
+            {
+                pastedBodies.Add("");
+                continue;
+            }
+            var original = WebUtility.HtmlDecode(text.Value);
+            var leading = original.Length - original.TrimStart(' ', '\t', '\u00a0').Length;
+            var trailing = original.Length - original.TrimEnd(' ', '\t', '\u00a0').Length;
+            var corrected = original[..leading] + sections[section++].Trim(' ', '\t', '\u00a0')
+                + original[(original.Length - trailing)..];
+            rebuilt.Append(fragment, cursor, text.Index - cursor);
+            rebuilt.Append(WebUtility.HtmlEncode(corrected));
+            cursor = text.Index + text.Length;
+            pastedBodies.Add(corrected.Replace('\u00a0', ' '));
+        }
+        rebuilt.Append(fragment, cursor, fragment.Length - cursor);
+        return RichTextReplacementResult.CreateHtml(
+            string.Join("\n", pastedBodies), BuildCfHtml(rebuilt.ToString()), paragraphs.Count);
     }
 
     // Align edits to the original HTML text nodes. The clipboard's Unicode
@@ -696,6 +763,9 @@ internal static partial class RichTextClipboard
 
     [GeneratedRegex("<p\\b[^>]*>(?:(?<text>[^<]*)|<span\\b[^>]*>(?<text>[^<]*)</span>)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ParagraphRegex();
+
+    [GeneratedRegex("<p\\b[^>]*>(?:(?<text>[^<]*)|<br\\b[^>]*>)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LinkedInParagraphRegex();
 
     [GeneratedRegex("<li\\b[^>]*data-pm-slice=\\\"[^\\\"]+\\\"[^>]*><p><span\\b[^>]*>(?<parent>[^<]*)</span></p><ol\\b[^>]*><li><p><span\\b[^>]*>(?<child>[^<]*)</span></p></li></ol></li>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex NestedOrderedListRegex();

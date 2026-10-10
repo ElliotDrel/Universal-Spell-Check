@@ -28,6 +28,47 @@ Assert(TextPostProcessor.StripEchoedInput(
         echoedInput) == echoedInput + "\n\nA legitimate continuation.",
     "content without the observed correction divider must remain untouched");
 
+const string linkedInFragment = "<p style=\"margin:0\">Please chek this.\u00a0</p><p style=\"margin:0\"><br style=\"font:inherit\"></p><p>Thanks!</p>";
+// Adding a producer header changes all UTF-8 offsets.
+string WithProducer(string fragment, string url)
+{
+    var original = CfHtml(fragment);
+    var added = "SourceURL:" + url + "\r\n";
+    var delta = Encoding.UTF8.GetByteCount(added);
+    foreach (var name in new[] { "StartHTML:", "EndHTML:", "StartFragment:", "EndFragment:" })
+    {
+        var offset = HeaderOffset(original, name);
+        original = original.Replace(name + offset.ToString("D10"), name + (offset + delta).ToString("D10"));
+    }
+    return original.Insert(105, added);
+}
+var linkedIn = RichTextClipboard.TryCreateReplacement(
+    WithProducer(linkedInFragment, "https://www.linkedin.com/messaging/thread/sample/"),
+    "Please chek this. \r\n\r\n\r\n\r\nThanks!", "Please check this.\n\n\nThanks!");
+Assert(linkedIn.Applied && linkedIn.ParagraphCount == 3
+    && linkedIn.Text == "Please check this. \n\nThanks!"
+    && Fragment(linkedIn.Html) == linkedInFragment.Replace("chek", "check").Replace("\u00a0", "&#160;"),
+    "LinkedIn empty paragraphs and NBSP must survive without doubled paste newlines");
+var linkedInAdjacent = RichTextClipboard.TryCreateReplacement(
+    WithProducer("<p>teh first</p><p>last</p>", "https://www.linkedin.com/messaging/"),
+    "teh first\r\n\r\nlast", "the first\n\nlast");
+Assert(linkedInAdjacent.Applied && linkedInAdjacent.Text == "the first\nlast"
+    && Fragment(linkedInAdjacent.Html) == "<p>the first</p><p>last</p>",
+    "adjacent LinkedIn paragraphs must not acquire an empty paragraph");
+var linkedInInline = RichTextClipboard.TryCreateReplacement(
+    WithProducer("<span>teh word</span>", "https://www.linkedin.com/messaging/"), "teh word", "the word");
+Assert(!linkedInInline.Applied && linkedInInline.Text == "the word", "inline LinkedIn selections retain plain fallback");
+
+foreach (var url in new[] { "https://www.linkedin.com.evil.test/messaging/", "https://www.linkedin.com/feed/", "https://example.com/messaging/" })
+    Assert(!RichTextClipboard.TryCreateReplacement(WithProducer(linkedInFragment, url),
+        "Please chek this. \r\n\r\n\r\n\r\nThanks!", "Please check this.\n\nThanks!").Applied,
+        "LinkedIn paragraph handling must require an exact messaging producer URL");
+Assert(!RichTextClipboard.TryCreateReplacement(WithProducer(linkedInFragment, "https://www.linkedin.com/messaging/"),
+    "different source", "Please check this.\n\nThanks!").Applied, "mismatched source must fall back");
+Assert(!RichTextClipboard.TryCreateReplacement(WithProducer(linkedInFragment, "https://www.linkedin.com/messaging/"),
+    "Please chek this. \r\n\r\n\r\n\r\nThanks!", "Please check this.\n\nAdded paragraph\n\nThanks!").Applied,
+    "changed paragraph content must fall back");
+
 const string chatGptSourceText = "make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  \n\n\n\nmake image 1 rn (4 versions like always)";
 const string chatGptCorrectedText = "make 2 different ones for this. \u201cSo I tried to fix it myself.\u201d\n\nmake image 1 right now (4 versions like always)";
 const string chatGptFragment = "<p data-pm-slice=\"1 1 []\">make 2 di fone for this. \u201cSo I tried to fix it myself.\u201d  </p><p></p><p>make image 1 rn (4 versions like always)</p>";

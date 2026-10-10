@@ -206,6 +206,16 @@ each position. The app removes surplus blank lines inserted between prefixed ite
 source newline sequence, and replaces only paragraph text in the original HTML tree. Unknown markup,
 changed prefixes, missing lines, and nonblank extra lines still fall back instead of being guessed.
 
+LinkedIn messaging selections have a separate conservative paragraph path, identified by the
+captured CF_HTML `SourceURL` with an exact HTTPS LinkedIn host and `/messaging/` path.
+Only plain `<p>` text and empty `<p><br></p>` blocks qualify. Their decoded text must
+match Chrome's copied two-newline paragraph boundaries (NBSP and space compare equally).
+The corrected output must keep the same nonempty sections. Reconstruction changes only
+paragraph text and retains empty blocks, styles, and source edge whitespace. The Unicode
+flavor uses one newline per paragraph boundary; it does not re-paste Chrome's doubled
+copy separators. Unsupported markup or changed content structure keeps the plain fallback.
+This path uses the existing `rich_text.mode=html` telemetry.
+
 Dev rich-text runs also read the replacement clipboard back immediately before the paste. The
 `rich_text` object records requested HTML size, whether the clipboard contained the exact generated
 CF_HTML (`exact_match`, `missing_html`, or `mismatch`), its readback size, and its post-write formats.

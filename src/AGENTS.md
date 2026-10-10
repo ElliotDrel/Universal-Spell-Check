@@ -45,6 +45,8 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 16. In ChatGPT, select a heading followed by a linked list where the heading is absent from the copied Unicode flavor but present in HTML. Verify the heading survives the correction and no extra `]` appears after the link.
 17. In ChatGPT desktop, correct a list selection containing a skill mention, a copied trailing newline, and missing final punctuation. Verify the skill remains a chip and list/paragraph formatting survives. Repeat with a longer selection containing unchanged paragraphs; confirm `rich_text.mode=aligned_html` for both.
 
+18. In LinkedIn messaging, select a message containing one blank paragraph between text blocks, correct it with Dev, and verify the blank-line count stays unchanged. Confirm `rich_text.mode=html`; repeat with a single-line message as a control. Do not send the test message.
+
 ## Top-of-mind reminders
 
 - A code change is not running until the process is stopped and rebuilt. **Always rebuild + relaunch before retesting.**
