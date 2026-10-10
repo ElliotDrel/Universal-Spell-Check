@@ -57,12 +57,11 @@ All channel constants live in `src/BuildChannel.cs` — that file is the canonic
 - `src/AppPaths.cs` — settings/API isolated per channel; logs shared.
 - `src/SettingsStore.cs` — app settings plus DPAPI-encrypted named API-key collections.
 - `src/UpdateService.cs` — single unified update flow (Launch / Periodic / ManualTray / ManualDashboard).
-- `src/UpdatePromptForm.cs` — downloaded-update prompt with one-click install and restart.
 - `src/SpellcheckCoordinator.cs` — capture/request/post-process/paste pipeline.
 - `src/OpenAiSpellcheckService.cs` — persistent HttpClient + Responses API.
 - `src/TextPostProcessor.cs` — `replacements.json` + prompt-leak guard.
 - `src/HotkeyWindow.cs` — Win32 `RegisterHotKey`, hotkey from `BuildChannel`.
-- `src/SpellCheckAppContext.cs` — tray lifetime, menu (version + Check/Update Now).
+- `src/SpellCheckAppContext.cs` — tray lifetime, shared restart and startup update handling.
 - `src/LoadingOverlayForm.cs` — bottom-center loading overlay with per-phase status text.
 - `src/UI/` — WPF dashboard (MainWindow + Activity/Settings pages + Styles/Components; Activity feed paginates shared JSONL logs).
 - `replacements.json` (repo root) — copied next to the exe at publish time.
@@ -81,7 +80,6 @@ Universal Spell Check/
 |   |-- HotkeyWindow.cs
 |   |-- SpellCheckAppContext.cs
 |   |-- UpdateService.cs
-|   |-- UpdatePromptForm.cs
 |   |-- SpellcheckCoordinator.cs
 |   |-- OpenAiSpellcheckService.cs
 |   |-- TextPostProcessor.cs

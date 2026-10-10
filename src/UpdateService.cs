@@ -1,6 +1,7 @@
 using System.IO;
 using Velopack;
 using Velopack.Sources;
+using Velopack.Locators;
 
 namespace UniversalSpellCheck;
 
@@ -10,7 +11,6 @@ internal enum UpdateTrigger
     Periodic,
     ManualTray,
     ManualDashboard,
-    CommandLine,
 }
 
 internal sealed record CheckCompletedEventArgs(UpdateTrigger Trigger, UpdateState Result);
@@ -37,25 +37,30 @@ internal sealed class UpdateService : IDisposable
     private static readonly TimeSpan PeriodicInterval = TimeSpan.FromHours(4);
 
     private readonly DiagnosticsLogger _logger;
+    private readonly string _stateDirectory;
     private readonly UpdateManager? _manager;
     private readonly System.Threading.Timer? _timer;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly CancellationTokenSource _shutdown = new();
+    private volatile bool _disposed;
 
     private UpdateInfo? _pendingUpdates;
     private UpdateState _state = new UpdateState.Idle();
 
+    public event Action<bool>? RestartRequested;
     public event EventHandler<UpdateState>? StateChanged;
     public event EventHandler<CheckCompletedEventArgs>? CheckCompleted;
 
     public DateTimeOffset? LastCheckedAt { get; private set; }
     public DateTimeOffset? LastUpdatedAt { get; private set; }
 
-    private static string LastCheckedPath => Path.Combine(AppPaths.AppDataDirectory, "last-update-check.txt");
-    private static string InstalledVersionPath => Path.Combine(AppPaths.AppDataDirectory, "installed-version.txt");
+    private string LastCheckedPath => Path.Combine(_stateDirectory, "last-update-check.txt");
+    private string InstalledVersionPath => Path.Combine(_stateDirectory, "installed-version.txt");
 
-    public UpdateService(DiagnosticsLogger logger)
+    public UpdateService(DiagnosticsLogger logger, UpdateManager? manager = null, string? stateDirectory = null)
     {
         _logger = logger;
+        _stateDirectory = stateDirectory ?? AppPaths.AppDataDirectory;
 
         if (BuildChannel.IsDev)
         {
@@ -70,7 +75,7 @@ internal sealed class UpdateService : IDisposable
         try
         {
             var source = new GithubSource(GitHubReleasesUrl, accessToken: null, prerelease: false);
-            _manager = new UpdateManager(source);
+            _manager = manager ?? new UpdateManager(source);
             _logger.Log($"update_service_init channel=prod source=\"{GitHubReleasesUrl}\"");
         }
         catch (Exception ex)
@@ -86,9 +91,14 @@ internal sealed class UpdateService : IDisposable
     }
 
     public UpdateState State => _state;
+    public bool CanUpdate => !BuildChannel.IsDev && _manager?.IsInstalled == true;
+
+    public void RequestRestart() => RestartRequested?.Invoke(false);
 
     public async Task CheckAsync(UpdateTrigger trigger)
     {
+        if (_disposed) return;
+        var shutdownToken = _shutdown.Token;
         if (BuildChannel.IsDev || _manager is null)
         {
             _logger.Log($"update_check_skipped trigger={trigger} reason=dev_or_uninstalled");
@@ -112,6 +122,7 @@ internal sealed class UpdateService : IDisposable
             SetState(new UpdateState.Checking());
             _logger.Log($"update_check_start trigger={trigger}");
             var info = await _manager.CheckForUpdatesAsync().ConfigureAwait(false);
+            shutdownToken.ThrowIfCancellationRequested();
 
             if (info is null || info.TargetFullRelease is null)
             {
@@ -123,25 +134,21 @@ internal sealed class UpdateService : IDisposable
 
             var latestVersion = info.TargetFullRelease.Version.ToString();
 
-            // Always converge on latest: if there's a stale pending download
-            // for a different version, drop our reference and re-download.
-            if (_pendingUpdates is not null &&
-                _pendingUpdates.TargetFullRelease.Version != info.TargetFullRelease.Version)
-            {
-                _logger.Log(
-                    $"update_pending_evicted old={_pendingUpdates.TargetFullRelease.Version} " +
-                    $"new={latestVersion}");
-                _pendingUpdates = null;
-            }
+            _pendingUpdates = null;
 
             SetState(new UpdateState.Downloading(latestVersion));
             _logger.Log($"update_download_start version={latestVersion}");
-            await _manager.DownloadUpdatesAsync(info).ConfigureAwait(false);
+            await _manager.DownloadUpdatesAsync(info, cancelToken: shutdownToken).ConfigureAwait(false);
+            shutdownToken.ThrowIfCancellationRequested();
             _pendingUpdates = info;
             _logger.Log($"update_download_done version={latestVersion}");
 
             SetState(new UpdateState.UpdateReady(latestVersion));
 
+        }
+        catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+        {
+            _logger.Log($"update_check_cancelled trigger={trigger} reason=shutdown");
         }
         catch (Exception ex)
         {
@@ -152,11 +159,16 @@ internal sealed class UpdateService : IDisposable
         }
         finally
         {
-            LastCheckedAt = DateTimeOffset.Now;
-            SaveLastCheckedAt(LastCheckedAt.Value);
+            if (!_disposed)
+            {
+                LastCheckedAt = DateTimeOffset.Now;
+                SaveLastCheckedAt(LastCheckedAt.Value);
+            }
             try
             {
-                CheckCompleted?.Invoke(this, new CheckCompletedEventArgs(trigger, _state));
+                if (!_disposed && trigger == UpdateTrigger.Launch && _state is UpdateState.UpdateReady)
+                    RestartRequested?.Invoke(true);
+                if (!_disposed) CheckCompleted?.Invoke(this, new CheckCompletedEventArgs(trigger, _state));
             }
             catch (Exception ex)
             {
@@ -189,7 +201,7 @@ internal sealed class UpdateService : IDisposable
     {
         try
         {
-            Directory.CreateDirectory(AppPaths.AppDataDirectory);
+            Directory.CreateDirectory(_stateDirectory);
             File.WriteAllText(LastCheckedPath, value.ToString("O"));
         }
         catch (Exception ex)
@@ -204,7 +216,7 @@ internal sealed class UpdateService : IDisposable
     {
         try
         {
-            Directory.CreateDirectory(AppPaths.AppDataDirectory);
+            Directory.CreateDirectory(_stateDirectory);
             if (File.Exists(InstalledVersionPath))
             {
                 var lines = File.ReadAllLines(InstalledVersionPath);
@@ -228,34 +240,40 @@ internal sealed class UpdateService : IDisposable
         }
     }
 
-    public Task ApplyUpdatesAndRestartAsync()
+    public bool PrepareRestart(bool applyUpdate)
     {
-        if (BuildChannel.IsDev || _manager is null || _pendingUpdates is null)
-        {
-            _logger.Log("update_apply_skipped reason=no_pending");
-            return Task.CompletedTask;
-        }
-
         try
         {
-            _logger.Log($"update_apply_now version={_pendingUpdates.TargetFullRelease.Version}");
-            _manager.ApplyUpdatesAndRestart(_pendingUpdates);
+            if (!CanUpdate)
+                throw new InvalidOperationException("Restart updates require an installed production app.");
+
+            if (applyUpdate)
+            {
+                if (_pendingUpdates is null)
+                    throw new InvalidOperationException("No verified update is ready to install.");
+                _logger.Log($"update_apply_now version={_pendingUpdates.TargetFullRelease.Version}");
+                _manager!.WaitExitThenApplyUpdates(_pendingUpdates, silent: true, restart: true, restartArgs: []);
+            }
+            else
+            {
+                _logger.Log("restart_requested");
+                UpdateExe.Start(VelopackLocator.Current, (uint)Environment.ProcessId, []);
+            }
+            return true;
         }
         catch (Exception ex)
         {
-            _logger.Log(
-                $"update_apply_failed error_type={ex.GetType().Name} " +
-                $"error=\"{Escape(ex.Message)}\"");
+            _logger.Log($"restart_prepare_failed error=\"{Escape(ex.Message)}\"");
             SetState(new UpdateState.Failed(ex.Message));
+            return false;
         }
-
-        return Task.CompletedTask;
     }
 
     private void OnTimerTick(object? _) => _ = CheckAsync(UpdateTrigger.Periodic);
 
     private void SetState(UpdateState next)
     {
+        if (_disposed) return;
         _state = next;
         try
         {
@@ -271,8 +289,12 @@ internal sealed class UpdateService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _timer?.Dispose();
-        _gate.Dispose();
+        _shutdown.Cancel();
+        // Async checks can still unwind; never dispose their gate or token
+        // source underneath them. Neither uses unmanaged wait handles here.
     }
 
     private static string Escape(string? value) =>

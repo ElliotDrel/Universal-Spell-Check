@@ -28,10 +28,10 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 ## Trigger an installed production update
 
 ```powershell
-& "$env:LOCALAPPDATA/UniversalSpellCheck/current/UniversalSpellCheck.exe" --update
+& "$env:LOCALAPPDATA/UniversalSpellCheck/current/UniversalSpellCheck.exe" --restart
 ```
 
-The running Prod app checks, downloads, installs, and restarts through its existing updater. If already current, it stays running. A second invocation exits `0` when the request is accepted and `1` if it cannot reach the running app. Dev rejects the command. Wait for a new Prod `started` event and verify the installed version before reporting an upgrade complete.
+The command restarts Prod through its native updater. Every startup checks, downloads, and automatically installs newer releases; `--update` remains an alias. It shows one informational notice; a failure also notifies and keeps the current version usable. A second invocation exits `0` when accepted and `1` if delivery fails. Dev rejects both flags. Verify a fresh Prod `started` event and installed version before reporting an upgrade complete.
 
 ## Manual Acceptance Checks
 
@@ -55,7 +55,7 @@ The running Prod app checks, downloads, installs, and restarts through its exist
 
 18. In LinkedIn messaging, select a message containing one blank paragraph between text blocks, correct it with Dev, and verify the blank-line count stays unchanged. Confirm `rich_text.mode=html`; repeat with a single-line message as a control. Do not send the test message.
 
-19. In an installed Prod build, invoke `--update` while running and while closed. With an available release, verify download, apply, and a fresh process at that version. Invoke during an active check and verify one apply/restart; invoke when current and verify no reinstall. Dev must return exit `1` without launching.
+19. In installed Prod, invoke `--restart` and its `--update` alias while running and closed. Verify exactly one informational notice on success, and a restart even when already current. On normal launch with an available release, verify automatic installation without a click. A failed check/download must notify and leave the current version usable. Background checks prepare updates for the next restart. Repeat a command during restart and verify no duplicate notice or helper. Start a correction before requesting restart: its paste must finish, and new hotkeys must be blocked during shutdown/startup updating. Dev must reject both flags with exit `1`.
 
 ## Top-of-mind reminders
 

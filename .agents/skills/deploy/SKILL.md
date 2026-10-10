@@ -56,7 +56,7 @@ shipping to production users.**
   `main` branch** so `origin/main` is never left behind the released commit. The
   tag triggers `.github/workflows/release.yml` — `dotnet publish` → `vpk pack` →
   `vpk upload github` → GitHub Release created. All installed prod copies
-  auto-update via Velopack on next launch or 4-hour periodic check.
+  install updates via Velopack on startup/restart; the 4-hour periodic check prepares downloads for the next restart.
 - **Hotkey when running:** Ctrl+Alt+U
 - **Auto-update:** Yes — every installed copy picks up the release automatically.
 - **Approval needed:** **YES. Hard stop. You must get explicit human confirmation

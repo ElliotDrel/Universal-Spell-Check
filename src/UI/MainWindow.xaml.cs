@@ -61,7 +61,7 @@ internal partial class MainWindow : Window
         VersionCheckButton.IsEnabled = state is not (UpdateState.Checking or UpdateState.Downloading) && !BuildChannel.IsDev;
         if (state is UpdateState.UpdateReady ready)
         {
-            UpdateBannerText.Text = $"Update available — v{ready.Version}";
+            UpdateBannerText.Text = $"Ready on restart — v{ready.Version}";
             UpdateBanner.Visibility = Visibility.Visible;
         }
         else
@@ -73,7 +73,7 @@ internal partial class MainWindow : Window
     private void OnUpdateNowClicked(object sender, RoutedEventArgs e)
     {
         if (_updateService is null) return;
-        _ = _updateService.ApplyUpdatesAndRestartAsync();
+        _updateService.RequestRestart();
     }
 
     private void OnCheckForUpdatesClicked(object sender, RoutedEventArgs e)

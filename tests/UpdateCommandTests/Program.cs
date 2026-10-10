@@ -6,27 +6,31 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        if (args.Contains("--send")) return HotkeyWindow.RequestUpdate() ? 0 : 1;
+        if (args.Contains("--send")) return HotkeyWindow.RequestRestart(args[1]) ? 0 : 1;
 
+        var testWindowTitle = "UpdateCommandTests." + Guid.NewGuid();
         try
         {
-            Require(!HotkeyWindow.RequestUpdate(), "Missing receiver must fail.");
-            using (var receiver = new HotkeyWindow())
+            Require(UniversalSpellCheck.Program.IsRestartCommand(["--ReStArT"]), "Restart flag is case-insensitive.");
+            Require(UniversalSpellCheck.Program.IsRestartCommand(["--UPDATE"]), "Existing update flag remains an alias.");
+            Require(!UniversalSpellCheck.Program.IsRestartCommand([]), "Normal launch is not a command request.");
+            Require(!HotkeyWindow.RequestRestart(testWindowTitle), "Missing receiver must fail.");
+            using (var receiver = new HotkeyWindow(testWindowTitle))
             {
-                using var unhandled = SendFromAnotherProcess();
+                using var unhandled = SendFromAnotherProcess(testWindowTitle);
                 PumpUntilExit(unhandled);
                 Require(unhandled.ExitCode == 1, "Receiver without a handler must reject.");
 
                 var received = 0;
                 EventHandler handler = (_, _) => received++;
-                receiver.UpdateRequested += handler;
-                using var accepted = SendFromAnotherProcess();
+                receiver.RestartRequested += handler;
+                using var accepted = SendFromAnotherProcess(testWindowTitle);
                 PumpUntilExit(accepted);
                 Require(accepted.ExitCode == 0 && received == 1,
                     "Another process must deliver exactly one acknowledged request.");
-                receiver.UpdateRequested -= handler;
+                receiver.RestartRequested -= handler;
 
-                using var blocked = SendFromAnotherProcess();
+                using var blocked = SendFromAnotherProcess(testWindowTitle);
                 // Deliberately do not pump the receiver: CLI must time out, not hang.
                 if (!blocked.WaitForExit(5000))
                 {
@@ -37,7 +41,8 @@ internal static class Program
                 Require(blocked.ExitCode == 1, "Hung receiver must fail.");
                 Application.DoEvents();
             }
-            Require(!HotkeyWindow.RequestUpdate(), "Disposed receiver must fail.");
+            Require(!HotkeyWindow.RequestRestart(testWindowTitle), "Disposed receiver must fail.");
+            UpdateFlowTests.Run();
             Console.WriteLine("update_command_tests_ok missing/unhandled/accepted/timeout/disposed");
             return 0;
         }
@@ -48,7 +53,7 @@ internal static class Program
         }
     }
 
-    private static Process SendFromAnotherProcess()
+    private static Process SendFromAnotherProcess(string windowTitle)
     {
         var start = new ProcessStartInfo(Environment.ProcessPath!)
         {
@@ -58,6 +63,7 @@ internal static class Program
         if (Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
             start.ArgumentList.Add(typeof(Program).Assembly.Location);
         start.ArgumentList.Add("--send");
+        start.ArgumentList.Add(windowTitle);
         return Process.Start(start)!;
     }
 

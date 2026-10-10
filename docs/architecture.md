@@ -8,9 +8,9 @@ The product is a C#/.NET 10 WinForms tray app with an embedded WPF dashboard, li
 
 ## Startup sequence (`src/Program.cs`)
 
-1. `VelopackApp.Build().Run()` — **must be the very first line of `Main`**. Handles first-run hooks and restart-after-update. Safe no-op when running via `dotnet run`.
+1. `VelopackApp.Build().SetAutoApplyOnStartup(false).Run()` — **must be the very first line of `Main`**. Handles first-run hooks and restart-after-update. Implicit staged-package application is disabled so CLI forwarding cannot install before acknowledgement or bypass the service-owned startup check. Safe no-op when running via `dotnet run`.
 2. `AppPaths.EnsureDataMigration()` creates the safe data roots and copies or merges legacy Velopack-directory data newer than the previous migration checkpoint before any logger or settings service opens a file.
-3. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0. With `--update`, it sends a bounded, channel-specific Windows message to the running instance instead and exits 0 only when acknowledged (1 if unavailable). Dev rejects `--update` with exit 1.
+3. Single-instance mutex via `BuildChannel.MutexName`. A second launch shows a message box and exits 0. With `--restart` (or `--update`), it sends a bounded, channel-specific Windows message to the running instance instead and exits 0 only when acknowledged (1 if unavailable). Dev rejects both flags with exit 1.
 4. Instantiate `System.Windows.Application` with `ShutdownMode.OnExplicitShutdown`. Merge `UI/Styles.xaml` and `UI/Components.xaml` into `app.Resources`. **Without this step**, WPF `DynamicResource` lookups crash (see watchlist).
 5. `Application.Run(new SpellCheckAppContext())` — starts the WinForms message loop.
 
@@ -53,7 +53,8 @@ Owns all long-lived objects: `NotifyIcon`, `HotkeyWindow`, `SpellcheckCoordinato
 Tray menu items:
 1. One status line combining the current version and last-check/update state.
 2. Check for Updates → `UpdateService.CheckAsync(ManualTray)`.
-3. Separator, Open Dashboard, Open Logs Folder, and Quit.
+3. Restart → `UpdateService.RequestRestart()`.
+4. Separator, Open Dashboard, Open Logs Folder, and Quit.
 
 Dev tray icon is orange-tinted at runtime (draws a semi-transparent orange overlay onto `SystemIcons.Application`).
 
@@ -115,23 +116,17 @@ Shows per-phase status text via `SetPhase(SpellcheckPhase)`: `Copying` shows the
 
 ## Update service (`src/UpdateService.cs`)
 
-Single entry point: `CheckAsync(UpdateTrigger)` where `UpdateTrigger ∈ { Launch, Periodic, ManualTray, ManualDashboard, CommandLine }`.
+Single update check: `CheckAsync(UpdateTrigger)` for `Launch`, `Periodic`, `ManualTray`, and `ManualDashboard`. The service owns one downloader and one check lock. State remains `Idle | Checking | Downloading(version) | UpdateReady(version) | UpToDate | Failed(reason)`.
 
-State machine: `Idle | Checking | Downloading(version) | UpdateReady(version) | UpToDate | Failed(reason)`.
+- **Startup:** check for the newest release, verify/download it, and request automatic installation if ready. Velopack waits for the old process to exit, installs silently, and relaunches without command arguments. A current or failed check leaves the current app usable. Failure state shows a notification.
+- **Background/manual checks:** prepare a verified download for the next restart. No install dialog or clickable ready notification. Manual checks may report that the app is current. The dashboard's `Restart to update` action uses the same restart request as the tray and terminal.
+- **Terminal:** `--restart` (with `--update` retained as an alias) sends the existing channel-specific registered Windows message, using the original `BuildChannel.UpdateRequestMessage` wire name for compatibility. The app shows exactly one informational notice, waits for any active correction, and requests a graceful restart through `UpdateExe.Start(..., waitPid, [])`. Startup then follows the same update check as every launch. A failed check or restart is the exception to the one-notice success path: it notifies the user and leaves the current version available. No up-to-date or install-ready notification follows a successful terminal request.
+- **Lifetime:** the app context owns shutdown and cleanup; `PrepareRestart` only starts Velopack's existing waiter. New hotkeys are blocked while startup updates or restart are underway. Command acknowledgement has a two-second bound and means accepted, not installed. If closed, the command launches the app with one notice and runs its normal startup update sequence.
+- **Channels:** Dev never auto-updates and rejects both flags. Standalone/uninstalled builds skip update checks. Four-hour checks continue while Prod is running.
 
-Flow:
-1. If `BuildChannel.IsDev` or not installed via Velopack: log skip, return.
-2. Check for concurrent call via `SemaphoreSlim(1,1)`.
-3. Query GitHub Releases via `GithubSource` + `UpdateManager.CheckForUpdatesAsync()`.
-4. If no update: set `UpToDate`, return.
-5. If stale pending download exists for a different version: evict it.
-6. Download via `DownloadUpdatesAsync`. Set `UpdateReady`.
-7. Notify only after the package is downloaded. Clicking the notification opens the small `UpdatePromptForm`; its single `Install now` action applies the pending package and restarts.
-8. If the user does nothing, Velopack applies the pending package on the next launch.
+### Simplicity audit
 
-The installed executable accepts `--update` from PowerShell or any terminal. The existing `HotkeyWindow` receives the registered message named by `BuildChannel.UpdateRequestMessage`, using `BuildChannel.HotkeyWindowTitle` to locate only its own channel. `SpellCheckAppContext` requests `CheckAsync(CommandLine)` and applies/restarts automatically when the active check finishes with `UpdateReady`. A command received during another check keeps that install intent until completion; up-to-date or failed checks clear it. No separate downloader or installer is involved. With no running instance, `--update` starts the normal app with the same install intent. The command acknowledges the request, not completion: verify the new process/version and startup log after restarting.
-
-Periodic check: 4-hour `System.Threading.Timer` owned by `UpdateService`. Dev channel skips all update activity.
+Elliot's requirements are automatic updates on startup/restart, one terminal progress notice, an additional failure notice when needed, and a native command. Keep the existing Velopack downloader, concurrency lock, graceful PID waiter, and shared channel constants because they protect installation and user data. Delete the separate terminal install-intent state, command-only check trigger, install prompt, balloon click handler, and redundant pending-version eviction branch. Keep manual checking as an explicit user action and background downloading as preparation. No repository installer script, custom updater process, new update framework, or second download path is needed.
 
 ---
 

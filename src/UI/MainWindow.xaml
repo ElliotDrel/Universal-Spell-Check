@@ -51,7 +51,7 @@
                 <Button x:Name="UpdateNowButton"
                         Grid.Column="1"
                         Style="{StaticResource PrimaryButton}"
-                        Content="Install now"
+                        Content="Restart to update"
                         Click="OnUpdateNowClicked"/>
             </Grid>
         </Border>

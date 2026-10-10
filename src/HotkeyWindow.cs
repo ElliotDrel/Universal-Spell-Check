@@ -13,19 +13,19 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
     private bool _registered;
 
     public event EventHandler? HotkeyPressed;
-    public event EventHandler? UpdateRequested;
+    public event EventHandler? RestartRequested;
 
-    public HotkeyWindow()
+    public HotkeyWindow(string? windowTitle = null)
     {
         CreateHandle(new CreateParams
         {
-            Caption = BuildChannel.HotkeyWindowTitle
+            Caption = windowTitle ?? BuildChannel.HotkeyWindowTitle
         });
     }
 
-    public static bool RequestUpdate()
+    public static bool RequestRestart(string? windowTitle = null)
     {
-        var window = FindWindow(null, BuildChannel.HotkeyWindowTitle);
+        var window = FindWindow(null, windowTitle ?? BuildChannel.HotkeyWindowTitle);
         return window != IntPtr.Zero && UpdateMessage != 0
             && SendMessageTimeout(window, UpdateMessage, IntPtr.Zero, IntPtr.Zero,
                 SmtoAbortIfHung, 2000, out var accepted) != IntPtr.Zero && accepted == new IntPtr(1);
@@ -70,9 +70,9 @@ internal sealed class HotkeyWindow : NativeWindow, IDisposable
         if (UpdateMessage != 0 && (uint)m.Msg == UpdateMessage)
         {
             m.Result = IntPtr.Zero;
-            if (UpdateRequested is not null)
+            if (RestartRequested is not null)
             {
-                UpdateRequested.Invoke(this, EventArgs.Empty);
+                RestartRequested.Invoke(this, EventArgs.Empty);
                 m.Result = new IntPtr(1);
             }
             return;

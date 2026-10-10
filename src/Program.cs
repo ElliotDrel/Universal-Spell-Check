@@ -11,8 +11,9 @@ static class Program
     {
         // Velopack's first-run / restart-after-update hooks must execute
         // before any other startup code. This is a no-op outside an installed
-        // build, so it is safe for Dev / dotnet-run.
-        VelopackApp.Build().Run();
+        // build, so it is safe for Dev / dotnet-run. Startup checks in
+        // UpdateService own installation; CLI forwarding must never apply first.
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
 
         var migrationResult = AppPaths.EnsureDataMigration();
 
@@ -61,20 +62,20 @@ static class Program
             return RunStartupSmoke(startupLogger);
         }
 
-        var updateRequested = args.Contains("--update", StringComparer.OrdinalIgnoreCase);
-        if (updateRequested && BuildChannel.IsDev)
+        var restartRequested = IsRestartCommand(args);
+        if (restartRequested && BuildChannel.IsDev)
         {
-            startupLogger.Log("update_command_rejected reason=dev_channel");
+            startupLogger.Log("restart_command_rejected reason=dev_channel");
             return 1;
         }
 
         using var appMutex = new Mutex(true, BuildChannel.MutexName, out var createdNew);
         if (!createdNew)
         {
-            if (updateRequested)
+            if (restartRequested)
             {
-                var accepted = HotkeyWindow.RequestUpdate();
-                startupLogger.Log($"update_command_forwarded accepted={accepted}");
+                var accepted = HotkeyWindow.RequestRestart();
+                startupLogger.Log($"restart_command_forwarded accepted={accepted}");
                 return accepted ? 0 : 1;
             }
 
@@ -103,7 +104,7 @@ static class Program
             LoadGlobalWpfResources(wpfApp, startupLogger);
             startupLogger.Log("wpf_app_initialized");
 
-            System.Windows.Forms.Application.Run(new SpellCheckAppContext(updateRequested));
+            System.Windows.Forms.Application.Run(new SpellCheckAppContext(restartRequested));
             return 0;
         }
         catch (Exception ex)
@@ -115,6 +116,10 @@ static class Program
             throw;
         }
     }
+
+    internal static bool IsRestartCommand(string[] args) =>
+        args.Contains("--restart", StringComparer.OrdinalIgnoreCase)
+        || args.Contains("--update", StringComparer.OrdinalIgnoreCase);
 
     private static void LoadGlobalWpfResources(System.Windows.Application app, DiagnosticsLogger logger)
     {

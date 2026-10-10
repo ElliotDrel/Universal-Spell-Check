@@ -17,7 +17,7 @@ Three kinds of regression suites live here:
 ```text
 tests/
 |-- ProtectedTextTests/                    # Real C# literal extraction/restoration tests
-|-- UpdateCommandTests/                   # Cross-process Windows update request and timeout checks
+|-- UpdateCommandTests/                   # Isolated IPC plus startup/download/failure/restart regression tests
 |-- TargetFormattingTests/                 # Rule matching, hooks, identity, literal safety, resolver microbench
 |-- test_benchmark_spellcheck_models.py    # Tests for benchmark_spellcheck_models.py
 |-- test_export_openai_finetune_dataset.py # Tests for export_openai_finetune_dataset.py
@@ -49,7 +49,7 @@ dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextT
 dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
 ```
 
-Run UpdateCommandTests with no instance of the tested channel running; they create a real hidden receiver window. Release CI runs them before packing.
+UpdateCommandTests uses a unique hidden receiver window, a temporary Velopack locator and recorded process calls: it does not touch installed apps, user data, or the network. It checks startup installation, background preparation, overlap, failures, and graceful restart arguments. Release CI runs it before packing.
 
 To replay one captured `spellcheck_detail` record against the rich-text mapper without a live paste,
 pipe one JSON object from the `read-logs` skill into `TargetFormattingTests` with `--replay-stdin`.

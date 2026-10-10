@@ -18,17 +18,19 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private readonly TargetFormattingPipeline _formattingPipeline;
     private readonly OverlayHost _overlayHost = new();
     private readonly UpdateService _updateService;
+    private readonly Action<string, string> _notify;
+    private readonly Func<Task> _runCorrection;
+    private readonly Action _exit;
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private DashboardWindow? _dashboardWindow;
-    private UpdatePromptForm? _updatePrompt;
     private Forms.ToolStripMenuItem _versionItem = null!;
     private Forms.ToolStripMenuItem _checkForUpdatesItem = null!;
-    private bool _updateNotificationActive;
-    private bool _installRequested;
+    private bool _restarting;
+    private bool _startupChecking;
+    private Task _activeCorrection = Task.CompletedTask;
 
-    public SpellCheckAppContext(bool updateRequested = false)
+    public SpellCheckAppContext(bool restartRequested = false)
     {
-        _installRequested = updateRequested;
         _logger = new DiagnosticsLogger(() => AppPaths.LogPath);
         Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
         _settingsStore = new SettingsStore(_logger);
@@ -64,17 +66,23 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             Visible = true,
             ContextMenuStrip = BuildMenu()
         };
-        _notifyIcon.BalloonTipClicked += OnBalloonTipClicked;
+
+        _notify = (title, message) => _notifyIcon.ShowBalloonTip(2500, title, message, Forms.ToolTipIcon.Info);
+        _runCorrection = _coordinator.RunAsync;
+        _exit = ExitThread;
 
         _hotkeyWindow = new HotkeyWindow();
         _hotkeyWindow.HotkeyPressed += OnHotkeyPressed;
-        _hotkeyWindow.UpdateRequested += OnUpdateRequested;
+        _hotkeyWindow.RestartRequested += OnCommandRestartRequested;
         _hotkeyWindow.Register(BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk);
 
+        _updateService.RestartRequested += OnRestartRequested;
         _updateService.StateChanged += OnUpdateStateChanged;
         _updateService.CheckCompleted += OnUpdateCheckCompleted;
         OnUpdateStateChanged(_updateService, _updateService.State);
-        _ = _updateService.CheckAsync(updateRequested ? UpdateTrigger.CommandLine : UpdateTrigger.Launch);
+        _startupChecking = _updateService.CanUpdate;
+        if (restartRequested) ShowRestartNotice();
+        _ = _updateService.CheckAsync(UpdateTrigger.Launch);
 
         StartupRegistration.EnsureFirstRunRegistered(_logger);
 
@@ -106,6 +114,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         menu.Items.Add(_versionItem);
         menu.Items.Add(_checkForUpdatesItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add(new Forms.ToolStripMenuItem("Restart", null, (_, _) => _updateService.RequestRestart())
+        { Enabled = _updateService.CanUpdate });
         menu.Items.Add("Open Dashboard", null, (_, _) => ShowSettings());
         menu.Items.Add("Open Logs Folder", null, (_, _) => OpenLogsFolder());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
@@ -152,84 +162,82 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
             : $"v{BuildChannel.AppVersion} · Checked {FormatLastChecked(_updateService.LastCheckedAt)}";
     }
 
-    private void OnUpdateRequested(object? sender, EventArgs e)
+    private void ShowRestartNotice()
     {
-        // Keep intent until the active check completes, including a check that
-        // began before the command; the service already serializes downloads.
-        _installRequested = true;
-        _logger.Log("update_command_received");
-        _ = _updateService.CheckAsync(UpdateTrigger.CommandLine);
+        ShowTip("Restarting", "Restarting and checking for updates. Please wait before using the app.");
+        _logger.Log("restart_notification");
+    }
+
+    private void OnCommandRestartRequested(object? sender, EventArgs e)
+    {
+        _logger.Log("restart_command_received");
+        _updateService.RequestRestart();
+    }
+
+    private void OnRestartRequested(bool applyUpdate)
+    {
+        if (!_dispatcher.CheckAccess())
+        {
+            _dispatcher.BeginInvoke(new Action(() => OnRestartRequested(applyUpdate)));
+            return;
+        }
+        if (_restarting) return;
+        if (!applyUpdate) ShowRestartNotice();
+        _ = RestartAsync(applyUpdate);
+    }
+
+    private async Task RestartAsync(bool applyUpdate)
+    {
+        if (_restarting) return;
+        _restarting = true;
+        try
+        {
+            // Let the acknowledgement and notification reach Windows, and finish
+            // any active paste before releasing the mutex and restarting.
+            await Task.Delay(1000);
+            try { await _activeCorrection; }
+            catch (Exception ex)
+            {
+                _logger.Log($"restart_after_correction_failure error=\"{Escape(ex.Message)}\"");
+            }
+            if (_updateService.PrepareRestart(applyUpdate))
+            {
+                _exit();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Log($"restart_failed error=\"{Escape(ex.Message)}\"");
+        }
+        _restarting = false;
+        ShowTip("Restart failed", "The app could not restart. The current version is still running.");
     }
 
     private void OnUpdateCheckCompleted(object? sender, CheckCompletedEventArgs e)
     {
-        // Keep command intent and restart on the startup dispatcher even before
-        // the tray menu has created a handle.
         if (!_dispatcher.CheckAccess())
         {
             _dispatcher.BeginInvoke(new Action(() => OnUpdateCheckCompleted(sender, e)));
             return;
         }
 
-        // A newer check may have started while this completion was queued.
-        if (_installRequested && e.Result == _updateService.State)
+        if (e.Trigger == UpdateTrigger.Launch)
         {
-            _installRequested = false;
-            if (e.Result is UpdateState.UpdateReady)
-            {
-                _ = _updateService.ApplyUpdatesAndRestartAsync();
-                return;
-            }
-        }
-
-        if (e.Trigger is not (UpdateTrigger.ManualTray or UpdateTrigger.ManualDashboard or UpdateTrigger.CommandLine) &&
-            e.Result is not UpdateState.UpdateReady) return;
-
-        switch (e.Result)
-        {
-            case UpdateState.UpToDate:
-                ShowTip("Up to date", $"You're on the latest version (v{BuildChannel.AppVersion}).");
-                break;
-            case UpdateState.UpdateReady ready:
-                _updateNotificationActive = true;
-                ShowTip("Update ready", $"v{ready.Version} is downloaded. Click to install.");
-                break;
-            case UpdateState.Downloading dl:
-                ShowTip("Downloading update", $"Fetching v{dl.Version}…");
-                break;
-            case UpdateState.Failed failed:
-                ShowTip("Update check failed", failed.Reason);
-                break;
-        }
-    }
-
-    private void OnBalloonTipClicked(object? sender, EventArgs e)
-    {
-        if (!_updateNotificationActive || _updateService.State is not UpdateState.UpdateReady ready) return;
-        _updateNotificationActive = false;
-        ShowUpdatePrompt(ready.Version);
-    }
-
-    private void ShowUpdatePrompt(string version)
-    {
-        if (_updatePrompt is { IsDisposed: false })
-        {
-            _updatePrompt.Activate();
+            _startupChecking = false;
             return;
         }
 
-        _updatePrompt = new UpdatePromptForm(version, () => _ = _updateService.ApplyUpdatesAndRestartAsync());
-        _updatePrompt.FormClosed += (_, _) => _updatePrompt = null;
-        _updatePrompt.Show();
-        _updatePrompt.Activate();
+        if (!_restarting && e.Trigger is (UpdateTrigger.ManualTray or UpdateTrigger.ManualDashboard)
+            && e.Result is UpdateState.UpToDate && e.Result == _updateService.State)
+            ShowTip("Up to date", $"You're on the latest version (v{BuildChannel.AppVersion}).");
     }
 
     private void OnUpdateStateChanged(object? sender, UpdateState state)
     {
-        // UpdateService may raise from a background thread; marshal to UI thread.
-        if (_notifyIcon.ContextMenuStrip is { } menu && menu.InvokeRequired)
+        if (!_dispatcher.CheckAccess())
         {
-            menu.BeginInvoke(new Action(() => OnUpdateStateChanged(sender, state)));
+            _dispatcher.BeginInvoke(new Action(() => OnUpdateStateChanged(sender, state)));
             return;
         }
 
@@ -253,6 +261,8 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         }
 
         _versionItem.Text = BuildVersionLine();
+        if (!_restarting && state is UpdateState.Failed)
+            ShowTip("Update failed", "Could not check or install the update. The current version is still available; try restarting later.");
     }
 
     private static System.Drawing.Icon BuildTrayIcon()
@@ -294,7 +304,12 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
     private void OnHotkeyPressed(object? sender, EventArgs e)
     {
         _logger.Log("hotkey_pressed");
-        _ = _coordinator.RunAsync();
+        if (_restarting || _startupChecking || !_activeCorrection.IsCompleted)
+        {
+            _logger.Log($"guard_rejected reason={(_restarting || _startupChecking ? "updating" : "already_running")}");
+            return;
+        }
+        _activeCorrection = _runCorrection();
     }
 
     private void OpenLogsFolder()
@@ -308,7 +323,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     private void ShowTip(string title, string message)
     {
-        _notifyIcon.ShowBalloonTip(2500, title, message, Forms.ToolTipIcon.Info);
+        _notify(title, message);
     }
 
     private void SetPhase(SpellcheckPhase phase)
@@ -395,16 +410,15 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _logger.Log("stopping");
         Dispatcher.CurrentDispatcher.UnhandledException -= OnDispatcherUnhandledException;
         _hotkeyWindow.HotkeyPressed -= OnHotkeyPressed;
-        _hotkeyWindow.UpdateRequested -= OnUpdateRequested;
+        _hotkeyWindow.RestartRequested -= OnCommandRestartRequested;
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
-        _notifyIcon.BalloonTipClicked -= OnBalloonTipClicked;
         _notifyIcon.Dispose();
-        _updatePrompt?.Close();
         _dashboardWindow?.Close();
         _overlayHost.Dispose();
         _coordinator.Dispose();
         _spellcheckService.Dispose();
+        _updateService.RestartRequested -= OnRestartRequested;
         _updateService.StateChanged -= OnUpdateStateChanged;
         _updateService.CheckCompleted -= OnUpdateCheckCompleted;
         _updateService.Dispose();
