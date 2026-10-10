@@ -1,46 +1,42 @@
 # Install local production after publishing
 
-A request to publish includes updating the installed production app on the current
-computer after the public release is ready. Keep installation inside the existing
-`UpdateService.CheckAsync(UpdateTrigger)` / `ApplyUpdatesAndRestartAsync` flow.
-Do not create a second downloader, copy build outputs into the installer root,
-or reinstall over user data.
+Publishing includes updating the installed production app on this computer.
+After the approved release workflow completes successfully and the release is
+public, run the programmatic installer:
 
-1. Verify the approved tag's release workflow finished and the release is published
-   with its installer/package assets. Record the expected semantic version.
-2. Identify the installed Prod process by its executable path under the actual
-   Velopack installation, normally `%LocalAppData%/UniversalSpellCheck/current/`.
-   Record its PID and version. Do not mistake a checkout/Dev process for Prod.
-3. Load the computer-use skill and use its supported Windows UI tools to select
-   the installed app's tray menu **Check for Updates** (or its dashboard update
-   check). This invokes the existing `UpdateService.CheckAsync` entry point.
-   If Prod is stopped, launch its installed executable first. Do not launch a
-   second instance while it is already running.
-4. Wait for `update_download_done version=<expected>` using the read-logs skill.
-   The **Update ready** notification opens the existing update prompt when clicked.
-   Verify that the prompt names the expected version, record the install start
-   timestamp, and click **Install now**. This runs `ApplyUpdatesAndRestartAsync`.
-   For an already-current installation, skip the install and verify it instead.
-5. Wait for the old PID to exit and the installed app to restart. Poll in bounded
-   intervals and give progress updates; after five minutes without convergence,
-   inspect update failure logs and report local installation as incomplete.
-6. Run the read-only verifier below with the expected version and, after an
-   actual restart, the timestamp recorded before clicking **Install now**:
+```powershell
+.agents/skills/deploy/scripts/install-local-prod.ps1 -ExpectedVersion 0.10.2
+```
 
-   ```powershell
-   .agents/skills/deploy/scripts/verify-local-prod.ps1 -ExpectedVersion 0.10.2 -StartedAfter $installStartedAt
-   ```
+Substitute the approved release version. Use normal machine access; sandbox
+LocalAppData redirection is not the installed app's location. Pass `-InstallRoot`
+when the actual installation is elsewhere.
 
-   The version is an example; substitute the approved release version. Pass
-   `-InstallRoot` when the actual installation is elsewhere. The verifier requires
-   one installed process and the matching installed/running binary version, plus
-   a fresh process when `-StartedAfter` is supplied. Run with normal machine access;
-   sandbox-redirection of LocalAppData or unavailable process access is not success.
-7. Read the latest Prod `started` event through the read-logs skill and verify
-   its version and PID match the verifier. Check update/startup failures for that
-   update. Report the installed version and PID only after these checks pass.
-8. Complete publishing closeout. Leave the updated installed Prod app running;
-   stop Dev/test/helper processes and clean only session-created scratch.
+The command verifies the public release and successful workflow, identifies the
+installed Prod process, and restarts it to invoke the existing
+`UpdateService.CheckAsync(Launch)` download. It waits up to five minutes for the
+staged full package and verifies its size/SHA256 against GitHub's release asset.
+It then stops only that installed process, applies the staged package with the
+installed `Update.exe apply --silent --package`, and verifies the restarted
+binary/process and fresh Prod startup log through the read-logs skill.
 
-If the desktop UI is unavailable, report that local installation is blocked while
-preserving the published release. Do not claim CI success alone installed it.
+This uses the app's existing downloader and Velopack staged-update mechanism;
+it does not copy checkout builds into the install root, reinstall over user data,
+or introduce a second download/feed path. An already-current installation is
+verified and left running. A newer installed version is never downgraded.
+
+The script waits for Update.exe itself, not its restarted app's entire process
+tree. Keep giving progress updates while it runs. If it fails, inspect the app's
+update/startup logs and report local installation as incomplete, even if the
+public release succeeded. Do not delete staged packages or user data as cleanup.
+
+For a separate read-only check, run:
+
+```powershell
+.agents/skills/deploy/scripts/verify-local-prod.ps1 -ExpectedVersion 0.10.2
+```
+
+After a restart, also supply `-StartedAfter` with its install start time and check
+that the fresh Prod `started` event matches the version/PID. Complete publishing
+closeout after installation: leave updated Prod running, stop Dev/helpers, and
+remove only session-created scratch.

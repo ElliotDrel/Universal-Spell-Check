@@ -213,8 +213,8 @@ action is needed.
 Only after the workflow completes successfully (or its fully uploaded draft is
 successfully published) and Step 7 confirms the release is public, follow
 [Install local production](install-local-prod.md). Trigger the existing installed
-app's update check, wait for its download, install/restart, and verify the new
-running version and startup log. A publish request authorizes this local update;
+app's update check through the programmatic install script, wait for its download,
+apply/restart, and verify the new running version and startup log. A publish request authorizes this local update;
 do not stop at waiting for the normal four-hour check. Local installation failure
 means publishing closeout is incomplete even if the public release succeeded.
 
