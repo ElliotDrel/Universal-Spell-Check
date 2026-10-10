@@ -77,6 +77,15 @@ land — do not declare done.
 
 ---
 
+## Step 5 — Verify publishing closeout
+
+Complete all three checks in [Required publishing closeout](SKILL.md#required-publishing-closeout)
+before ending the turn: every session change pushed, Dev stopped and cleared, and
+session-created scratch/processes cleaned up. Verify remote HEAD and the final local
+working tree after cleanup. Include the results in the completion report.
+
+---
+
 ## Quality Bar
 
 A good dev deploy satisfies all of the following:
@@ -84,6 +93,7 @@ A good dev deploy satisfies all of the following:
 - Relevant acceptance checks passed; report any manual checks that were not run.
 - The branch was `main` with a clean working tree before push.
 - `git log origin/main --oneline -1` SHA matches local HEAD after push.
+- All required publishing closeout checks are verified.
 
 If any of these are not true, the deploy is not complete.
 

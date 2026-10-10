@@ -58,7 +58,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 1. **Channels are owned by `BuildChannel`.** Never hardcode a hotkey, mutex name, app-data folder, or display string. Add the constant to `BuildChannel.cs` and consume it.
 2. **Logs are shared, settings are isolated.** `AppPaths.LogDirectory` returns the shared path; `AppDataDirectory` uses `BuildChannel.AppDataFolder`. Do not split logs by channel — the unified corpus is required for fine-tune work, and per-line `channel`/`app_version` stamps are the filter.
 3. **One update flow.** Every entry point (launch, periodic, tray, dashboard) calls `UpdateService.CheckAsync(UpdateTrigger)`. Do not add parallel update paths.
-4. **Releases ship via tag.** A semver `v*.*.*` tag triggers `.github/workflows/release.yml`. Do not run `vpk` manually for production.
+4. **Releases ship via tag.** A semver `v*.*.*` tag triggers `.github/workflows/release.yml`. Do not run `vpk` manually for production. Before ending a publishing turn, verify every session change is pushed, the Dev app/server is stopped and cleared, and session-created scratch/processes are cleaned up; after CI and release publication succeed, update/restart the local installed Prod app and verify its running version. Follow the `deploy` skill closeout checklist.
 5. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
 6. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
 7. **Native retests require rebuild/relaunch.** A code change is not running until the process is stopped and rebuilt. Prod owns Ctrl+Alt+U; Dev owns Ctrl+Alt+D — they can run side by side.

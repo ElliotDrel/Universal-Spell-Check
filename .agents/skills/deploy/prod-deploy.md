@@ -208,6 +208,30 @@ action is needed.
 
 ---
 
+## Step 8 — Install the published version on this computer
+
+Only after the workflow completes successfully (or its fully uploaded draft is
+successfully published) and Step 7 confirms the release is public, follow
+[Install local production](install-local-prod.md). Trigger the existing installed
+app's update check, wait for its download, install/restart, and verify the new
+running version and startup log. A publish request authorizes this local update;
+do not stop at waiting for the normal four-hour check. Local installation failure
+means publishing closeout is incomplete even if the public release succeeded.
+
+---
+
+## Step 9 — Verify publishing closeout
+
+After verifying the release, complete all three checks in
+[Required publishing closeout](SKILL.md#required-publishing-closeout) before ending
+the turn: every session change pushed, Dev stopped and cleared, and session-created
+scratch/processes cleaned up. Verify remote HEAD/tag and the final local working tree
+after cleanup. Include these results in the completion report. If stopping earlier
+for approval or an external failure, perform the applicable closeout checks and
+explicitly report the release as pending or incomplete.
+
+---
+
 ## Quality Bar
 
 A good prod release satisfies **all** of the following:
@@ -220,6 +244,8 @@ A good prod release satisfies **all** of the following:
 - CI `Release` workflow run confirmed triggered (matching run found within 60 s).
 - CI run completed with `conclusion=success` OR a stuck Draft was manually published.
 - `gh release view vX.Y.Z --json isDraft` returns `false`.
+- The locally installed Prod app restarted at the released version, verified by process/binary version and its fresh `started` log.
+- All required publishing closeout checks are verified.
 
 If any of these are not true, the release is not complete. Do not end the conversation.
 
@@ -228,5 +254,6 @@ If any of these are not true, the release is not complete. Do not end the conver
 ## Done
 
 Report to the user: the tag and branch pushed (`vX.Y.Z` + `main`), the GitHub Actions
-run URL, confirmation that `isDraft=false`, and that installed prod copies (Ctrl+Alt+U)
-will auto-update on next launch or within the 4-hour periodic check.
+run URL, confirmation that `isDraft=false`, the verified local Prod version/PID,
+and the publishing closeout results. Other installed copies still use the normal
+launch/four-hour update check.
