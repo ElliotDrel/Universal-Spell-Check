@@ -43,6 +43,7 @@ Hotkey: Ctrl+Alt+U. Settings: `%LocalAppData%\UniversalSpellCheck.Data\`.
 14. Start a correction, switch to a different app before the request completes, and verify the corrected text pastes into the app that is active when the response is ready.
 15. In ChatGPT, correct a selection spanning an inline link and an ordered list. Verify the corrected text pastes, the link and list remain intact when `rich_text.mode=aligned_html`, and any unmappable selection still pastes corrected Unicode text instead of refusing the correction.
 16. In ChatGPT, select a heading followed by a linked list where the heading is absent from the copied Unicode flavor but present in HTML. Verify the heading survives the correction and no extra `]` appears after the link.
+17. In ChatGPT desktop, correct a list selection containing a skill mention, a copied trailing newline, and missing final punctuation. Verify the skill remains a chip and list/paragraph formatting survives. Repeat with a longer selection containing unchanged paragraphs; confirm `rich_text.mode=aligned_html` for both.
 
 ## Top-of-mind reminders
 

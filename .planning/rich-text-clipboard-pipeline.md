@@ -2,6 +2,10 @@
 
 ## Status
 
+**2026-10-09:** Captured ChatGPT skill selections exposed two alignment boundaries: final punctuation inserted after removal of a copied trailing newline had no HTML owner, and long selections exceeded the diff matrix budget even when much of the text was unchanged. The mapper now anchors that final insertion at the deleted whitespace suffix and excludes identical selection edges from the bounded diff. Original skill spans, attributes, list structure, and empty paragraphs remain intact when alignment succeeds. Changed paragraph structure still falls back. Mapper regression and original-editor acceptance are separate checks.
+
+Verification: both captured selections replay as `aligned_html` with unchanged source tags/attributes and exact corrected Unicode. The native formatting suite passes, Dev builds, and the disposable Dev clipboard/evidence smoke exits 0. Original ChatGPT skill-chip rendering still requires a retest.
+
 **2026-09-28:** Mixed ChatGPT spans, links, line breaks, and lists now have a bounded text-node alignment path. It maps each source HTML text node to the copied Unicode text, applies only edits owned by those nodes, and emits corrected HTML with original tags intact. Unmappable edits and any reconstruction exception fall back to corrected Unicode paste. The temporary refusal to paste unsupported ChatGPT formatting was removed: spell-check completion takes priority over formatting fidelity. An optional before-paste formatting failure also falls back to the corrected text.
 
 **2026-09-28 follow-up:** A real Dev run proved that ChatGPT can omit a visible selected heading from `CF_UNICODETEXT` while retaining it in `CF_HTML`. The alignment path now keeps unmatched HTML text nodes and reinserts their text in the Unicode replacement, even on structural fallback. Markdown links are protected as one literal before the model request so their closing punctuation cannot be duplicated.

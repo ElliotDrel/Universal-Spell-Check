@@ -71,6 +71,33 @@ Assert(nestedMarkup.Applied && nestedMarkup.Mode == "aligned_html"
     "a correction inside a styled text node must preserve the original markup");
 
 const string link = "https://example.com/task";
+const string skillChip = "<span skill-mention-name=\"sample-skill\" skill-mention-display-name=\"Sample Skill\" skill-mention-path=\"C:\\Skills\\sample-skill\\SKILL.md\" data-prompt-link-label=\"$sample-skill\"><span contenteditable=\"false\"></span><span>Sample Skill</span></span>";
+var skillWithTrailingNewline = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"1 1 []\">Notes:</p><ul><li><p>use " + skillChip + " then chek this</p></li></ul><p></p>"),
+    "Notes:\n- use Sample Skill then chek this\n",
+    "Notes:\n- use Sample Skill then check this.");
+Assert(skillWithTrailingNewline.Applied && skillWithTrailingNewline.Mode == "aligned_html"
+    && Fragment(skillWithTrailingNewline.Html) == "<p data-pm-slice=\"1 1 []\">Notes:</p><ul><li><p>use " + skillChip + " then check this.</p></li></ul><p></p>",
+    "removing a copied trailing newline before adding punctuation must preserve the skill chip and list markup");
+var styledTrailingBreak = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><strong>chek this</strong></p><p></p>"),
+    "chek this\r\n\r\n", "check this.");
+Assert(styledTrailingBreak.Applied && Fragment(styledTrailingBreak.Html)
+    == "<p data-pm-slice=\"0 0 []\"><strong>check this.</strong></p><p></p>",
+    "final punctuation after deleted CRLF separators must remain inside the last styled text node");
+var trailingStructuralEdit = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\"><strong>check this</strong></p>"),
+    "check this\n", "check this\nnew paragraph");
+Assert(!trailingStructuralEdit.Applied,
+    "new paragraph content beyond an HTML node must continue to decline rich reconstruction");
+var unchangedTail = new string('x', 1400);
+var largeSkillSelection = RichTextClipboard.TryCreateReplacement(
+    CfHtml("<p data-pm-slice=\"0 0 []\">use " + skillChip + " to chek</p><p>" + unchangedTail + "</p>"),
+    "use Sample Skill to chek\n\n" + unchangedTail,
+    "use Sample Skill to check\n\n" + unchangedTail);
+Assert(largeSkillSelection.Applied && Fragment(largeSkillSelection.Html)
+    == "<p data-pm-slice=\"0 0 []\">use " + skillChip + " to check</p><p>" + unchangedTail + "</p>",
+    "unchanged selection edges must not consume the bounded alignment diff budget");
 const string richListFragment = "<p data-pm-slice=\"0 0 []\">githbu: <span class=\"mention\"><span>https://example.com/task</span></span></p><ol start=\"1\"><li><p>trest linee 1</p></li><li><p>testsst line 2</p></li></ol>";
 var richListReplacement = RichTextClipboard.TryCreateReplacement(
     CfHtml(richListFragment),

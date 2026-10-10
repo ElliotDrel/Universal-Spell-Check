@@ -213,11 +213,13 @@ internal static partial class RichTextClipboard
 
         var output = nodes.Select(_ => new StringBuilder()).ToArray();
         var sourcePosition = 0;
-        foreach (var edit in UI.InlineTextDiff.ComputeChars(sourceText, correctedText))
+        var deletedWhitespaceStart = -1;
+        foreach (var edit in ComputeAlignmentDiff(sourceText, correctedText))
         {
             switch (edit.Kind)
             {
                 case UI.TextDiffKind.Equal:
+                    deletedWhitespaceStart = -1;
                     foreach (var character in edit.Text)
                     {
                         var owner = FindTextNode(nodes, sourcePosition++);
@@ -228,12 +230,27 @@ internal static partial class RichTextClipboard
                 case UI.TextDiffKind.Delete:
                     foreach (var character in edit.Text)
                     {
-                        if (FindTextNode(nodes, sourcePosition++) < 0 && !char.IsWhiteSpace(character))
-                            return false;
+                        if (FindTextNode(nodes, sourcePosition) < 0)
+                        {
+                            if (!char.IsWhiteSpace(character))
+                                return false;
+                            if (deletedWhitespaceStart < 0)
+                                deletedWhitespaceStart = sourcePosition;
+                        }
+                        else
+                        {
+                            deletedWhitespaceStart = -1;
+                        }
+                        sourcePosition++;
                     }
                     break;
                 case UI.TextDiffKind.Insert:
                     var target = FindInsertionNode(nodes, sourcePosition);
+                    // LCS deletes the clipboard's trailing newline before inserting
+                    // final punctuation. Anchor that insertion at the removed suffix,
+                    // rather than beyond the last HTML text node.
+                    if (target < 0 && sourcePosition == sourceText.Length && deletedWhitespaceStart >= 0)
+                        target = FindInsertionNode(nodes, deletedWhitespaceStart);
                     if (target < 0)
                     {
                         if (edit.Text.All(char.IsWhiteSpace))
@@ -243,6 +260,7 @@ internal static partial class RichTextClipboard
                     if (edit.Text.Contains('\n') || edit.Text.Contains('\r'))
                         return false;
                     output[target].Append(edit.Text);
+                    deletedWhitespaceStart = -1;
                     break;
             }
         }
@@ -294,6 +312,33 @@ internal static partial class RichTextClipboard
         return -1;
     }
 
+    private static IReadOnlyList<UI.TextDiffSegment> ComputeAlignmentDiff(string sourceText, string correctedText)
+    {
+        // Keep the dashboard's bounded diff, but do not charge unchanged
+        // selection edges against its matrix budget during rich reconstruction.
+        if ((long)sourceText.Length * correctedText.Length <= 1_000_000)
+            return UI.InlineTextDiff.ComputeChars(sourceText, correctedText);
+
+        var prefix = 0;
+        while (prefix < Math.Min(sourceText.Length, correctedText.Length)
+            && sourceText[prefix] == correctedText[prefix])
+            prefix++;
+        var suffix = 0;
+        while (suffix < Math.Min(sourceText.Length, correctedText.Length) - prefix
+            && sourceText[^(suffix + 1)] == correctedText[^(suffix + 1)])
+            suffix++;
+
+        var segments = new List<UI.TextDiffSegment>();
+        if (prefix > 0)
+            segments.Add(new(sourceText[..prefix], UI.TextDiffKind.Equal));
+        segments.AddRange(UI.InlineTextDiff.ComputeChars(
+            sourceText.Substring(prefix, sourceText.Length - prefix - suffix),
+            correctedText.Substring(prefix, correctedText.Length - prefix - suffix)));
+        if (suffix > 0)
+            segments.Add(new(sourceText[^suffix..], UI.TextDiffKind.Equal));
+        return segments;
+    }
+
     private static int FindInsertionNode(IReadOnlyList<HtmlTextNode> nodes, int position)
     {
         var atStart = FindTextNode(nodes, position);
@@ -338,7 +383,7 @@ internal static partial class RichTextClipboard
     {
         var sourcePosition = 0;
         var correctedPosition = 0;
-        foreach (var edit in UI.InlineTextDiff.ComputeChars(sourceText, correctedText))
+        foreach (var edit in ComputeAlignmentDiff(sourceText, correctedText))
         {
             if (edit.Kind == UI.TextDiffKind.Insert)
             {

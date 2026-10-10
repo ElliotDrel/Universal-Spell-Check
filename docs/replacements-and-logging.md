@@ -185,6 +185,10 @@ accepted around the item body. Mixed spans, links, and lists next use text-node 
 HTML text node must map in order to the copied Unicode text, and every model edit must belong to a
 mapped node. The output retains the original tags and attributes. `rich_text.mode=aligned_html`
 identifies this path, while `html` and `list_body_text` identify the narrower paths. If alignment
+removes copied trailing whitespace before inserting final punctuation, that insertion is owned by
+the text node at the start of the removed suffix. Large alignment diffs omit identical prefix/suffix
+text before applying the existing bounded matrix limit. Skill mentions retain their original spans
+and attributes when surrounding corrections align successfully. If alignment
 declines, corrected Unicode text still pastes with any HTML text nodes omitted from the source Unicode flavor,
 and `rich_text.reason` records why. If reconstruction throws, the corrected Unicode text still pastes.
 An exact
