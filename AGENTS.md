@@ -42,6 +42,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Running, building, manual acceptance-testing the native app | `src/AGENTS.md` |
 | Python fine-tune dataset tooling, benchmarks, eval runs | `tests/AGENTS.md` |
 | Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
+| Resuming hotkey/clipboard speed investigation after the Rust port | `.planning/rust-port-performance-handoff.md` |
 | Dry-running text through replacements.json without the live app | `python tests/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
 | Investigating a reported formatting problem with captured evidence and local replay | `.agents/skills/formatting-troubleshoot/SKILL.md` |
 | Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
