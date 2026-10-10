@@ -42,10 +42,10 @@ It is intentionally not the full Markdown/alignment pipeline: nested markup, mal
 changed structure, and every other producer retain the exact plain-text fallback.
 
 **Decided:** the AI-facing representation is Markdown; the reconstruction mechanism is splicing
-corrections back onto the original HTML runs. See Â§ Chosen Approach.
+corrections back onto the original HTML runs. See § Chosen Approach.
 
-**Open:** which model, and how well each candidate representation actually performs â€” answered by
-measurement against the corpus now accumulating (Â§ Model Comparison), not by argument.
+**Open:** which model, and how well each candidate representation actually performs — answered by
+measurement against the corpus now accumulating (§ Model Comparison), not by argument.
 
 Triggered on 2026-07-20 by a Gmail run that silently destroyed paragraph spacing. A narrow
 plain-text-only fix was prototyped and deliberately abandoned: the durable answer is to stop
@@ -54,7 +54,7 @@ round-tripping through `text/plain` at all.
 The abandoned prototype (a CF_HTML paragraph-gap reconstructor with a browser-serialization model and
 a self-verifying baseline check) is kept out of `src/` on purpose. Its HTML tokenizer, entity
 decoder, block-element model, and margin parser are directly reusable here and are described in
-Â§ Reusable Pieces.
+§ Reusable Pieces.
 
 ---
 
@@ -65,11 +65,11 @@ Prod 0.7.1, gpt-4.1, two runs against the same Gmail draft.
 Run 1 (`2026-07-20T09:02:57`) received this as the clipboard's plain text:
 
 ```text
-Good morning Tim,\nAfter our call 2 weeks ago, ... {insert point here about ocntext}.Â \nWould it be ...
+Good morning Tim,\nAfter our call 2 weeks ago, ... {insert point here about ocntext}. \nWould it be ...
 ```
 
 Single `\n`. The draft on screen had visible blank lines between all three paragraphs. Nothing in
-our pipeline touched the text before it was logged â€” `terminal_normalization.applied: false`, no rule
+our pipeline touched the text before it was logged — `terminal_normalization.applied: false`, no rule
 matched, `target_formatting` none. The AI received tight lines, returned tight lines, and the paste
 flattened the email.
 
@@ -83,15 +83,15 @@ a synthetic page and dumping both clipboard flavors:
 
 | Markup | `text/plain` output | Gap survives |
 |---|---|---|
-| `<p style="margin:0 0 1em">A</p><p â€¦>B</p>` | `A\r\n\r\nB` | yes |
+| `<p style="margin:0 0 1em">A</p><p …>B</p>` | `A\r\n\r\nB` | yes |
 | `<div>A</div><div><br></div><div>B</div>` | `A\r\n\r\nB` | yes |
 | `<div>A</div><div>B</div>` | `A\r\nB` | n/a |
-| `<div style="margin-bottom:1em">A</div><div â€¦>B</div>` | `A\r\nB` | **no** |
+| `<div style="margin-bottom:1em">A</div><div …>B</div>` | `A\r\nB` | **no** |
 
 The rule: a block boundary emits one newline, a `</p>` emits two, an empty block contributes its own.
 CSS margin emits nothing, because `text/plain` cannot express it.
 
-This is not Gmail-specific and cannot be fixed by a `TargetFormatting` rule â€” the information is
+This is not Gmail-specific and cannot be fixed by a `TargetFormatting` rule — the information is
 destroyed by the browser before `AfterCopy` ever runs, and a rule may not touch the clipboard.
 
 ### The larger loss
@@ -130,7 +130,7 @@ Non-goals:
 **Markdown in, run-splice back out.**
 
 Convert the captured `CF_HTML` to Markdown and send that to the model. Markdown is the one
-representation models are genuinely good at, and it carries the structure that plain text destroys â€”
+representation models are genuinely good at, and it carries the structure that plain text destroys —
 paragraph breaks, lists, headings, emphasis, links.
 
 Then do **not** re-render the Markdown. Map the correction back onto the original HTML runs and
@@ -141,8 +141,8 @@ inline styles, nested tables, and the source app's exact block structure.
 The model sees structure. The document keeps its formatting. Neither representation has to be
 lossless on its own.
 
-The alternatives below stay documented because the comparison in Â§ Model Comparison still measures
-against them â€” if the measurement contradicts this choice, the choice changes.
+The alternatives below stay documented because the comparison in § Model Comparison still measures
+against them — if the measurement contradicts this choice, the choice changes.
 
 ## Open Decisions
 
@@ -150,24 +150,24 @@ against them â€” if the measurement contradicts this choice, the choice cha
 
 | Option | AI sees | Cost / latency | Risk |
 |---|---|---|---|
-| **A. Raw HTML in, corrected HTML out** | Full markup | Highly variable â€” see the note below. | Model rewrites, drops, or invents tags. Prompt-leak guard and protected literals now have to survive markup. High. |
+| **A. Raw HTML in, corrected HTML out** | Full markup | Highly variable — see the note below. | Model rewrites, drops, or invents tags. Prompt-leak guard and protected literals now have to survive markup. High. |
 | **B. Plain text in, diff-aligned back onto the original runs** (recommended) | Exactly what it sees today | Identical token count. Added cost is local parse + diff, target sub-millisecond. | Alignment bugs, bounded by a strict verification gate and a plain-text fallback. |
 | **C. Text with inline formatting sentinels** | Text plus markers | Slightly more tokens | Model eats or moves the sentinels. Already a known failure mode from the protected-literal work. |
-| **D. HTML converted to Markdown, corrected, converted back** | Clean Markdown | Modest token increase over plain text; far cheaper than raw HTML | Models handle Markdown very well, so the correction quality should be high. The loss is in the conversion: Markdown cannot express font family, size, color, arbitrary inline styles, nested tables, or Gmail's exact block structure. HTMLâ†’MDâ†’HTML is lossy in a way HTMLâ†’runsâ†’HTML is not. |
+| **D. HTML converted to Markdown, corrected, converted back** | Clean Markdown | Modest token increase over plain text; far cheaper than raw HTML | Models handle Markdown very well, so the correction quality should be high. The loss is in the conversion: Markdown cannot express font family, size, color, arbitrary inline styles, nested tables, or Gmail's exact block structure. HTML→MD→HTML is lossy in a way HTML→runs→HTML is not. |
 
 B and D are not mutually exclusive. Markdown is the better *AI-facing* representation; run-splicing
 is the better *reconstruction* mechanism. The strongest version is likely a hybrid: hand the model
 Markdown so it sees real structure, then map the correction back onto the original HTML runs rather
 than re-rendering the Markdown. That preserves everything Markdown cannot describe.
 
-**This is now an empirical question, not an argument.** See Â§ Model Comparison.
+**This is now an empirical question, not an argument.** See § Model Comparison.
 
 ### D2. Does pasting HTML back into the source ever look worse than plain text?
 
 Chrome's `CF_HTML` carries *computed* styles inlined on every element. Pasting that back into the
 same Gmail compose box should reproduce the original, but it also hard-codes what was previously
 inherited (font family, size, color). If the user later changes the message font, the corrected span
-may not follow. Needs a Dev experiment before this ships; see Â§ Verification.
+may not follow. Needs a Dev experiment before this ships; see § Verification.
 
 ### D3. Behavior when the destination is plain-text-only.
 
@@ -180,14 +180,14 @@ unaffected. Confirm no editor prefers `CF_HTML` and pastes visible markup.
 
 D1 gets decided by measurement against real captured markup, not by reasoning about token counts.
 
-### Collection â€” Stage 1, implemented 2026-07-20
+### Collection — Stage 1, implemented 2026-07-20
 
 `ClipboardLoop.CaptureSelectionAsync` reads `CF_HTML` in the same clipboard window as
 `CF_UNICODETEXT`. It has to happen there: `ExcludeTextFromHistory` empties the clipboard moments
 later and the source markup is gone for good. Absence of an HTML flavor is normal and never fails a
 run.
 
-Both flavors ride the ordinary path â€” `RunRecord.CapturedHtml` beside `InputText`, logged in the
+Both flavors ride the ordinary path — `RunRecord.CapturedHtml` beside `InputText`, logged in the
 ordinary `spellcheck_detail` blob as `clipboard_html` with `clipboard_html_chars` and
 `clipboard_html_truncated`. No sidecar files, no separate corpus, no parallel code path. The field is
 capped at 512K chars so one pathological selection cannot produce a multi-megabyte log line;
@@ -195,7 +195,7 @@ capped at 512K chars so one pathological selection cannot produce a multi-megaby
 
 Filter with `logs.py --has-html`. The formatted view prints only the size; `--json` yields the markup.
 
-This inflates the daily JSONL â€” a styled email fragment is tens of KB against ~2 KB for the rest of
+This inflates the daily JSONL — a styled email fragment is tens of KB against ~2 KB for the rest of
 the row. That is accepted deliberately: the fine-tune tooling selects fields, so a bigger file costs
 disk and nothing else, and one log corpus beats two.
 
@@ -208,7 +208,7 @@ Four runs on v0.8.0 before the first review. Small sample, but two results alrea
 
 **Slack offers no `CF_HTML` at all.** Three Slack runs, all `clipboard_html_chars=0`, including one
 selection containing a code span and an `@mention`. Both arrived as plain text. If this holds, the
-rich-text pipeline cannot help Slack â€” the formatting is destroyed by the source app before the
+rich-text pipeline cannot help Slack — the formatting is destroyed by the source app before the
 clipboard, and no amount of reconstruction recovers it. Worth confirming against
 `clipboard_formats` now that it is captured; if Slack offers RTF instead, the picture changes.
 
@@ -219,7 +219,7 @@ CF_HTML:          Meet&nbsp;at&nbsp;Middletown&nbsp;Plannet&nbsp;Fitness
 CF_UNICODETEXT:   Meet at Middletown Plannet Fitness
 ```
 
-This breaks the serialization verification gate as specified. Decoding `&nbsp;` to `Â ` and
+This breaks the serialization verification gate as specified. Decoding `&nbsp;` to ` ` and
 comparing byte-for-byte against the plain text yields `model_mismatch` on every Akiflow run, which
 would silently disable the pipeline there. **The gate must treat NBSP and ordinary space as
 equivalent when comparing**, while still preserving whichever character the source used when
@@ -227,8 +227,8 @@ splicing. This is exactly the kind of thing the collection pass exists to find.
 
 ### Second pass, with `clipboard_formats` (2026-07-20 Dev)
 
-Seven runs across Gmail, Slack, ChatGPT, and Windows Terminal. `clipboard_ms` ranged 226â€“272 ms
-against a 251â€“260 ms pre-change baseline â€” reading three flavors instead of one costs nothing
+Seven runs across Gmail, Slack, ChatGPT, and Windows Terminal. `clipboard_ms` ranged 226–272 ms
+against a 251–260 ms pre-change baseline — reading three flavors instead of one costs nothing
 measurable.
 
 **The bug reproduced in real captured data.** A Gmail reading-pane selection:
@@ -247,11 +247,11 @@ than on a synthetic page.
 
 **Gmail compose itself is fine.** A re-typed version of the original Tim email uses `<br><br>`
 between paragraphs, which Chrome serializes as `\r\n\r\n`. The gap survives. So the draft that
-started this carried *pasted* margin-styled blocks, not Gmail's native structure â€” consistent with
+started this carried *pasted* margin-styled blocks, not Gmail's native structure — consistent with
 the original diagnosis. The pipeline is needed for pasted-in and rendered content, not for text typed
 directly into a compose box.
 
-**Slack confirmed: no HTML on the clipboard.** The format list settles it â€” Slack offers
+**Slack confirmed: no HTML on the clipboard.** The format list settles it — Slack offers
 `UnicodeText,Chromium internal source RFH token,Chromium Web Custom MIME Data Format,Chromium internal source URL,Locale,Text,OEMText`
 and no `HTML Format`. Not a failed read on our side. Slack's own rich representation presumably lives
 in `Chromium Web Custom MIME Data Format`, but that is a Chromium-internal blob and the sibling
@@ -262,8 +262,8 @@ same until measured. **Slack is out of scope for the rich-text pipeline.**
 run and no HTML at all on another. Whatever the pipeline does, it must degrade to the plain-text path
 per run, not per app.
 
-**Still no RTF sample.** No captured selection has offered it. The capture stays in â€” Word and
-desktop Outlook are the expected sources and neither has been exercised â€” but nothing yet depends
+**Still no RTF sample.** No captured selection has offered it. The capture stays in — Word and
+desktop Outlook are the expected sources and neither has been exercised — but nothing yet depends
 on it.
 
 **Privacy note:** `clipboard_html` from an email carries remote asset URLs, including tracking pixels
@@ -281,7 +281,7 @@ nothing:
 ```
 
 So raw-HTML cost depends entirely on where the selection came from, and the corpus has to answer it
-per-source rather than in general. Gmail compose is the case that matters and is still unmeasured â€”
+per-source rather than in general. Gmail compose is the case that matters and is still unmeasured —
 **no Gmail run has been captured on v0.8.0 yet**, so the bug that started this work has not been
 observed through the new instrumentation.
 
@@ -301,7 +301,7 @@ representation through several models and score them:
 
 Representations to test: raw HTML (A), plain text (today's baseline), Markdown (D), and the
 Markdown-in / run-splice-back hybrid. Models to test: gpt-4.1 (current production), plus a
-frontier-tier and a small-fast-tier model â€” pick the exact set when the corpus is ready, from live
+frontier-tier and a small-fast-tier model — pick the exact set when the corpus is ready, from live
 model listings rather than memory.
 
 The `tests/` Python tooling and `bench/` already know how to run batches against the API; this
@@ -311,7 +311,7 @@ harness belongs beside them, not in `src/`.
 
 A representation only beats the current plain-text baseline if it fixes the same typos, invents
 nothing, and stays inside the latency contract. Better formatting preservation does not buy the right
-to be slower or less accurate â€” speed is the product.
+to be slower or less accurate — speed is the product.
 
 ---
 
@@ -372,12 +372,12 @@ to ship: markup is only ever rewritten when we can prove we understand how the b
 ### Markdown rendering
 
 Render the run list to Markdown, recording each run's span in the output. Markdown syntax the
-renderer emits â€” `**`, `_`, `#`, `-`, `> `, `[`/`](url)`, table pipes â€” belongs to no run. That is the
+renderer emits — `**`, `_`, `#`, `-`, `> `, `[`/`](url)`, table pipes — belongs to no run. That is the
 point: syntax characters are structure, not content, and the alignment step must be able to tell the
 difference.
 
 Keep the rendering conservative. Anything with no faithful Markdown form (a colored span, a nested
-table, an inline style) renders as its plain text and stays a run â€” its markup is preserved by the
+table, an inline style) renders as its plain text and stays a run — its markup is preserved by the
 splice regardless, because the splice never touches tags.
 
 ### Alignment
@@ -405,7 +405,7 @@ Rebuild the fragment by splicing corrected run text back into the original marku
 `SourceStart`/`SourceLength`, leaving every tag, attribute, and inline style byte-identical. Re-encode
 `&`, `<`, `>`, and NBSP on the way in. Do not pretty-print, minify, normalize, or reorder anything.
 
-Then emit a valid `CF_HTML` payload with a correctly recomputed header â€” `StartHTML`, `EndHTML`,
+Then emit a valid `CF_HTML` payload with a correctly recomputed header — `StartHTML`, `EndHTML`,
 `StartFragment`, `EndFragment` are byte offsets into the UTF-8 payload and are the single most common
 source of "paste produces garbage" bugs.
 
@@ -413,14 +413,14 @@ source of "paste produces garbage" bugs.
 
 `ExcludeTextFromHistory` already owns a manual `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`
 session. The final write becomes the same shape: one session placing `CF_HTML`, `CF_UNICODETEXT`, and
-no history-exclusion DWORDs (the corrected text is meant to stay in Win+V â€” see root `AGENTS.md`).
+no history-exclusion DWORDs (the corrected text is meant to stay in Win+V — see root `AGENTS.md`).
 `Clipboard.SetText` is no longer sufficient.
 
 ### Protected literals
 
 Unchanged, and deliberately so. Protection and restoration continue to operate on plain text before
 and after the request. Alignment happens strictly after literal restoration, so a URL that survived
-the AI also survives the re-serialization â€” it is simply a run whose text did not change.
+the AI also survives the re-serialization — it is simply a run whose text did not change.
 
 ---
 
@@ -434,7 +434,7 @@ real implementation:
 - A tag scanner that finds the closing `>` without being fooled by `>` inside a quoted attribute
   value. Inline style strings hit this immediately.
 - Whitespace collapsing for `white-space: normal`, with NBSP explicitly non-collapsible. The captured
-  Gmail text contains real `Â ` characters and they must survive byte-for-byte.
+  Gmail text contains real ` ` characters and they must survive byte-for-byte.
 - HTML entity decoding, named and numeric.
 - The block-element set and the `</p>` double-newline rule.
 - Inline `margin` / `margin-bottom` / `margin-block-end` parsing including all four shorthand arities.
@@ -488,12 +488,12 @@ Manual Dev acceptance:
 - The original Tim email in Gmail, margin-styled paragraphs, spacing intact after correction.
 - A selection containing bold, a link, and colored text.
 - A bulleted list.
-- Notepad, Windows Terminal, and VS Code â€” confirm no visible markup and no behavior change (D3).
+- Notepad, Windows Terminal, and VS Code — confirm no visible markup and no behavior change (D3).
 - Paste into Gmail, then change the message font, and check whether the corrected span follows (D2).
 - An unmatched Chrome textarea, unchanged.
 
 Gate commands are the existing ones from `.planning/app-site-formatting-customizations.md`
-Â§ Verification gate, plus the new test project.
+§ Verification gate, plus the new test project.
 
 ---
 
@@ -501,7 +501,7 @@ Gate commands are the existing ones from `.planning/app-site-formatting-customiz
 
 1. **Done (2026-07-20).** Dual-flavor capture, logged in the ordinary `spellcheck_detail` blob.
    Behavior unchanged. Shipped to Prod so the corpus comes from real daily use.
-2. Run the comparison in Â§ Model Comparison against the collected corpus. Confirm or overturn the
+2. Run the comparison in § Model Comparison against the collected corpus. Confirm or overturn the
    Markdown choice and pick the model.
 3. Run extraction + the serialization verification gate, logging only. Confirm `model_mismatch` is
    rare against real markup before anything depends on it. This is the honest place to find out the
