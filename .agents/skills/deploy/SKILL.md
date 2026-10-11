@@ -45,7 +45,7 @@ shipping to production users.**
 
 - **What it means:** Push code to `origin/main`. The Dev channel is updated by
   doing `git pull` + `dotnet run -c Dev`. No versioning, no CI, no installer.
-- **Hotkey when running:** Ctrl+Alt+D (orange-tinted tray icon)
+- **Hotkey when running:** Ctrl+Alt+D (yellow background on the Dev app icon)
 - **Auto-update:** None — Dev never auto-updates. It's always a manual pull + relaunch.
 - **Approval needed:** No. Push whenever changes are stable enough to test.
 - **File to read next:** Read `dev-deploy.md` in full, then follow it.
