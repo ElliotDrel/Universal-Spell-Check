@@ -241,7 +241,7 @@ internal static partial class RichTextClipboard
         if (paragraphs.Count == 1 && bodies.Length == 1)
             withoutCopyMarker = GoogleDocsBlockTagRegex().Replace(withoutCopyMarker, "");
         if (TryAlignTextNodes(withoutCopyMarker, expectedSource, corrected, out var aligned, normalizeNbsp: true))
-            return aligned with { ParagraphCount = paragraphs.Count };
+            return aligned with { ParagraphCount = paragraphs.Count, ContentUnchanged = corrected == expectedSource };
         return RichTextReplacementResult.NotApplied("unsupported_fragment", corrected, paragraphs.Count);
     }
 
@@ -925,6 +925,8 @@ internal sealed record RichTextReplacementResult(
     string Reason,
     int ParagraphCount)
 {
+    public bool ContentUnchanged { get; init; }
+
     public static RichTextReplacementResult NotApplied(
         string reason,
         string text = "",

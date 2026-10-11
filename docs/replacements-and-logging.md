@@ -333,3 +333,14 @@ The final rebuilt Dev native smoke passed again (PID 13196, run
 `7deef858b13a4cd3b05d77ba20abce96`, capture scheduling 3ms). The actual Dev dashboard then
 disabled the setting and a second normal Notepad correction succeeded without developer evidence
 (run `7ad4a5999ea54a93ab2bfee465f87bf6`). Dev settings were left disabled.
+
+### Verified unchanged Docs corrections
+
+A successful correction can use `paste_method=none_unchanged` with
+`text_changed=false` and event `replace_skipped reason=verified_content_unchanged`.
+The verified normalized Docs content required no correction, and the identified
+source window/title remained the destination, so Ctrl+V was skipped after the
+normal corrected-clipboard write. Evidence captures `after-no-change`; its
+`paste_issued_at` is null. No `replace_succeeded` event is emitted for that run.
+Mapper replay exposes `result.content_unchanged`; this is a content decision,
+not destination rendering acceptance.
