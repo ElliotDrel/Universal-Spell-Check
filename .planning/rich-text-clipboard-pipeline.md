@@ -2,25 +2,21 @@
 
 ## Status
 
-### Partial-start selection isolation (2026-10-11, editor test pending)
+### Partial-start indentation deferred (2026-10-11)
 
-Run `e742b24ff24942c5bbb97db612fd454c` starts inside a nested list paragraph,
-then crosses a top-level item and nested items. Native source/request/readback
-retain the original indentation, list identities and nesting at every delimiter
-and the final trailing paragraph. This establishes transport fidelity, not
-correct insertion. Its 150ms after image still shows the original selection
-and does not establish the reported rendered shift.
+Later evidence from `a057dd031b044e549c306d7a70a9bcb7` showed native source,
+requested paste and readback retaining levels 1,0,1,1,1, while the editor
+rebased the heading and following items under the starting nested paragraph.
+Elliot's ordinary Ctrl+C then Ctrl+V control reproduced the same shift.
+Native-only clipboard transport therefore does not prevent Docs' contextual
+list insertion behavior. This remaining issue is explicitly deferred.
 
-Previously supported slices offered both native and HTML. The first HTML block
-represents the selected sentence tail as a complete nested list item. To isolate
-that competing import path, verified native replacements now offer only native
-and Unicode; HTML remains the fallback when native validation declines. No
-native style or selection-boundary metadata is guessed. Changed and unchanged
-partial-start regressions retain nesting and indentation, with no HTML or added
-terminal separator. The diagnostic after-image delay is now 600ms, off the
-correction path. The same partial-start selection needs an original-editor
-retest to distinguish HTML import from native insertion behavior; this change
-is not yet a verified root-cause fix.
+The proposed keyboard-driven paragraph-by-paragraph replacement was rejected
+as outside scope. Both its live integration and preparatory code/tests were
+reverted. Dev retains a single paste; unchanged text is still pasted. Native
+and Unicode remain the preferred verified Docs payload, with HTML as fallback.
+The diagnostic after-image delay remains 600ms. Earlier heading, inline-style,
+logging and synthetic terminal-newline fixes remain in place.
 
 ### One Docs paragraph model; headings no longer block native (2026-10-11, reviewed; editor retest pending)
 
