@@ -82,6 +82,17 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 8. On request failure: restore clipboard, notify user, log `request_failed`, return.
 9. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Strips an exact echoed input followed by a correction divider, applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
 10. **Format for paste** — recapture the current foreground context and run the optional frozen before-paste hook. Before-paste rules receive formatter-neutral, private-use placeholders; a missing or duplicated placeholder skips the optional formatting and uses the already-corrected text.
+Docs corrections also retain the bounded original Chromium native slice before
+history exclusion. `GoogleDocsClipboard` verifies its text against the copied
+selection and remaps sparse style positions with the same character diff. It
+retains final paragraph/list styles and the native slice's exact end boundary;
+Unicode's copy-only separator is not substituted for that boundary. It removes
+the original cache ID and emits edited custom MIME beside Unicode/HTML. Only
+verified slices without positional embedded content/suggestions use this path;
+unsupported native data retains the existing corrected HTML/text fallback.
+Native bytes are used in memory regardless of logging, and persisted only when
+Developer logging is enabled. Unchanged text always replaces the selection.
+
 11. **Paste** — write corrected Unicode text, plus `CF_HTML` for verified rich selections, to the clipboard (untagged so it IS kept in history). Even if rich reconstruction declines or throws, write the corrected Unicode text and paste it. Wait for the existing settle delay and send Ctrl+V to whichever app is active. Switching apps while the request runs does not change the destination behavior.
 12. Log `replace_succeeded` with target-formatting metadata and separate hook timings.
 13. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.

@@ -114,7 +114,12 @@ def make_replay_case(entry, log_dir):
                    "output_chars": _utf16_chars(frozen["output_text"]),
                    "clipboard_html_chars": _utf16_chars(frozen["clipboard_html"]),
                    "clipboard_html_truncated": False})
-    for field in ("paste_text", "paste_html"):
+    native = payload("clipboard_chromium_mime_base64", detail.get("clipboard_chromium_mime_status") == "ok")
+    if native is not None:
+        frozen.update({"clipboard_chromium_mime_base64": native,
+                       "clipboard_chromium_mime_base64_chars": _utf16_chars(native),
+                       "clipboard_chromium_mime_base64_truncated": False})
+    for field in ("paste_text", "paste_html", "paste_chromium_mime_base64"):
         value = payload(field, False)
         if value is not None:
             frozen[field] = value

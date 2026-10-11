@@ -10,6 +10,7 @@ if (args.Length > 0 && args[0].StartsWith("--replay", StringComparison.Ordinal))
 }
 
 FormattingReplayTests.Run();
+GoogleDocsClipboardTests.Run();
 
 const string docsInline = "<meta charset=\"utf-8\"><b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><span style=\"font-size:16pt\">Mentalitys</span></b>";
 var docsHeading = RichTextClipboard.TryCreateReplacement(CfHtml(docsInline), "Mentalitys", "Mentalities");

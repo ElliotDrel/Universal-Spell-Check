@@ -12,7 +12,7 @@ internal static class ClipboardLoop
     private const int ClipboardRetryAttempts = 8;
     private const int MaxCopyAttempts = 2;
 
-    public static async Task<CaptureResult> CaptureSelectionAsync(bool captureNativeDocsMime = false)
+    public static async Task<CaptureResult> CaptureSelectionAsync(bool developerLogging = false)
     {
         var startedAt = Environment.TickCount64;
 
@@ -80,14 +80,14 @@ internal static class ClipboardLoop
                 // The format list is what makes an empty html/rtf interpretable:
                 // without it, "no markup" and "markup we failed to read" look
                 // identical in the logs.
-                var capturedSequence = captureNativeDocsMime ? GetClipboardSequenceNumber() : 0;
+                var capturedSequence = GetClipboardSequenceNumber();
                 TryGetHtml(out var html);
                 TryGetRtf(out var rtf);
                 var formats = DescribeClipboardFormats();
 
                 var nativeMime = "";
-                var nativeMimeStatus = captureNativeDocsMime ? "not_applicable" : "disabled";
-                if (captureNativeDocsMime && html.Contains("docs-internal-guid-", StringComparison.Ordinal))
+                var nativeMimeStatus = developerLogging ? "not_applicable" : "disabled";
+                if (html.Contains("docs-internal-guid-", StringComparison.Ordinal))
                     (nativeMime, nativeMimeStatus) = ReadChromiumCustomMime(capturedSequence);
                 return CaptureResult.Ok(text, html, rtf, formats, Environment.TickCount64 - startedAt, attempt,
                     nativeMime, nativeMimeStatus);
@@ -209,28 +209,36 @@ internal static class ClipboardLoop
         }, out _);
     }
 
-    public static async Task<ReplacementClipboardResult> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "", bool developerLogging = false)
+    public static async Task<ReplacementClipboardResult> TrySetReplacementTextAsync(string replacementText, string richTextHtml = "", bool developerLogging = false, byte[]? nativeDocsBytes = null)
     {
-        if (!await TrySetTextAsync(replacementText, richTextHtml))
+        if (!await TrySetTextAsync(replacementText, richTextHtml, nativeDocsBytes))
         {
             return ReplacementClipboardResult.Failed();
         }
 
+        var nativeVerification = "not_requested";
+        if (nativeDocsBytes is not null)
+        {
+            var (base64, status) = ReadChromiumCustomMime(GetClipboardSequenceNumber());
+            nativeVerification = status == "ok"
+                ? (Convert.FromBase64String(base64).AsSpan().SequenceEqual(nativeDocsBytes) ? "exact_match" : "mismatch")
+                : status;
+        }
         if (developerLogging)
         {
             return ReplacementClipboardResult.Succeeded(richTextHtml.Length) with
             {
-                HtmlVerification = "pending", ReadbackCapture = BeginReadback()
+                HtmlVerification = "pending", ReadbackCapture = BeginReadback(), NativeVerification = nativeVerification
             };
         }
 #if DEV
         if (richTextHtml.Length > 0)
         {
-            return VerifyRichTextClipboardWrite(richTextHtml);
+            return VerifyRichTextClipboardWrite(richTextHtml) with { NativeVerification = nativeVerification };
         }
 #endif
 
-        return ReplacementClipboardResult.Succeeded(richTextHtml.Length);
+        return ReplacementClipboardResult.Succeeded(richTextHtml.Length) with { NativeVerification = nativeVerification };
     }
 
     // Re-asserts the just-captured (pre-correction) selection onto the
@@ -379,7 +387,7 @@ internal static class ClipboardLoop
         return true;
     }
 
-    private static async Task<bool> TrySetTextAsync(string text, string richTextHtml = "")
+    private static async Task<bool> TrySetTextAsync(string text, string richTextHtml = "", byte[]? nativeDocsBytes = null)
     {
         for (var attempt = 1; attempt <= ClipboardRetryAttempts; attempt++)
         {
@@ -394,6 +402,9 @@ internal static class ClipboardLoop
                     var data = new DataObject();
                     data.SetData(DataFormats.UnicodeText, text);
                     data.SetData(DataFormats.Html, richTextHtml);
+                    using var nativeStream = nativeDocsBytes is null ? null : new MemoryStream(nativeDocsBytes, writable: false);
+                    if (nativeStream is not null)
+                        data.SetData(GoogleDocsClipboard.WindowsFormat, false, nativeStream);
                     Clipboard.SetDataObject(data, true);
                 }
                 return true;
@@ -510,7 +521,11 @@ internal static class ClipboardLoop
             var text = Read(DataFormats.UnicodeText, out var textStatus);
             var html = Read(DataFormats.Html, out var htmlStatus);
             var rtf = Read(DataFormats.Rtf, out var rtfStatus);
-            return new(text, html, rtf, string.Join(",", data.GetFormats(false)), textStatus, htmlStatus, rtfStatus);
+            var formats = string.Join(",", data.GetFormats(false));
+            var (native, nativeStatus) = formats.Contains(GoogleDocsClipboard.WindowsFormat, StringComparison.Ordinal)
+                ? ReadChromiumCustomMime(GetClipboardSequenceNumber()) : ("", "absent");
+            return new(text, html, rtf, formats, textStatus, htmlStatus, rtfStatus)
+                { ChromiumMimeBase64 = native, ChromiumMimeStatus = nativeStatus };
         }
         catch { return new(null, null, null, null, "failed", "failed", "failed"); }
     }
@@ -602,7 +617,7 @@ internal static class ClipboardLoop
     }
 
     // Docs' native paste metadata is destroyed by history exclusion. Keep
-    // bounded bytes only for enabled developer evidence; never use a stale read.
+    // bounded bytes for native paste; persist them only with developer logging.
     private static (string Base64, string Status) ReadChromiumCustomMime(uint capturedSequence)
     {
         if (!OpenClipboard(IntPtr.Zero))
@@ -636,7 +651,7 @@ internal static class ClipboardLoop
     }
 
     private static readonly uint CfChromiumCustomMime =
-        RegisterClipboardFormat("Chromium Web Custom MIME Data Format");
+        RegisterClipboardFormat(GoogleDocsClipboard.WindowsFormat);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr GetClipboardData(uint format);
@@ -791,6 +806,7 @@ internal sealed record ReplacementClipboardResult(
     int VerifiedHtmlChars,
     string VerifiedFormats)
 {
+    public string NativeVerification { get; init; } = "not_requested";
     public ClipboardReadback? Readback { get; init; }
     public Task<ClipboardReadback>? ReadbackCapture { get; init; }
     public static ReplacementClipboardResult Failed() => new(false, 0, "write_failed", 0, "");
@@ -816,6 +832,8 @@ internal sealed record ReplacementClipboardResult(
 
 internal sealed record ClipboardReadback(string? Text, string? Html, string? Rtf, string? Formats, string TextStatus, string HtmlStatus, string RtfStatus)
 {
+    public string ChromiumMimeBase64 { get; init; } = "";
+    public string ChromiumMimeStatus { get; init; } = "not_requested";
     public DateTimeOffset CapturedAt { get; } = DateTimeOffset.UtcNow;
     public uint Sequence { get; init; }
     public string Status { get; init; } = "ok";

@@ -93,6 +93,8 @@ Use full JSON parse when many nested fields are needed or structure varies. Keep
 Formatting incidents can be frozen and replayed through the actual `RichTextClipboard` implementation
 without an API request, live clipboard write, running editor, or server. The replay scope is the
 rich-text mapper: original `input_text` + `clipboard_html` + recorded post-processed `output_text`.
+For Docs, an available full `clipboard_chromium_mime_base64` is also hydrated
+and remapped; replay returns the native status and generated binary as base64.
 It does not rerun AI, replacements, target hooks, RTF, or the destination's rendering behavior.
 
 ```powershell

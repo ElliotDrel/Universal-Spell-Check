@@ -18,7 +18,10 @@ internal static partial class RichTextClipboard
     public static RichTextReplacementResult TryCreateReplacement(
         string sourceHtml,
         string sourceText,
-        string correctedText)
+        string correctedText) => TryCreateReplacement(sourceHtml, sourceText, correctedText, "");
+
+    public static RichTextReplacementResult TryCreateReplacement(
+        string sourceHtml, string sourceText, string correctedText, string nativeDocsBase64)
     {
         if (sourceHtml.Length == 0)
         {
@@ -34,7 +37,13 @@ internal static partial class RichTextClipboard
             return CreateLinkedInParagraphReplacement(fragment, sourceText, correctedText);
 
         if (GoogleDocsMarkerRegex().IsMatch(fragment))
-            return CreateGoogleDocsReplacement(fragment, sourceText, correctedText);
+        {
+            var result = CreateGoogleDocsReplacement(fragment, sourceText, correctedText);
+            if (!result.Applied) return result;
+            var native = GoogleDocsClipboard.Rewrite(nativeDocsBase64, sourceText, result.Text, out var status);
+            return result with { NativeDocsBytes = native, NativeDocsStatus = status,
+                Mode = native is null ? result.Mode : "docs_native" };
+        }
 
         // data-pm-slice is the stable marker in the captured ChatGPT selection.
         // Do not apply a structural assumption to a different HTML producer.
@@ -488,7 +497,7 @@ internal static partial class RichTextClipboard
         return -1;
     }
 
-    private static IReadOnlyList<UI.TextDiffSegment> ComputeAlignmentDiff(string sourceText, string correctedText)
+    internal static IReadOnlyList<UI.TextDiffSegment> ComputeAlignmentDiff(string sourceText, string correctedText)
     {
         // Keep the dashboard's bounded diff, but do not charge unchanged
         // selection edges against its matrix budget during rich reconstruction.
@@ -925,6 +934,9 @@ internal sealed record RichTextReplacementResult(
     string Reason,
     int ParagraphCount)
 {
+    public byte[]? NativeDocsBytes { get; init; }
+    public string NativeDocsStatus { get; init; } = "not_applicable";
+
     public static RichTextReplacementResult NotApplied(
         string reason,
         string text = "",

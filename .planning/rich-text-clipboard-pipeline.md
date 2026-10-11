@@ -2,6 +2,45 @@
 
 ## Status
 
+### Native Docs slice repair; unchanged-text skip removed (2026-10-11)
+
+Elliot explicitly rejected skipping unchanged text. Commit `24007d2` reverts
+that entire behavior; all corrections still write and paste the replacement.
+The six-paragraph native capture from `0ac375c0fb364a0b8e7e18ab2d996168`
+contains five internal paragraph breaks and no final newline. The last item's
+paragraph/list styles live in `stsl_trailing`, while Unicode includes a final
+copy-only CRLF and HTML closes a whole list. The HTML-only paste created an
+empty top-level item. The native slice carries the selection boundary HTML lost.
+
+`GoogleDocsClipboard` reads Chromium's bounded Pickle string map, validates the
+slice text, and remaps non-null sparse style offsets through the existing
+bounded alignment diff. The native text's final break (if actually present),
+leading/trailing styles, list identities, and inline style transitions survive.
+Unchanged text also emits a native replacement. Original internal clip IDs are
+removed so edited content cannot retrieve the original cached slice. Native
+suggestions and position-bearing embedded content are declined explicitly,
+retaining the established corrected HTML/text fallback. No native schema is
+invented: original objects are retained and only text/style offsets change.
+
+The Chromium container matches its [custom-data implementation](https://chromium.googlesource.com/chromium/src/+/refs/tags/129.0.6631.1/ui/base/clipboard/custom_data_helper.cc): entry count and aligned UTF-16 key/value pairs.
+
+The writer emits the custom native bytes beside Unicode/HTML and immediately
+verifies exact binary readback. Developer logging retains full source,
+requested and readback native sidecars; disabled logging uses native bytes
+only in memory. Mapper replay includes native source/output and the exporter
+hydrates it with integrity checks. Source-editor acceptance remains separate.
+
+Verification: native formatting regressions (including changed/unchanged text,
+style positions, nested list IDs, partial final paragraphs, a real selected
+terminal break, supplementary Unicode and corrupt/mismatched source rejection),
+three integrity-checked native incident replays, and a changed-word variant of
+the six-paragraph capture pass. Changed and unchanged six-paragraph outputs both
+have exactly five internal breaks and no final break. Fourteen log-reader tests,
+exporter-to-native-replay integration, Release/Dev builds and isolated developer
+evidence tests pass. No live clipboard/keyboard test was run while Elliot was
+active. Browser setup failed before connecting (recorded in tooling gaps), so
+original Docs rendering remains the acceptance gate.
+
 ### Retest rejects the block-only diagnosis (2026-10-11 08:50 Eastern)
 
 Run `e504e1b96e784e94a481ffd44cf485c3` used the rebuilt inline-only Dev code.
@@ -47,8 +86,8 @@ logging, including the Production logging setting after release. Enabled
 corrections now capture bounded Chromium custom MIME bytes for Docs-marked
 selections before history exclusion. The 1 MiB binary cap, sequence validation,
 explicit read status, 512K base64 inline cap and full integrity-checked evidence
-sidecar keep missing/truncated inputs visible. Disabled logging never reads the
-native format. No separate diagnostic flag or new UI was added.
+sidecar keep missing/truncated inputs visible. Superseded by the native-paste repair above: disabled logging now reads native
+bytes in memory for Docs, but never persists them. No separate diagnostic flag or new UI was added.
 
 Release/Dev builds, formatting regressions, and synthetic developer-evidence
 roundtrip/hash/failure-status tests pass. The enabled Dev correction `91cfde99502f446cb9d060a8a89b61cd` captured

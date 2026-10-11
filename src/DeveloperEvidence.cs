@@ -186,6 +186,10 @@ internal sealed class DeveloperEvidence
                 ["clipboard_chromium_mime_base64"] = run.CapturedChromiumMimeStatus == "ok" ? run.CapturedChromiumMimeBase64 : null,
                 ["raw_ai_output"] = run.RawAiOutput, ["output_text"] = run.OutputText,
                 ["paste_text"] = run.RichTextReplacement.Text, ["paste_html"] = run.RichTextReplacement.Html,
+                ["paste_chromium_mime_base64"] = run.RichTextReplacement.NativeDocsBytes is null
+                    ? "" : Convert.ToBase64String(run.RichTextReplacement.NativeDocsBytes),
+                ["readback_chromium_mime_base64"] = readback?.ChromiumMimeStatus == "ok"
+                    ? readback.ChromiumMimeBase64 : run.RichTextReplacement.NativeDocsBytes is null ? "" : null,
                 ["readback_text"] = readback?.Text, ["readback_html"] = readback?.Html,
                 ["readback_rtf"] = readback?.Rtf, ["readback_formats"] = readback?.Formats
             })

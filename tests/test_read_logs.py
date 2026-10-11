@@ -264,3 +264,24 @@ def test_structured_completion_event_retains_fields_in_json_output(tmp_path):
     rows = [json.loads(line) for line in result.stdout.splitlines()]
     assert rows[0]["fields"] == fields
     assert rows[1]["fields"] == {"status": "success"}
+
+
+def test_export_hydrates_native_docs_payload_and_checks_integrity(tmp_path):
+    import hashlib
+    import pytest
+    entry, path, manifest = _developer_entry(tmp_path)
+    value = "AQIDBA=="
+    raw = value.encode("utf-8")
+    (path.parent / "native.txt").write_bytes(raw)
+    manifest["payloads"]["clipboard_chromium_mime_base64"] = {
+        "path": "native.txt", "sha256": hashlib.sha256(raw).hexdigest(),
+        "bytes": len(raw), "chars": len(value), "complete": True, "status": "ok"}
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    entry["detail"]["clipboard_chromium_mime_status"] = "ok"
+    entry["detail"]["clipboard_chromium_mime_base64_truncated"] = True
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert case["detail"]["clipboard_chromium_mime_base64"] == value
+    assert case["detail"]["clipboard_chromium_mime_base64_truncated"] is False
+    (path.parent / "native.txt").write_bytes(b"corrupt")
+    with pytest.raises(ValueError, match="integrity"):
+        _reader().make_replay_case(entry, tmp_path)

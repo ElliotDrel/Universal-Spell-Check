@@ -236,8 +236,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.CapturedHtml = capture.Html;
             record.CapturedRtf = capture.Rtf;
             record.ClipboardFormats = capture.Formats;
-            record.CapturedChromiumMimeBase64 = capture.ChromiumMimeBase64;
-            record.CapturedChromiumMimeStatus = capture.ChromiumMimeStatus;
+            record.CapturedChromiumMimeBase64 = record.DeveloperLoggingEnabled ? capture.ChromiumMimeBase64 : "";
+            record.CapturedChromiumMimeStatus = record.DeveloperLoggingEnabled ? capture.ChromiumMimeStatus : "disabled";
             record.Events.Add("capture_succeeded");
 
             // Re-tag the just-captured (incorrect) text as transient so it stays
@@ -364,7 +364,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 record.RichTextReplacement = RichTextClipboard.TryCreateReplacement(
                     record.CapturedHtml,
                     capture.Text!,
-                    finalText);
+                    finalText, capture.ChromiumMimeBase64);
             }
             catch (Exception ex)
             {
@@ -376,7 +376,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.T_PasteIssued = Stopwatch.GetTimestamp();
             record.ReplacementClipboard = await ClipboardLoop.TrySetReplacementTextAsync(
                 record.RichTextReplacement.Text,
-                record.RichTextReplacement.Html, record.Evidence is not null);
+                record.RichTextReplacement.Html, record.Evidence is not null, record.RichTextReplacement.NativeDocsBytes);
             if (record.ReplacementClipboard.Success)
             {
                 record.CorrectedTextOnClipboard = true;
@@ -585,6 +585,9 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     mode = r.RichTextReplacement.Mode,
                     reason = r.RichTextReplacement.Reason,
                     paragraph_count = r.RichTextReplacement.ParagraphCount,
+                    native_docs_status = r.RichTextReplacement.NativeDocsStatus,
+                    clipboard_native_verification = r.ReplacementClipboard.NativeVerification,
+                    native_docs_bytes = r.RichTextReplacement.NativeDocsBytes?.Length ?? 0,
                     paste_text_chars = r.RichTextReplacement.Text.Length,
                     replacement_html_chars = r.ReplacementClipboard.RequestedHtmlChars,
                     clipboard_html_verification = r.ReplacementClipboard.HtmlVerification,

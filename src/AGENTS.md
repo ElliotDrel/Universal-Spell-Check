@@ -75,8 +75,12 @@ If the run commands, channel constants, manual checks, or Top-of-mind reminders 
 For a Google Docs correction with Developer logging enabled, verify
 `clipboard_chromium_mime_status=ok` and the complete native base64 sidecar in its
 manifest. Repeat with logging disabled: native status must be `disabled`, with
-no native clipboard read. This captures diagnostic data; it does not establish
-list-level paste acceptance.
+no native payload persisted. Docs still reads bounded native data in memory
+for the paste. For multiline lists, verify `rich_text.mode=docs_native`,
+`native_docs_status=ok`, and `clipboard_native_verification=exact_match`.
+Retest changed and unchanged text: both must paste, with no extra final item
+and unchanged indentation/numbering. Native readback proves transport;
+original-editor screenshots establish list-level paste acceptance.
 
 ## Developer evidence verification
 

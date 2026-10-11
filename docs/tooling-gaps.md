@@ -15,3 +15,13 @@ The full Python run (`.venv/Scripts/python.exe -m pytest tests/ bench/ --continu
 Resolve whether these APIs are still intended before changing implementations or tests. Do not skip the failing cases or describe the Python suite as passing. `google-genai` also emits an upstream Python 3.14 deprecation warning for `_UnionGenericAlias`; it does not fail the passing tests.
 
 Native compilation retains the documented channel-specific CS0162 warnings and an existing CS8602 nullable warning at `SpellCheckAppContext.cs:49`. The dependency update does not suppress those warnings.
+
+## Browser runtime path access (2026-10-11)
+
+During Docs paste verification, the Chrome skill's mandatory bootstrap import
+of its installed `scripts/browser-client.mjs` failed in `mcp__node_repl__js`
+with `EPERM: operation not permitted, realpath`. The same file is readable
+through the shell. No browser connection or browser actions occurred. The
+runtime exposes no callable feedback path in this session; this records the
+individual tool gap locally. Fix the runtime sandbox's access to its installed
+plugin path; do not bypass the mandatory browser surface with another driver.
