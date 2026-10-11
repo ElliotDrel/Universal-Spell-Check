@@ -17,7 +17,12 @@ incident replays emit literal apostrophes (and literal NBSP for the tagged run) 
 no `&#39;` or `&#160;`. Validation used installed SDK 10.0.204; the repository pin
 remains 10.0.401. The native developer-evidence smoke stopped at its pre-paste
 RTF-source assertion (`Rich editor source must expose RTF.`), so it does not
-establish paste acceptance. The original LinkedIn editor retest remains required.
+establish paste acceptance. Elliot confirmed the LinkedIn retest has no weird
+characters. Dev runs `861cbe4716cb4c32b97242e45f2ba885` and
+`73053c4bddda41589fcf3172902d78cc` (2026-10-10 20:10 Eastern) succeeded
+with `mode=html`, exact 239-character HTML readback, and no paste errors.
+Those samples contain no apostrophe; the original incident replays verify the
+encoding change, and Elliot provides the visible destination acceptance.
 
 ### Future request: preserve tags in place (deferred 2026-10-10)
 
