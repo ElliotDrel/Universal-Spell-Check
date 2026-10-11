@@ -2,14 +2,33 @@
 
 ## Status
 
+### Retest rejects the block-only diagnosis (2026-10-11 08:50 Eastern)
+
+Run `e504e1b96e784e94a481ffd44cf485c3` used the rebuilt inline-only Dev code.
+Requested/readback Unicode and HTML are corrected and newline-free, with no
+list/paragraph tags. Nevertheless the after image shows the original wording
+("goals to I need", rather than corrected "goals I need") and a new empty list
+paragraph. Removing block wrappers alone did not fix destination behavior; it
+cannot be cited as acceptance or the complete root cause.
+
+The remaining `id="docs-internal-guid-..."` matches the captured native internal
+clip ID and identifies the original Docs slice, whose text contains the typo
+and final newline. The unchanged wording despite edited HTML supports Docs
+using its cached original slice. Generated Docs HTML now removes that original
+copy ID after producer recognition. It preserves unrelated IDs, formatting,
+links, and multi-paragraph/list structure. No native slice schema is invented
+or mutated. Tests verify this for inline, single-paragraph and multi-level
+selections; source-editor acceptance still requires a live retest.
+
 ### Single-paragraph Docs extra line (2026-10-11 08:40 Eastern)
 
 Run `91cfde99502f446cb9d060a8a89b61cd` selected one level-three list item's
 text. AI output and requested/readback Unicode contain no terminal newline;
 HTML readback exactly matches the requested payload. Before/after images show
 a new blank, unnumbered line after the corrected item. The source copied the
-text as a whole `ol/li/p` block despite the inline selection; reimporting that
-block introduces a destination paragraph boundary.
+text as a whole `ol/li/p` block despite the inline selection; the first hypothesis was that reimporting that
+block introduced a destination paragraph boundary. The 08:50 retest above
+rejects this as the complete explanation.
 
 For a verified single-paragraph Docs selection with no internal line break,
 remove only its `ol/ul/li/p` wrappers before alignment. Keep the producer and

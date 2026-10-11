@@ -228,10 +228,16 @@ internal static partial class RichTextClipboard
             }
             corrected = string.Join("\n", sections);
         }
+        // The producer ID points back to Docs' cached, original document slice.
+        // Reusing it can paste the original typo and its terminal paragraph
+        // instead of our edited HTML. Recognize it at capture, never emit it.
+        withoutCopyMarker = GoogleDocsMarkerRegex().Replace(withoutCopyMarker,
+            marker => GoogleDocsCopyIdRegex().Replace(marker.Value, ""));
+
         // Docs exports even a selection inside one list item as ol/li/p.
-        // Reimporting that block creates a paragraph boundary after the text
-        // and can nest it relative to the current item. A single paragraph
-        // needs only its inline formatting; keep the destination's block.
+        // A single paragraph needs only its inline formatting. Removing the
+        // exported block avoids importing layout relative to the current item;
+        // keep the destination's block instead.
         if (paragraphs.Count == 1 && bodies.Length == 1)
             withoutCopyMarker = GoogleDocsBlockTagRegex().Replace(withoutCopyMarker, "");
         if (TryAlignTextNodes(withoutCopyMarker, expectedSource, corrected, out var aligned, normalizeNbsp: true))
@@ -241,6 +247,9 @@ internal static partial class RichTextClipboard
 
     [GeneratedRegex(@"</?(?:ol|ul|li|p)\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GoogleDocsBlockTagRegex();
+
+    [GeneratedRegex("\\s+id\\s*=\\s*(?:\"docs-internal-guid-[^\"]+\"|'docs-internal-guid-[^']+')", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GoogleDocsCopyIdRegex();
 
     private static string GoogleDocsVisibleText(string html) => WebUtility.HtmlDecode(
         HtmlTagRegex().Replace(HtmlBreakRegex().Replace(html, "\n"), "")).Replace('\u00a0', ' ');

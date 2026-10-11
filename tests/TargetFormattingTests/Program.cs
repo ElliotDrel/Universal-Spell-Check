@@ -14,12 +14,13 @@ FormattingReplayTests.Run();
 const string docsInline = "<meta charset=\"utf-8\"><b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><span style=\"font-size:16pt\">Mentalitys</span></b>";
 var docsHeading = RichTextClipboard.TryCreateReplacement(CfHtml(docsInline), "Mentalitys", "Mentalities");
 Assert(docsHeading.Applied && docsHeading.Text == "Mentalities"
-    && Fragment(docsHeading.Html) == docsInline.Replace("Mentalitys", "Mentalities")
+    && Fragment(docsHeading.Html) == docsInline.Replace("Mentalitys", "Mentalities").Replace(" id=\"docs-internal-guid-test\"", "")
     && docsHeading.ParagraphCount == 0,
     "Docs heading selection must stay inline and retain its font without adding a paragraph");
 const string docsList = "<meta charset=\"utf-8\"><b id=\"docs-internal-guid-test\"><ol style=\"margin:0\"><li aria-level=\"2\" style=\"list-style-type:lower-alpha\"><p><span>chek tasks&nbsp;</span></p></li><ol><li aria-level=\"3\" style=\"list-style-type:lower-roman\"><p><strong>Move</strong><span> teh tasks</span></p></li></ol></ol></b>";
 var docsNested = RichTextClipboard.TryCreateReplacement(CfHtml(docsList), "chek tasks \r\nMove teh tasks\r\n", "check tasks  \nMove the tasks");
 Assert(docsNested.Applied && docsNested.Text == "check tasks \nMove the tasks"
+    && !Fragment(docsNested.Html).Contains("docs-internal-guid-", StringComparison.OrdinalIgnoreCase)
     && Fragment(docsNested.Html).Contains("list-style-type:lower-roman")
     && Fragment(docsNested.Html).Contains("<strong>Move</strong>")
     && Fragment(docsNested.Html).Contains("check tasks\u00a0")
@@ -30,19 +31,25 @@ Assert(docsNested.Applied && docsNested.Text == "check tasks \nMove the tasks"
 const string docsSingleItem = "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><ol><li aria-level=\"3\" style=\"margin-left:72pt\"><p style=\"margin-bottom:12pt\"><span>chek </span><strong>goals</strong><a href=\"https://example.test\"> link</a><span>&nbsp;</span></p></li></ol></b>";
 var docsSingle = RichTextClipboard.TryCreateReplacement(CfHtml(docsSingleItem), "chek goals link \r\n", "check goals link");
 Assert(docsSingle.Applied && docsSingle.Text == "check goals link "
-    && Fragment(docsSingle.Html) == "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><span>check </span><strong>goals</strong><a href=\"https://example.test\"> link</a><span>&nbsp;</span></b>",
+    && Fragment(docsSingle.Html) == "<b style=\"font-weight:normal\"><span>check </span><strong>goals</strong><a href=\"https://example.test\"> link</a><span>&nbsp;</span></b>",
     "single Docs list-item selection must replace inline text without a new list or paragraph boundary");
 var docsSingleParagraph = RichTextClipboard.TryCreateReplacement(CfHtml("<b id=\"docs-internal-guid-test\"><p><span>chek</span></p></b>"), "chek\r\n", "check\n");
 Assert(docsSingleParagraph.Applied && docsSingleParagraph.Text == "check"
-    && Fragment(docsSingleParagraph.Html) == "<b id=\"docs-internal-guid-test\"><span>check</span></b>",
+    && Fragment(docsSingleParagraph.Html) == "<b><span>check</span></b>",
     "single Docs paragraph must omit copy-only block boundary and model terminal newline");
 const string docsStyled = "<b id=\"docs-internal-guid-test\"><span style=\"font-weight:700\">chek</span><span>&nbsp;</span><a href=\"https://example.test\">link</a></b>";
 var docsStyle = RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "chek link", "check link");
-Assert(docsStyle.Applied && Fragment(docsStyle.Html) == docsStyled.Replace("chek", "check"),
+Assert(docsStyle.Applied && Fragment(docsStyle.Html) == docsStyled.Replace("chek", "check").Replace(" id=\"docs-internal-guid-test\"", ""),
     "Docs partial selections retain bold, links and original NBSP encoding");
+var docsCopyId = RichTextClipboard.TryCreateReplacement(CfHtml("<b id='docs-internal-guid-copy'><span id=\"keep-this\" data-id=\"keep-data\">chek</span></b>"), "chek", "check");
+Assert(docsCopyId.Applied && Fragment(docsCopyId.Html) == "<b><span id=\"keep-this\" data-id=\"keep-data\">check</span></b>",
+    "generated Docs HTML must omit the original cached-slice ID while retaining unrelated identity attributes");
+var docsLiteralId = RichTextClipboard.TryCreateReplacement(CfHtml("<b id=\"docs-internal-guid-copy\"><span>chek id=\"docs-internal-guid-literal\"</span></b>"), "chek id=\"docs-internal-guid-literal\"", "check id=\"docs-internal-guid-literal\"");
+Assert(docsLiteralId.Applied && Fragment(docsLiteralId.Html) == "<b><span>check id=\"docs-internal-guid-literal\"</span></b>",
+    "copy-ID removal must target the producer attribute, never literal selected text");
 const string docsBlank = "<b id=\"docs-internal-guid-test\"><p><span>chek</span></p><p><br></p><p><span>last</span></p></b>";
 var docsEmpty = RichTextClipboard.TryCreateReplacement(CfHtml(docsBlank), "chek\r\n\r\nlast\r\n", "check\n\nlast");
-Assert(docsEmpty.Applied && Fragment(docsEmpty.Html) == docsBlank.Replace("chek", "check")
+Assert(docsEmpty.Applied && Fragment(docsEmpty.Html) == docsBlank.Replace("chek", "check").Replace(" id=\"docs-internal-guid-test\"", "")
     && docsEmpty.Text == "check\n\nlast", "Docs intentional empty paragraphs must survive");
 Assert(!RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "different input", "check link").Applied,
     "Docs mapping must reject incomplete or mismatched copied text");
@@ -68,7 +75,7 @@ Assert(fileChipBreak.Applied && fileChipBreak.Text == "help with me Reference Do
 const string docsInterchange = "<b id=\"docs-internal-guid-test\"><p><span>chek</span></p><br><p><span>last</span></p></b><br class=\"Apple-interchange-newline\">";
 var docsInterchangeResult = RichTextClipboard.TryCreateReplacement(CfHtml(docsInterchange), "chek\r\n\r\nlast\r\n", "check\n\nlast");
 Assert(docsInterchangeResult.Applied && docsInterchangeResult.Text == "check\n\nlast"
-    && Fragment(docsInterchangeResult.Html) == docsInterchange.Replace("chek", "check").Replace("<br class=\"Apple-interchange-newline\">", ""),
+    && Fragment(docsInterchangeResult.Html) == docsInterchange.Replace("chek", "check").Replace(" id=\"docs-internal-guid-test\"", "").Replace("<br class=\"Apple-interchange-newline\">", ""),
     "Docs inter-paragraph breaks survive, while the copy-only terminal interchange marker must not be pasted");
 
 const long now = 10_000;
