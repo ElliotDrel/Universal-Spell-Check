@@ -393,7 +393,7 @@ internal static class ClipboardLoop
         {
             try
             {
-                if (richTextHtml.Length == 0)
+                if (richTextHtml.Length == 0 && nativeDocsBytes is null)
                 {
                     Clipboard.SetText(text, TextDataFormat.UnicodeText);
                 }
@@ -401,7 +401,8 @@ internal static class ClipboardLoop
                 {
                     var data = new DataObject();
                     data.SetData(DataFormats.UnicodeText, text);
-                    data.SetData(DataFormats.Html, richTextHtml);
+                    if (richTextHtml.Length > 0)
+                        data.SetData(DataFormats.Html, richTextHtml);
                     using var nativeStream = nativeDocsBytes is null ? null : new MemoryStream(nativeDocsBytes, writable: false);
                     if (nativeStream is not null)
                         data.SetData(GoogleDocsClipboard.WindowsFormat, false, nativeStream);

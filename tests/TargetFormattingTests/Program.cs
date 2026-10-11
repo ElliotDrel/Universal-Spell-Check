@@ -78,6 +78,56 @@ var docsInterchangeResult = RichTextClipboard.TryCreateReplacement(CfHtml(docsIn
 Assert(docsInterchangeResult.Applied && docsInterchangeResult.Text == "check\n\nlast"
     && Fragment(docsInterchangeResult.Html) == docsInterchange.Replace("chek", "check").Replace(" id=\"docs-internal-guid-test\"", "").Replace("<br class=\"Apple-interchange-newline\">", ""),
     "Docs inter-paragraph breaks survive, while the copy-only terminal interchange marker must not be pasted");
+// Sanitized captured failure: Docs exports a heading as h2, not p, while its
+// Unicode separates heading and list items alike by one CRLF.
+const string docsHeadingList = "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><h2 dir=\"ltr\" style=\"margin-top:18pt\"><span style=\"font-size:16pt\">Planing</span></h2><ul style=\"margin:0\"><li aria-level=\"1\" style=\"list-style-type:disc\"><p><span>alpha</span></p></li><li aria-level=\"2\" style=\"list-style-type:circle\"><p><span>bta </span><a href=\"https://example.test\"><span>link</span></a></p></li><li aria-level=\"1\"><p><span style=\"font-weight:700\">gama</span></p></li><li aria-level=\"1\"><p><span>delta</span></p></li></ul></b>";
+foreach (var (correction, expected) in new[] {
+    ("Planning\nalpha\nbeta link\ngamma\ndelta\n", "Planning\nalpha\nbeta link\ngamma\ndelta"),
+    ("Planing\nalpha\nbta link\ngama\ndelta", "Planing\nalpha\nbta link\ngama\ndelta") })
+{
+    var headingList = RichTextClipboard.TryCreateReplacement(CfHtml(docsHeadingList), "Planing\r\nalpha\r\nbta link\r\ngama\r\ndelta\r\n", correction);
+    var expectedFragment = docsHeadingList.Replace(" id=\"docs-internal-guid-test\"", "");
+    if (expected != correction)
+        expectedFragment = expectedFragment.Replace(">Planing<", ">Planning<").Replace(">bta <", ">beta <").Replace(">gama<", ">gamma<");
+    Assert(headingList.Applied && headingList.Mode == "aligned_html" && headingList.Text == expected
+        && Fragment(headingList.Html) == expectedFragment && headingList.ParagraphCount == 5,
+        "Docs heading + list selection must keep heading, list levels, link and bold for changed and unchanged text");
+}
+const string docsMixed = "<b id=\"docs-internal-guid-test\"><p dir=\"ltr\"><span>Intro</span></p><h1 dir=\"ltr\"><span style=\"font-weight:700\">Hedaing </span><a href=\"https://example.test\"><span>linc</span></a></h1><br><ol><li aria-level=\"1\"><p><span>itme</span></p></li></ol></b>";
+const string docsMixedCopy = "Intro\r\nHedaing linc\r\n\r\nitme\r\n";
+var docsMixedResult = RichTextClipboard.TryCreateReplacement(CfHtml(docsMixed), docsMixedCopy, "Intro\nHeading link\n\nitem");
+Assert(docsMixedResult.Applied && docsMixedResult.Text == "Intro\nHeading link\n\nitem"
+    && Fragment(docsMixedResult.Html) == docsMixed.Replace(" id=\"docs-internal-guid-test\"", "").Replace("Hedaing", "Heading").Replace("linc", "link").Replace("itme", "item"),
+    "Docs paragraph, multi-node heading, blank paragraph and list item must map words into their original nodes");
+foreach (var structural in new[] { "Intro\nHeading link\nitem", "Intro\nHeading\nlink\n\nitem", "Intro\nHeading link\nnew\nitem" })
+    Assert(!RichTextClipboard.TryCreateReplacement(CfHtml(docsMixed), docsMixedCopy, structural).Applied,
+        "Docs corrections must not drop, split or fill paragraphs");
+const string docsWholeHeading = "<b id=\"docs-internal-guid-test\"><h3 dir=\"ltr\" style=\"margin:0\"><span style=\"font-size:14pt\">Mentalitys</span></h3></b>";
+var docsWholeHeadingResult = RichTextClipboard.TryCreateReplacement(CfHtml(docsWholeHeading), "Mentalitys\r\n", "Mentalities\n");
+Assert(docsWholeHeadingResult.Applied && docsWholeHeadingResult.Text == "Mentalities"
+    && Fragment(docsWholeHeadingResult.Html) == "<b><span style=\"font-size:14pt\">Mentalities</span></b>",
+    "a single whole Docs heading must paste inline into the destination heading without a new block");
+// An intentional final blank paragraph is distinct from a copy-only separator.
+// Unicode may match the HTML serialization exactly or include one extra LF.
+const string docsFinalBlank = "<b id=\"docs-internal-guid-test\"><h2><span>Planing</span></h2><p><br></p></b>";
+foreach (var copiedFinalBlank in new[] { "Planing\r\n", "Planing\r\n\r\n" })
+{
+    var finalBlank = RichTextClipboard.TryCreateReplacement(CfHtml(docsFinalBlank), copiedFinalBlank, "Planning\n");
+    Assert(finalBlank.Applied && finalBlank.Text == "Planning\n"
+        && Fragment(finalBlank.Html) == docsFinalBlank.Replace(" id=\"docs-internal-guid-test\"", "").Replace("Planing", "Planning"),
+        "verified final blank paragraph must survive with and without an extra copied separator");
+}
+const string docsHeadingInsideList = "<b id=\"docs-internal-guid-test\"><ol><li aria-level=\"2\"><h2><span>Planing</span></h2></li><li aria-level=\"2\"><p><span>itme</span></p></li></ol></b>";
+var headingInsideList = RichTextClipboard.TryCreateReplacement(CfHtml(docsHeadingInsideList), "Planing\r\nitme\r\n", "Planning\nitem");
+Assert(headingInsideList.Applied && headingInsideList.Text == "Planning\nitem"
+    && Fragment(headingInsideList.Html) == docsHeadingInsideList.Replace(" id=\"docs-internal-guid-test\"", "").Replace("Planing", "Planning").Replace("itme", "item"),
+    "heading paragraphs inside numbered lists must preserve the original list and heading tags");
+const string docsSoftBreak = "<b id=\"docs-internal-guid-test\"><p><span>chek</span><br><span>line</span></p></b>";
+var softBreak = RichTextClipboard.TryCreateReplacement(CfHtml(docsSoftBreak), "chek\r\nline\r\n", "check\nline");
+Assert(softBreak.Applied && softBreak.Text == "check\nline"
+    && Fragment(softBreak.Html) == docsSoftBreak.Replace(" id=\"docs-internal-guid-test\"", "").Replace("chek", "check"),
+    "a real line break inside a Docs paragraph must retain its original br node");
+GoogleDocsClipboardTests.RunSelections(CfHtml);
 
 const long now = 10_000;
 const long freshness = 1_000;

@@ -37,13 +37,7 @@ internal static partial class RichTextClipboard
             return CreateLinkedInParagraphReplacement(fragment, sourceText, correctedText);
 
         if (GoogleDocsMarkerRegex().IsMatch(fragment))
-        {
-            var result = CreateGoogleDocsReplacement(fragment, sourceText, correctedText);
-            if (!result.Applied) return result;
-            var native = GoogleDocsClipboard.Rewrite(nativeDocsBase64, sourceText, result.Text, out var status);
-            return result with { NativeDocsBytes = native, NativeDocsStatus = status,
-                Mode = native is null ? result.Mode : "docs_native" };
-        }
+            return CreateGoogleDocsReplacement(fragment, sourceText, correctedText, nativeDocsBase64);
 
         // data-pm-slice is the stable marker in the captured ChatGPT selection.
         // Do not apply a structural assumption to a different HTML producer.
@@ -178,83 +172,109 @@ internal static partial class RichTextClipboard
             ? AddedLineBreakRegex().Replace(text, " ").TrimEnd(' ', '\t')
             : text;
 
+    // One verified selection model owns paragraph boundaries for both flavors.
+    // HTML distinguishes intentional final blanks from a copy-only separator;
+    // unfamiliar HTML shapes can still use the copied Unicode and native slice.
+    // Paragraph boundaries are
+    // source metadata: the correction may change words, never their count.
+    // CF_HTML and the native slice are then verified against that model
+    // independently, so an HTML shape the serializer does not know cannot
+    // block the native slice, which owns Docs' positional styles.
     private static RichTextReplacementResult CreateGoogleDocsReplacement(
-        string fragment, string sourceText, string correctedText)
+        string fragment, string sourceText, string correctedText, string nativeDocsBase64)
     {
-        // Docs uses its own producer marker and does not emit data-pm-slice.
-        // Verify the entire copied Unicode serialization before mapping, rather
-        // than treating unmatched nodes as omitted ChatGPT headings.
-        var paragraphs = GoogleDocsParagraphRegex().Matches(fragment);
-        var copied = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
-        var corrected = correctedText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
         var withoutCopyMarker = AppleInterchangeBreakRegex().Replace(fragment, "");
-        var serialized = paragraphs.Count == 0
-            ? GoogleDocsVisibleText(withoutCopyMarker)
-            : GoogleDocsVisibleText(GoogleDocsParagraphRegex().Replace(withoutCopyMarker,
-                p =>
+        var blocks = GoogleDocsBlockRegex().Matches(withoutCopyMarker).Count;
+        var copied = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        var serialized = GoogleDocsSerializedText(withoutCopyMarker, blocks);
+        var source = blocks > 0 && copied.EndsWith('\n') ? copied[..^1] : copied;
+        // An actual final blank paragraph already ends in LF. If the HTML
+        // serialization verifies, use it rather than trimming blindly.
+        if (copied == serialized || copied == serialized + "\n")
+            source = serialized;
+        var corrected = correctedText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        // One paragraph cannot gain paragraphs; never manufacture a block.
+        if (!source.Contains('\n'))
+            corrected = RemoveAddedLineBreaks(corrected);
+        var bodies = source.Split('\n');
+        var sections = corrected.Split('\n');
+        if (sections.Length == bodies.Length + 1 && sections[^1].Length == 0)
+            sections = sections[..^1];
+        if (sections.Length != bodies.Length)
+            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, blocks);
+        for (var i = 0; i < sections.Length; i++)
+        {
+            var original = bodies[i];
+            var leading = original.Length - original.TrimStart(' ', '\t').Length;
+            var trailing = original.Length - original.TrimEnd(' ', '\t').Length;
+            if (leading == original.Length)
+            {
+                // Blank paragraphs are intentional structure, never new text.
+                if (!string.IsNullOrWhiteSpace(sections[i]))
+                    return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, blocks);
+                sections[i] = original;
+            }
+            else
+                sections[i] = original[..leading] + sections[i].Trim(' ', '\t')
+                    + original[(original.Length - trailing)..];
+        }
+        corrected = string.Join("\n", sections);
+
+        var html = CreateGoogleDocsHtml(withoutCopyMarker, blocks, serialized, source, corrected);
+        var text = html.Applied ? html.Text : corrected;
+        var native = GoogleDocsClipboard.Rewrite(nativeDocsBase64, sourceText, text, out var status);
+        if (native is not null)
+            html = html.Applied
+                ? html with { Mode = "docs_native" }
+                : RichTextReplacementResult.CreateDocsNative(text, blocks);
+        return html with { ParagraphCount = blocks, NativeDocsBytes = native, NativeDocsStatus = status };
+    }
+
+    private static string GoogleDocsSerializedText(string fragment, int blocks)
+    {
+        var serialized = blocks == 0
+            ? GoogleDocsVisibleText(fragment)
+            : GoogleDocsVisibleText(GoogleDocsBlockRegex().Replace(fragment,
+                b =>
                 {
-                    var body = GoogleDocsVisibleText(p.Groups["body"].Value);
+                    var body = GoogleDocsVisibleText(b.Groups["body"].Value);
                     return (body == "\n" ? "" : body) + "\n";
                 }));
-        var expectedSource = paragraphs.Count > 0 && serialized.EndsWith('\n')
-            ? serialized[..^1] : serialized;
-        var bodies = expectedSource.Split('\n');
-        if (copied != expectedSource && (paragraphs.Count == 0 || copied != expectedSource + "\n"))
-            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+        if (blocks > 0 && serialized.EndsWith('\n'))
+            serialized = serialized[..^1];
+        return serialized;
+    }
 
-        // No block markup means an inline selection (including heading text).
-        // Never manufacture a paragraph or copy-only trailing list separator.
-        if (paragraphs.Count == 0)
-        {
-            if (!copied.Contains('\n'))
-                corrected = RemoveAddedLineBreaks(corrected);
-        }
-        else
-        {
-            // All visible text must belong to the verified paragraphs; tables,
-            // mixed inline/block captures and omitted text need explicit support.
-            if (GoogleDocsVisibleText(GoogleDocsParagraphRegex().Replace(fragment, "")).Trim().Length != 0)
-                return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText, paragraphs.Count);
-            var sections = corrected.Split('\n');
-            if (sections.Length == bodies.Length + 1 && sections[^1].Length == 0)
-                sections = sections[..^1];
-            if (sections.Length != bodies.Length)
-                return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
-            for (var i = 0; i < sections.Length; i++)
-            {
-                var original = bodies[i];
-                var leading = original.Length - original.TrimStart(' ', '\t').Length;
-                var trailing = original.Length - original.TrimEnd(' ', '\t').Length;
-                if (leading == original.Length)
-                {
-                    if (!string.IsNullOrWhiteSpace(sections[i]))
-                        return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
-                    sections[i] = original;
-                }
-                else
-                    sections[i] = original[..leading] + sections[i].Trim(' ', '\t')
-                        + original[(original.Length - trailing)..];
-            }
-            corrected = string.Join("\n", sections);
-        }
+    private static RichTextReplacementResult CreateGoogleDocsHtml(
+        string fragment, int blocks, string serialized, string source, string corrected)
+    {
+        // HTML must verify independently; an unfamiliar shape cannot block a
+        // verified native slice, and unmatched nodes are never omitted text.
+        if (serialized != source)
+            return RichTextReplacementResult.NotApplied("model_mismatch", corrected);
+        // All visible text must belong to the verified blocks; tables,
+        // mixed inline/block captures and omitted text need explicit support.
+        if (blocks > 0 && GoogleDocsVisibleText(GoogleDocsBlockRegex().Replace(fragment, "")).Trim().Length != 0)
+            return RichTextReplacementResult.NotApplied("unsupported_fragment", corrected);
+
         // The producer ID points back to Docs' cached, original document slice.
         // Reusing it can paste the original typo and its terminal paragraph
         // instead of our edited HTML. Recognize it at capture, never emit it.
-        withoutCopyMarker = GoogleDocsMarkerRegex().Replace(withoutCopyMarker,
+        fragment = GoogleDocsMarkerRegex().Replace(fragment,
             marker => GoogleDocsCopyIdRegex().Replace(marker.Value, ""));
 
-        // Docs exports even a selection inside one list item as ol/li/p.
-        // A single paragraph needs only its inline formatting. Removing the
-        // exported block avoids importing layout relative to the current item;
-        // keep the destination's block instead.
-        if (paragraphs.Count == 1 && bodies.Length == 1)
-            withoutCopyMarker = GoogleDocsBlockTagRegex().Replace(withoutCopyMarker, "");
-        if (TryAlignTextNodes(withoutCopyMarker, expectedSource, corrected, out var aligned, normalizeNbsp: true))
-            return aligned with { ParagraphCount = paragraphs.Count };
-        return RichTextReplacementResult.NotApplied("unsupported_fragment", corrected, paragraphs.Count);
+        // Docs exports even a selection inside one list item or heading as a
+        // block. A single paragraph needs only its inline formatting. Removing
+        // the exported block avoids importing layout relative to the current
+        // paragraph; keep the destination's block instead.
+        if (blocks == 1 && !source.Contains('\n'))
+            fragment = GoogleDocsBlockTagRegex().Replace(fragment, "");
+        return TryAlignTextNodes(fragment, source, corrected, out var aligned, normalizeNbsp: true)
+            ? aligned
+            : RichTextReplacementResult.NotApplied("unsupported_fragment", corrected);
     }
 
-    [GeneratedRegex(@"</?(?:ol|ul|li|p)\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"</?(?:ol|ul|li|p|h[1-6])\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GoogleDocsBlockTagRegex();
 
     [GeneratedRegex("\\s+id\\s*=\\s*(?:\"docs-internal-guid-[^\"]+\"|'docs-internal-guid-[^']+')", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -891,8 +911,9 @@ internal static partial class RichTextClipboard
     [GeneratedRegex("<br\\b[^>]*class=[\"']Apple-interchange-newline[\"'][^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AppleInterchangeBreakRegex();
 
-    [GeneratedRegex("<p\\b[^>]*>(?<body>.*?)</p>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
-    private static partial Regex GoogleDocsParagraphRegex();
+    // Docs exports each document paragraph as p or h1-h6 (list items wrap p).
+    [GeneratedRegex("<(?<tag>p|h[1-6])\\b[^>]*>(?<body>.*?)</\\k<tag>\\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex GoogleDocsBlockRegex();
 
     [GeneratedRegex("<[^>]+>", RegexOptions.CultureInvariant)]
     private static partial Regex HtmlTagRegex();
@@ -968,6 +989,16 @@ internal sealed record RichTextReplacementResult(
         Text: text,
         Html: html,
         Mode: "aligned_html",
+        Attempted: true,
+        Applied: true,
+        Reason: "",
+        ParagraphCount: paragraphCount);
+
+    // Verified Docs native slice beside Unicode, when CF_HTML could not be verified.
+    public static RichTextReplacementResult CreateDocsNative(string text, int paragraphCount) => new(
+        Text: text,
+        Html: "",
+        Mode: "docs_native",
         Attempted: true,
         Applied: true,
         Reason: "",

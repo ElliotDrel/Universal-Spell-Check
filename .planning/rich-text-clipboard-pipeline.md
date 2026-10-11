@@ -2,6 +2,56 @@
 
 ## Status
 
+### One Docs paragraph model; headings no longer block native (2026-10-11, reviewed; editor retest pending)
+
+Sanitized failure: an `h2` heading followed by a four-item `ul`, copied
+Unicode heading + items separated by CRLF plus one terminal separator. The
+Docs mapper counted only `p` blocks, saw four paragraphs instead of five and
+returned `model_mismatch`; the native slice, which carries heading level/ID
+and list styles, was never attempted because it was gated on HTML success.
+
+Root cause is that HTML block serialization owned both the paragraph
+boundaries and the native gate. Now one selection model owns them. Verified
+HTML serialization distinguishes an intentional final blank from a copy-only
+separator; copied Unicode supplies the model for unfamiliar HTML shapes.
+The correction is normalized against that model once; changed paragraph counts and filled
+blank paragraphs decline. CF_HTML (serializer now treats `p` and `h1`-`h6` as
+blocks) and native are verified against that model independently. A verified
+native slice is emitted with Unicode even when the HTML shape is not
+understood (`docs_native`, empty `paste_html`); the clipboard writer now
+supports that combination. A single whole heading block is unwrapped to its
+inline spans, like a single list paragraph. The native copy-only LF rule from
+the entry below is unchanged; it now receives the common selection target.
+
+Behavior changes beyond headings: inline selections also keep source edge
+whitespace; single-paragraph model line breaks are collapsed instead of
+declining; the plain fallback after a verified paragraph model pastes the
+normalized text (no model terminal newline). Primary review found and repaired
+the initial proposal's unconditional separator trimming: an intentional final
+blank now survives whether copied Unicode includes an additional separator or
+matches HTML serialization exactly. The added regression failed before repair.
+
+Tested (mapper only, no clipboard): changed and unchanged heading + list HTML
+and native (heading ID on remapped delimiter, list nesting, link/bold/font
+transitions, final-item trailing styles, no terminal LF), mixed paragraph /
+multi-node heading / blank / list, structural rejections, whole-heading inline
+paste, native-only with an unmodeled HTML block, final intentional blank with
+and without a copy-only separator, heading inside a list, an in-paragraph br,
+and all prior regressions.
+Primary verification: the formatting suite and Dev build pass, and six real native replays
+(latest heading plus four single/multiline captures and the changed six-paragraph
+variant) emit matching native/Unicode text without a final separator. Native
+style marker values, heading properties, list entities and other source metadata
+remain unchanged; only offsets and the removed delimiter's trailing styles move.
+Additional native regressions distinguish the same terminal LF used as a single
+heading's copy separator versus a real break before an intentional final blank.
+
+Rendering remains unverified: the original heading selection and the new
+native-without-HTML fallback still require Docs acceptance. Unsupported positional
+embedded objects and suggestions retain the established HTML/text fallback.
+This is a shared mechanism for text selections, not a claim of complete support
+for every Docs object type.
+
 ### Native terminal separator assumption superseded (2026-10-11 09:38 Eastern)
 
 Run `07cdf3a31dbb4e3c8e67f347f34c0049` proves the native copy can also

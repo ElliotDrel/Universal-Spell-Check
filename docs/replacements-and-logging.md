@@ -267,7 +267,10 @@ persist native payloads: the bounded captured bytes are used only in memory
 for Docs paste. Headless requests remain unchanged. Native replacements log
 `rich_text.mode=docs_native`, `native_docs_status`, `native_docs_bytes`, and
 `clipboard_native_verification` (`exact_match` confirms the binary clipboard
-format survived the write). Enabled evidence saves requested/readback native
+format survived the write). `native_docs_status` is now reported whenever the
+common selection model verifies, even if CF_HTML did not; a `docs_native` run
+with `rich_text.replacement_html_chars=0` wrote only Unicode plus the native slice because its
+HTML block shape could not be verified. Enabled evidence saves requested/readback native
 base64 sidecars. Replay export hydrates and integrity-checks the native source
 so replay exercises the same path.
 
