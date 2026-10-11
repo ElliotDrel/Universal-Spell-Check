@@ -59,7 +59,7 @@ internal static class FormattingReplay
             mapperExceptionType = ex.GetType().Name;
         }
         var current = new ReplayResult(replacement.Text, replacement.Html, replacement.Mode, replacement.Reason,
-            replacement.Attempted, replacement.Applied, replacement.ParagraphCount, replacement.ContentUnchanged);
+            replacement.Attempted, replacement.Applied, replacement.ParagraphCount);
         bool? recordedMatches = null;
         if (OptionalComplete(detail, "paste_text", out var recordedText)
             && OptionalComplete(detail, "paste_html", out var recordedHtml))
@@ -120,7 +120,7 @@ internal static class FormattingReplay
 }
 
 internal sealed record ReplayResult(string text, string html, string mode, string reason,
-    bool attempted, bool applied, int paragraph_count, bool content_unchanged);
+    bool attempted, bool applied, int paragraph_count);
 internal sealed record ReplayOutput(int schema_version, string scope, string current_app_version,
     string? current_build, JsonElement source, ReplayResult result, bool? recorded_matches,
     bool? expected_matches, string? mapper_exception_type, List<string> warnings);

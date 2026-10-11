@@ -2,28 +2,6 @@
 
 ## Status
 
-### Unchanged nested-list paste (2026-10-11 follow-up)
-
-Single-item run `7523158d8d824530bc9383e39692fee2` used the copy-ID fix;
-its automatic before/after images show the same list item without an added line.
-The following run `0ac375c0fb364a0b8e7e18ab2d996168` selected six paragraphs
-(a heading and five child items). The model changed no words, only Markdown
-hard-break spaces. The mapper restored the verified original text, yet the app
-pasted the unchanged block and Docs created an empty top-level item "6.".
-Removing the cached copy ID therefore does not establish multi-item acceptance.
-
-The mapper now identifies unchanged content only after full producer-specific
-serialization verification, source edge-whitespace restoration, and successful
-alignment. In the same identified source window/title, the coordinator keeps
-the corrected clipboard/history write but skips Ctrl+V. It records
-`paste_method=none_unchanged`, `text_changed=false`,
-`replace_skipped reason=verified_content_unchanged`, and an `after-no-change`
-evidence image with no paste-issued timestamp. A changed or unidentified
-destination still receives the requested paste. Genuine text changes and
-unverified mappings are never suppressed. This removes an unnecessary document
-operation; changed multi-paragraph/list imports remain an unresolved acceptance
-case, not a claimed fixed path.
-
 ### Retest rejects the block-only diagnosis (2026-10-11 08:50 Eastern)
 
 Run `e504e1b96e784e94a481ffd44cf485c3` used the rebuilt inline-only Dev code.

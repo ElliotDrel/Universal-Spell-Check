@@ -58,12 +58,6 @@ The command restarts Prod through its native updater. Every startup checks, down
 19. In installed Prod, invoke `--restart` and its `--update` alias while running and closed. Verify exactly one informational notice on success, and a restart even when already current. On normal launch with an available release, verify automatic installation without a click. A failed check/download must notify and leave the current version usable. Background checks prepare updates for the next restart. Repeat a command during restart and verify no duplicate notice or helper. Start a correction before requesting restart: its paste must finish, and new hotkeys must be blocked during shutdown/startup updating. Dev must reject both flags with exit `1`.
 
 20. In Google Docs, select the text of one nested list item and verify there is no new blank line or list item after correction; the emitted fragment should be inline and omit the original `docs-internal-guid-` copy ID. Verify the actual words are corrected too; exact clipboard readback alone is insufficient. Then select two nested numbered/bulleted items, correct them with Dev, and verify their bullet/number styles and indentation remain intact without an extra empty final item. Repeat with a styled inline heading, bold/link spans, and an intentional blank paragraph. Confirm `aligned_html` and exact HTML readback when developer logging is enabled.
-For an unchanged nested Docs list, verify the document and selection stay
-untouched, `paste_method=none_unchanged`, `text_changed=false`, and
-`replace_skipped reason=verified_content_unchanged`. Introduce an actual typo:
-that run must still paste. Verify a changed destination still receives the
-requested text.
-
 21. In the prompt editor, select one paragraph containing a skill or pasted Google Drive document-reference chip and text needing correction. Verify the chip remains usable and no model-added line break appears beside it. Repeat with intentional multiple paragraphs; keep those breaks.
 
 ## Top-of-mind reminders

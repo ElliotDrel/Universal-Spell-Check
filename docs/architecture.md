@@ -83,12 +83,6 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 9. **Post-process and restore** — `SetPhase(Pasting)` (overlay reads "Pasting..."), then `TextPostProcessor.Process(output, protection)`. Strips an exact echoed input followed by a correction divider, applies replacements, strips prompt-leak text, and restores every protected literal byte-for-byte. Missing or duplicated placeholders fail safely without a paste.
 10. **Format for paste** — recapture the current foreground context and run the optional frozen before-paste hook. Before-paste rules receive formatter-neutral, private-use placeholders; a missing or duplicated placeholder skips the optional formatting and uses the already-corrected text.
 11. **Paste** — write corrected Unicode text, plus `CF_HTML` for verified rich selections, to the clipboard (untagged so it IS kept in history). Even if rich reconstruction declines or throws, write the corrected Unicode text and paste it. Wait for the existing settle delay and send Ctrl+V to whichever app is active. Switching apps while the request runs does not change the destination behavior.
-For a verified Docs mapping whose normalized content is unchanged, skip Ctrl+V
-when the source and current destination HWND, PID, and title match. Keep the
-replacement clipboard/history write, record `none_unchanged` and
-`replace_skipped`, and leave the editor selection/document untouched. Another
-or unidentified destination still receives the normal paste.
-
 12. Log `replace_succeeded` with target-formatting metadata and separate hook timings.
 13. `SetPhase(Done)` in `RunAsync` the moment the hot path returns — loading overlay hides even on failure, and **before** the original-clipboard restore, which can block for seconds on failed runs while the OS renders the original clipboard formats.
 

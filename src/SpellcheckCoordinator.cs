@@ -398,22 +398,6 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             record.T_PasteTargetCheck = Stopwatch.GetTimestamp();
             record.ActiveWindowAtPaste = ActiveWindowInfo.Capture();
-            // Copy serialization/AI Markdown can differ without changing the
-            // verified Docs content. Do not reimport its list just to replace
-            // identical words. Keep cross-window paste behavior unchanged.
-            if (ShouldSkipUnchangedPaste(record.RichTextReplacement,
-                    record.ActiveWindowAtStart, record.ActiveWindowAtPaste))
-            {
-                record.PasteMethod = "none_unchanged";
-                record.OutputText = record.RichTextReplacement.Text;
-                record.TextChanged = false;
-                record.Status = RunStatus.Success;
-                record.Events.Add("replace_skipped reason=verified_content_unchanged");
-                record.T_PasteAck = Stopwatch.GetTimestamp();
-                record.Evidence?.CaptureContext("after-no-change", record.ActiveWindowAtPaste);
-                record.T_HotPathReturned = Stopwatch.GetTimestamp();
-                return record;
-            }
             record.Evidence?.MarkPasteIssued();
 
             try
@@ -452,14 +436,6 @@ internal sealed class SpellcheckCoordinator : IDisposable
             return record;
         }
     }
-
-    internal static bool ShouldSkipUnchangedPaste(
-        RichTextReplacementResult replacement, ActiveWindowInfo source, ActiveWindowInfo destination) =>
-        replacement.Applied && replacement.ContentUnchanged
-        && source.WindowHandle != IntPtr.Zero
-        && source.WindowHandle == destination.WindowHandle
-        && source.ProcessId == destination.ProcessId
-        && source.WindowTitle == destination.WindowTitle;
 
     // Guard against one pathological selection producing a multi-megabyte log
     // line. Real styled email and document fragments land well under this.

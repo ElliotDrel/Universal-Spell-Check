@@ -37,20 +37,6 @@ var docsSingleParagraph = RichTextClipboard.TryCreateReplacement(CfHtml("<b id=\
 Assert(docsSingleParagraph.Applied && docsSingleParagraph.Text == "check"
     && Fragment(docsSingleParagraph.Html) == "<b><span>check</span></b>",
     "single Docs paragraph must omit copy-only block boundary and model terminal newline");
-var docsNoChange = RichTextClipboard.TryCreateReplacement(CfHtml(docsList), "chek tasks \r\nMove teh tasks\r\n", "chek tasks  \nMove teh tasks");
-var docsWindow = new ActiveWindowInfo { WindowHandle = new IntPtr(101), ProcessId = 22, WindowTitle = "Sample - Google Docs" };
-Assert(docsNoChange.Applied && docsNoChange.ContentUnchanged
-    && SpellcheckCoordinator.ShouldSkipUnchangedPaste(docsNoChange, docsWindow, docsWindow),
-    "unchanged verified Docs words must skip Ctrl+V even when the model changes Markdown spaces and copied CRLF");
-Assert(!docsNested.ContentUnchanged
-    && !SpellcheckCoordinator.ShouldSkipUnchangedPaste(docsNested, docsWindow, docsWindow),
-    "a genuine correction must still paste");
-Assert(!SpellcheckCoordinator.ShouldSkipUnchangedPaste(docsNoChange, docsWindow,
-        new ActiveWindowInfo { WindowHandle = new IntPtr(102), ProcessId = 22, WindowTitle = docsWindow.WindowTitle })
-    && !SpellcheckCoordinator.ShouldSkipUnchangedPaste(docsNoChange, docsWindow,
-        new ActiveWindowInfo { WindowHandle = docsWindow.WindowHandle, ProcessId = 22, WindowTitle = "Another Doc" })
-    && !SpellcheckCoordinator.ShouldSkipUnchangedPaste(docsNoChange, new ActiveWindowInfo(), new ActiveWindowInfo()),
-    "no-change suppression must not discard a requested paste into another or unidentified destination");
 const string docsStyled = "<b id=\"docs-internal-guid-test\"><span style=\"font-weight:700\">chek</span><span>&nbsp;</span><a href=\"https://example.test\">link</a></b>";
 var docsStyle = RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "chek link", "check link");
 Assert(docsStyle.Applied && Fragment(docsStyle.Html) == docsStyled.Replace("chek", "check").Replace(" id=\"docs-internal-guid-test\"", ""),
