@@ -96,9 +96,6 @@ rich-text mapper: original `input_text` + `clipboard_html` + recorded post-proce
 For Docs, an available full `clipboard_chromium_mime_base64` is also hydrated
 and remapped; replay returns the native status and generated binary as base64.
 It does not rerun AI, replacements, target hooks, RTF, or the destination's rendering behavior.
-For verified native Docs captures, `result.paragraph_edits` also exposes the
-pure inline-only paragraph plan when supported. A plan is diagnostic data:
-it does not run the unused guarded executor or enable the live paste branch.
 
 ```powershell
 New-Item -ItemType Directory -Force formatting_replay_runs

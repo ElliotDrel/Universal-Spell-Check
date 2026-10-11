@@ -128,7 +128,6 @@ Assert(softBreak.Applied && softBreak.Text == "check\nline"
     && Fragment(softBreak.Html) == docsSoftBreak.Replace(" id=\"docs-internal-guid-test\"", "").Replace("chek", "check"),
     "a real line break inside a Docs paragraph must retain its original br node");
 GoogleDocsClipboardTests.RunSelections(CfHtml);
-DocsParagraphPasteTests.Run(CfHtml);
 
 const long now = 10_000;
 const long freshness = 1_000;
