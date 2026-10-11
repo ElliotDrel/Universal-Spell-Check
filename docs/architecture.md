@@ -85,8 +85,9 @@ Serialized via `SemaphoreSlim(1, 1)`. Overlapping hotkey presses are rejected (`
 Docs corrections also retain the bounded original Chromium native slice before
 history exclusion. `GoogleDocsClipboard` verifies its text against the copied
 selection and remaps sparse style positions with the same character diff. It
-retains final paragraph/list styles and the native slice's exact end boundary;
-Unicode's copy-only separator is not substituted for that boundary. It removes
+retains final paragraph/list styles and uses verified HTML paragraph boundaries;
+a copy-only terminal LF can occur in native data too. When removed, its list and
+paragraph styles become trailing styles for the final partial paragraph. It removes
 the original cache ID and emits edited custom MIME beside Unicode/HTML. Only
 verified slices without positional embedded content/suggestions use this path;
 unsupported native data retains the existing corrected HTML/text fallback.

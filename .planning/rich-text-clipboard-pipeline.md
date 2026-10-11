@@ -2,6 +2,28 @@
 
 ## Status
 
+### Native terminal separator assumption superseded (2026-10-11 09:38 Eastern)
+
+Run `07cdf3a31dbb4e3c8e67f347f34c0049` proves the native copy can also
+contain a copy-only final LF. Before-image selection contains one item; the
+requested Unicode/HTML contain no newline, but native requested/readback data
+contains the LF and the after-image shows an empty `c.` item. The previous
+native repair deliberately restored that LF. Its test incorrectly called it
+a real selected break; that assumption and test are superseded.
+
+The native rewrite now follows the mapper's verified HTML paragraph count and
+removes exactly one excess terminal LF. The removed delimiter's paragraph/list
+styles move to `stsl_trailing`, matching captured partial native slices, so
+indentation survives without inserting an empty item. Internal breaks and final
+breaks retained by verified HTML remain. Changed and unchanged text both paste.
+No new editor integration, skip behavior, or logging layer is added.
+Verification: the full formatting suite and Dev build pass. Five native
+replays (latest single item, two earlier single items, six-paragraph unchanged
+text and its changed-word variant) emit native text identical to replacement
+Unicode with no final LF. Regressions cover changed/unchanged single and multiple
+items, final-item indentation/nesting, UTF-16 offsets, and intentional breaks.
+Original-editor retest remains required; replay verifies the emitted payload.
+
 ### Native Docs slice repair; unchanged-text skip removed (2026-10-11)
 
 Elliot explicitly rejected skipping unchanged text. Commit `24007d2` reverts
@@ -14,8 +36,8 @@ empty top-level item. The native slice carries the selection boundary HTML lost.
 
 `GoogleDocsClipboard` reads Chromium's bounded Pickle string map, validates the
 slice text, and remaps non-null sparse style offsets through the existing
-bounded alignment diff. The native text's final break (if actually present),
-leading/trailing styles, list identities, and inline style transitions survive.
+bounded alignment diff. Leading/trailing styles, list identities, and inline style transitions survive.
+The final-break assumption here is superseded by the captured retest above.
 Unchanged text also emits a native replacement. Original internal clip IDs are
 removed so edited content cannot retrieve the original cached slice. Native
 suggestions and position-bearing embedded content are declined explicitly,
@@ -31,8 +53,8 @@ only in memory. Mapper replay includes native source/output and the exporter
 hydrates it with integrity checks. Source-editor acceptance remains separate.
 
 Verification: native formatting regressions (including changed/unchanged text,
-style positions, nested list IDs, partial final paragraphs, a real selected
-terminal break, supplementary Unicode and corrupt/mismatched source rejection),
+style positions, nested list IDs, partial final paragraphs, a terminal-break fixture
+subsequently superseded above, supplementary Unicode and corrupt/mismatched source rejection),
 three integrity-checked native incident replays, and a changed-word variant of
 the six-paragraph capture pass. Changed and unchanged six-paragraph outputs both
 have exactly five internal breaks and no final break. Fourteen log-reader tests,

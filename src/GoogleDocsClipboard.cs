@@ -4,8 +4,8 @@ using System.Text.Json.Nodes;
 
 namespace UniversalSpellCheck;
 
-// Docs' slice distinguishes a partial final paragraph from a copied paragraph
-// break. HTML alone loses that boundary and imports an extra list item.
+// Native paragraph/list metadata preserves indentation. The verified HTML
+// text determines boundaries: Docs can append a copy-only LF to its slice too.
 internal static class GoogleDocsClipboard
 {
     internal const string SliceType = "application/x-vnd.google-docs-document-slice-clip+wrapped";
@@ -28,10 +28,12 @@ internal static class GoogleDocsClipboard
             if (source != copied && source + "\n" != copied)
                 { status = "source_mismatch"; return null; }
             var target = replacementText;
-            // Unicode adds a copy-only separator in either case. The native
-            // slice tells us whether a real final paragraph break was selected.
-            if (source.EndsWith('\n') && source == copied && !target.EndsWith('\n')) target += "\n";
-            if (source.Count(c => c == '\n') != target.Count(c => c == '\n'))
+            // Use the mapper's verified paragraph structure, never restore a
+            // separator just because the native copy contains it.
+            var trimCopyBreak = source.EndsWith('\n')
+                && source.Count(c => c == '\n') == target.Count(c => c == '\n') + 1;
+            var alignmentSource = trimCopyBreak ? source[..^1] : source;
+            if (alignmentSource.Count(c => c == '\n') != target.Count(c => c == '\n'))
                 { status = "paragraph_mismatch"; return null; }
             // Position-bearing embedded content needs its own verified mapping.
             foreach (var key in new[] { "dsl_entitypositionmap", "dsl_relateddocslices", "dsl_nestedmodelmap", "dsl_drawingrevisionaccesstokenmap" })
@@ -42,7 +44,7 @@ internal static class GoogleDocsClipboard
                     { status = "unsupported_suggestions"; return null; }
             if (slice["autotext_content"] is not JsonObject autotext || autotext.Count != 0)
                 { status = "unsupported_autotext"; return null; }
-            var positions = MapPositions(source, target);
+            var positions = MapPositions(alignmentSource, target);
             if (positions is null) { status = "paragraph_edit"; return null; }
             foreach (var key in new[] { "dsl_styleslices", "dsl_metastyleslices" })
             {
@@ -55,7 +57,16 @@ internal static class GoogleDocsClipboard
                     {
                         if (old[i] is null) continue;
                         if (i > source.Length) { status = "invalid_style_offset"; return null; }
-                        var position = positions[i];
+                        if (trimCopyBreak && i == source.Length - 1
+                            && style["stsl_type"]!.GetValue<string>() is "paragraph" or "list")
+                        {
+                            // A removed delimiter's style belongs to the final
+                            // partial paragraph, as in Docs' own partial slices.
+                            style["stsl_trailing"] = old[i]!.DeepClone();
+                            style["stsl_trailingType"] = style["stsl_type"]!.DeepClone();
+                            continue;
+                        }
+                        var position = positions[Math.Min(i, alignmentSource.Length)];
                         while (mapped.Count <= position) mapped.Add(null);
                         mapped[position] = old[i]!.DeepClone();
                     }
