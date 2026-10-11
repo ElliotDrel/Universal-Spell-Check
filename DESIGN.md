@@ -277,6 +277,4 @@ After visual changes, verify in this order:
 
 The app mark combines a white lowercase a and checkmark on a rounded square: forest green for Prod, golden yellow for Dev. Source PNGs and multi-resolution Windows ICOs live in `src/Assets/`. The same channel mark appears in the tray, dashboard title/taskbar, sidebar, executable, and packaged Windows shortcuts. The prior generic Windows icon and runtime orange overlay are superseded.
 
-Artwork prompt (built-in image generation): bold white a integrated with a checkmark, flat forest-green rounded-square tile, transparent outside (the original white backing is superseded), thick strokes legible at 16 pixels; Dev changes only the tile to golden yellow.
-
-The exterior white backing is removed by an edge-connected flood fill; the enclosed white glyph and colored tile remain opaque. PNGs retain alpha and all eight ICO sizes (16, 20, 24, 32, 48, 64, 128, 256) preserve transparent corners.
+Prod uses Elliot's corrected logo-no-outline.png, moved from Downloads to src/Assets/logo.png on 2026-10-11. It supersedes the generated green image and its background-removal variants. The PNG is preserved unchanged; its Windows ICO uses transparent square padding to preserve the artwork's aspect ratio. Dev retains the approved yellow PNG and ICO unchanged. Both ICOs contain 16, 20, 24, 32, 48, 64, 128, and 256 pixel sizes.
