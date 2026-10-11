@@ -181,6 +181,8 @@ internal sealed class DeveloperEvidence
             var payloads = new Dictionary<string, object>();
             foreach (var (name, value) in new Dictionary<string, string?>
             {
+                ["docs_paragraph_edits"] = run.DocsParagraphEdits is null ? null : JsonSerializer.Serialize(run.DocsParagraphEdits),
+                ["docs_paragraph_verification_native_base64"] = run.DocsParagraphPaste?.VerificationNative,
                 ["input_text"] = run.InputText, ["clipboard_html"] = run.CapturedHtml,
                 ["clipboard_rtf"] = run.CapturedRtf, ["clipboard_formats"] = run.ClipboardFormats,
                 ["clipboard_chromium_mime_base64"] = run.CapturedChromiumMimeStatus == "ok" ? run.CapturedChromiumMimeBase64 : null,

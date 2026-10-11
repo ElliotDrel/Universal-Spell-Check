@@ -372,11 +372,15 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 record.Events.Add($"rich_text_failed error_type={ex.GetType().Name}");
             }
 
+            var docsEdits = BuildChannel.IsDev && record.RichTextReplacement.NativeDocsStatus == "ok"
+                ? RichTextClipboard.CreateDocsParagraphEdits(record.CapturedHtml, capture.Text!, record.RichTextReplacement.Text)
+                : null;
+
             // Paste into whichever app is active when the correction is ready.
             record.T_PasteIssued = Stopwatch.GetTimestamp();
             record.ReplacementClipboard = await ClipboardLoop.TrySetReplacementTextAsync(
                 record.RichTextReplacement.Text,
-                record.RichTextReplacement.Html, record.Evidence is not null, record.RichTextReplacement.NativeDocsBytes);
+                record.RichTextReplacement.Html, record.Evidence is not null && docsEdits is null, record.RichTextReplacement.NativeDocsBytes);
             if (record.ReplacementClipboard.Success)
             {
                 record.CorrectedTextOnClipboard = true;
@@ -402,16 +406,40 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             try
             {
-                SendKeys.SendWait("^v");
+                if (docsEdits is not null && record.ActiveWindowAtPaste.WindowHandle == record.ActiveWindowAtStart.WindowHandle)
+                {
+                    record.PasteMethod = "docs_paragraphs";
+                    record.DocsParagraphEdits = docsEdits;
+                    record.DocsParagraphPaste = await DocsParagraphPaste.PasteAsync(
+                        docsEdits, capture.ChromiumMimeBase64, record.ActiveWindowAtPaste.WindowHandle, _clipboardOwnerHandle?.Invoke());
+                    // Verification copies are temporary: retain the full correction afterward.
+                    record.ReplacementClipboard = await ClipboardLoop.TrySetReplacementTextAsync(
+                        record.RichTextReplacement.Text, record.RichTextReplacement.Html,
+                        record.Evidence is not null, record.RichTextReplacement.NativeDocsBytes);
+                    record.CorrectedTextOnClipboard = record.ReplacementClipboard.Success;
+                    if (!record.DocsParagraphPaste.Success)
+                    {
+                        record.PasteFailurePhase = record.DocsParagraphPaste.Stage;
+                        throw new InvalidOperationException($"Docs repair stopped: {record.DocsParagraphPaste.Completed}/{docsEdits.Length} paragraphs verified, {record.DocsParagraphPaste.Attempted} pastes attempted. Undo may require several presses.");
+                    }
+                    if (!record.ReplacementClipboard.Success)
+                    {
+                        record.PasteFailurePhase = "restore_corrected_clipboard";
+                        throw new InvalidOperationException("Docs text verified, but the full correction could not be retained on the clipboard.");
+                    }
+                }
+                else
+                    SendKeys.SendWait("^v");
             }
             catch (Exception ex)
             {
                 record.Status = RunStatus.PasteFailed;
                 record.ErrorMessage = ex.Message;
                 record.PasteErrorType = ex.GetType().Name;
-                record.PasteFailurePhase = "send_ctrl_v";
+                record.PasteFailurePhase ??= "send_ctrl_v";
                 record.Events.Add("paste_failed");
-                _notify("Paste failed", "The corrected text is on the clipboard, but could not be pasted automatically.");
+                record.Evidence?.CaptureContext("after-paste", record.ActiveWindowAtPaste!, afterPaste: true);
+                _notify("Paste failed", record.PasteMethod == "docs_paragraphs" ? ex.Message : "The corrected text is on the clipboard, but could not be pasted automatically.");
                 record.T_PasteAck = Stopwatch.GetTimestamp();
                 record.T_HotPathReturned = Stopwatch.GetTimestamp();
                 return record;
@@ -547,6 +575,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
                     : r.ActiveWindowAtPaste?.WindowTitle ?? "",
                 paste_target_exe = r.ActiveWindowAtPaste?.ProcessName ?? "",
                 paste_method = r.PasteMethod,
+                docs_paragraph_paste = r.DocsParagraphPaste is null ? null : new { total = r.DocsParagraphEdits?.Length, completed = r.DocsParagraphPaste.Completed, attempted = r.DocsParagraphPaste.Attempted, verified = r.DocsParagraphPaste.Success, stage = r.DocsParagraphPaste.Stage },
                 paste_failure_phase = r.PasteFailurePhase,
                 paste_error_type = r.PasteErrorType,
                 corrected_text_on_clipboard = r.CorrectedTextOnClipboard,

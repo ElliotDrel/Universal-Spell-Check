@@ -342,3 +342,10 @@ The final rebuilt Dev native smoke passed again (PID 13196, run
 `7deef858b13a4cd3b05d77ba20abce96`, capture scheduling 3ms). The actual Dev dashboard then
 disabled the setting and a second normal Notepad correction succeeded without developer evidence
 (run `7ad4a5999ea54a93ab2bfee465f87bf6`). Dev settings were left disabled.
+
+
+### Guarded Docs paragraph test (Dev)
+
+Dev now uses `DocsParagraphPaste` for supported multiline Docs selections: replace inline paragraph text in reverse order, leave existing delimiters in place, and freshly verify each source and replacement. Every paragraph is pasted, including unchanged text. Final copied native list/heading/indent signatures must match the original. Stop on mismatch without falling back to a structural paste; several Undo presses may be necessary. Live editor acceptance remains pending. Unsupported selections retain the existing paste path.
+
+`paste_method=docs_paragraphs` identifies this path. `docs_paragraph_paste` records total, attempted, completed, verified, and failure stage. Developer evidence stores `docs_paragraph_edits` and final `docs_paragraph_verification_native_base64`. For this method, the existing full `paste_*` fields describe the correction retained on the clipboard afterward; individual edit payloads describe actual pastes.

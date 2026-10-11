@@ -206,3 +206,10 @@ Triggered by `v*.*.*` tags. Steps: checkout → dotnet publish Release win-x64 �
 - `fine_tune_runs/` — one dated folder per fine-tune run: train/val JSONL, finetune_job.json, benchmark.json, summary.md.
 - `benchmark_runs/` — one dated folder per standalone benchmark run.
 - `tests/` — pytest suites for Python fine-tune dataset tooling. Reference `replacements.json` at repo root.
+
+
+### Guarded Docs paragraph test (Dev)
+
+Dev now uses `DocsParagraphPaste` for supported multiline Docs selections: replace inline paragraph text in reverse order, leave existing delimiters in place, and freshly verify each source and replacement. Every paragraph is pasted, including unchanged text. Final copied native list/heading/indent signatures must match the original. Stop on mismatch without falling back to a structural paste; several Undo presses may be necessary. Live editor acceptance remains pending. Unsupported selections retain the existing paste path.
+
+`paste_method=docs_paragraphs` identifies this path. `docs_paragraph_paste` records total, attempted, completed, verified, and failure stage. Developer evidence stores `docs_paragraph_edits` and final `docs_paragraph_verification_native_base64`. For this method, the existing full `paste_*` fields describe the correction retained on the clipboard afterward; individual edit payloads describe actual pastes.
