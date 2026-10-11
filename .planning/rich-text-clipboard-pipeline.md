@@ -2,6 +2,24 @@
 
 ## Status
 
+### Single-paragraph Docs extra line (2026-10-11 08:40 Eastern)
+
+Run `91cfde99502f446cb9d060a8a89b61cd` selected one level-three list item's
+text. AI output and requested/readback Unicode contain no terminal newline;
+HTML readback exactly matches the requested payload. Before/after images show
+a new blank, unnumbered line after the corrected item. The source copied the
+text as a whole `ol/li/p` block despite the inline selection; reimporting that
+block introduces a destination paragraph boundary.
+
+For a verified single-paragraph Docs selection with no internal line break,
+remove only its `ol/ul/li/p` wrappers before alignment. Keep the producer and
+inline styles, bold, links, and original edge whitespace. This leaves the
+existing destination paragraph/list item in charge of layout. Multiple
+paragraphs and intentional blank paragraphs retain their structure. Native
+regressions and incident replay verify the emitted fragment has no block end;
+original-editor retest is the remaining rendering acceptance check. This does
+not establish acceptance for multi-level selections.
+
 ### Developer logging native Docs capture (2026-10-11)
 
 Supersedes the approval-pending diagnostic proposal below. Elliot explicitly
@@ -14,8 +32,10 @@ sidecar keep missing/truncated inputs visible. Disabled logging never reads the
 native format. No separate diagnostic flag or new UI was added.
 
 Release/Dev builds, formatting regressions, and synthetic developer-evidence
-roundtrip/hash/failure-status tests pass. The live original Docs payload still
-needs one enabled Dev correction; list paste acceptance remains unresolved.
+roundtrip/hash/failure-status tests pass. The enabled Dev correction `91cfde99502f446cb9d060a8a89b61cd` captured
+26,320 bytes of Chromium metadata successfully with a complete base64 sidecar.
+It contains the native Docs document slice and internal clip ID. Multi-level
+list paste acceptance remains unresolved.
 
 ### Docs list paste acceptance failed (2026-10-11 08:27 Eastern)
 
@@ -28,9 +48,11 @@ level-4 decimal items, and a later level-1 heading becomes a level-2 item.
 The previous HTML-only repair is incomplete. Do not treat another exact mapper
 replay as proof of a list paste fix.
 
-The source offered `Chromium Web Custom MIME Data Format`; the app currently
-lists but does not serialize it. Docs native paste metadata is a candidate for
-preserving list identity/context, but its contents and necessity are unverified.
+At that retest, the source offered `Chromium Web Custom MIME Data Format`,
+but the app listed without serializing it. The subsequently approved logging
+repair above captures this format; the 08:40 run confirms it contains a native
+Docs slice and list entities. Its necessity for multi-level paste remains
+unverified.
 No constant indent subtraction or invented native payload is justified.
 
 Proposed next diagnostic: for one explicitly approved, developer-logging-enabled
@@ -38,8 +60,9 @@ Docs retest, capture at most 1 MiB of that original custom format before clipboa
 history exclusion, with explicit absent/read-failed/size-limit statuses. Persist
 base64 in the existing local evidence with a bounded inline log preview. This
 may contain identifiers and document data beyond the visible selected text.
-Automatic approval review rejected implementing the capture without explicit
-user approval; no capture code was applied and approval is pending.
+Automatic approval review originally rejected capture without explicit approval.
+Elliot then explicitly approved it; the normal Developer logging implementation
+above supersedes this proposal and the earlier approval-pending state.
 
 ### Google Docs selections and inline references (2026-10-11)
 

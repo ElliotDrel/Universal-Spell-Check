@@ -228,10 +228,19 @@ internal static partial class RichTextClipboard
             }
             corrected = string.Join("\n", sections);
         }
+        // Docs exports even a selection inside one list item as ol/li/p.
+        // Reimporting that block creates a paragraph boundary after the text
+        // and can nest it relative to the current item. A single paragraph
+        // needs only its inline formatting; keep the destination's block.
+        if (paragraphs.Count == 1 && bodies.Length == 1)
+            withoutCopyMarker = GoogleDocsBlockTagRegex().Replace(withoutCopyMarker, "");
         if (TryAlignTextNodes(withoutCopyMarker, expectedSource, corrected, out var aligned, normalizeNbsp: true))
             return aligned with { ParagraphCount = paragraphs.Count };
         return RichTextReplacementResult.NotApplied("unsupported_fragment", corrected, paragraphs.Count);
     }
+
+    [GeneratedRegex(@"</?(?:ol|ul|li|p)\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GoogleDocsBlockTagRegex();
 
     private static string GoogleDocsVisibleText(string html) => WebUtility.HtmlDecode(
         HtmlTagRegex().Replace(HtmlBreakRegex().Replace(html, "\n"), "")).Replace('\u00a0', ' ');

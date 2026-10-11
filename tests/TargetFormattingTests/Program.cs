@@ -25,6 +25,17 @@ Assert(docsNested.Applied && docsNested.Text == "check tasks \nMove the tasks"
     && Fragment(docsNested.Html).Contains("check tasks\u00a0")
     && !docsNested.Text.EndsWith('\n') && docsNested.ParagraphCount == 2,
     "Docs nested list, NBSP, emphasis and indentation survive without Markdown spaces or a terminal blank item");
+// Captured failure: selecting one level-three item produced a blank line
+// after paste, despite newline-free Unicode and exact HTML readback.
+const string docsSingleItem = "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><ol><li aria-level=\"3\" style=\"margin-left:72pt\"><p style=\"margin-bottom:12pt\"><span>chek </span><strong>goals</strong><a href=\"https://example.test\"> link</a><span>&nbsp;</span></p></li></ol></b>";
+var docsSingle = RichTextClipboard.TryCreateReplacement(CfHtml(docsSingleItem), "chek goals link \r\n", "check goals link");
+Assert(docsSingle.Applied && docsSingle.Text == "check goals link "
+    && Fragment(docsSingle.Html) == "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><span>check </span><strong>goals</strong><a href=\"https://example.test\"> link</a><span>&nbsp;</span></b>",
+    "single Docs list-item selection must replace inline text without a new list or paragraph boundary");
+var docsSingleParagraph = RichTextClipboard.TryCreateReplacement(CfHtml("<b id=\"docs-internal-guid-test\"><p><span>chek</span></p></b>"), "chek\r\n", "check\n");
+Assert(docsSingleParagraph.Applied && docsSingleParagraph.Text == "check"
+    && Fragment(docsSingleParagraph.Html) == "<b id=\"docs-internal-guid-test\"><span>check</span></b>",
+    "single Docs paragraph must omit copy-only block boundary and model terminal newline");
 const string docsStyled = "<b id=\"docs-internal-guid-test\"><span style=\"font-weight:700\">chek</span><span>&nbsp;</span><a href=\"https://example.test\">link</a></b>";
 var docsStyle = RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "chek link", "check link");
 Assert(docsStyle.Applied && Fragment(docsStyle.Html) == docsStyled.Replace("chek", "check"),
