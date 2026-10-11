@@ -2,6 +2,30 @@
 
 ## Status
 
+### Docs list paste acceptance failed (2026-10-11 08:27 Eastern)
+
+The earlier producer-marked replay results below establish mapper preservation,
+not Google Docs list-level acceptance. Dev run `5d06f010e9254dadb555e00243c8dbfb`
+preserved the captured list tags/styles/aria-level attributes and had exact HTML
+readback, but the user's screenshots show a destination list-level shift:
+selected level-2 alpha items become level-3 roman items, their children become
+level-4 decimal items, and a later level-1 heading becomes a level-2 item.
+The previous HTML-only repair is incomplete. Do not treat another exact mapper
+replay as proof of a list paste fix.
+
+The source offered `Chromium Web Custom MIME Data Format`; the app currently
+lists but does not serialize it. Docs native paste metadata is a candidate for
+preserving list identity/context, but its contents and necessity are unverified.
+No constant indent subtraction or invented native payload is justified.
+
+Proposed next diagnostic: for one explicitly approved, developer-logging-enabled
+Docs retest, capture at most 1 MiB of that original custom format before clipboard
+history exclusion, with explicit absent/read-failed/size-limit statuses. Persist
+base64 in the existing local evidence with a bounded inline log preview. This
+may contain identifiers and document data beyond the visible selected text.
+Automatic approval review rejected implementing the capture without explicit
+user approval; no capture code was applied and approval is pending.
+
 ### Google Docs selections and inline references (2026-10-11)
 
 Audited 171 Google Docs runs from 2026-07-07 through 2026-10-11 08:13 Eastern.
