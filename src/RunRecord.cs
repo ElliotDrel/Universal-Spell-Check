@@ -26,9 +26,7 @@ internal sealed class RunRecord
     public ActiveWindowInfo ActiveWindowAtStart { get; set; } = new();
     public ActiveWindowInfo? ActiveWindowAtPaste { get; set; }
     public string Model { get; set; } = OpenAiSpellcheckService.DefaultModel;
-    public string PasteMethod { get; set; } = "ctrl_v";
-    public DocsParagraphEdit[]? DocsParagraphEdits { get; set; }
-    public DocsParagraphPasteResult? DocsParagraphPaste { get; set; }
+    public string PasteMethod { get; } = "ctrl_v";
     public string? PasteFailurePhase { get; set; }
     public string? PasteErrorType { get; set; }
     public bool CorrectedTextOnClipboard { get; set; }

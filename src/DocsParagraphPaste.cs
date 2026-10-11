@@ -15,7 +15,7 @@ internal sealed record DocsParagraphPasteResult(bool Success, int Completed, str
 internal static class DocsParagraphPaste
 {
     internal static async Task<DocsParagraphPasteResult> PasteAsync(
-        DocsParagraphEdit[] edits, string originalNative, IntPtr window, IntPtr? clipboardOwner = null)
+        DocsParagraphEdit[] edits, string originalNative, IntPtr window)
     {
         var completed = 0;
         var attempted = 0;
@@ -25,14 +25,12 @@ internal static class DocsParagraphPaste
             return Result(false, "invalid_plan_or_layout");
         var stage = "initial_selection";
         bool FocusMatches() => ActiveWindowInfo.Capture().WindowHandle == window;
-        async Task<CaptureResult?> CopyAsync(bool originalText = false)
+        async Task<CaptureResult?> CopyAsync()
         {
             if (!FocusMatches()) return null;
             // CaptureSelectionAsync requires a new clipboard sequence, never a
             // stale copy. It reads Docs HTML/native before any clipboard rewrite.
             var copy = await ClipboardLoop.CaptureSelectionAsync();
-            if (copy.Success && originalText && clipboardOwner is { } owner)
-                ClipboardLoop.ExcludeTextFromHistory(copy.Text!, owner, out _);
             return copy.Success && FocusMatches() ? copy : null;
         }
         try
@@ -45,7 +43,7 @@ internal static class DocsParagraphPaste
                 stage = $"source_selection_{i}";
                 if (!FocusMatches()) return Result(false, "foreground_changed");
                 SendKeys.SendWait("+{LEFT " + edit.SourceSteps + "}");
-                var source = await CopyAsync(originalText: true);
+                var source = await CopyAsync();
                 if (source is null || !RichTextClipboard.IsCopiedDocsParagraph(source.Html, source.Text!, edit.Source))
                     return Result(false, stage);
                 stage = $"clipboard_write_{i}";
