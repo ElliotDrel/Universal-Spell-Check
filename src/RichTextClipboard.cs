@@ -224,9 +224,9 @@ internal static partial class RichTextClipboard
         var text = html.Applied ? html.Text : corrected;
         var native = GoogleDocsClipboard.Rewrite(nativeDocsBase64, sourceText, text, out var status);
         if (native is not null)
-            html = html.Applied
-                ? html with { Mode = "docs_native" }
-                : RichTextReplacementResult.CreateDocsNative(text, blocks);
+            // Native carries selection boundaries that HTML list wrappers lose.
+            // Offer one rich format so the editor cannot import competing HTML.
+            html = RichTextReplacementResult.CreateDocsNative(text, blocks);
         return html with { ParagraphCount = blocks, NativeDocsBytes = native, NativeDocsStatus = status };
     }
 

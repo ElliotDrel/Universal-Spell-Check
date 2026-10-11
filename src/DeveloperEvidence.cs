@@ -39,7 +39,7 @@ internal sealed class DeveloperEvidence
         var requested = DateTimeOffset.UtcNow;
         _contexts.Add(Task.Run(async () =>
         {
-            if (afterPaste) await Task.Delay(150).ConfigureAwait(false);
+            if (afterPaste) await Task.Delay(600).ConfigureAwait(false);
             var image = CaptureImage(phase, target);
             var accessibility = await CaptureAccessibility(target, () => phase == "before-source" && Interlocked.Read(ref _pasteIssued) != 0).ConfigureAwait(false);
             return (object)new { phase, requested_at = requested, target = Identity(target), image, accessibility };

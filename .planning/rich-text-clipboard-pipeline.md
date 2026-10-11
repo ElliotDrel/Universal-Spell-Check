@@ -2,6 +2,26 @@
 
 ## Status
 
+### Partial-start selection isolation (2026-10-11, editor test pending)
+
+Run `e742b24ff24942c5bbb97db612fd454c` starts inside a nested list paragraph,
+then crosses a top-level item and nested items. Native source/request/readback
+retain the original indentation, list identities and nesting at every delimiter
+and the final trailing paragraph. This establishes transport fidelity, not
+correct insertion. Its 150ms after image still shows the original selection
+and does not establish the reported rendered shift.
+
+Previously supported slices offered both native and HTML. The first HTML block
+represents the selected sentence tail as a complete nested list item. To isolate
+that competing import path, verified native replacements now offer only native
+and Unicode; HTML remains the fallback when native validation declines. No
+native style or selection-boundary metadata is guessed. Changed and unchanged
+partial-start regressions retain nesting and indentation, with no HTML or added
+terminal separator. The diagnostic after-image delay is now 600ms, off the
+correction path. The same partial-start selection needs an original-editor
+retest to distinguish HTML import from native insertion behavior; this change
+is not yet a verified root-cause fix.
+
 ### One Docs paragraph model; headings no longer block native (2026-10-11, reviewed; editor retest pending)
 
 Sanitized failure: an `h2` heading followed by a four-item `ul`, copied

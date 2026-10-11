@@ -295,7 +295,7 @@ contain selected text and surrounding editor content; API key/settings files are
 `contexts` links automatic `before-source` and `after-paste` captures with requested/captured/completed
 timestamps and target process/PID/HWND/title. Images contain visible screen pixels within the
 foreground window bounds (screen-clipped), and can include overlays; they are not DOM snapshots.
-The after capture requests a 150ms settling delay, which does not prove editor rendering is finished.
+The after capture requests a 600ms settling delay, which does not prove editor rendering is finished.
 Foreground changes and late source captures are explicitly labeled. UIA reports focused control
 identity, up to 32768 characters of document text and 8 selected ranges of up to 8193 characters.
 Changed paste destinations explicitly label unavailable destination-before context.

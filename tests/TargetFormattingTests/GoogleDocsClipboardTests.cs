@@ -139,7 +139,7 @@ internal static class GoogleDocsClipboardTests
         const string html = "<b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><h2 dir=\"ltr\"><span style=\"font-size:16pt\">Planing</span></h2><ul><li aria-level=\"1\"><p><span>alpha</span></p></li><li aria-level=\"2\"><p><span>bta </span><a href=\"https://example.test\"><span>link</span></a></p></li><li aria-level=\"1\"><p><span style=\"font-weight:700\">gama</span></p></li><li aria-level=\"1\"><p><span>delta</span></p></li></ul></b>";
 
         var changed = RichTextClipboard.TryCreateReplacement(cfHtml(html), copy, "Planning\nalpha\nbeta link\ngamma\ndelta", native);
-        Check(changed.Mode == "docs_native" && changed.NativeDocsStatus == "ok" && changed.Html.Length > 0
+        Check(changed.Mode == "docs_native" && changed.NativeDocsStatus == "ok" && changed.Html.Length == 0
             && changed.Text == "Planning\nalpha\nbeta link\ngamma\ndelta", "heading + list selection must reach the native slice");
         var output = Decode(changed.NativeDocsBytes!);
         Check(output["dsl_spacers"]!.GetValue<string>() == changed.Text, "native text must equal pasted Unicode with no copy-only LF");
@@ -199,6 +199,38 @@ internal static class GoogleDocsClipboardTests
         Check(nativeOnly.Applied && nativeOnly.Mode == "docs_native" && nativeOnly.Html.Length == 0
             && Decode(nativeOnly.NativeDocsBytes!)["dsl_spacers"]!.GetValue<string>() == nativeOnly.Text,
             "verified native slice must be used even when CF_HTML cannot be verified");
+        // Selected tail of a nested item, followed by a top-level item and a
+        // nested final item. Native metadata must retain absolute list levels.
+        const string partialSource = "tail chek\nHeading\nitem";
+        var partialResolved = resolved.DeepClone().AsObject();
+        partialResolved["dsl_spacers"] = partialSource;
+        partialResolved["dsl_styleslices"] = new JsonArray(
+            new JsonObject { ["stsl_type"] = "paragraph", ["stsl_styles"] = Sparse(partialSource.Length,
+                (9, new JsonObject { ["ps_il"] = 72, ["ps_ifl"] = 54 }),
+                (17, new JsonObject { ["ps_il"] = 36, ["ps_ifl"] = 18 })),
+                ["stsl_trailing"] = new JsonObject { ["ps_il"] = 72, ["ps_ifl"] = 54 }, ["stsl_trailingType"] = "paragraph" },
+            new JsonObject { ["stsl_type"] = "list", ["stsl_styles"] = Sparse(partialSource.Length, (9, Item(1)), (17, Item(0))),
+                ["stsl_trailing"] = Item(1), ["stsl_trailingType"] = "list" });
+        var partialNative = Convert.ToBase64String(GoogleDocsClipboard.WriteMap(new()
+        {
+            [GoogleDocsClipboard.SliceType] = new JsonObject { ["data"] = new JsonObject
+                { ["resolved"] = partialResolved, ["autotext_content"] = new JsonObject() }.ToJsonString() }.ToJsonString()
+        }));
+        const string partialHtml = "<b id=\"docs-internal-guid-test\"><ol><li><p>tail chek</p></li></ol><ol><li><p>Heading</p><ol><li><p>item</p></li></ol></li></ol></b>";
+        foreach (var correction in new[] { "tail check\nHeading\nitem", partialSource })
+        {
+            var partial = RichTextClipboard.TryCreateReplacement(cfHtml(partialHtml), partialSource.Replace("\n", "\r\n") + "\r\n", correction, partialNative);
+            var slice = Decode(partial.NativeDocsBytes!);
+            var shift = correction.Length - partialSource.Length;
+            Check(partial.Applied && partial.Html.Length == 0 && partial.Text == correction
+                && At(slice, 0, 9 + shift)?["ps_il"]?.GetValue<int>() == 72
+                && At(slice, 0, 17 + shift)?["ps_il"]?.GetValue<int>() == 36
+                && At(slice, 1, 9 + shift)?["ls_nest"]?.GetValue<int>() == 1
+                && At(slice, 1, 17 + shift)?["ls_nest"]?.GetValue<int>() == 0
+                && slice["dsl_styleslices"]![1]!["stsl_trailing"]?["ls_nest"]?.GetValue<int>() == 1,
+                "partial-start selections must paste changed and unchanged native text with original levels and no competing HTML");
+        }
+
         var neither = RichTextClipboard.TryCreateReplacement(cfHtml(unknownBlock), copy, "Planning\nalpha\nbeta link\ngamma\ndelta\n");
         Check(!neither.Applied && neither.Text == "Planning\nalpha\nbeta link\ngamma\ndelta",
             "plain fallback must not paste the copy-only terminal separator");
