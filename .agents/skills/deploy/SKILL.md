@@ -8,10 +8,10 @@ description: 'Use when ready to push code to the Dev channel or release to Produ
   shipped to end users as a production release.
 
   Two paths: Dev (fast, no approval needed — push whenever changes are stable enough
-  to test) and Prod (requires explicit human approval before tagging — a semver tag
+  to test) and Prod (an explicit production publish request is approval — a semver tag
   triggers a GitHub Release and is irreversible).'
 metadata:
-  version: 1.0.1
+  version: 1.0.2
   triggers:
   - deploy
   - push to dev
@@ -26,7 +26,6 @@ metadata:
   tools:
   - Bash
   - PowerShell
-  - AskUserQuestion
   mutating: true
 ---
 
@@ -59,9 +58,10 @@ shipping to production users.**
   install updates via Velopack on startup/restart; the 4-hour periodic check prepares downloads for the next restart.
 - **Hotkey when running:** Ctrl+Alt+U
 - **Auto-update:** Yes — every installed copy picks up the release automatically.
-- **Approval needed:** **YES. Hard stop. You must get explicit human confirmation
-  via AskUserQuestion before pushing the tag.** A pushed tag starts the CI pipeline
-  immediately and cannot be undone cleanly.
+- **Approval:** An explicit request to publish, release, or ship to production
+  authorizes the release. Do not request a second confirmation. State the chosen
+  version and commit scope, complete verification, then publish. Ask only when
+  the destination or release scope is materially ambiguous.
 - **File to read next:** Read `prod-deploy.md` in full, then follow it.
 
 ---
@@ -82,7 +82,7 @@ Load only the sub-file you need. Do not pre-load both.
 
 - Routes to exactly one sub-file based on user intent. Never loads both.
 - Never reads `prod-deploy.md` unless explicitly routing a production release.
-- Never pushes a git tag without `AskUserQuestion` approval in the current session.
+- Requires a clear user request to publish to production; that request is sufficient approval to tag and publish.
 - Leaves the repo clean after a dev deploy.
 - Leaves a new semver tag, the `main` branch pushed alongside it (`origin/main` not behind the released commit), a verified published release, and the local installed Prod app updated and running at that version.
 - Always reports back: what was pushed, the commit SHA, and next steps.
@@ -106,7 +106,7 @@ Run cleanup even when production approval or an external failure prevents public
 ## Anti-Patterns
 
 - Loading both sub-files on ambiguous intent — ask the user instead.
-- Treating a casual "yes" or "ship it" in the triggering message as prod approval.
+- Asking for redundant approval after a clear production publish request.
 - Pushing a dirty working tree under any circumstances, even if the user asks.
 - Pushing a prod tag without a preceding `dotnet build -c Release` passing.
 - Skipping the acceptance checklist because "the build passed."

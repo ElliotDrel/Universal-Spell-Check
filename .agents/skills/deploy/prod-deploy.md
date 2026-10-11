@@ -8,8 +8,8 @@ For pipeline details, read `.github/workflows/release.yml`. For version constant
 and channel configuration, read `src/BuildChannel.cs`.
 
 **This is irreversible.** A pushed tag immediately starts the CI pipeline and
-creates a public GitHub Release. Do not proceed past Step 4 without explicit
-human approval delivered via `AskUserQuestion` in this session.
+creates a public GitHub Release. A clear user request to publish, release, or
+ship to production is sufficient approval. Do not ask for a second confirmation.
 
 ---
 
@@ -31,7 +31,7 @@ git status
 
 ## Step 2 — Build check (Release config)
 
-Before determining a version or seeking approval, confirm the code compiles in
+Before determining a version or publishing, confirm the code compiles in
 Release config:
 
 ```powershell
@@ -62,34 +62,23 @@ propose a version equal to or lower than the last tag.
 
 ---
 
-## Step 4 — Get explicit human approval (HARD STOP)
+## Step 4 — State the authorized release scope
 
-**The message that triggered this skill does not constitute approval — even if
-the user said "ship it", "yes", or "go ahead" before this step. You must stop
-here and ask via `AskUserQuestion` regardless of what was said earlier.**
+An explicit production request such as "publish", "release", or "ship it"
+authorizes tagging and publishing. Honor authorization already given in the
+conversation; do not ask for an additional Yes/No or version-and-commit approval.
 
-Show the user the exact proposed tag and the commits it will include (paste the
-one-line log output from Step 3). Then use `AskUserQuestion` to ask:
-
-> "Ready to release **vX.Y.Z** to production?
->
-> Commits included: [paste git log output]
->
-> This will push tag `vX.Y.Z` to origin, trigger GitHub Actions (release.yml),
-> build a Velopack installer, create a public GitHub Release, and push the update
-> to all installed users automatically. There is no undo."
-
-Provide **Yes** / **No** options only. If the user says No, stop completely.
-Do not tag anything. Do not push anything.
-
-Approval from a prior conversation turn, a prior session, or any message before
-this `AskUserQuestion` does not count as approval.
+State the proposed tag, exact commit, and included one-line commit log before
+publishing, then continue. Follow a version explicitly requested by the user;
+otherwise choose the next version using Step 3. If the destination or included
+changes are materially ambiguous, ask one narrow question to resolve that scope.
+A request only to push to Dev does not authorize a production release.
 
 ---
 
 ## Step 5 — Tag and push (branch + tag together)
 
-Only after explicit Yes from Step 4. **Always push the branch with the tag** so
+After verifying the user-authorized scope in Step 4, **push the branch with the tag** so
 `origin/main` is never left behind the released commit:
 
 ```powershell
@@ -238,7 +227,7 @@ A good prod release satisfies **all** of the following:
 - Branch was `main`, clean, up to date with origin before tagging.
 - `dotnet build -c Release` passed with no new errors.
 - The tag is strictly higher than the previous latest tag.
-- Approval was given via `AskUserQuestion` after the exact version and commit list were shown.
+- The user explicitly requested production publication, and the stated version and commits match that authorized scope. No redundant approval was requested.
 - The `main` branch was pushed alongside the tag (`git push origin main vX.Y.Z`) — `origin/main` is not behind the released commit.
 - Tag confirmed present on GitHub remote via API.
 - CI `Release` workflow run confirmed triggered (matching run found within 60 s).
