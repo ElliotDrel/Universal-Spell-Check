@@ -11,6 +11,55 @@ if (args.Length > 0 && args[0].StartsWith("--replay", StringComparison.Ordinal))
 
 FormattingReplayTests.Run();
 
+const string docsInline = "<meta charset=\"utf-8\"><b style=\"font-weight:normal\" id=\"docs-internal-guid-test\"><span style=\"font-size:16pt\">Mentalitys</span></b>";
+var docsHeading = RichTextClipboard.TryCreateReplacement(CfHtml(docsInline), "Mentalitys", "Mentalities");
+Assert(docsHeading.Applied && docsHeading.Text == "Mentalities"
+    && Fragment(docsHeading.Html) == docsInline.Replace("Mentalitys", "Mentalities")
+    && docsHeading.ParagraphCount == 0,
+    "Docs heading selection must stay inline and retain its font without adding a paragraph");
+const string docsList = "<meta charset=\"utf-8\"><b id=\"docs-internal-guid-test\"><ol style=\"margin:0\"><li aria-level=\"2\" style=\"list-style-type:lower-alpha\"><p><span>chek tasks&nbsp;</span></p></li><ol><li aria-level=\"3\" style=\"list-style-type:lower-roman\"><p><strong>Move</strong><span> teh tasks</span></p></li></ol></ol></b>";
+var docsNested = RichTextClipboard.TryCreateReplacement(CfHtml(docsList), "chek tasks \r\nMove teh tasks\r\n", "check tasks  \nMove the tasks");
+Assert(docsNested.Applied && docsNested.Text == "check tasks \nMove the tasks"
+    && Fragment(docsNested.Html).Contains("list-style-type:lower-roman")
+    && Fragment(docsNested.Html).Contains("<strong>Move</strong>")
+    && Fragment(docsNested.Html).Contains("check tasks\u00a0")
+    && !docsNested.Text.EndsWith('\n') && docsNested.ParagraphCount == 2,
+    "Docs nested list, NBSP, emphasis and indentation survive without Markdown spaces or a terminal blank item");
+const string docsStyled = "<b id=\"docs-internal-guid-test\"><span style=\"font-weight:700\">chek</span><span>&nbsp;</span><a href=\"https://example.test\">link</a></b>";
+var docsStyle = RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "chek link", "check link");
+Assert(docsStyle.Applied && Fragment(docsStyle.Html) == docsStyled.Replace("chek", "check"),
+    "Docs partial selections retain bold, links and original NBSP encoding");
+const string docsBlank = "<b id=\"docs-internal-guid-test\"><p><span>chek</span></p><p><br></p><p><span>last</span></p></b>";
+var docsEmpty = RichTextClipboard.TryCreateReplacement(CfHtml(docsBlank), "chek\r\n\r\nlast\r\n", "check\n\nlast");
+Assert(docsEmpty.Applied && Fragment(docsEmpty.Html) == docsBlank.Replace("chek", "check")
+    && docsEmpty.Text == "check\n\nlast", "Docs intentional empty paragraphs must survive");
+Assert(!RichTextClipboard.TryCreateReplacement(CfHtml(docsStyled), "different input", "check link").Applied,
+    "Docs mapping must reject incomplete or mismatched copied text");
+Assert(!RichTextClipboard.TryCreateReplacement(CfHtml(docsList), "chek tasks \r\nMove teh tasks\r\n", "check tasks\nnew content\nMove the tasks").Applied,
+    "Docs added content must not be silently dropped to preserve lists");
+Assert(!RichTextClipboard.TryCreateReplacement(CfHtml(docsInline.Replace("docs-internal-guid-test", "other-editor")), "Mentalitys", "Mentalities").Applied,
+    "Docs mapping must require the actual clipboard producer marker");
+const string skillInline = "<p data-pm-slice=\"0 0 []\"><span skill-mention-name=\"formatting-troubleshoot\" skill-mention-path=\"C:/sample/SKILL.md\"><span contenteditable=\"false\"></span><span>Formatting Troubleshoot</span></span> i had aissue.</p>";
+var skillBreak = RichTextClipboard.TryCreateReplacement(CfHtml(skillInline), "Formatting Troubleshoot i had aissue.", "Formatting Troubleshoot  \nI had an issue.");
+Assert(skillBreak.Applied && skillBreak.Text == "Formatting Troubleshoot I had an issue."
+    && Fragment(skillBreak.Html) == skillInline.Replace("i had aissue.", "I had an issue."),
+    "model-inserted Markdown linebreak must not flatten an inline skill chip");
+var skillExistingBreak = RichTextClipboard.TryCreateReplacement(CfHtml(skillInline + "<p>next</p>"), "Formatting Troubleshoot i had aissue.\n\nnext", "Formatting Troubleshoot I had an issue.\n\nnext");
+Assert(skillExistingBreak.Applied && skillExistingBreak.Text.Contains("\n\nnext"),
+    "skill selections with intentional paragraph breaks keep them");
+
+const string fileChip = "<p data-pm-slice=\"0 0 []\">help wht me<span chatgpt-library-file-mention-id=\"external-gdrive:file:sample\" data-prompt-link-href=\"chatgpt-library-file://sample\" data-prompt-link-label=\"Reference Doc\"><span contenteditable=\"false\"></span><span>Reference Doc</span></span></p>";
+var fileChipBreak = RichTextClipboard.TryCreateReplacement(CfHtml(fileChip), "help wht meReference Doc", "help with me  \nReference Doc");
+Assert(fileChipBreak.Applied && fileChipBreak.Text == "help with me Reference Doc"
+    && Fragment(fileChipBreak.Html).Contains("chatgpt-library-file-mention-id=\"external-gdrive:file:sample\"")
+    && Fragment(fileChipBreak.Html).Contains("data-prompt-link-href=\"chatgpt-library-file://sample\""),
+    "model-inserted newline must not flatten a pasted Google Drive document chip");
+const string docsInterchange = "<b id=\"docs-internal-guid-test\"><p><span>chek</span></p><br><p><span>last</span></p></b><br class=\"Apple-interchange-newline\">";
+var docsInterchangeResult = RichTextClipboard.TryCreateReplacement(CfHtml(docsInterchange), "chek\r\n\r\nlast\r\n", "check\n\nlast");
+Assert(docsInterchangeResult.Applied && docsInterchangeResult.Text == "check\n\nlast"
+    && Fragment(docsInterchangeResult.Html) == docsInterchange.Replace("chek", "check").Replace("<br class=\"Apple-interchange-newline\">", ""),
+    "Docs inter-paragraph breaks survive, while the copy-only terminal interchange marker must not be pasted");
+
 const long now = 10_000;
 const long freshness = 1_000;
 

@@ -57,6 +57,9 @@ The command restarts Prod through its native updater. Every startup checks, down
 
 19. In installed Prod, invoke `--restart` and its `--update` alias while running and closed. Verify exactly one informational notice on success, and a restart even when already current. On normal launch with an available release, verify automatic installation without a click. A failed check/download must notify and leave the current version usable. Background checks prepare updates for the next restart. Repeat a command during restart and verify no duplicate notice or helper. Start a correction before requesting restart: its paste must finish, and new hotkeys must be blocked during shutdown/startup updating. Dev must reject both flags with exit `1`.
 
+20. In Google Docs, select two nested numbered/bulleted items, correct them with Dev, and verify their bullet/number styles and indentation remain intact without an extra empty final item. Repeat with a styled inline heading, bold/link spans, and an intentional blank paragraph. Confirm `aligned_html` and exact HTML readback when developer logging is enabled.
+21. In the prompt editor, select one paragraph containing a skill or pasted Google Drive document-reference chip and text needing correction. Verify the chip remains usable and no model-added line break appears beside it. Repeat with intentional multiple paragraphs; keep those breaks.
+
 ## Top-of-mind reminders
 
 - A code change is not running until the process is stopped and rebuilt. **Always rebuild + relaunch before retesting.**

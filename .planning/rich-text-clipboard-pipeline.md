@@ -2,6 +2,45 @@
 
 ## Status
 
+### Google Docs selections and inline references (2026-10-11)
+
+Audited 171 Google Docs runs from 2026-07-07 through 2026-10-11 08:13 Eastern.
+All 58 records with a rich-text decision rejected Docs HTML as `unsupported_editor`;
+older records do not establish visible formatting acceptance. The 106 captures
+with the `docs-internal-guid-` producer marker now replay as `aligned_html`.
+The remaining historical records lack that marker or HTML and are outside this
+producer-specific reconstruction path.
+
+Prod 0.12.1 runs `7c527bb164f947998af1874846643e69`,
+`28ff855359804a48900ac60b298dadcc`, and `9ac4df84343844ceb2e6624a0d957947`
+captured nested alpha/roman lists but requested plain text. Before/after images
+show an extra empty list item after the first paste. The mapper now verifies Docs'
+complete Unicode serialization, maps edits into its original text nodes, retains
+list levels/styles, inline fonts, emphasis, links, and NBSP, and excludes the
+copy-only final paragraph separator from replacement Unicode. A historical
+2026-09-02 paragraph selection additionally carries a real inter-paragraph `<br>`
+and a terminal `Apple-interchange-newline`; the real break is retained and the
+copy-only interchange marker is excluded. Inline heading run
+`151ceb8188f84ed4a780f18668edbc74` requested `Mentalities` without a newline;
+it now retains the original inline 16pt span rather than manufacturing a block.
+Its screenshots alone do not prove a newly inserted terminal blank paragraph.
+
+Skill run `efb5afb6bd3f42d4aa3dc1c99eaa4b5d` and document-reference run
+`246090d0545644d89cbaad40540df19f` copied one ProseMirror paragraph. The model
+inserted a Markdown hard break beside the chip; the mapper rejected that inserted
+newline and fell back to plain text, losing the chip's identity. For captured
+skill/file-reference selections whose source Unicode has no line breaks, remove
+only model-added line breaks before alignment. Preserve the original skill/file
+identity and link attributes. Multi-paragraph selections retain their existing
+breaks. This repairs clipboard reconstruction; destination deserialization still
+requires a real-editor retest.
+
+Verification: pinned SDK 10.0.401, Release formatting regressions, Dev build,
+106 historical producer-marked replays, and five full-evidence incident replays.
+No live user clipboard/keyboard test was run: the existing native smoke uses the
+interactive desktop and is not isolated from ongoing user activity. Original
+Google Docs and reference-chip paste acceptance remains pending.
+
 ### LinkedIn comment character encoding (2026-10-10)
 
 Prod 0.10.1 runs `e4b40ced28a34fdd830443e0610b2fd9` and

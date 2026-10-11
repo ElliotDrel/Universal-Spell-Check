@@ -4,9 +4,10 @@ using System.Text.RegularExpressions;
 
 namespace UniversalSpellCheck;
 
-// Re-emits verified LinkedIn messaging paragraphs and the supported subset
-// of CF_HTML from ChatGPT's ProseMirror editor. Plain-text paste turns its paragraph
-// separators into extra empty paragraphs, so preserve the original paragraph
+// Re-emits verified Google Docs selections, LinkedIn messaging paragraphs,
+// and the supported subset of CF_HTML from ChatGPT's ProseMirror editor.
+// Plain-text paste turns paragraph separators into extra empty paragraphs,
+// so preserve the original paragraph
 // structure when the corrected text maps to it exactly.
 internal static partial class RichTextClipboard
 {
@@ -32,12 +33,23 @@ internal static partial class RichTextClipboard
         if (IsLinkedInMessagingSource(sourceHtml))
             return CreateLinkedInParagraphReplacement(fragment, sourceText, correctedText);
 
+        if (GoogleDocsMarkerRegex().IsMatch(fragment))
+            return CreateGoogleDocsReplacement(fragment, sourceText, correctedText);
+
         // data-pm-slice is the stable marker in the captured ChatGPT selection.
         // Do not apply a structural assumption to a different HTML producer.
         if (!fragment.Contains("data-pm-slice", StringComparison.Ordinal))
         {
             return RichTextReplacementResult.NotApplied("unsupported_editor", correctedText);
         }
+
+        // The recorded skill/file selections are one paragraph, but the model
+        // inserted a Markdown hard break beside the chip. Keep the source's inline
+        // shape before alignment so that insertion cannot force a plain paste.
+        if ((fragment.Contains("skill-mention-name=", StringComparison.Ordinal)
+                || fragment.Contains("chatgpt-library-file-mention-id=", StringComparison.Ordinal))
+            && !sourceText.Contains('\n') && !sourceText.Contains('\r'))
+            correctedText = RemoveAddedLineBreaks(correctedText);
 
         if (TryCreateNestedOrderedListReplacement(
                 fragment,
@@ -152,6 +164,78 @@ internal static partial class RichTextClipboard
             paragraphs.Count);
     }
 
+    private static string RemoveAddedLineBreaks(string text) =>
+        text.Contains('\n') || text.Contains('\r')
+            ? AddedLineBreakRegex().Replace(text, " ").TrimEnd(' ', '\t')
+            : text;
+
+    private static RichTextReplacementResult CreateGoogleDocsReplacement(
+        string fragment, string sourceText, string correctedText)
+    {
+        // Docs uses its own producer marker and does not emit data-pm-slice.
+        // Verify the entire copied Unicode serialization before mapping, rather
+        // than treating unmatched nodes as omitted ChatGPT headings.
+        var paragraphs = GoogleDocsParagraphRegex().Matches(fragment);
+        var copied = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        var corrected = correctedText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        var withoutCopyMarker = AppleInterchangeBreakRegex().Replace(fragment, "");
+        var serialized = paragraphs.Count == 0
+            ? GoogleDocsVisibleText(withoutCopyMarker)
+            : GoogleDocsVisibleText(GoogleDocsParagraphRegex().Replace(withoutCopyMarker,
+                p =>
+                {
+                    var body = GoogleDocsVisibleText(p.Groups["body"].Value);
+                    return (body == "\n" ? "" : body) + "\n";
+                }));
+        var expectedSource = paragraphs.Count > 0 && serialized.EndsWith('\n')
+            ? serialized[..^1] : serialized;
+        var bodies = expectedSource.Split('\n');
+        if (copied != expectedSource && (paragraphs.Count == 0 || copied != expectedSource + "\n"))
+            return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+
+        // No block markup means an inline selection (including heading text).
+        // Never manufacture a paragraph or copy-only trailing list separator.
+        if (paragraphs.Count == 0)
+        {
+            if (!copied.Contains('\n'))
+                corrected = RemoveAddedLineBreaks(corrected);
+        }
+        else
+        {
+            // All visible text must belong to the verified paragraphs; tables,
+            // mixed inline/block captures and omitted text need explicit support.
+            if (GoogleDocsVisibleText(GoogleDocsParagraphRegex().Replace(fragment, "")).Trim().Length != 0)
+                return RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText, paragraphs.Count);
+            var sections = corrected.Split('\n');
+            if (sections.Length == bodies.Length + 1 && sections[^1].Length == 0)
+                sections = sections[..^1];
+            if (sections.Length != bodies.Length)
+                return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+            for (var i = 0; i < sections.Length; i++)
+            {
+                var original = bodies[i];
+                var leading = original.Length - original.TrimStart(' ', '\t').Length;
+                var trailing = original.Length - original.TrimEnd(' ', '\t').Length;
+                if (leading == original.Length)
+                {
+                    if (!string.IsNullOrWhiteSpace(sections[i]))
+                        return RichTextReplacementResult.NotApplied("model_mismatch", correctedText, paragraphs.Count);
+                    sections[i] = original;
+                }
+                else
+                    sections[i] = original[..leading] + sections[i].Trim(' ', '\t')
+                        + original[(original.Length - trailing)..];
+            }
+            corrected = string.Join("\n", sections);
+        }
+        if (TryAlignTextNodes(withoutCopyMarker, expectedSource, corrected, out var aligned, normalizeNbsp: true))
+            return aligned with { ParagraphCount = paragraphs.Count };
+        return RichTextReplacementResult.NotApplied("unsupported_fragment", corrected, paragraphs.Count);
+    }
+
+    private static string GoogleDocsVisibleText(string html) => WebUtility.HtmlDecode(
+        HtmlTagRegex().Replace(HtmlBreakRegex().Replace(html, "\n"), "")).Replace('\u00a0', ' ');
+
     // Text nodes need only HTML syntax escaped. Numeric entities emitted by
     // HtmlEncode for apostrophes/NBSP are mangled by LinkedIn's paste handler.
     // Keep Unicode literal; CF_HTML offsets are computed from UTF-8 bytes.
@@ -232,7 +316,8 @@ internal static partial class RichTextClipboard
         string fragment,
         string sourceText,
         string correctedText,
-        out RichTextReplacementResult replacement)
+        out RichTextReplacementResult replacement,
+        bool normalizeNbsp = false)
     {
         replacement = RichTextReplacementResult.NotApplied("unsupported_fragment", correctedText);
         var nodes = new List<HtmlTextNode>();
@@ -250,10 +335,13 @@ internal static partial class RichTextClipboard
             var htmlStart = i;
             while (i < fragment.Length && fragment[i] != '<')
                 i++;
-            var decoded = WebUtility.HtmlDecode(fragment[htmlStart..i]);
+            var original = WebUtility.HtmlDecode(fragment[htmlStart..i]);
+            var decoded = original;
+            if (normalizeNbsp)
+                decoded = decoded.Replace('\u00a0', ' ');
             if (decoded.Length == 0)
                 continue;
-            nodes.Add(new HtmlTextNode(htmlStart, i - htmlStart, -1, decoded));
+            nodes.Add(new HtmlTextNode(htmlStart, i - htmlStart, -1, decoded, original));
         }
 
         if (nodes.Count == 0)
@@ -304,9 +392,10 @@ internal static partial class RichTextClipboard
                     deletedWhitespaceStart = -1;
                     foreach (var character in edit.Text)
                     {
-                        var owner = FindTextNode(nodes, sourcePosition++);
+                        var owner = FindTextNode(nodes, sourcePosition);
                         if (owner >= 0)
-                            output[owner].Append(character);
+                            output[owner].Append(nodes[owner].OriginalText[sourcePosition - nodes[owner].TextStart]);
+                        sourcePosition++;
                     }
                     break;
                 case UI.TextDiffKind.Delete:
@@ -356,7 +445,7 @@ internal static partial class RichTextClipboard
         {
             var node = nodes[i];
             rebuilt.Append(fragment, htmlCursor, node.HtmlStart - htmlCursor);
-            rebuilt.Append(node.TextStart < 0 || output[i].ToString() == node.Text
+            rebuilt.Append(node.TextStart < 0 || output[i].ToString() == node.OriginalText
                 ? fragment.Substring(node.HtmlStart, node.HtmlLength)
                 : EncodeTextNode(output[i].ToString()));
             htmlCursor = node.HtmlStart + node.HtmlLength;
@@ -485,7 +574,7 @@ internal static partial class RichTextClipboard
         return -1;
     }
 
-    private sealed record HtmlTextNode(int HtmlStart, int HtmlLength, int TextStart, string Text);
+    private sealed record HtmlTextNode(int HtmlStart, int HtmlLength, int TextStart, string Text, string OriginalText);
 
     private static bool TryCreateStructuredListReplacement(
         string fragment,
@@ -768,6 +857,24 @@ internal static partial class RichTextClipboard
             ? header + html
             : throw new InvalidOperationException("CF_HTML header length changed.");
     }
+
+    [GeneratedRegex("<b\\b[^>]*\\bid=[\"']docs-internal-guid-[^\"']+[\"']", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GoogleDocsMarkerRegex();
+
+    [GeneratedRegex("<br\\b[^>]*class=[\"']Apple-interchange-newline[\"'][^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AppleInterchangeBreakRegex();
+
+    [GeneratedRegex("<p\\b[^>]*>(?<body>.*?)</p>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex GoogleDocsParagraphRegex();
+
+    [GeneratedRegex("<[^>]+>", RegexOptions.CultureInvariant)]
+    private static partial Regex HtmlTagRegex();
+
+    [GeneratedRegex("<br\\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex HtmlBreakRegex();
+
+    [GeneratedRegex("[ \\t]*[\\r\\n]+[ \\t]*", RegexOptions.CultureInvariant)]
+    private static partial Regex AddedLineBreakRegex();
 
     [GeneratedRegex("<p\\b[^>]*>(?:(?<text>[^<]*)|<span\\b[^>]*>(?<text>[^<]*)</span>)</p>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ParagraphRegex();
