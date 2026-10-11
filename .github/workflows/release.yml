@@ -78,7 +78,8 @@ jobs:
             --packVersion ${{ steps.ver.outputs.semver }} `
             --packDir publish `
             --mainExe UniversalSpellCheck.exe `
-            --packTitle "Universal Spell Check"
+            --packTitle "Universal Spell Check" `
+            --icon src/Assets/app.ico
 
       - name: Upload to GitHub Releases
         env:

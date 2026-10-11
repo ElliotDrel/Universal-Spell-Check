@@ -64,13 +64,16 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,0,0,28">
+                <Image x:Name="BrandLogo" Width="32" Height="32" Margin="0,0,10,0"/>
+            <TextBlock
                        Text="UNIVERSAL SPELL CHECK"
                        FontFamily="{StaticResource FontBody}"
                        FontSize="11"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource TextPrimary}"
-                       Margin="12,0,0,28"/>
+                       VerticalAlignment="Center" TextWrapping="Wrap" Width="150"/>
+            </StackPanel>
 
             <StackPanel Grid.Row="1">
                 <RadioButton x:Name="HomeNav"

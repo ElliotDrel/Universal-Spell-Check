@@ -272,3 +272,9 @@ After visual changes, verify in this order:
 | 2026-05-27 | Flat Activity feed + all-time stats bar | Wispr Flow–style layout: no feed card, inline char diff, hover actions, paginated infinite scroll (30/page), `SmoothScrollViewer` for trackpad. Mockup `home.png` remains tone reference only. |
 | 2026-05-27 | Inline diff replaces stacked +/- rows | Character-level highlights within lines; side-by-side view optional per row via ⋮ menu. |
 | 2026-07-05 | Activity rows expose persisted timing telemetry | A hover clock lazily expands the clipboard, AI request, post-processing, paste, and total durations without adding hot-path work. |
+
+## App identity
+
+The app mark combines a white lowercase a and checkmark on a rounded square: forest green for Prod, golden yellow for Dev. Source PNGs and multi-resolution Windows ICOs live in `src/Assets/`. The same channel mark appears in the tray, dashboard title/taskbar, sidebar, executable, and packaged Windows shortcuts. The prior generic Windows icon and runtime orange overlay are superseded.
+
+Artwork prompt (built-in image generation): bold white a integrated with a checkmark, flat forest-green rounded-square tile, plain white outside, thick strokes legible at 16 pixels; Dev changes only the tile to golden yellow.

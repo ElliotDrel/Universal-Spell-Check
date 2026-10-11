@@ -10,11 +10,13 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <Configurations>Debug;Release;Dev</Configurations>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
     <DefineConstants>$(DefineConstants);DEV</DefineConstants>
     <Optimize>false</Optimize>
+    <ApplicationIcon>Assets/app-dev.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Embed the latest git tag as InformationalVersion for Dev builds so the app can display the real prod version with a -dev suffix. -->
@@ -28,6 +30,11 @@
       <InformationalVersion Condition="'$(_GitTagStripped)' != ''">$(_GitTagStripped)</InformationalVersion>
     </PropertyGroup>
   </Target>
+
+  <ItemGroup>
+    <Resource Include="Assets/*.ico" />
+    <Resource Include="Assets/*.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Velopack" Version="1.2.161" />

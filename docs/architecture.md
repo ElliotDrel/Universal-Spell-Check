@@ -56,7 +56,7 @@ Tray menu items:
 3. Restart → `UpdateService.RequestRestart()`.
 4. Separator, Open Dashboard, Open Logs Folder, and Quit.
 
-Dev tray icon is orange-tinted at runtime (draws a semi-transparent orange overlay onto `SystemIcons.Application`).
+Both channels use the a/checkmark brand in `src/Assets/`: forest green for Prod and golden yellow for Dev. `BuildChannel.IconAsset` and `LogoAsset` select embedded tray/window/sidebar resources; the project selects the matching executable icon per configuration. Release packaging uses the Prod icon for the installer and Windows shortcuts.
 
 The dashboard auto-opens once on startup via `Application.Idle` so WPF resource failures surface immediately.
 

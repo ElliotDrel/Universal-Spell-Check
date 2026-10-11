@@ -12,6 +12,11 @@ internal partial class MainWindow : Window
     public MainWindow(SettingsStore settingsStore, DiagnosticsLogger logger, UpdateService? updateService = null)
     {
         InitializeComponent();
+        Title = BuildChannel.DisplayName;
+        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri(
+            $"pack://application:,,,/UniversalSpellCheck;component/{BuildChannel.IconAsset}"));
+        BrandLogo.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(
+            $"pack://application:,,,/UniversalSpellCheck;component/{BuildChannel.LogoAsset}"));
         _activityPage = new ActivityPage(logger);
         _settingsPage = new SettingsPage(settingsStore, logger, updateService);
         _updateService = updateService;

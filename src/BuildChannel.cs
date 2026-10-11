@@ -10,6 +10,8 @@ internal static class BuildChannel
 
 #if DEV
     public const bool IsDev = true;
+    public const string IconAsset = "Assets/app-dev.ico";
+    public const string LogoAsset = "Assets/logo-dev.png";
     public const string DisplayName = "Universal Spell Check (Dev)";
     public const string ChannelName = "dev";
     public const string AppDataFolder = "UniversalSpellCheck.Dev";
@@ -20,6 +22,8 @@ internal static class BuildChannel
     public const uint HotkeyVk = 0x44; // VK_D
 #else
     public const bool IsDev = false;
+    public const string IconAsset = "Assets/app.ico";
+    public const string LogoAsset = "Assets/logo.png";
     public const string DisplayName = "Universal Spell Check";
     public const string ChannelName = "prod";
     public const string AppDataFolder = SharedDataFolder;

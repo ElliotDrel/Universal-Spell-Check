@@ -267,32 +267,12 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
 
     private static System.Drawing.Icon BuildTrayIcon()
     {
-        var baseIcon = System.Drawing.SystemIcons.Application;
-        if (!BuildChannel.IsDev)
-        {
-            return baseIcon;
-        }
-
-        // Tint the Dev icon orange so it is visually distinct from Prod when
-        // both run side-by-side in the tray.
-        try
-        {
-            using var bmp = baseIcon.ToBitmap();
-            using var tinted = new System.Drawing.Bitmap(bmp.Width, bmp.Height);
-            using (var g = System.Drawing.Graphics.FromImage(tinted))
-            {
-                g.DrawImage(bmp, 0, 0);
-                using var overlay = new System.Drawing.SolidBrush(
-                    System.Drawing.Color.FromArgb(120, 255, 140, 0));
-                g.FillRectangle(overlay, 0, 0, bmp.Width, bmp.Height);
-            }
-            var hIcon = tinted.GetHicon();
-            return System.Drawing.Icon.FromHandle(hIcon);
-        }
-        catch
-        {
-            return baseIcon;
-        }
+        var uri = new Uri($"pack://application:,,,/UniversalSpellCheck;component/{BuildChannel.IconAsset}");
+        var resource = System.Windows.Application.GetResourceStream(uri)
+            ?? throw new InvalidOperationException($"Missing app icon: {BuildChannel.IconAsset}");
+        using var stream = resource.Stream;
+        using var icon = new System.Drawing.Icon(stream, System.Windows.Forms.SystemInformation.SmallIconSize);
+        return (System.Drawing.Icon)icon.Clone();
     }
 
     private static string TruncateTooltip(string text)
@@ -413,6 +393,7 @@ internal sealed class SpellCheckAppContext : Forms.ApplicationContext
         _hotkeyWindow.RestartRequested -= OnCommandRestartRequested;
         _hotkeyWindow.Dispose();
         _notifyIcon.Visible = false;
+        _notifyIcon.Icon?.Dispose();
         _notifyIcon.Dispose();
         _dashboardWindow?.Close();
         _overlayHost.Dispose();
