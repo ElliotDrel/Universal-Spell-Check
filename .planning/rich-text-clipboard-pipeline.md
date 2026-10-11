@@ -2,6 +2,54 @@
 
 ## Status
 
+### Native-only retest isolates destination list rebasing (2026-10-11 11:29 Eastern)
+
+The partial-start isolation above is now rendered and still fails. Run
+`a057dd031b044e549c306d7a70a9bcb7` starts at the selected tail of a nested item,
+then crosses the top-level Reflect item and its children. The 600ms after-image
+shows Reflect changing from `2.` to `d.`, with its children changing from alpha
+level 1 to roman level 2. The final selected paragraph joins the roman level,
+so the unselected questions following it become siblings instead of children.
+Source/request/readback retain list levels 1,0,1,1,1 and indentation 72,36,72,72,72.
+The replacement offers no HTML. The observed shift therefore occurs in Docs'
+contextual insertion, not HTML import or native offset mapping.
+
+Control `acb0c3b9f60648be8c51bcc0862a634e`, starting at the top-level Reflect
+item, preserves visible levels. Single-paragraph control
+`d8fc4b774db94aa393d2ebcbc8e6f0e9` corrects text without moving its paragraph.
+These distinguish a cross-paragraph insertion at a nested boundary from the
+single-paragraph and top-level-start paths. Native-only is not a root repair
+for this issue. Absolute serialized levels are not sufficient acceptance.
+
+Elliot confirmed original Docs Ctrl+C/Ctrl+V over the same selection also
+shifts the list. The explicitly authorized clipboard read preserved that copy
+locally: the native slice retains levels 1,0,1,1,1 and its original internal
+copy ID. This establishes ordinary structural-paste rebasing, not an external
+clipboard identity defect. The repair must keep the document's delimiters.
+
+A guarded paragraph-text replacement draft is implemented but not connected
+to the coordinator. The pure planner verifies one source block per paragraph
+and generates only inline HTML, no list/heading/paragraph wrappers or breaks.
+Every paragraph is planned, including unchanged text. Empty paragraphs and
+soft breaks decline this initial range contract. The unused executor proposes
+reverse text selections, requires a fresh clipboard copy and exact one-block
+content before each paste, then recopies/verifies each replacement. It verifies
+the entire corrected selection and native paragraph/list layout afterward.
+Navigation mismatches stop explicitly; there is no blind whole-selection retry.
+Native layout is checked before navigation; issued and verified paste counts
+are separate. These edits may form multiple undo operations.
+
+The formatting suite passes, including boundary/whitespace/structural rejection,
+inline bold/link preservation, and layout comparison catching the observed
+rebase, omitted final paragraphs and missing style data. Both real replays
+produce complete inline-only plans: five paragraphs (two unchanged) and eleven
+paragraphs (ten unchanged). No editor rendering or keyboard contract has been
+claimed from those checks. Automatic approval review rejected live coordinator
+integration due to unverified caret positioning/unselected-text risk. Explicit
+user approval to enable a Dev test is pending. Current running Dev retains
+the previous native-only behavior. No clipboard write or keyboard input was
+performed by the agent; only Elliot's explicitly authorized clipboard read.
+
 ### Partial-start selection isolation (2026-10-11, editor test pending)
 
 Run `e742b24ff24942c5bbb97db612fd454c` starts inside a nested list paragraph,

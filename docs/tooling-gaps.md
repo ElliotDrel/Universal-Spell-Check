@@ -20,7 +20,7 @@ Native compilation retains the documented channel-specific CS0162 warnings and a
 
 During Docs paste verification, the Chrome skill's mandatory bootstrap import
 of its installed `scripts/browser-client.mjs` failed in `mcp__node_repl__js`
-with `EPERM: operation not permitted, realpath`. The same file is readable
+with `EPERM: operation not permitted, realpath`. Reproduced on the 2026-10-11 11:29 partial-selection investigation; browser-controlled insertion testing remains unavailable. The same file is readable
 through the shell. No browser connection or browser actions occurred. The
 runtime exposes no callable feedback path in this session; this records the
 individual tool gap locally. Fix the runtime sandbox's access to its installed

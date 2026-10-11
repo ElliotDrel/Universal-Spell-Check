@@ -66,7 +66,8 @@ internal static class FormattingReplay
         }
         var current = new ReplayResult(replacement.Text, replacement.Html, replacement.Mode, replacement.Reason,
             replacement.Attempted, replacement.Applied, replacement.ParagraphCount,
-            replacement.NativeDocsStatus, replacement.NativeDocsBytes is null ? null : Convert.ToBase64String(replacement.NativeDocsBytes));
+            replacement.NativeDocsStatus, replacement.NativeDocsBytes is null ? null : Convert.ToBase64String(replacement.NativeDocsBytes),
+            replacement.Mode == "docs_native" ? RichTextClipboard.CreateDocsParagraphEdits(sourceHtml, sourceText, replacement.Text) : null);
         bool? recordedMatches = null;
         if (OptionalComplete(detail, "paste_text", out var recordedText)
             && OptionalComplete(detail, "paste_html", out var recordedHtml))
@@ -127,7 +128,8 @@ internal static class FormattingReplay
 }
 
 internal sealed record ReplayResult(string text, string html, string mode, string reason,
-    bool attempted, bool applied, int paragraph_count, string native_docs_status, string? native_docs_base64);
+    bool attempted, bool applied, int paragraph_count, string native_docs_status, string? native_docs_base64,
+    DocsParagraphEdit[]? paragraph_edits = null);
 internal sealed record ReplayOutput(int schema_version, string scope, string current_app_version,
     string? current_build, JsonElement source, ReplayResult result, bool? recorded_matches,
     bool? expected_matches, string? mapper_exception_type, List<string> warnings);

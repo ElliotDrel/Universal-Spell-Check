@@ -85,6 +85,42 @@ internal static class GoogleDocsClipboard
         { status = "invalid_native_data"; return null; }
     }
 
+    internal static string? ParagraphLayout(string base64, int paragraphCount)
+    {
+        try
+        {
+            var map = ReadMap(Convert.FromBase64String(base64));
+            var wrapper = JsonNode.Parse(map[SliceType])!;
+            var resolved = JsonNode.Parse(wrapper["data"]!.GetValue<string>())!["resolved"]!;
+            var text = resolved["dsl_spacers"]!.GetValue<string>();
+            var ends = text.Select((c, i) => (c, i)).Where(x => x.c == '\n').Select(x => x.i).ToList();
+            if (ends.Count == paragraphCount - 1) ends.Add(-1);
+            else if (ends.Count != paragraphCount || !text.EndsWith('\n')) return null;
+            var slices = resolved["dsl_styleslices"]!.AsArray();
+            if (!slices.Any(s => s?["stsl_type"]?.GetValue<string>() == "paragraph")) return null;
+            var layout = new JsonArray();
+            foreach (var end in ends)
+            {
+                var paragraph = new JsonObject();
+                foreach (var slice in resolved["dsl_styleslices"]!.AsArray())
+                {
+                    var type = slice!["stsl_type"]!.GetValue<string>();
+                    if (type is not ("paragraph" or "list")) continue;
+                    var styles = slice["stsl_styles"]!.AsArray();
+                    var style = end < 0 ? slice["stsl_trailing"] : end < styles.Count ? styles[end] : null;
+                    if (type == "paragraph" && (style is not JsonObject p || !p.Any(x => x.Key is "ps_hd" or "ps_il" or "ps_ifl"))) return null;
+                    var keys = type == "list" ? new[] { "ls_id", "ls_nest" }
+                        : new[] { "ps_hd", "ps_hdid", "ps_il", "ps_ifl", "ps_ir", "ps_ltr" };
+                    foreach (var key in keys) paragraph[key] = style?[key]?.DeepClone();
+                }
+                layout.Add(paragraph);
+            }
+            return layout.ToJsonString();
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException or InvalidOperationException or NullReferenceException or InvalidDataException or EndOfStreamException or ArgumentException or KeyNotFoundException)
+        { return null; }
+    }
+
     private static int[]? MapPositions(string source, string target)
     {
         var positions = new int[source.Length + 1];

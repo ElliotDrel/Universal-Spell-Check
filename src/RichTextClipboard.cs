@@ -230,6 +230,45 @@ internal static partial class RichTextClipboard
         return html with { ParagraphCount = blocks, NativeDocsBytes = native, NativeDocsStatus = status };
     }
 
+    internal static DocsParagraphEdit[]? CreateDocsParagraphEdits(string sourceHtml, string copiedText, string correctedText)
+    {
+        if (!TryExtractFragment(sourceHtml, out var fragment) || !GoogleDocsMarkerRegex().IsMatch(fragment)) return null;
+        fragment = AppleInterchangeBreakRegex().Replace(fragment, "");
+        var blocks = GoogleDocsBlockRegex().Matches(fragment);
+        if (blocks.Count < 2 || blocks.Count > 64 || copiedText.Length > 32768) return null;
+        var source = GoogleDocsSerializedText(fragment, blocks.Count);
+        var copied = copiedText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        if (copied != source && copied != source + "\n") return null;
+        if (GoogleDocsVisibleText(GoogleDocsBlockRegex().Replace(fragment, "")).Trim().Length != 0) return null;
+        var original = source.Split('\n');
+        var corrected = correctedText.Split('\n');
+        if (original.Length != blocks.Count || corrected.Length != blocks.Count) return null;
+        var edits = new DocsParagraphEdit[blocks.Count];
+        for (var i = 0; i < edits.Length; i++)
+        {
+            // Empty paragraphs and soft breaks need a different range contract.
+            if (string.IsNullOrWhiteSpace(original[i]) || string.IsNullOrWhiteSpace(corrected[i])
+                || HtmlBreakRegex().IsMatch(blocks[i].Value)) return null;
+            var inline = TryCreateReplacement(BuildCfHtml("<b id=\"docs-internal-guid-paragraph\" style=\"font-weight:normal;\">" + blocks[i].Value + "</b>"),
+                original[i], corrected[i]);
+            if (!inline.Applied || inline.Text != corrected[i] || !TryExtractFragment(inline.Html, out var output)
+                || GoogleDocsBlockTagRegex().IsMatch(output) || HtmlBreakRegex().IsMatch(output)) return null;
+            edits[i] = new(original[i], corrected[i], inline.Html);
+        }
+        return edits;
+    }
+
+    internal static bool IsCopiedDocsParagraph(string html, string copiedText, string expected)
+    {
+        var copied = copiedText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\u00a0', ' ');
+        if (copied != expected && copied != expected + "\n") return false;
+        if (!TryExtractFragment(html, out var fragment) || !GoogleDocsMarkerRegex().IsMatch(fragment)) return false;
+        fragment = AppleInterchangeBreakRegex().Replace(fragment, "");
+        return GoogleDocsBlockRegex().Matches(fragment).Count == 1
+            && GoogleDocsSerializedText(fragment, 1) == expected
+            && GoogleDocsVisibleText(GoogleDocsBlockRegex().Replace(fragment, "")).Trim().Length == 0;
+    }
+
     private static string GoogleDocsSerializedText(string fragment, int blocks)
     {
         var serialized = blocks == 0
@@ -994,7 +1033,7 @@ internal sealed record RichTextReplacementResult(
         Reason: "",
         ParagraphCount: paragraphCount);
 
-    // Verified Docs native slice beside Unicode, when CF_HTML could not be verified.
+    // Verified Docs native slice beside Unicode, without competing HTML.
     public static RichTextReplacementResult CreateDocsNative(string text, int paragraphCount) => new(
         Text: text,
         Html: "",
