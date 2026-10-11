@@ -72,6 +72,12 @@ The command restarts Prod through its native updater. Every startup checks, down
 
 If the run commands, channel constants, manual checks, or Top-of-mind reminders drift from the code, fix this file in the same change. **If you notice drift while doing other work — stale step, removed file, wrong hotkey — flag it to the user and propose the fix.** Do not silently work around it.
 
+For a Google Docs correction with Developer logging enabled, verify
+`clipboard_chromium_mime_status=ok` and the complete native base64 sidecar in its
+manifest. Repeat with logging disabled: native status must be `disabled`, with
+no native clipboard read. This captures diagnostic data; it does not establish
+list-level paste acceptance.
+
 ## Developer evidence verification
 
 Build `Dev` then run `src/bin/Dev/net10.0-windows/UniversalSpellCheck.exe --developer-evidence-smoke`

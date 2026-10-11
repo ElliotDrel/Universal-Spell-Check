@@ -50,6 +50,8 @@ internal sealed class RunRecord
     // indistinguishable after the fact.
     public string CapturedRtf { get; set; } = "";
     public string ClipboardFormats { get; set; } = "";
+    public string CapturedChromiumMimeBase64 { get; set; } = "";
+    public string CapturedChromiumMimeStatus { get; set; } = "disabled";
     public RichTextReplacementResult RichTextReplacement { get; set; } = RichTextReplacementResult.NotApplied("not_attempted");
     public ReplacementClipboardResult ReplacementClipboard { get; set; } = ReplacementClipboardResult.Succeeded(0);
     public string? OutputText { get; set; }

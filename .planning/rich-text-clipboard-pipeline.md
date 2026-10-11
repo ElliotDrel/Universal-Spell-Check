@@ -2,6 +2,21 @@
 
 ## Status
 
+### Developer logging native Docs capture (2026-10-11)
+
+Supersedes the approval-pending diagnostic proposal below. Elliot explicitly
+approved capture/storage and then asked to make it part of normal Developer
+logging, including the Production logging setting after release. Enabled
+corrections now capture bounded Chromium custom MIME bytes for Docs-marked
+selections before history exclusion. The 1 MiB binary cap, sequence validation,
+explicit read status, 512K base64 inline cap and full integrity-checked evidence
+sidecar keep missing/truncated inputs visible. Disabled logging never reads the
+native format. No separate diagnostic flag or new UI was added.
+
+Release/Dev builds, formatting regressions, and synthetic developer-evidence
+roundtrip/hash/failure-status tests pass. The live original Docs payload still
+needs one enabled Dev correction; list paste acceptance remains unresolved.
+
 ### Docs list paste acceptance failed (2026-10-11 08:27 Eastern)
 
 The earlier producer-marked replay results below establish mapper preservation,

@@ -16,7 +16,9 @@ internal static class DeveloperEvidenceTests
             {
                 InputText = "teh 🐈\r\n" + new string('x', 600000), OutputText = "the 🐈\r\n",
                 CapturedHtml = "<b>teh 🐈</b>", CapturedRtf = "{\\rtf1 teh}",
-                ClipboardFormats = "UnicodeText,HTML Format,Rich Text Format"
+                ClipboardFormats = "UnicodeText,HTML Format,Rich Text Format",
+                CapturedChromiumMimeBase64 = Convert.ToBase64String(new byte[] { 0, 255, 17, 0, 128 }),
+                CapturedChromiumMimeStatus = "ok"
             };
             var evidence = DeveloperEvidence.TryCreate(record.RunId, root)!;
             var reference = JsonSerializer.SerializeToElement(evidence.Save(record));
@@ -29,6 +31,24 @@ internal static class DeveloperEvidenceTests
             Check(input.GetProperty("sha256").GetString() == Convert.ToHexStringLower(SHA256.HashData(bytes)), "Hash must match artifact.");
             Check(input.GetProperty("chars").GetInt32() == record.InputText.Length, "Characters must count UTF16 code units.");
             Check(manifest.RootElement.GetProperty("run_id").GetString() == record.RunId, "Stable ID mismatch.");
+
+            var native = manifest.RootElement.GetProperty("payloads").GetProperty("clipboard_chromium_mime_base64");
+            Check(native.GetProperty("complete").GetBoolean(), "Successful native capture must be complete.");
+            var nativeBytes = File.ReadAllBytes(Path.Combine(directory, native.GetProperty("path").GetString()!));
+            Check(Convert.FromBase64String(Encoding.UTF8.GetString(nativeBytes)).SequenceEqual(new byte[] { 0, 255, 17, 0, 128 }),
+                "Binary native bytes must roundtrip through the base64 evidence sidecar.");
+            Check(native.GetProperty("sha256").GetString() == Convert.ToHexStringLower(SHA256.HashData(nativeBytes)),
+                "Native evidence hash must match the stored sidecar.");
+            Check(manifest.RootElement.GetProperty("clipboard_chromium_mime_status").GetString() == "ok",
+                "Native read status must be retained in the manifest.");
+
+            var nativeFailed = new RunRecord { InputText = "sample", CapturedChromiumMimeStatus = "size_limit" };
+            DeveloperEvidence.TryCreate(nativeFailed.RunId, root)!.Save(nativeFailed);
+            using var nativeMissing = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "developer-evidence", nativeFailed.RunId, "manifest.json")));
+            Check(!nativeMissing.RootElement.GetProperty("payloads").GetProperty("clipboard_chromium_mime_base64").GetProperty("complete").GetBoolean(),
+                "Failed native capture must not be reported as an empty complete payload.");
+            Check(nativeMissing.RootElement.GetProperty("clipboard_chromium_mime_status").GetString() == "size_limit",
+                "Native size-limit status must survive evidence saving.");
 
             var incomplete = new RunRecord { InputText = "text", OutputText = "text", ClipboardFormats = "UnicodeText,HTML Format" };
             DeveloperEvidence.TryCreate(incomplete.RunId, root)!.Save(incomplete);

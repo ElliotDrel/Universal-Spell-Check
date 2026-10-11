@@ -252,6 +252,19 @@ Settings → Logs → Developer logging is off by default in both channels, incl
 Changing it applies to the next correction without restarting. Disabled corrections keep their
 existing clipboard and diagnostic behavior. Headless/benchmark requests do not capture the desktop.
 
+Enabled logging also reads the original `Chromium Web Custom MIME Data Format`
+for selections whose CF_HTML carries the Google Docs producer marker. Capture
+runs before history exclusion, is capped at 1 MiB of binary data, and skips a
+changed clipboard sequence. `clipboard_chromium_mime_status` distinguishes
+`disabled`, `not_applicable`, `ok`, busy/read failures, `source_changed`, and
+`size_limit`; an unavailable payload is never treated as a successful empty read.
+`clipboard_chromium_mime_base64`, its `_chars` count and `_truncated` flag appear
+in the detail record with the usual 512K inline cap. Full base64 is retained in
+an integrity-checked developer-evidence sidecar with the same name. The manifest
+also retains the capture status. This native metadata can include document
+identifiers and data beyond the visible selection. Disabled logging does not
+read the native format; headless requests remain unchanged.
+
 Each detail record has `run_id` and `developer_logging_enabled`. Enabled runs add `developer_evidence` with `schema_version`,
 `manifest_path` relative to the shared log directory, and `status`. Busy evidence admission is reported explicitly. Ordinary `run_completed` and the single `spellcheck_detail` are written before optional evidence
 provider/storage waits, with a `pending` manifest reference. The app then writes evidence and a separate

@@ -12,7 +12,7 @@ internal static class ClipboardLoop
     private const int ClipboardRetryAttempts = 8;
     private const int MaxCopyAttempts = 2;
 
-    public static async Task<CaptureResult> CaptureSelectionAsync()
+    public static async Task<CaptureResult> CaptureSelectionAsync(bool captureNativeDocsMime = false)
     {
         var startedAt = Environment.TickCount64;
 
@@ -80,11 +80,17 @@ internal static class ClipboardLoop
                 // The format list is what makes an empty html/rtf interpretable:
                 // without it, "no markup" and "markup we failed to read" look
                 // identical in the logs.
+                var capturedSequence = captureNativeDocsMime ? GetClipboardSequenceNumber() : 0;
                 TryGetHtml(out var html);
                 TryGetRtf(out var rtf);
                 var formats = DescribeClipboardFormats();
 
-                return CaptureResult.Ok(text, html, rtf, formats, Environment.TickCount64 - startedAt, attempt);
+                var nativeMime = "";
+                var nativeMimeStatus = captureNativeDocsMime ? "not_applicable" : "disabled";
+                if (captureNativeDocsMime && html.Contains("docs-internal-guid-", StringComparison.Ordinal))
+                    (nativeMime, nativeMimeStatus) = ReadChromiumCustomMime(capturedSequence);
+                return CaptureResult.Ok(text, html, rtf, formats, Environment.TickCount64 - startedAt, attempt,
+                    nativeMime, nativeMimeStatus);
             }
 
             lastFailureReason = "Clipboard did not change after Ctrl+C.";
@@ -595,6 +601,49 @@ internal static class ClipboardLoop
         return false;
     }
 
+    // Docs' native paste metadata is destroyed by history exclusion. Keep
+    // bounded bytes only for enabled developer evidence; never use a stale read.
+    private static (string Base64, string Status) ReadChromiumCustomMime(uint capturedSequence)
+    {
+        if (!OpenClipboard(IntPtr.Zero))
+            return ("", "clipboard_busy");
+        try
+        {
+            if (GetClipboardSequenceNumber() != capturedSequence)
+                return ("", "source_changed");
+            var handle = GetClipboardData(CfChromiumCustomMime);
+            if (handle == IntPtr.Zero)
+                return ("", "absent_or_unreadable");
+            var size = GlobalSize(handle).ToUInt64();
+            if (size == 0 || size > 1024 * 1024)
+                return ("", size == 0 ? "empty" : "size_limit");
+            var pointer = GlobalLock(handle);
+            if (pointer == IntPtr.Zero)
+                return ("", "lock_failed");
+            try
+            {
+                var bytes = new byte[(int)size];
+                Marshal.Copy(pointer, bytes, 0, bytes.Length);
+                return (Convert.ToBase64String(bytes), "ok");
+            }
+            finally { GlobalUnlock(handle); }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return ("", "read_failed:" + ex.GetType().Name);
+        }
+        finally { CloseClipboard(); }
+    }
+
+    private static readonly uint CfChromiumCustomMime =
+        RegisterClipboardFormat("Chromium Web Custom MIME Data Format");
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetClipboardData(uint format);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern UIntPtr GlobalSize(IntPtr handle);
+
     [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
 
@@ -681,6 +730,8 @@ internal sealed class CaptureResult
     public string Rtf { get; init; } = "";
     // Comma-joined clipboard format names present at capture.
     public string Formats { get; init; } = "";
+    public string ChromiumMimeBase64 { get; init; } = "";
+    public string ChromiumMimeStatus { get; init; } = "disabled";
     public string? FailureReason { get; init; }
     // Per-attempt forensics (sequence numbers, modifier state, foreground
     // process + elevation). Populated only on failure.
@@ -689,13 +740,16 @@ internal sealed class CaptureResult
     public int Attempts { get; init; }
 
     public static CaptureResult Ok(
-        string text, string html, string rtf, string formats, long durationMs, int attempts) => new()
+        string text, string html, string rtf, string formats, long durationMs, int attempts,
+        string chromiumMimeBase64 = "", string chromiumMimeStatus = "disabled") => new()
     {
         Success = true,
         Text = text,
         Html = html,
         Rtf = rtf,
         Formats = formats,
+        ChromiumMimeBase64 = chromiumMimeBase64,
+        ChromiumMimeStatus = chromiumMimeStatus,
         DurationMs = durationMs,
         Attempts = attempts
     };

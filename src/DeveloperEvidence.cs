@@ -183,6 +183,7 @@ internal sealed class DeveloperEvidence
             {
                 ["input_text"] = run.InputText, ["clipboard_html"] = run.CapturedHtml,
                 ["clipboard_rtf"] = run.CapturedRtf, ["clipboard_formats"] = run.ClipboardFormats,
+                ["clipboard_chromium_mime_base64"] = run.CapturedChromiumMimeStatus == "ok" ? run.CapturedChromiumMimeBase64 : null,
                 ["raw_ai_output"] = run.RawAiOutput, ["output_text"] = run.OutputText,
                 ["paste_text"] = run.RichTextReplacement.Text, ["paste_html"] = run.RichTextReplacement.Html,
                 ["readback_text"] = readback?.Text, ["readback_html"] = readback?.Html,
@@ -204,6 +205,7 @@ internal sealed class DeveloperEvidence
                 paste_target = run.ActiveWindowAtPaste is null ? null : Identity(run.ActiveWindowAtPaste),
                 destination_before_context = run.ActiveWindowAtPaste is null ? "no_paste" :
                     run.ActiveWindowAtPaste.WindowHandle == run.ActiveWindowAtStart.WindowHandle ? "source_window_capture_available_if_timely" : "unavailable_destination_changed",
+                clipboard_chromium_mime_status = run.CapturedChromiumMimeStatus,
                 payloads, contexts, source_clipboard_captured_at = run.SourceClipboardCapturedAt,
                 paste_issued_at = Interlocked.Read(ref _pasteIssued) == 0 ? (DateTimeOffset?)null :
                     new DateTimeOffset(Interlocked.Read(ref _pasteIssued), TimeSpan.Zero),
@@ -212,7 +214,7 @@ internal sealed class DeveloperEvidence
                     Interlocked.Read(ref _pasteIssued) == 0 ? "no_paste" :
                     readback.CapturedAt.UtcTicks < Interlocked.Read(ref _pasteIssued) ? "before_paste" : "after_paste",
                 readback_status = readback is null ? null : new { status = readback.Status, sequence = readback.Sequence, text = readback.TextStatus, html = readback.HtmlStatus, rtf = readback.RtfStatus },
-                capture_contract = "Decoded Unicode/CF_HTML/RTF strings; proprietary clipboard formats are listed but not serialized."
+                capture_contract = "Decoded Unicode/CF_HTML/RTF strings; enabled Docs Chromium custom MIME bytes are bounded base64 with explicit read status. Other proprietary formats are only listed."
             });
             var saved = WriteBytes("manifest.json", manifest);
             return new { schema_version = 1, manifest_path = manifestPath, status = saved.Status };

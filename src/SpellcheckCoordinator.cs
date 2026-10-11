@@ -213,7 +213,7 @@ internal sealed class SpellcheckCoordinator : IDisposable
 
             // Capture
             record.T_CaptureStart = Stopwatch.GetTimestamp();
-            var capture = await ClipboardLoop.CaptureSelectionAsync();
+            var capture = await ClipboardLoop.CaptureSelectionAsync(record.DeveloperLoggingEnabled);
             record.T_CaptureEnd = Stopwatch.GetTimestamp();
             record.CopyAttempts = capture.Attempts;
 
@@ -236,6 +236,8 @@ internal sealed class SpellcheckCoordinator : IDisposable
             record.CapturedHtml = capture.Html;
             record.CapturedRtf = capture.Rtf;
             record.ClipboardFormats = capture.Formats;
+            record.CapturedChromiumMimeBase64 = capture.ChromiumMimeBase64;
+            record.CapturedChromiumMimeStatus = capture.ChromiumMimeStatus;
             record.Events.Add("capture_succeeded");
 
             // Re-tag the just-captured (incorrect) text as transient so it stays
@@ -570,6 +572,11 @@ internal sealed class SpellcheckCoordinator : IDisposable
                 clipboard_rtf_chars = r.CapturedRtf.Length,
                 clipboard_rtf_truncated = rtfTruncated,
                 clipboard_formats = r.ClipboardFormats,
+                clipboard_chromium_mime_base64 = r.CapturedChromiumMimeBase64.Length > MaxLoggedHtmlChars
+                    ? r.CapturedChromiumMimeBase64[..MaxLoggedHtmlChars] : r.CapturedChromiumMimeBase64,
+                clipboard_chromium_mime_base64_chars = r.CapturedChromiumMimeBase64.Length,
+                clipboard_chromium_mime_base64_truncated = r.CapturedChromiumMimeBase64.Length > MaxLoggedHtmlChars,
+                clipboard_chromium_mime_status = r.CapturedChromiumMimeStatus,
                 rich_text = new
                 {
                     source_html_present = r.CapturedHtml.Length > 0,
