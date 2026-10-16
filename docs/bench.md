@@ -117,3 +117,22 @@ confidence. Use a modest first run and repeat when variability makes the result 
 
 The old `compare.py`, `check_correctness.py` and autoopt documents target the legacy
 schema; they are historical and must not be used to validate this baseline.
+
+## October 16, 2026 checkpoint
+
+- Preserve the local package under the primary checkout's ignored
+  `benchmark_runs/rust-baseline-2026-10-16/` directory.
+- Record 100/100 measured live headless successes plus 20/20 successful warmups:
+  API median 843.5 ms, p95 1,891.3 ms, mean 1,026.54 ms.
+- Retain six measured list outputs with two extra spaces before LF; 94/100 outputs
+  match the hand-written expected text exactly, and all six differences were checked.
+- Use `compute-final-a` and `compute-final-b`: each passed 200 measured and 20 warmup
+  frozen-output/mapping checks; total medians 0.50595/0.54315 ms and p95 1.593775/1.871985 ms.
+- Mark earlier `compute-a`/`compute-b` superseded: their fake transport unnecessarily
+  rebuilt all fixture protection maps inside the timed path; retain those artifacts.
+- Keep the 30-run production observation separate: v0.12.3, October 15-16, developer
+  logging enabled, 27 successful and three failed; logged successful total median
+  2,625 ms and p95 8,464.8 ms do not prove verified editor replacement.
+- Leave local clipboard/E2E, original-editor acceptance and startup timing unmeasured
+  until the requested idle-desktop turn. The installed-app memory figure is one
+  aged-process snapshot, not a steady-state comparison.
