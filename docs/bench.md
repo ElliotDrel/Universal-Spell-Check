@@ -55,7 +55,8 @@ dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode e2
 The visible benchmark editor uses Ctrl+Alt+B, separate from Prod/Dev. It verifies
 foreground, full selection and fixture text before injection. A normal STA
 `Application.Run` message loop replaces the old `DoEvents`/sleep polling loop.
-The textbox observes completion of WM_PASTE, including unchanged-text replacement,
+The textbox observes completion of WM_PASTE or the native Ctrl+V character command,
+including unchanged-text replacement,
 and checks the complete resulting text against the actual requested `paste_text`.
 Only CRLF/LF normalization is allowed. Missing telemetry, paste receipt, wrong text,
 lost foreground or mismatched requested clipboard HTML fails the trial and stops
@@ -65,6 +66,10 @@ Rich fixtures provide synthetic CF_HTML on copy, exercising the production mappe
 and rich clipboard writer. The textbox verifies text and clipboard HTML, not visual
 bold/link/list rendering in a browser. Original-editor acceptance remains separate.
 Desktop runs change focus and leave corrected text on the clipboard, like the app.
+The registered benchmark window also supplies the real clipboard-history owner,
+so the production history-exclusion step runs. The harness has no loading overlay,
+tray, updater or dashboard; production observations remain separate context.
+Output directories must be empty; existing evidence is never overwritten.
 
 ## Results and interpretation
 

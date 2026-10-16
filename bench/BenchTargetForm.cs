@@ -44,7 +44,8 @@ internal sealed class BenchTargetForm : Form
             }
             base.WndProc(ref m);
             // WM_PASTE is observed even when unchanged text is replaced with identical text.
-            if (m.Msg == 0x302) LastPasteTicks = Stopwatch.GetTimestamp();
+            if (m.Msg == 0x302 || (m.Msg == 0x102 && m.WParam == new IntPtr(0x16)))
+                LastPasteTicks = Stopwatch.GetTimestamp();
         }
     }
 }

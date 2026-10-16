@@ -29,6 +29,8 @@ internal static class Program
             if (cases.Count == 0 || cases.Select(c => c.Id).Distinct().Count() != cases.Count
                 || cases.Any(c => string.IsNullOrWhiteSpace(c.Id) || string.IsNullOrWhiteSpace(c.Text)))
                 throw new ArgumentException("Cases must be nonempty with unique IDs and nonempty text.");
+            if (Directory.Exists(opts.Output) && Directory.EnumerateFileSystemEntries(opts.Output).Any())
+                throw new ArgumentException("Output directory is not empty; use a fresh run directory to preserve the baseline.");
             Directory.CreateDirectory(opts.Output);
             var fixtures = opts.Fixtures is null ? new List<ReplayFixture>()
                 : JsonSerializer.Deserialize<List<ReplayFixture>>(File.ReadAllText(opts.Fixtures), Json)!;
@@ -50,8 +52,10 @@ internal static class Program
             using var service = new OpenAiSpellcheckService(cached, logger, model,
                 opts.Live ? null : new ReplayTransport(fixtures));
             var post = new TextPostProcessor(logger);
+            IntPtr clipboardOwner = IntPtr.Zero;
             using var coordinator = new SpellcheckCoordinator(logger, service, post, new TargetFormattingPipeline(),
-                (_, _) => { }, _ => { }, () => { }, developerLogging: () => opts.DeveloperLogging);
+                (_, _) => { }, _ => { }, () => { }, clipboardOwnerHandle: () => clipboardOwner,
+                developerLogging: () => opts.DeveloperLogging);
             var manifest = new
             {
                 schema_version = 2, created_utc = DateTimeOffset.UtcNow, options = opts,
@@ -78,6 +82,7 @@ internal static class Program
                 Application.EnableVisualStyles();
                 using var form = new BenchTargetForm();
                 using var hotkey = new HotkeyWindow("UniversalSpellCheck.Benchmark");
+                clipboardOwner = hotkey.Handle;
                 hotkey.Register(HotkeyInjector.HotkeyModifiers, HotkeyInjector.HotkeyVk);
                 Task? running = null;
                 hotkey.HotkeyPressed += (_, _) => running = coordinator.RunAsync();
