@@ -116,11 +116,11 @@ Output shows delta per phase. Interpretation:
 
 | Delta | Signal |
 |---|---|
-| >= +5% improvement | Real gain (marked ✓) |
-| >= +5% regression | Real regression (marked ✗) |
-| < 5% either direction | Noise — discard |
+| >= +5% improvement | Candidate gain (marked ✓); confirm with repeated matched runs |
+| >= +5% regression | Candidate regression (marked ✗); investigate and repeat |
+| < 5% either direction | Below the report's heuristic threshold; not proof of no change |
 
-Network jitter is irreducible; 10 trials gives ±5% confidence at the median. For clean signal, use `--runs 20` or more.
+The previous claim that 10 trials provides ±5% confidence is superseded: neither a fixed trial count nor a 5% threshold establishes statistical confidence. Report sample counts, failures, median and p95, and repeat matched blocks to check variability. For live comparisons, alternate C#/Rust/Rust/C# blocks with identical inputs and API settings; increasing `--runs` alone does not remove time-of-day or server-load effects.
 
 The package-free target-formatting suite includes the deterministic no-match microbenchmark:
 
