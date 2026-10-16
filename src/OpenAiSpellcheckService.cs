@@ -34,7 +34,7 @@ internal sealed class OpenAiSpellcheckService : IDisposable
 
     private readonly CachedSettings _cachedSettings;
     private readonly DiagnosticsLogger _logger;
-    private readonly SocketsHttpHandler _handler;
+    private readonly HttpMessageHandler _handler;
     private readonly HttpClient _httpClient;
     private System.Threading.Timer? _rewarmTimer;
 
@@ -43,13 +43,14 @@ internal sealed class OpenAiSpellcheckService : IDisposable
     {
     }
 
-    public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger, string model)
+    public OpenAiSpellcheckService(CachedSettings cachedSettings, DiagnosticsLogger logger, string model,
+        HttpMessageHandler? transport = null)
     {
         _cachedSettings = cachedSettings;
         _logger = logger;
         _payloadConfig = BuildPayloadConfig(model);
         cachedSettings.SettingsStore.SettingsChanged += OnSettingsChanged;
-        _handler = new SocketsHttpHandler
+        _handler = transport ?? new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(10),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),

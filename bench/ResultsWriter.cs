@@ -4,76 +4,40 @@ namespace UniversalSpellCheck.Bench;
 
 internal static class ResultsWriter
 {
-    public static void Write(string path, object opts, IReadOnlyList<InputResult> results)
+    internal static void Write(string path, List<Trial> trials)
     {
-        var summary = results.Select(input => new
+        object Summary(IEnumerable<Trial> source)
         {
-            name = input.Name,
-            input_chars = input.InputChars,
-            trial_count = input.Trials.Count,
-            success_count = input.Trials.Count(t => t.Success),
-            total_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.TotalMs),
-            coordinator_total_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.CoordinatorTotalMs),
-            capture_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.CaptureMs),
-            request_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.RequestMs),
-            post_process_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PostProcessMs),
-            after_copy_format_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.AfterCopyFormatMs),
-            before_paste_format_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.BeforePasteFormatMs),
-            paste_ms = Stats.For(input.Trials.Where(t => t.Success), t => t.PasteMs),
-            tokens = new
+            var all = source.ToArray(); var ok = all.Where(t => t.Success).ToArray();
+            return new
             {
-                input_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.InputTokens ?? 0),
-                output_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.OutputTokens ?? 0),
-                cached_avg = input.Trials.Where(t => t.Success).DefaultIfEmpty().Average(t => t?.CachedTokens ?? 0),
-            },
-            sample_output = input.SampleOutput,
-        });
-
-        var aggregate = new
+                attempted = all.Length, succeeded = ok.Length, failed = all.Length - ok.Length,
+                quality_matches = all.Count(t => t.QualityMatch),
+                timings = ok.SelectMany(t => t.Timings.Keys).Distinct().ToDictionary(k => k,
+                    k => Stats.For(ok.Select(t => t.Timings.GetValueOrDefault(k))))
+            };
+        }
+        var measured = trials.Where(t => !t.Warmup).ToArray();
+        File.WriteAllText(path, JsonSerializer.Serialize(new
         {
-            generated_at_utc = DateTime.UtcNow.ToString("O"),
-            options = opts,
-            inputs = summary,
-            trials = results.SelectMany(r => r.Trials),  // raw per-trial dump for re-aggregation
-        };
-
-        File.WriteAllText(
-            path,
-            JsonSerializer.Serialize(aggregate, new JsonSerializerOptions { WriteIndented = true }));
+            aggregate = Summary(measured), warmup = Summary(trials.Where(t => t.Warmup)),
+            cases = measured.GroupBy(t => t.CaseId).ToDictionary(g => g.Key, g => Summary(g))
+        }, Program.Json));
     }
 }
 
 internal static class Stats
 {
-    public static object For<T>(IEnumerable<T> items, Func<T, long> selector)
+    internal static object For(IEnumerable<double?> samples)
     {
-        var values = items.Select(selector).Where(v => v > 0).OrderBy(v => v).ToList();
-        if (values.Count == 0)
-        {
-            return new { count = 0, mean = 0.0, median = 0.0, p95 = 0.0, min = 0L, max = 0L, stddev = 0.0 };
-        }
-        var mean = values.Average();
-        var sumSq = values.Sum(v => (v - mean) * (v - mean));
-        var stddev = values.Count > 1 ? Math.Sqrt(sumSq / (values.Count - 1)) : 0.0;
-        return new
-        {
-            count = values.Count,
-            mean,
-            median = Percentile(values, 0.50),
-            p95 = Percentile(values, 0.95),
-            min = values[0],
-            max = values[^1],
-            stddev,
-        };
+        var values = samples.Where(v => v.HasValue).Select(v => v!.Value).Order().ToArray();
+        if (values.Length == 0) return new { count = 0, mean = (double?)null, median = (double?)null, p95 = (double?)null, min = (double?)null, max = (double?)null };
+        return new { count = values.Length, mean = (double?)values.Average(), median = (double?)Percentile(values, .5),
+            p95 = (double?)Percentile(values, .95), min = (double?)values[0], max = (double?)values[^1] };
     }
-
-    private static double Percentile(IReadOnlyList<long> sorted, double p)
+    internal static double Percentile(double[] sorted, double p)
     {
-        if (sorted.Count == 1) return sorted[0];
-        var idx = p * (sorted.Count - 1);
-        var lo = (int)Math.Floor(idx);
-        var hi = (int)Math.Ceiling(idx);
-        if (lo == hi) return sorted[lo];
-        return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+        var position = p * (sorted.Length - 1); var lo = (int)position; var hi = (int)Math.Ceiling(position);
+        return sorted[lo] + (sorted[hi] - sorted[lo]) * (position - lo);
     }
 }

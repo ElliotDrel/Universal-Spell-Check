@@ -1,0 +1,31 @@
+using System.Text.Json;
+
+namespace UniversalSpellCheck.Bench;
+
+internal static class BenchTests
+{
+    internal static int Run()
+    {
+        void Check(bool value, string name) { if (!value) throw new Exception(name); Console.WriteLine($"PASS {name}"); }
+        var stats = JsonSerializer.SerializeToElement(Stats.For(new double?[] { 0, 0, 2, null }));
+        Check(stats.GetProperty("count").GetInt32() == 3 && stats.GetProperty("median").GetDouble() == 0, "zeros retained, null omitted");
+        Check(Math.Abs(Stats.Percentile(new double[] { 0, 10 }, .95) - 9.5) < .0001, "p95 interpolation");
+        Check(JsonSerializer.SerializeToElement(Stats.For(Array.Empty<double?>())).GetProperty("mean").ValueKind == JsonValueKind.Null, "missing data stays null");
+        Check(BenchHarness.Normalize("a\r\nb") == "a\nb" && BenchHarness.Normalize("a\nb\n") != "a\nb", "only CRLF is normalized");
+        bool rejected = false;
+        try { Options.Parse(new[] { "--runs", "0" }); } catch (ArgumentException) { rejected = true; }
+        Check(rejected, "zero repeat count rejected");
+        rejected = false;
+        try { Options.Parse(new[] { "--bogus" }); } catch (ArgumentException) { rejected = true; }
+        Check(rejected, "unknown arguments rejected");
+        var cases = JsonSerializer.Deserialize<List<BenchCase>>(File.ReadAllText("bench/baseline-cases.json"), Program.Json)!;
+        Check(cases.Count == 10 && cases.Select(c => c.Id).Distinct().Count() == 10, "ten distinct fixed cases");
+        foreach (var c in cases.Where(c => c.Html.Length > 0))
+        {
+            var rich = RichTextClipboard.TryCreateReplacement(c.Html, c.Text, c.Expected);
+            Console.WriteLine($"{c.Id}: applied={rich.Applied} reason={rich.Reason} mode={rich.Mode} text={rich.Text}");
+            Check(rich.Applied && rich.Text == c.Expected && rich.Html.Contains("<a ") == c.Html.Contains("<a "), $"{c.Id} real mapper retains rich structure");
+        }
+        return 0;
+    }
+}

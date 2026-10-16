@@ -1,273 +1,133 @@
 using System.Diagnostics;
+using System.Text.Json;
 using System.Windows.Forms;
 
 namespace UniversalSpellCheck.Bench;
 
-internal sealed class TrialResult
+internal sealed record Trial(string CaseId, int Index, bool Warmup, bool Success,
+    bool QualityMatch, Dictionary<string, double?> Timings, string Output, string? Error);
+
+internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<ReplayFixture> fixtures,
+    OpenAiSpellcheckService service, TextPostProcessor post, SpellcheckCoordinator coordinator, CapturingLogger logger)
 {
-    public required string InputName { get; init; }
-    public required int TrialIndex { get; init; }
-    public required bool Success { get; init; }
-    public required long TotalMs { get; init; }              // hotkey-press → TextChanged
-    public required long CoordinatorTotalMs { get; init; }   // RunRecord total (hotkey → HotPathReturned)
-    public required long CaptureMs { get; init; }
-    public required long RequestMs { get; init; }
-    public required long PostProcessMs { get; init; }
-    public required long AfterCopyFormatMs { get; init; }
-    public required long BeforePasteFormatMs { get; init; }
-    public required long PasteMs { get; init; }
-    public required int InputTokens { get; init; }
-    public required int OutputTokens { get; init; }
-    public required int CachedTokens { get; init; }
-    public string? Error { get; init; }
-    public string? OutputText { get; init; }
-}
+    internal List<ReplayFixture> Fixtures { get; } = fixtures;
+    internal Func<Task?> CoordinatorTask { get; set; } = () => null;
 
-internal sealed class InputResult
-{
-    public required string Name { get; init; }
-    public required int InputChars { get; init; }
-    public required List<TrialResult> Trials { get; init; }
-    public string? SampleOutput { get; set; }
-}
-
-internal sealed class BenchHarness
-{
-    private readonly BenchTargetForm? _form;
-    private readonly SpellcheckCoordinator _coordinator;
-    private readonly DiagnosticsLogger _logger;
-    private readonly int _runs;
-    private readonly int _warmup;
-    private readonly bool _e2eMode;
-
-    // RunRecord captured by the coordinator's logger sink. The coordinator only
-    // exposes timings via its FinalizeAsync log; the cleanest seam is to wrap
-    // the logger so we can intercept the spellcheck_detail JSON per trial.
-    private volatile TrialTimings? _lastTrialTimings;
-    private volatile bool _pasteExpected;
-    private long _t1Ticks;
-
-    public BenchHarness(
-        BenchTargetForm? form,
-        SpellcheckCoordinator coordinator,
-        DiagnosticsLogger logger,
-        int runs,
-        int warmup,
-        bool e2eMode)
+    internal async Task<int> RunAsync(BenchTargetForm? form)
     {
-        _form = form;
-        _coordinator = coordinator;
-        _logger = logger;
-        _runs = runs;
-        _warmup = warmup;
-        _e2eMode = e2eMode;
-    }
-
-    /// <summary>Set by Program.cs after each Coordinator.RunAsync completes.</summary>
-    public void RecordCoordinatorTimings(TrialTimings timings) => _lastTrialTimings = timings;
-
-    public async Task<List<InputResult>> RunAllAsync(IReadOnlyList<(string Name, string Text)> inputs)
-    {
-        var results = new List<InputResult>();
-
-        // Headless: one global warmup on the first input is enough — the HTTP/2 connection
-        // stays alive in the pool for all subsequent inputs. E2E: warmup per input because
-        // each input resets focus and clipboard state.
-        var globalWarmupDone = false;
-
-        foreach (var (name, text) in inputs)
+        var trials = new List<Trial>();
+        using var raw = new StreamWriter(Path.Combine(opts.Output, "trials.jsonl"), append: false) { AutoFlush = true };
+        var aborted = false;
+        foreach (var c in cases)
         {
-            var trials = new List<TrialResult>();
-
-            var warmupCount = _e2eMode ? _warmup : (globalWarmupDone ? 0 : _warmup);
-            for (var w = 0; w < warmupCount; w++)
+            for (int i = -opts.Warmup; i < opts.Runs; i++)
             {
-                _logger.Log($"bench warmup input={name} trial={w + 1}/{warmupCount}");
-                _ = await RunOneTrialAsync(name, text, trialIndex: -(w + 1));
-                if (_e2eMode) await Task.Delay(300);
-            }
-            if (!_e2eMode) globalWarmupDone = true;
-
-            string? sampleOutput = null;
-            for (var i = 0; i < _runs; i++)
-            {
-                _logger.Log($"bench measured input={name} trial={i + 1}/{_runs}");
-                var trial = await RunOneTrialAsync(name, text, trialIndex: i + 1);
-                trials.Add(trial);
-                if (sampleOutput is null && trial.Success && trial.OutputText is { Length: > 0 } o)
-                    sampleOutput = o;
-                if (_e2eMode) await Task.Delay(300);
-            }
-
-            results.Add(new InputResult
-            {
-                Name = name,
-                InputChars = text.Length,
-                Trials = trials,
-                SampleOutput = sampleOutput,
-            });
-        }
-
-        return results;
-    }
-
-    private async Task<TrialResult> RunOneTrialAsync(string name, string text, int trialIndex)
-    {
-        if (_e2eMode) return await E2eTrialAsync(name, text, trialIndex);
-        return await HeadlessTrialAsync(name, text, trialIndex);
-    }
-
-    private async Task<TrialResult> E2eTrialAsync(string name, string text, int trialIndex)
-    {
-        _lastTrialTimings = null;
-        _pasteExpected = false;
-        _t1Ticks = 0;
-        var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var form = _form ?? throw new InvalidOperationException("E2E mode requires a bench target form.");
-
-        // Subscribe ONCE per trial to the textbox change event.
-        void OnChanged(object? _, EventArgs __)
-        {
-            if (!_pasteExpected) return;   // ignore LoadAndSelect writes before we fire hotkey
-            Interlocked.Exchange(ref _t1Ticks, Stopwatch.GetTimestamp());
-            ready.TrySetResult(true);
-        }
-
-        form.TargetTextChanged += OnChanged;
-        try
-        {
-            // Load text + focus. Pump messages so focus actually lands.
-            form.Invoke(() => form.LoadAndSelect(text));
-            Application.DoEvents();
-            await Task.Delay(50);  // give Windows a tick to settle focus
-
-            _pasteExpected = true;
-            var t0 = Stopwatch.GetTimestamp();
-            HotkeyInjector.FireCtrlAltB();
-
-            // Wait up to 60s for the textbox to change (cap = HttpClient timeout + slack).
-            var winner = await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(60)));
-
-            if (winner != ready.Task)
-            {
-                return new TrialResult
+                bool warmup = i < 0;
+                Trial trial;
+                try
                 {
-                    InputName = name,
-                    TrialIndex = trialIndex,
-                    Success = false,
-                    TotalMs = TicksToMs(t0, Stopwatch.GetTimestamp()),
-                    CoordinatorTotalMs = 0,
-                    CaptureMs = 0,
-                    RequestMs = 0,
-                    PostProcessMs = 0,
-                    AfterCopyFormatMs = 0,
-                    BeforePasteFormatMs = 0,
-                    PasteMs = 0,
-                    InputTokens = 0,
-                    OutputTokens = 0,
-                    CachedTokens = 0,
-                    Error = "Timed out waiting for paste TextChanged.",
-                };
+                    trial = opts.Mode == "compute" ? await ComputeAsync(c, i, warmup)
+                        : await PipelineAsync(c, i, warmup, form);
+                }
+                catch (Exception e)
+                {
+                    trial = new(c.Id, i, warmup, false, false, new(), "", e.Message);
+                }
+                trials.Add(trial);
+                raw.WriteLine(JsonSerializer.Serialize(trial, Program.Json).Replace("\r", "").Replace("\n", ""));
+                ResultsWriter.Write(Path.Combine(opts.Output, "summary.json"), trials);
+                Console.WriteLine($"{opts.Mode} {c.Id} {(warmup ? "warmup" : "trial")} {i + 1}: {(trial.Success ? "ok" : "FAIL")} quality={trial.QualityMatch} {trial.Error}");
+                // A desktop failure can mean focus/selection changed. Stop rather than sending more keys.
+                if (opts.Desktop && !trial.Success) { aborted = true; break; }
+                if (opts.Desktop) await Task.Delay(150);
             }
-
-            // Coordinator finalize runs as Task.Run after RunAsync returns; wait briefly
-            // for the timings sink to receive the spellcheck_detail event.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (_lastTrialTimings is null && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(20);
-            }
-            if (_lastTrialTimings is null)
-            {
-                _logger.Log($"bench warn: FinalizeAsync timings not received within 5s for input={name} trial={trialIndex}");
-            }
-
-            var t = _lastTrialTimings;
-            return new TrialResult
-            {
-                InputName = name,
-                TrialIndex = trialIndex,
-                Success = t?.Status == "success",
-                TotalMs = TicksToMs(t0, _t1Ticks),
-                CoordinatorTotalMs = t?.TotalMs ?? 0,
-                CaptureMs = t?.ClipboardMs ?? 0,
-                RequestMs = t?.RequestMs ?? 0,
-                PostProcessMs = (t?.ReplacementsMs ?? 0) + (t?.PromptGuardMs ?? 0),
-                AfterCopyFormatMs = t?.AfterCopyFormatMs ?? 0,
-                BeforePasteFormatMs = t?.BeforePasteFormatMs ?? 0,
-                PasteMs = t?.PasteMs ?? 0,
-                InputTokens = t?.InputTokens ?? 0,
-                OutputTokens = t?.OutputTokens ?? 0,
-                CachedTokens = t?.CachedTokens ?? 0,
-                Error = t?.ErrorMessage,
-                OutputText = t?.OutputText,
-            };
+            if (aborted) break;
         }
-        finally
-        {
-            form.TargetTextChanged -= OnChanged;
-        }
+        return aborted || trials.Any(t => !t.Success) ? 1 : 0;
     }
 
-    private async Task<TrialResult> HeadlessTrialAsync(string name, string text, int trialIndex)
+    private async Task<Trial> ComputeAsync(BenchCase c, int index, bool warmup)
     {
-        var r = await _coordinator.RunHeadlessAsync(text);
-
-        if (r is null)
+        var expected = Fixtures.Single(f => f.Id == c.Id);
+        var total = Stopwatch.GetTimestamp();
+        var start = total;
+        var protection = ProtectedText.Protect(c.Text);
+        double protectMs = Elapsed(start);
+        var record = new RunRecord();
+        start = Stopwatch.GetTimestamp();
+        var result = await service.SpellcheckAsync(protection.Text, record);
+        double serviceMs = Elapsed(start);
+        start = Stopwatch.GetTimestamp();
+        var pp = post.Process(result.OutputText ?? "", protection);
+        double postMs = Elapsed(start);
+        start = Stopwatch.GetTimestamp();
+        var rich = RichTextClipboard.TryCreateReplacement(c.Html, c.Text, pp.Text);
+        double richMs = Elapsed(start);
+        var ms = new Dictionary<string, double?>
         {
-            return new TrialResult
-            {
-                InputName = name, TrialIndex = trialIndex, Success = false,
-                TotalMs = 0, CoordinatorTotalMs = 0, CaptureMs = 0, RequestMs = 0,
-                PostProcessMs = 0, AfterCopyFormatMs = 0, BeforePasteFormatMs = 0,
-                PasteMs = 0, InputTokens = 0, OutputTokens = 0,
-                CachedTokens = 0, Error = "Coordinator gate rejected (already running).",
-            };
-        }
-
-        return new TrialResult
-        {
-            InputName = name,
-            TrialIndex = trialIndex,
-            Success = r.Success,
-            TotalMs = r.TotalMs,
-            CoordinatorTotalMs = r.TotalMs,
-            CaptureMs = 0,
-            RequestMs = r.RequestMs,
-            PostProcessMs = r.ReplacementsMs + r.PromptGuardMs,
-            AfterCopyFormatMs = 0,
-            BeforePasteFormatMs = 0,
-            PasteMs = 0,
-            InputTokens = r.InputTokens,
-            OutputTokens = r.OutputTokens,
-            CachedTokens = r.CachedTokens,
-            Error = r.ErrorMessage,
-            OutputText = r.OutputText,
+            ["total_ms"] = Elapsed(total), ["protect_ms"] = protectMs,
+            ["replay_service_ms"] = serviceMs, ["post_process_ms"] = postMs,
+            ["rich_map_ms"] = richMs, ["request_ms"] = null, ["capture_ms"] = null, ["paste_ms"] = null
         };
+        bool exact = result.Success && pp.ProtectionRestored && pp.Text == expected.Output
+            && rich.Text == expected.PasteText && rich.Html == expected.PasteHtml;
+        return new(c.Id, index, warmup, exact, Normalize(pp.Text) == Normalize(c.Expected), ms, pp.Text,
+            exact ? null : "Recorded output or rich mapping differs from frozen reference.");
     }
 
-    private static long TicksToMs(long start, long end)
+    private async Task<Trial> PipelineAsync(BenchCase c, int index, bool warmup, BenchTargetForm? form)
     {
-        if (start == 0 || end == 0 || end <= start) return 0;
-        return (long)((end - start) * 1000.0 / Stopwatch.Frequency);
+        if (form is not null)
+        {
+            form.LoadAndSelect(c);
+            await Task.Delay(100);
+            form.VerifySelection(c.Text);
+            form.Arm();
+        }
+        var pending = logger.BeginTrial();
+        var start = Stopwatch.GetTimestamp();
+        if (form is null)
+            await coordinator.RunHeadlessAsync(c.Text);
+        else
+            HotkeyInjector.FireCtrlAltB();
+        var returnedMs = Elapsed(start);
+        var detail = await pending.WaitAsync(TimeSpan.FromSeconds(70));
+        if (form is not null && CoordinatorTask() is { } running) await running;
+        var output = detail.GetProperty("output_text").GetString() ?? "";
+        var rawOutput = detail.GetProperty("raw_ai_output").GetString() ?? "";
+        var timings = detail.GetProperty("timings").EnumerateObject()
+            .ToDictionary(p => p.Name, p => (double?)p.Value.GetDouble());
+        // These production log fields are placeholders, not measurements.
+        timings["payload_ms"] = null; timings["parse_ms"] = null;
+        timings["coordinator_total_ms"] = timings["total_ms"];
+        timings["total_ms"] = form is null ? returnedMs
+            : form.LastPasteTicks == 0 ? null : (form.LastPasteTicks - start) * 1000.0 / Stopwatch.Frequency;
+        if (form is null)
+            foreach (var field in new[] { "clipboard_ms", "capture_ms", "paste_ms", "after_copy_format_ms", "before_paste_format_ms" })
+                timings[field] = null;
+        else timings["capture_ms"] = timings["clipboard_ms"];
+        bool success = detail.GetProperty("status").GetString() == "success";
+        string? error = success ? null : detail.GetProperty("error").GetString();
+        var rich = RichTextClipboard.TryCreateReplacement(c.Html, c.Text, output);
+        if (form is not null)
+        {
+            var paste = detail.GetProperty("paste_text").GetString() ?? "";
+            success &= form.LastPasteTicks > start && Normalize(form.CurrentText) == Normalize(paste) && form.Foreground;
+            if (success && !string.IsNullOrEmpty(detail.GetProperty("paste_html").GetString()))
+                success &= Clipboard.GetText(TextDataFormat.Html) == detail.GetProperty("paste_html").GetString();
+            if (!success) error ??= "Editor text, paste receipt, foreground, or clipboard HTML did not verify.";
+        }
+        if (!opts.Live)
+        {
+            var frozen = Fixtures.Single(f => f.Id == c.Id);
+            success &= output == frozen.Output && Normalize(form?.CurrentText ?? output) == Normalize(frozen.PasteText);
+            if (!success) error ??= "Replay differs from frozen output.";
+        }
+        else if (success && !Fixtures.Any(f => f.Id == c.Id))
+            Fixtures.Add(new(c.Id, c.Text, rawOutput, output, rich.Text, rich.Html));
+        return new(c.Id, index, warmup, success, Normalize(output) == Normalize(c.Expected), timings, output, error);
     }
-}
 
-/// <summary>Coordinator phase timings captured per trial via a logger interceptor.</summary>
-internal sealed class TrialTimings
-{
-    public required string Status { get; init; }
-    public required long TotalMs { get; init; }
-    public required long ClipboardMs { get; init; }
-    public required long RequestMs { get; init; }
-    public required long ReplacementsMs { get; init; }
-    public required long PromptGuardMs { get; init; }
-    public required long AfterCopyFormatMs { get; init; }
-    public required long BeforePasteFormatMs { get; init; }
-    public required long PasteMs { get; init; }
-    public required int InputTokens { get; init; }
-    public required int OutputTokens { get; init; }
-    public required int CachedTokens { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? OutputText { get; init; }
+    internal static string Normalize(string text) => text.Replace("\r\n", "\n");
+    internal static double Elapsed(long ticks) => (Stopwatch.GetTimestamp() - ticks) * 1000.0 / Stopwatch.Frequency;
 }

@@ -1,183 +1,114 @@
-# Speed Bench Harness
+# C# / Rust Baseline
 
-## Overview
+## Scope
 
-`bench/` contains a deterministic speed harness that drives the real `SpellcheckCoordinator` and records per-phase timings via a `CapturingLogger` interceptor — no mocking, no stubs, no modifications to `src/` at runtime.
+The October 16, 2026 harness replaces the old benchmark. Use Release builds and
+`bench/baseline-cases.json`: ten fixed public synthetic cases covering short,
+paragraph, long, unchanged, replacements, protected literals, Unicode, blank lines,
+bold/link HTML and list HTML. Do not regenerate this file from changing production
+logs. Version a new case file if the workload changes.
 
-Two modes:
-
-| Mode | How it works | When to use |
+| Mode | What runs | Desktop required? |
 |---|---|---|
-| **Headless** (default) | Calls `SpellcheckCoordinator.RunHeadlessAsync` directly — no clipboard, no paste, no focus required. You can keep using your PC. | Baselines, optimization comparisons — the common case. |
-| **E2E** (`--e2e`) | Uses a hidden `BenchTargetForm` + Win32 `SendInput` to fire `Ctrl+Alt+B`, driving the full clipboard-capture → paste path. Requires the PC to be idle. | Measuring clipboard/paste overhead or verifying the complete real-world flow. |
+| `headless` | Real coordinator, live API, protection/post-processing; no capture, target hooks or rich mapping | No |
+| `compute` | Real protection, payload construction, response parser, post-processing and rich mapper with recorded AI output | No |
+| `local` | Real hotkey/coordinator/capture/formatting/paste; only HTTP transport replaced with recorded output | Yes |
+| `e2e` | Real hotkey/coordinator/capture/formatting/live API/paste | Yes |
+| `self-test` | Measurement invariants and real-mapper fixture checks | No |
 
-In headless mode `total_ms ≈ request_ms` — clipboard and paste phases read as 0ms. In e2e mode all phases are captured.
+`compute` is a component measurement, not a substitute for the full local pipeline.
+The replay response envelope is synthesized from recorded model text; it is not a
+byte-for-byte replay of the complete server response. Replay has no network transport.
+Offline modes use a dummy key in isolated run-local settings, never the user's key.
+Desktop modes accept `--developer-logging` to match the actual production setting;
+otherwise developer evidence is disabled. Record and match that flag across languages.
+The only product change is optional HTTP-handler injection; the normal handler and
+product path are unchanged.
 
-The e2e bench uses hotkey `Ctrl+Alt+B` and never touches `Ctrl+Alt+U` (prod) or `Ctrl+Alt+D` (dev).
+## Run
 
----
-
-## Inputs (`bench/inputs.json`)
-
-20 inputs stored as:
-
-```json
-[{"id": "01", "text": "..."}, ...]
-```
-
-Three equal-weight categories:
-
-| Category | What it exercises |
-|---|---|
-| General spelling/grammar | Core correction path |
-| Brand-name replacements | `replacements.json` post-processing (`OpenAI`, `GitHub`, `buildPurdue`, etc.) |
-| Protected literals | URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs pass through unchanged |
-
-To refresh inputs from real production logs:
+From the repository root, use the SDK selected by `global.json`:
 
 ```powershell
-python bench/extract_inputs.py
+dotnet build bench/UniversalSpellCheck.Bench.csproj -c Release
+dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode self-test
+dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode headless --runs 10 --warmup 2 --output bench/results/csharp-api-a
+dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode compute --fixtures bench/results/csharp-api-a/fixtures.json --runs 20 --warmup 2 --output bench/results/csharp-compute-a
 ```
 
----
+Live mode reads the current saved model and protected API key. `--model` overrides the
+model explicitly; use `--settings` to select the real production data directory if a
+sandbox redirects LocalAppData. Never put a key in a command or result file.
+Each case has its own excluded warmups. Ten cases with ten runs and two warmups
+make 120 correction requests, before service retries. There is no parallel request
+load. First-use warmups are retained in raw output rather than silently discarded.
 
-## Running the bench
-
-**Headless (default — keep using your PC):**
+Desktop tests MUST wait until Elliot has stopped using the computer. Preparing the
+command or building the runner does not authorize running it during active use.
+Both desktop modes reject invocation without `--allow-desktop`:
 
 ```powershell
-dotnet run --project bench/UniversalSpellCheck.Bench.csproj -- --runs 10 --warmup 2 --variant baseline-headless
+dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode local --fixtures bench/results/csharp-api-a/fixtures.json --runs 20 --warmup 2 --allow-desktop --output bench/results/csharp-local-a
+dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode e2e --runs 10 --warmup 2 --allow-desktop --output bench/results/csharp-e2e-a
 ```
 
-**E2E (full clipboard + paste path — PC must be idle):**
+The visible benchmark editor uses Ctrl+Alt+B, separate from Prod/Dev. It verifies
+foreground, full selection and fixture text before injection. A normal STA
+`Application.Run` message loop replaces the old `DoEvents`/sleep polling loop.
+The textbox observes completion of WM_PASTE, including unchanged-text replacement,
+and checks the complete resulting text against the actual requested `paste_text`.
+Only CRLF/LF normalization is allowed. Missing telemetry, paste receipt, wrong text,
+lost foreground or mismatched requested clipboard HTML fails the trial and stops
+the desktop block. Do not silently retry or exclude failed attempts.
 
-```powershell
-dotnet run --project bench/UniversalSpellCheck.Bench.csproj -- --runs 10 --warmup 2 --variant baseline-e2e --e2e
-```
+Rich fixtures provide synthetic CF_HTML on copy, exercising the production mapper
+and rich clipboard writer. The textbox verifies text and clipboard HTML, not visual
+bold/link/list rendering in a browser. Original-editor acceptance remains separate.
+Desktop runs change focus and leave corrected text on the clipboard, like the app.
 
-CLI flags:
+## Results and interpretation
 
-| Flag | Default | Description |
-|---|---|---|
-| `--runs` | `10` | Number of measured trials per input |
-| `--warmup` | `2` | Warmup trials excluded from stats |
-| `--model` | `gpt-4.1-nano` | OpenAI model passed to the coordinator |
-| `--variant` | `baseline` | Label embedded in the output filename |
-| `--e2e` | off | Enable full e2e mode (SendInput + clipboard) |
+Every result directory contains:
 
-Results are written to `bench/results/{utc}-{sha}-{variant}.json`.
+- `manifest.json`: commit/dirty state, product/harness/case/replacements/fixture hashes,
+  OS/runtime/architecture, stopwatch frequency, model, prompt, options and boundaries.
+- `trials.jsonl`: every attempted warmup and measured trial, with timings, failures,
+  complete output and exact expected-text comparison.
+- `summary.json`: attempted/succeeded/failed counts and mean/median/p95/min/max overall
+  and per case. Statistics describe successful attempts; failures remain explicit.
+- `fixtures.json` (live modes): the first successful model output per case, including
+  warmup, plus the resulting production text/HTML reference for deterministic replay.
+- `spellcheck-YYYY-MM-DD.jsonl`: normal coordinator diagnostics. Read with the
+  `read-logs` skill and `--log-dir <result-directory>`.
 
-In e2e mode: do not click, type, or switch windows while the bench is running — `SendInput` steals focus and clipboard interference will corrupt results.
+Live `quality_match` is exact agreement with the hand-written expected text, not a
+complete semantic judge. Legitimate wording variations require review. Success
+requires the production pipeline to succeed; offline replay additionally requires
+exact frozen output/mapping. Frozen output is a behavior reference, not proof that
+every existing behavior is desirable. The original expected case text remains intact.
 
----
+Compare directories with `python bench/baseline_compare.py <before-directory> <after-directory>`.
+The comparison rejects mismatched workloads/settings, incomplete coverage or failed runs.
 
-## Metrics
+`total_ms` is call-to-headless-return, compute start-to-map-return, or synthetic
+hotkey injection-to-editor-WM_PASTE completion, depending on mode. Production phase
+times remain whole milliseconds; component and external timings use Stopwatch ticks.
+Keep zero samples. Null denotes an unmeasured/inapplicable phase; historical
+`payload_ms` and `parse_ms` zeros are placeholders and are converted to null.
+Compute `replay_service_ms` includes real payload/parser work and fake transport;
+it is never reported as API latency. Logging finalization is awaited between trials
+but is outside external total measurements. The manifest records effective developer
+evidence logging and the saved setting separately; headless/compute do not capture evidence.
 
-Per trial, the harness captures:
+Before porting, copy the exact Release binaries and source archive to a durable
+ignored `benchmark_runs/` directory, retain the case/replacements files, and checksum
+the package. Keep results outside disposable worktrees. Never commit real run artifacts.
 
-| Field | Headless | E2E | Meaning |
-|---|---|---|---|
-| `total_ms` | ✓ | ✓ | Full pipeline wall-clock (coordinator start → end) |
-| `coordinator_total_ms` | ✓ | ✓ | Same as total in headless; hotkey → HotPathReturned in e2e |
-| `capture_ms` | 0 | ✓ | Clipboard capture phase (Ctrl+C loop) |
-| `request_ms` | ✓ | ✓ | OpenAI API round-trip |
-| `post_process_ms` | ✓ | ✓ | `TextPostProcessor.Process` (replacements + prompt-leak guard) |
-| `after_copy_format_ms` | 0 | ✓ | Target rule resolution plus after-copy hook |
-| `before_paste_format_ms` | 0 | ✓ | Before-paste target hook |
-| `paste_ms` | 0 | ✓ | Clipboard write + `SendInput` Ctrl+V |
+After porting, rerun C# and Rust on the same machine with identical fixtures/settings.
+Alternate C#/Rust/Rust/C# blocks, preserve all failures and inspect per-case order
+effects. Report milliseconds saved and percentage/speed ratio separately for local
+and full E2E. Neither a 5% threshold nor a fixed sample count establishes statistical
+confidence. Use a modest first run and repeat when variability makes the result unclear.
 
-Per-phase stats reported: median, p95, mean, stddev, min, max. Only successful trials are included in stats — failed trials are counted separately.
-
-Each input also gets a `sample_output` field — the corrected text from the first successful trial. Used by `check_correctness.py` to enforce behavioral contracts deterministically without re-running the model.
-
----
-
-## Correctness gate
-
-`python bench/check_correctness.py <results.json>` runs behavioral contract checks and exits 0 / 1.
-
-Contracts are derived automatically from `bench/inputs.json` + `replacements.json` — no calibration file, no recalibration needed:
-
-- **Protected literal passthrough** — URLs, UUIDs/session IDs, API keys, file paths, and opaque IDs in the original input must appear byte-identical in `sample_output`.
-- **Brand replacements** — every `replacements.json` variant present outside protected literals must appear as its canonical form in `sample_output`.
-- Inputs with neither protected literals nor matched variants are silently skipped.
-
-Used as a hard gate by the autoopt loop (see `docs/autoopt.md`) before any change is committed.
-
----
-
-## Comparing runs
-
-```powershell
-python bench/compare.py bench/results/<before>.json bench/results/<after>.json
-```
-
-Output shows delta per phase. Interpretation:
-
-| Delta | Signal |
-|---|---|
-| >= +5% improvement | Candidate gain (marked ✓); confirm with repeated matched runs |
-| >= +5% regression | Candidate regression (marked ✗); investigate and repeat |
-| < 5% either direction | Below the report's heuristic threshold; not proof of no change |
-
-The previous claim that 10 trials provides ±5% confidence is superseded: neither a fixed trial count nor a 5% threshold establishes statistical confidence. Report sample counts, failures, median and p95, and repeat matched blocks to check variability. For live comparisons, alternate C#/Rust/Rust/C# blocks with identical inputs and API settings; increasing `--runs` alone does not remove time-of-day or server-load effects.
-
-The package-free target-formatting suite includes the deterministic no-match microbenchmark:
-
-```powershell
-dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
-```
-
-It fails if average no-match resolution reaches one millisecond. Headless runs do not synthesize a
-target, so their formatting timings remain zero.
-
----
-
-## Optimization workflow
-
-1. Run headless with `--variant baseline-headless` to capture the current state.
-2. Make one `src/` change.
-3. Rebuild and re-run headless with a descriptive `--variant` (e.g. `--variant http2-keepalive`).
-4. Compare with `compare.py`.
-
-Isolate one variable per variant. Concurrent `src/` changes make comparisons uninterpretable.
-
-Use headless for all optimization work — it's faster, deterministic, and removes focus/clipboard noise. Use `--e2e` only when you specifically want to measure the clipboard or paste phases.
-
----
-
-## Architecture
-
-### `BenchTargetForm` (e2e only)
-
-Hidden borderless WinForms form (`Opacity=0.01`) containing a multiline `TextBox`. Provides the focus target that the coordinator's `Ctrl+C` / `Ctrl+V` clipboard ops are directed at. Opacity is set to `0.01` (not `0`) so the window remains a valid foreground target on Windows. Not created in headless mode.
-
-### `HotkeyInjector` (e2e only)
-
-Calls Win32 `SendInput` to synthesize `Ctrl+Alt+B`. Deliberately avoids `Ctrl+Alt+U` and `Ctrl+Alt+D` so the bench hotkey never collides with prod or dev. Not used in headless mode.
-
-### `CapturingLogger`
-
-Subclasses `DiagnosticsLogger` (`LogData` is `virtual`; `DiagnosticsLogger` is unsealed). Intercepts `spellcheck_detail` events to extract per-phase timing. Used by E2E mode only — headless gets timings directly from `RunHeadlessAsync`.
-
-### `BenchHarness`
-
-Drives the per-trial loop. Dispatches to `HeadlessTrialAsync` or `E2eTrialAsync` based on the `--e2e` flag.
-
-- **Headless path:** calls `coordinator.RunHeadlessAsync(text)`, which returns a `HeadlessResult` record with all timings computed directly from the `RunRecord` timestamps. No polling required.
-- **E2e path:** uses a `_pasteExpected` flag — not value equality — to distinguish the coordinator's paste from `LoadAndSelect` writes into the `TextBox`. This correctly handles no-correction inputs where output text equals input.
-
-Warmup trials fire the full pipeline to prime the HTTP/2 connection pool and JIT; they are discarded before stats are computed. The 300ms inter-trial delay only fires in E2E mode (headless has no clipboard events to settle).
-
----
-
-## Prod `src/` changes made to support the bench
-
-These changes were made to `src/` to allow the bench to compose against the real coordinator without forking it. They are intentional and should be preserved.
-
-| File | Change |
-|---|---|
-| `DiagnosticsLogger.cs` | Class unsealed; `LogData` made `virtual` |
-| `OpenAiSpellcheckService.cs` | `Model` const renamed to `DefaultModel`; new 3-arg constructor `(CachedSettings, DiagnosticsLogger, string model)` added; prod default preserved |
-| `HotkeyWindow.cs` | `Register()` signature changed to `Register(uint modifiers, uint vk)`; prod call updated to pass `BuildChannel.HotkeyModifiers, BuildChannel.HotkeyVk` |
-| `SpellcheckCoordinator.cs` | `RunHeadlessAsync(string inputText)` returns `HeadlessResult?` with all phase timings; `ExecuteHeadlessAsync` added — skips clipboard capture and paste, runs API + post-process |
+The old `compare.py`, `check_correctness.py` and autoopt documents target the legacy
+schema; they are historical and must not be used to validate this baseline.

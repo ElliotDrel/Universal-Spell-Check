@@ -1,5 +1,11 @@
 # AutoOpt - Autonomous Speed Optimization Loop
 
+> Historical workflow, superseded for Rust-port measurement on October 16, 2026.
+> Its old `--variant` commands and result schema do not apply to the rewritten harness.
+> Do not run this loop until it is deliberately migrated. Use `docs/bench.md` for the
+> current fixed-case, raw-trial baseline. Percentage thresholds below are historical
+> selection heuristics, not statistical confidence guarantees.
+
 Karpathy-style auto-research loop for the speed bench. Runs N iterations in an isolated git worktree, each iteration proposing one `src/` change, building, running the headless bench, verifying correctness, and committing or reverting based on deterministic metrics.
 
 ## Invocation
