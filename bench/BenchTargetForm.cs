@@ -23,10 +23,24 @@ internal sealed class BenchTargetForm : Form
     }
     internal void VerifySelection(string input)
     {
-        if (!Foreground || !_text.Focused || _text.SelectionLength != _text.TextLength || _text.TextLength == 0
+        if (!SelectionReady(Foreground, _text.Focused, _text.SelectionStart, _text.SelectionLength, _text.TextLength)
             || BenchHarness.Normalize(_text.Text) != BenchHarness.Normalize(input))
-            throw new InvalidOperationException("Fixture is not foreground with the full input selected; refusing input injection.");
+            throw new InvalidOperationException($"Fixture is not foreground with the full input selected; refusing input injection. foreground={Foreground} textbox_focused={_text.Focused} selection={_text.SelectionStart}+{_text.SelectionLength} text_length={_text.TextLength} expected_length={input.Length} form_hwnd={Handle} foreground_hwnd={GetForegroundWindow()}");
     }
+    internal async Task PrepareAsync(BenchCase c)
+    {
+        LoadAndSelect(c);
+        for (int attempt = 0; attempt < 30; attempt++)
+        {
+            await Task.Delay(100);
+            if (SelectionReady(Foreground, _text.Focused, _text.SelectionStart, _text.SelectionLength, _text.TextLength))
+            { VerifySelection(c.Text); return; }
+            Activate(); _text.Focus(); _text.SelectAll();
+        }
+        VerifySelection(c.Text);
+    }
+    internal static bool SelectionReady(bool foreground, bool focused, int start, int length, int textLength) =>
+        foreground && focused && start == 0 && length == textLength && textLength > 0;
     internal void Arm() => _text.LastPasteTicks = 0;
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
 
@@ -37,7 +51,7 @@ internal sealed class BenchTargetForm : Form
         protected override void WndProc(ref Message m)
         {
             // A synthetic source supplies stable CF_HTML; this is not a claim about browser copy behavior.
-            if (m.Msg == 0x301 && Html.Length > 0)
+            if ((m.Msg == 0x301 || (m.Msg == 0x102 && m.WParam == new IntPtr(0x03))) && Html.Length > 0)
             {
                 var data = new DataObject(); data.SetData(DataFormats.UnicodeText, SelectedText);
                 data.SetData(DataFormats.Html, Html); Clipboard.SetDataObject(data, true); return;

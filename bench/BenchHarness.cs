@@ -38,12 +38,13 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
                 ResultsWriter.Write(Path.Combine(opts.Output, "summary.json"), trials);
                 Console.WriteLine($"{opts.Mode} {c.Id} {(warmup ? "warmup" : "trial")} {i + 1}: {(trial.Success ? "ok" : "FAIL")} quality={trial.QualityMatch} {trial.Error}");
                 // A desktop failure can mean focus/selection changed. Stop rather than sending more keys.
-                if (opts.Desktop && !trial.Success) { aborted = true; break; }
+                if (opts.Desktop && !trial.Success && (trial.Timings.Count == 0 || form is null || !form.Foreground))
+                { aborted = true; break; }
                 if (opts.Desktop) await Task.Delay(150);
             }
             if (aborted) break;
         }
-        return aborted || trials.Any(t => !t.Success) ? 1 : 0;
+        return aborted ? 3 : trials.Any(t => !t.Success) ? 1 : 0;
     }
 
     private async Task<Trial> ComputeAsync(BenchCase c, int index, bool warmup)
@@ -79,9 +80,7 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
     {
         if (form is not null)
         {
-            form.LoadAndSelect(c);
-            await Task.Delay(100);
-            form.VerifySelection(c.Text);
+            await form.PrepareAsync(c);
             form.Arm();
         }
         var pending = logger.BeginTrial();
@@ -93,6 +92,13 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
         var returnedMs = Elapsed(start);
         var detail = await pending.WaitAsync(TimeSpan.FromSeconds(70));
         if (form is not null && CoordinatorTask() is { } running) await running;
+        if (form is not null && detail.GetProperty("developer_evidence").TryGetProperty("status", out var evidenceStatus)
+            && evidenceStatus.GetString() == "pending")
+        {
+            var completed = await logger.EvidenceCompleted.WaitAsync(TimeSpan.FromSeconds(15));
+            if (completed.GetProperty("run_id").GetString() != detail.GetProperty("run_id").GetString())
+                throw new InvalidOperationException("Evidence completion belongs to another trial.");
+        }
         var output = detail.GetProperty("output_text").GetString() ?? "";
         var rawOutput = detail.GetProperty("raw_ai_output").GetString() ?? "";
         var timings = detail.GetProperty("timings").EnumerateObject()
@@ -111,6 +117,8 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
         var rich = RichTextClipboard.TryCreateReplacement(c.Html, c.Text, output);
         if (form is not null)
         {
+            if (success && c.Html.Length > 0 && detail.GetProperty("clipboard_html").GetString() != c.Html)
+                throw new InvalidOperationException("Synthetic rich copy did not supply the frozen CF_HTML; refusing a plain-text benchmark result.");
             var paste = detail.GetProperty("paste_text").GetString() ?? "";
             success &= form.LastPasteTicks > start && Normalize(form.CurrentText) == Normalize(paste) && form.Foreground;
             if (success && !string.IsNullOrEmpty(detail.GetProperty("paste_html").GetString()))
@@ -121,6 +129,7 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
         {
             var frozen = Fixtures.Single(f => f.Id == c.Id);
             success &= output == frozen.Output && Normalize(form?.CurrentText ?? output) == Normalize(frozen.PasteText);
+            if (form is not null) success &= detail.GetProperty("paste_html").GetString() == frozen.PasteHtml;
             if (!success) error ??= "Replay differs from frozen output.";
         }
         else if (success && !Fixtures.Any(f => f.Id == c.Id))

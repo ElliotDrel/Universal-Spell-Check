@@ -156,14 +156,19 @@ internal sealed record ReplayFixture(string Id, string Input, string RawAiOutput
 internal sealed class CapturingLogger(string path) : DiagnosticsLogger(path)
 {
     private TaskCompletionSource<JsonElement>? _pending;
+    private TaskCompletionSource<JsonElement>? _evidence;
+    internal Task<JsonElement> EvidenceCompleted => _evidence!.Task;
     internal Task<JsonElement> BeginTrial()
     {
-        _pending = new(TaskCreationOptions.RunContinuationsAsynchronously); return _pending.Task;
+        _pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _evidence = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        return _pending.Task;
     }
     public override void LogData(string eventName, object data)
     {
         // Complete only after the previous log has been written, so trials never overlap finalization.
         base.LogData(eventName, data);
         if (eventName == "spellcheck_detail") _pending?.TrySetResult(JsonSerializer.SerializeToElement(data));
+        if (eventName == "developer_evidence_completed") _evidence?.TrySetResult(JsonSerializer.SerializeToElement(data));
     }
 }

@@ -18,6 +18,17 @@ internal static class BenchTests
         rejected = false;
         try { Options.Parse(new[] { "--bogus" }); } catch (ArgumentException) { rejected = true; }
         Check(rejected, "unknown arguments rejected");
+        Check(BenchTargetForm.SelectionReady(true, true, 0, 12, 12), "focused full selection admitted");
+        Check(!BenchTargetForm.SelectionReady(false, true, 0, 12, 12), "background editor refuses injection");
+        Check(!BenchTargetForm.SelectionReady(true, false, 0, 12, 12), "unfocused textbox refuses injection");
+        Check(!BenchTargetForm.SelectionReady(true, true, 1, 11, 12)
+            && !BenchTargetForm.SelectionReady(true, true, 0, 0, 0), "partial and empty selections refuse injection");
+        var logger = new CapturingLogger(Path.Combine("bench", "results", "self-tests", Guid.NewGuid().ToString("N"), "events.log"));
+        _ = logger.BeginTrial();
+        logger.LogData("spellcheck_detail", new { run_id = "test" });
+        Check(!logger.EvidenceCompleted.IsCompleted, "pipeline detail does not imply evidence completion");
+        logger.LogData("developer_evidence_completed", new { run_id = "test" });
+        Check(logger.EvidenceCompleted.IsCompletedSuccessfully, "separate evidence completion observed");
         var cases = JsonSerializer.Deserialize<List<BenchCase>>(File.ReadAllText("bench/baseline-cases.json"), Program.Json)!;
         Check(cases.Count == 10 && cases.Select(c => c.Id).Distinct().Count() == 10, "ten distinct fixed cases");
         foreach (var c in cases.Where(c => c.Html.Length > 0))
