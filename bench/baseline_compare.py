@@ -43,7 +43,7 @@ def main():
     if set(before["cases"]) != set(after["cases"]):
         raise ValueError("Incomparable case coverage")
     if any(result["aggregate"]["failed"] or result["warmup"]["failed"] for result in (before, after)):
-        raise ValueError("At least one run failed; speed alone is not a passing comparison")
+        print("NOTICE: failed attempts are retained in reliability counts; timing distributions describe successful attempts only. This comparison does not award a passing verdict.")
     print("\nScope / phase / statistic: before ms -> after ms; saved ms; reduction; speed ratio")
     groups = [("all", before["aggregate"], after["aggregate"])]
     groups += [(name, before["cases"][name], after["cases"][name]) for name in before["cases"]]

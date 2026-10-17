@@ -52,15 +52,25 @@ dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode lo
 dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode e2e --runs 10 --warmup 2 --allow-desktop --output bench/results/csharp-e2e-a
 ```
 
-The visible benchmark editor uses Ctrl+Alt+B, separate from Prod/Dev. It verifies
+The visible benchmark editor uses Ctrl+Alt+B, separate from Prod/Dev. It allows
+up to three seconds of unmeasured activation/selection preparation, then verifies
 foreground, full selection and fixture text before injection. A normal STA
 `Application.Run` message loop replaces the old `DoEvents`/sleep polling loop.
 The textbox observes completion of WM_PASTE or the native Ctrl+V character command,
 including unchanged-text replacement,
 and checks the complete resulting text against the actual requested `paste_text`.
 Only CRLF/LF normalization is allowed. Missing telemetry, paste receipt, wrong text,
-lost foreground or mismatched requested clipboard HTML fails the trial and stops
-the desktop block. Do not silently retry or exclude failed attempts.
+lost foreground or mismatched requested clipboard HTML fails the trial. Unsafe
+fixture/telemetry failures stop the block; completed product failures remain in
+the sample and may continue only with foreground retained and a fresh verified
+selection. Never silently retry or exclude a failed attempt.
+
+Developer-evidence completion is awaited by run ID outside the timed interval
+before preparing another trial, so asynchronous clipboard readback and after-paste
+capture cannot overlap the next case. Rich sources must supply the exact fixture
+CF_HTML; local replay must match the frozen requested HTML as well as editor text.
+Exit codes: `0` complete success, `1` completed with failed trials, `2` fatal setup,
+`3` safety abort. Initial fixture diagnostics remain saved separately.
 
 Rich fixtures provide synthetic CF_HTML on copy, exercising the production mapper
 and rich clipboard writer. The textbox verifies text and clipboard HTML, not visual
@@ -93,7 +103,10 @@ exact frozen output/mapping. Frozen output is a behavior reference, not proof th
 every existing behavior is desirable. The original expected case text remains intact.
 
 Compare directories with `python bench/baseline_compare.py <before-directory> <after-directory>`.
-The comparison rejects mismatched workloads/settings, incomplete coverage or failed runs.
+The comparison rejects mismatched workloads/settings or incomplete coverage. It
+reports failures and successful-only timing distributions together; an existing
+product failure must not prevent analysis of whether Rust improves reliability.
+It never awards a passing verdict based on speed alone.
 
 `total_ms` is call-to-headless-return, compute start-to-map-return, or synthetic
 hotkey injection-to-editor-WM_PASTE completion, depending on mode. Production phase
@@ -117,6 +130,22 @@ confidence. Use a modest first run and repeat when variability makes the result 
 
 The old `compare.py`, `check_correctness.py` and autoopt documents target the legacy
 schema; they are historical and must not be used to validate this baseline.
+
+## Startup
+
+`bench/measure-startup.ps1` uses the existing `--startup-smoke` path to measure ten
+standalone Release process starts through the `started` log, after real hotkey and
+tray/context initialization. It temporarily stops the exact installed process to
+release its hotkey, then restores that executable in `finally`. It refuses missing
+first-run registration state and ambiguous processes. Run only in the authorized
+idle-desktop window. Pass the frozen executable, installed executable, production
+data directory and fresh output directory explicitly.
+
+Read ready milestones through the log-reader CLI, matched by PID and lifetime.
+Retain process-through-exit timings separately; they include smoke teardown and
+are not startup readiness. Cross-process readiness uses wall-clock timestamps;
+filesystem caches remain warm, and installed update checks/dashboard rendering
+are excluded. Preserve the first launch separately rather than claiming cold boot.
 
 ## October 16, 2026 checkpoint
 

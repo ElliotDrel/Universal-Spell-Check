@@ -2,6 +2,11 @@
 
 import copy
 import unittest
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
 from baseline_compare import validate
 
@@ -39,6 +44,26 @@ class ComparisonTests(unittest.TestCase):
         other["schema_version"] = 1
         with self.assertRaises(ValueError):
             validate(other, other)
+
+    def test_existing_failures_remain_comparable_and_visible(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["options"]["runs"] = 2
+        group = {"attempted": 2, "succeeded": 1, "failed": 1, "quality_matches": 1,
+                 "timings": {"total_ms": {"median": 100, "p95": 100}}}
+        summary = {"aggregate": group, "warmup": {"failed": 0}, "cases": {"short": group}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("before", "after"):
+                folder = root / name
+                folder.mkdir()
+                (folder / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+                (folder / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(Path(__file__).with_name("baseline_compare.py")),
+                                     str(root / "before"), str(root / "after")], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1/2 successful", result.stdout)
+        self.assertIn("successful attempts only", result.stdout)
+        self.assertIn("does not award a passing verdict", result.stdout)
 
 
 if __name__ == "__main__":
