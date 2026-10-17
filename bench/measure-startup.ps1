@@ -51,7 +51,8 @@ finally {
 $reader = Join-Path (Split-Path $PSScriptRoot -Parent) '.agents/skills/read-logs/scripts/logs.py'
 $lines = & python $reader --log-dir (Join-Path $DataDirectory 'logs') --event started --last 100 --json
 if ($LASTEXITCODE -ne 0) { throw 'Log reader failed.' }
-$startedEvents = @($lines | ForEach-Object { $_ | ConvertFrom-Json })
+# Keep fractional seconds and offsets: implicit DateTime conversion loses them on reparse.
+$startedEvents = @($lines | ForEach-Object { $_ | ConvertFrom-Json -DateKind String })
 $measurements = foreach ($trial in $trials) {
     $lower = [DateTimeOffset]::Parse($trial.process_started_utc)
     $upper = $lower.AddMilliseconds($trial.process_through_exit_ms + 1000)
