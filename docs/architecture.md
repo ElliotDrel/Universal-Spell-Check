@@ -206,3 +206,14 @@ Triggered by `v*.*.*` tags. Steps: checkout → dotnet publish Release win-x64 �
 - `fine_tune_runs/` — one dated folder per fine-tune run: train/val JSONL, finetune_job.json, benchmark.json, summary.md.
 - `benchmark_runs/` — one dated folder per standalone benchmark run.
 - `tests/` — pytest suites for Python fine-tune dataset tooling. Reference `replacements.json` at repo root.
+
+## Rust port in progress
+
+- Build the Rust candidate under `rust/`; retain `src/` as the C# behavior reference until acceptance passes.
+- Use `native-windows-gui` for native controls and direct documented Win32 APIs for clipboard ownership, input, DPAPI, and WinHTTP.
+- Generate channel constants from `src/BuildChannel.cs`; default Cargo builds select Dev, while `--no-default-features` selects Prod.
+- Keep the dashboard, correction worker, and logging independent so dashboard I/O and rendering cannot delay registered hotkeys.
+- Preserve current-target paste, unchanged-text paste, captured-text history exclusions, corrected-text history inclusion, and existing encrypted named-key storage.
+- Verify text, CF_HTML, native Docs bytes, mode and fallback metadata against the existing C# formatting tests using `rust/tests/parity.py`.
+- Preserve the completed C# baseline in the primary checkout; ignored baseline files are not copied into the Rust worktree.
+- Treat the Rust app as unfinished until tray/dashboard, updater, developer evidence, native acceptance and matched measurements pass.

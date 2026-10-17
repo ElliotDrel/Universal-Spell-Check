@@ -48,3 +48,6 @@ bench/results/
 
 # Formatting replay evidence (may contain private copied content)
 formatting_replay_runs/
+
+# Rust build artifacts
+/rust/target/
