@@ -254,3 +254,18 @@ are excluded. Preserve the first launch separately rather than claiming cold boo
 - Add `-Mode local -AllowDesktop` or `-Mode e2e -AllowDesktop` only after the user has confirmed the desktop is idle.
 - Use the existing startup measurement helper for matched standalone starts; it stops/restores only the explicitly named installed executable and reads ready milestones through the approved log reader.
 - Keep desktop and startup comparisons pending until they have actually run; compilation and golden tests do not establish an end-to-end speedup.
+
+### Rust offline checkpoint, October 17, 2026
+
+Sequential `compute-abba-02` used the frozen safe C# runner and optimized Rust candidate on the same machine, ten cases, 20 measured and two warmups per case. All four blocks passed 200/200 measured and 20/20 warmup frozen-output/mapping checks. The identical rich-list fixture retains two spaces before LF, so each block has 180/200 matches to hand-written expected text.
+
+| Block | Median total ms | p95 total ms |
+|---|---:|---:|
+| C# A | 0.26205 | 1.11392 |
+| Rust A | 0.11835 | 1.208485 |
+| Rust B | 0.09715 | 2.255075 |
+| C# B | 0.26515 | 1.135035 |
+
+These component medians improved 2.21–2.73 times; Rust tail latency did not improve. This establishes neither an end-to-end speedup nor statistical significance. All 131 baseline hashes, settings and encrypted key hashes were unchanged. Final Release differential formatting passed 76/76 original C# cases.
+
+Exclude `compute-abba-01`: the initial PowerShell wrapper did not wait for GUI-subsystem native executables, allowing possible overlap. The repaired wrapper explicitly waits for each process and drains stdout/stderr concurrently. Keep the failed-method diagnostics. Desktop, startup and visual acceptance remain pending an explicitly idle computer.

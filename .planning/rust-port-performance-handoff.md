@@ -13,6 +13,27 @@
 - Require a fresh explicitly idle desktop before any focus/clipboard test. The previous idle window ended; no Rust desktop benchmark has run.
 - Treat this active section as superseding the cleanup-only instructions below; keep the historical C# baseline and performance investigation intact.
 
+### Verified candidate checkpoint
+
+- Native app milestone: `c61207b`; benchmark process-wait repair: `6e04289`. Keep working on `codex/rust-port` in the attached Rust worktree.
+- Both Dev and Prod pass 18 Rust tests. Formatting and both Clippy configurations pass with warnings denied. The final optimized executable matches all 76 newly recorded C# formatting calls exactly (`parity-final-release/report.json`) and all ten frozen processing fixtures.
+- Candidate is at primary `benchmark_runs/rust-port/candidate-prod/`: 7,472,128-byte `UniversalSpellCheck.exe`, replacements, and three font licenses. SHA-256: `02409a8050fa0fe00affa0b7f6f6674962930c26e0a5727a24328502b9315cc1`. It is a static-CRT production-channel candidate, not an installation or release.
+- Valid sequential comparison is `benchmark_runs/rust-port/compute-abba-02/`: C#/Rust/Rust/C#, each 200/200 measured and 20/20 warmup frozen-output checks. C# median 0.26205/0.26515 ms, Rust 0.11835/0.09715 ms. Rust p95 1.208485/2.255075 ms versus C# 1.11392/1.135035 ms: median improved, tail did not. Do not extrapolate a desktop speedup.
+- All blocks retain 180/200 matches to hand-written expected text: the same frozen rich-list response has two spaces before LF. Preserve this difference; all 200 outputs and rich mappings match the frozen reference.
+- `compute-abba-01` is excluded: PowerShell's call operator returned before GUI-subsystem executables exited, so blocks could overlap. The repaired wrapper uses `ProcessStartInfo.ArgumentList`, concurrent stdout/stderr draining and `WaitForExit`. Preserve the excluded diagnostics.
+- All 131 frozen baseline checksums match. Valid comparison verified settings and encrypted credentials unchanged. `release-cli-guards.json` proves the Release desktop CLI refuses missing `--allow-desktop`; it also exercises JSON CLI without desktop access.
+- Final Claude reports: `claude-core-review-clean.json`, `claude-integration-review.json`, `claude-gui-review.json`. Confirmed issues were repaired. Retain conservative evidence reservation-before-write to match C#; do not adopt a reviewer suggestion that would weaken the shared quota. Terminal comparison keeps existing C# semantics. Direct Win32 clipboard writes do not require STA, but dashboard initialization is consistent with the other native threads.
+- A deadline regression initially failed its 150 ms elapsed-time assertion during a concurrent optimized build. It now asserts the timeout result and asynchronous callback-state release; the OS scheduler is measured by benchmarks, not a narrow unit-test timing threshold.
+
+### Next authorized desktop window
+
+1. End the current turn before taking focus or touching the clipboard. Ask Elliot to reply `Run` when idle. No Rust GUI, clipboard benchmark, native editor acceptance, browser formatting acceptance, or startup comparison has run yet.
+2. Read the current installed process path and settings/key hashes. Installed C# Prod was still running at checkpoint; PID 18020 is only a snapshot. No Rust process remains running.
+3. Use `bench/compare-rust.ps1 -Mode local -AllowDesktop` and then `-Mode e2e -AllowDesktop`, with explicit candidate, safe frozen runner, portable dotnet, primary baseline, real data directory and fresh output directories. Match developer logging and the full shared evidence quota. Stop if clipboard/foreground/fixture safety aborts; retain every failure.
+4. Run matched startup readiness with `bench/measure-startup.ps1` (stop and restore only the exact installed executable in `finally`). Check its arguments before use; never remove the first-run registration flag.
+5. Launch the rebuilt Rust Dev candidate for visual/native acceptance without replacing Prod. Check tray, lazy dashboard, minimum-size layout, large-corpus first page and paging, multi-line and side-by-side diff colors, copy feedback, settings/key isolation, progress overlay, no-selection and overlap guards, actual browser/Docs formatting, and foreground-at-paste behavior. Preserve real credentials and backups. CLI offline transforms are not visual acceptance.
+6. Rebuild after fixes, rerun relevant regressions and affected measurements, then update this checkpoint. Change production packaging/install only after acceptance and the user's release instruction.
+
 ## Completed Baseline Handoff
 
 ## Compaction Handoff — Start Here
