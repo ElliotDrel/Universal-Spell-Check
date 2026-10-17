@@ -221,7 +221,7 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 ## Rust implementation details
 
 - Keep one correction worker with a clipboard-listener window and one outstanding correction; reject overlapping hotkeys rather than queuing them.
-- Assign fully rendered clipboard memory to the tray's pumping window, avoiding an OLE clipboard writer or a fixed paste-settle delay.
+- Assign fully rendered clipboard memory to the tray's pumping window, avoiding an OLE clipboard writer while retaining the existing 50 ms clipboard settling period.
 - Own clipboard backup formats before copy, including duplicated GDI/metafile objects; restore on failure only after a sequence change, and retain corrected text once published.
 - Wait for physical modifiers before copy and paste; inject each chord with one `SendInput` batch and clean up partially inserted keys.
 - Use one app-lifetime native WinHTTP session/connection with automatic proxy discovery and HTTP/2 enabled. Keep each request's body, headers and read buffer alive through `HANDLE_CLOSING`; enforce a 30-second deadline per attempt, matching two attempts and a 500 ms retry interval.

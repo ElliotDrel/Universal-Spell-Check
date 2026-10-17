@@ -223,6 +223,14 @@ pub fn write(
     }
     Ok(unsafe { GetClipboardSequenceNumber() })
 }
+pub fn settle_publication() {
+    // Zero-delay publication failed real editor checks with correct bytes and selection.
+    // Retain the C# 50 ms handoff period; pump only the worker's messages while waiting.
+    let until = Instant::now() + Duration::from_millis(50);
+    while let Some(remaining) = until.checked_duration_since(Instant::now()) {
+        pump_wait(remaining.as_millis().clamp(1, 50) as u32);
+    }
+}
 pub fn modifiers_released(timeout: Duration) -> Result<(), String> {
     let start = Instant::now();
     loop {

@@ -387,7 +387,8 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         if settings.developer_logging {
             detail["clipboard_readback"] = crate::evidence::readback_before_input(owner, sequence);
         }
-        // Fully-rendered native memory is already published; CloseClipboard precedes the input batch.
+        // CloseClipboard publishes data, but live consumers still need the established handoff period.
+        clipboard::settle_publication();
         clipboard::modifiers_released(Duration::from_millis(1200))?;
         clipboard::chord(0x56)?;
         let paste_ms = ms(paste);

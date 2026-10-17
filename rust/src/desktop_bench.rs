@@ -26,6 +26,7 @@ struct Paste {
     at: Instant,
     text: String,
     clipboard: clipboard::Clipboard,
+    trace: Value,
 }
 struct Editor {
     fixture: Mutex<Option<Case>>,
@@ -60,7 +61,35 @@ unsafe extern "system" fn editor_proc(
         }
         return 0;
     }
+    let is_paste = message == WM_PASTE || (message == WM_CHAR && w == 22);
+    let mut trace = if is_paste {
+        unsafe {
+            use windows_sys::Win32::System::DataExchange::*;
+            let mut a = 0u32;
+            let mut b = 0u32;
+            SendMessageW(
+                hwnd,
+                0xb0,
+                (&mut a as *mut u32) as usize,
+                (&mut b as *mut u32) as isize,
+            );
+            let holder = GetOpenClipboardWindow();
+            let mut holder_pid = 0;
+            GetWindowThreadProcessId(holder, &mut holder_pid);
+            json!({"message":message,"selection_start":a,"selection_end":b,"holder":holder as usize,"holder_pid":holder_pid,"ctrl_state":GetKeyState(VK_CONTROL as i32),"focused":GetFocus()==hwnd,"sequence_before_default":GetClipboardSequenceNumber()})
+        }
+    } else {
+        Value::Null
+    };
+    if is_paste {
+        unsafe {
+            SetLastError(0);
+        }
+    }
     let result = unsafe { DefSubclassProc(hwnd, message, w, l) };
+    if is_paste {
+        trace["default_error"] = json!(unsafe { GetLastError() });
+    }
     if message == WM_PASTE || (message == WM_CHAR && w == 22) {
         let at = Instant::now();
         let copied = (|| -> Result<Paste, String> {
@@ -74,6 +103,7 @@ unsafe extern "system" fn editor_proc(
                     at,
                     text,
                     clipboard,
+                    trace,
                 })
             }
         })();
@@ -260,7 +290,7 @@ impl Run {
         let mut success = !failed;
         match completion {
             Some(Ok(paste)) => {
-                observed_clipboard = json!({"text":paste.clipboard.text,"html":paste.clipboard.html,"sequence":paste.clipboard.sequence});
+                observed_clipboard = json!({"text":paste.clipboard.text,"html":paste.clipboard.html,"sequence":paste.clipboard.sequence,"paste_entry":paste.trace,"editor_text_at_finish":self.editor.text()});
                 output = paste.text;
                 timings.insert(
                     "total_ms".into(),
