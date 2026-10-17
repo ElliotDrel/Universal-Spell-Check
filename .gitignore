@@ -51,3 +51,4 @@ formatting_replay_runs/
 
 # Rust build artifacts
 /rust/target/
+/rust/dist/

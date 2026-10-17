@@ -1,5 +1,20 @@
 # Rust Port and Performance Handoff
 
+## Active Rust Port — October 17
+
+- Continue in the attached worktree `C:/Users/2supe/.codex/worktrees/rust-port/Universal Spell Check`, branch `codex/rust-port`, based on the primary checkout's local `main` at `8c919a7`.
+- Preserve primary `main` and its fifteen unpublished baseline commits; do not reset it to `origin/main`.
+- Preserve the ignored C# baseline package in the primary checkout and the unrelated `.worktrees/chatgpt-formatting` checkout.
+- Find the Rust implementation, native GUI, worker, native async WinHTTP, clipboard/keyboard/DPAPI, updater, developer evidence and benchmark in `rust/`.
+- Keep the deployed C# app running until the authorized desktop/startup comparison; no Rust installation or publication has occurred.
+- Use `claude -p --safe-mode --model claude-opus-5-5 --effort medium --tools '' --strict-mcp-config --no-session-persistence` for the requested thinking/adversarial partner. Supply bounded code through stdin; save reports under primary `benchmark_runs/rust-port/`. The first consultation with normal hooks produced an irrelevant follow-up, so later reviews disable hooks.
+- Read `rust/AGENTS.md`, the Rust sections of `docs/architecture.md` and `docs/bench.md`, and current Git status before continuing.
+- Preserve reports in primary `benchmark_runs/rust-port/`: `parity-a/` recorded 76 calls from the existing C# formatting tests; `parity-b.json` verified all 76 exact matches. Synthetic expected outputs are also committed as Rust golden fixtures.
+- Require a fresh explicitly idle desktop before any focus/clipboard test. The previous idle window ended; no Rust desktop benchmark has run.
+- Treat this active section as superseding the cleanup-only instructions below; keep the historical C# baseline and performance investigation intact.
+
+## Completed Baseline Handoff
+
 ## Compaction Handoff — Start Here
 
 - Elliot wants this Windows spell checker ported to Rust for speed, using KISS/MVP judgment; the requested pre-port baseline is finished, and no Rust implementation has started.

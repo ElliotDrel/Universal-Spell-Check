@@ -32,7 +32,9 @@ pub fn read_map(bytes: &[u8]) -> Result<IndexMap<String, String>, String> {
             let end = cursor.checked_add(len).ok_or("invalid_native_data")?;
             let raw = bytes.get(cursor..end).ok_or("invalid_native_data")?;
             let utf16: Vec<u16> = raw
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|b| u16::from_le_bytes([b[0], b[1]]))
                 .collect();
             strings.push(String::from_utf16(&utf16).map_err(|_| "invalid_native_data")?);
@@ -60,7 +62,7 @@ pub fn write_map(map: &IndexMap<String, String>) -> Result<Vec<u8>, String> {
             for u in units {
                 bytes.extend_from_slice(&u.to_le_bytes());
             }
-            while bytes.len() % 4 != 0 {
+            while !bytes.len().is_multiple_of(4) {
                 bytes.push(0);
             }
         }
@@ -175,20 +177,6 @@ pub fn rewrite(bytes: &[u8], copied: &str, replacement: &str) -> Result<Vec<u8>,
     map.shift_remove(CLIP_ID);
     write_map(&map)
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn pickle_roundtrip_and_bounds() {
-        let map = IndexMap::from([("emoji 🦀".into(), "payload".into())]);
-        assert_eq!(read_map(&write_map(&map).unwrap()).unwrap(), map);
-        assert!(read_map(&[0; 8]).is_err());
-        for n in 0..40 {
-            assert!(read_map(&vec![255; n]).is_err());
-        }
-    }
-}
-
 // Match System.Text.Json escaping in Chromium's nested JSON strings to retain byte parity.
 fn dotnet_json(value: &Value) -> String {
     fn string(text: &str) -> String {
@@ -230,5 +218,19 @@ fn dotnet_json(value: &Value) -> String {
                 .join(",")
         ),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn pickle_roundtrip_and_bounds() {
+        let map = IndexMap::from([("emoji 🦀".into(), "payload".into())]);
+        assert_eq!(read_map(&write_map(&map).unwrap()).unwrap(), map);
+        assert!(read_map(&[0; 8]).is_err());
+        for n in 0..40 {
+            assert!(read_map(&vec![255; n]).is_err());
+        }
     }
 }

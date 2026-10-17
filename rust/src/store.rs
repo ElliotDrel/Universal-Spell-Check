@@ -239,7 +239,16 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::create_dir_all(path.parent().ok_or("Missing parent directory")?)
         .map_err(|e| e.to_string())?;
     let temporary = path.with_extension(format!("{}.tmp", new_id()));
-    fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
+    let write_result = (|| -> std::io::Result<()> {
+        use std::io::Write;
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()
+    })();
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.to_string());
+    }
     // MoveFileEx provides atomic replacement on Windows; std::fs::rename cannot overwrite there.
     unsafe {
         use windows_sys::Win32::Storage::FileSystem::*;

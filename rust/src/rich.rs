@@ -484,11 +484,9 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
                 })
             })
         });
-        if !later {
-            if let Some(p) = candidate {
-                nodes[index].position = Some(p);
-                cursor = p + nodes[index].text.len();
-            }
+        if !later && let Some(p) = candidate {
+            nodes[index].position = Some(p);
+            cursor = p + nodes[index].text.len();
         }
     }
     if nodes.iter().all(|n| n.position.is_none()) {
@@ -696,5 +694,52 @@ mod tests {
         assert!(out.applied);
         assert!(out.html.contains("&lt;"));
         assert!(!out.html.contains("<cat>"));
+    }
+}
+
+#[cfg(test)]
+mod golden_tests {
+    use super::*;
+    use base64::Engine;
+    use serde_json::{Value, json};
+    #[test]
+    fn original_csharp_formatting_contracts() {
+        for (index, line) in include_str!("../tests/fixtures/csharp-formatting.jsonl")
+            .lines()
+            .enumerate()
+        {
+            let case: Value = serde_json::from_str(line).unwrap();
+            let native = base64::engine::general_purpose::STANDARD
+                .decode(case["native_base64"].as_str().unwrap())
+                .unwrap();
+            let result = rewrite(
+                case["source_html"].as_str().unwrap(),
+                case["input"].as_str().unwrap(),
+                case["output"].as_str().unwrap(),
+                &native,
+            );
+            let actual = json!({"text":result.text,"html":result.html,"mode":result.mode,"applied":result.applied,"reason":result.reason,"paragraph_count":result.paragraph_count,"native_base64":result.native.as_ref().map(|n|base64::engine::general_purpose::STANDARD.encode(n)).unwrap_or_default(),"native_status":result.native_docs_status});
+            assert_eq!(actual, case["expected"], "C# golden case {index}");
+        }
+    }
+    #[test]
+    fn frozen_baseline_processing_matches() {
+        let cases: Vec<crate::benchmark::Case> =
+            serde_json::from_str(include_str!("../../bench/baseline-cases.json")).unwrap();
+        let fixtures: Vec<crate::benchmark::Fixture> =
+            serde_json::from_str(include_str!("../tests/fixtures/baseline-api.json")).unwrap();
+        let replacements =
+            crate::core::Replacements::parse(include_bytes!("../../replacements.json")).unwrap();
+        for case in cases {
+            let fixture = fixtures.iter().find(|f| f.id == case.id).unwrap();
+            let protection = crate::core::Protection::new(&case.text).unwrap();
+            let (output, _, _, _) = replacements
+                .process(&fixture.raw_ai_output, &protection)
+                .unwrap();
+            let rich = rewrite(&case.html, &case.text, &output, &[]);
+            assert_eq!(output, fixture.output, "{} text", case.id);
+            assert_eq!(rich.text, fixture.paste_text, "{} paste text", case.id);
+            assert_eq!(rich.html, fixture.paste_html, "{} HTML", case.id);
+        }
     }
 }

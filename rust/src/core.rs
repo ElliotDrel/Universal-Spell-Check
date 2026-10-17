@@ -144,22 +144,21 @@ fn strip_echo<'a>(output: &'a str, input: &str) -> &'a str {
     if input.is_empty() {
         return output;
     }
-    if let Some(rest) = output.strip_prefix(input) {
-        if let Some(corrected) = rest
+    if let Some(rest) = output.strip_prefix(input)
+        && let Some(corrected) = rest
             .strip_prefix("\n\n---\n\n")
             .or_else(|| rest.strip_prefix("\r\n\r\n---\r\n\r\n"))
+    {
+        let corrected = if corrected
+            .get(..15)
+            .is_some_and(|s| s.eq_ignore_ascii_case("Corrected text:"))
         {
-            let corrected = if corrected
-                .get(..15)
-                .is_some_and(|s| s.eq_ignore_ascii_case("Corrected text:"))
-            {
-                corrected[15..].trim_start_matches(['\r', '\n'])
-            } else {
-                corrected
-            };
-            if !corrected.is_empty() {
-                return corrected;
-            }
+            corrected[15..].trim_start_matches(['\r', '\n'])
+        } else {
+            corrected
+        };
+        if !corrected.is_empty() {
+            return corrected;
         }
     }
     output
@@ -196,10 +195,10 @@ pub fn extract_output(body: &Value) -> Result<String, String> {
         for item in items {
             if let Some(content) = item.get("content").and_then(Value::as_array) {
                 for part in content {
-                    if part["type"] == "output_text" {
-                        if let Some(text) = part["text"].as_str() {
-                            output.push_str(text);
-                        }
+                    if part["type"] == "output_text"
+                        && let Some(text) = part["text"].as_str()
+                    {
+                        output.push_str(text);
                     }
                 }
             }
@@ -248,6 +247,55 @@ mod tests {
                 .is_err()
         );
         assert!(p.restore("missing".into()).is_err());
+    }
+    #[test]
+    fn csharp_literal_kinds_links_and_collision_contracts() {
+        let cases = [
+            ("See https://example.com/open-ai?q=GitHub.", "url"),
+            (
+                "Session d5c821f1-68a1-4a4b-9e69-e2f8882f373e failed.",
+                "uuid",
+            ),
+            ("Use sk-proj-abcdefghijklmnopqrstuvwxyz123456.", "api_key"),
+            ("Token ghp_abcdefghijklmnopqrstuvwxyz1234567890.", "api_key"),
+            ("api_key = \"abcDEF1234567890+/=\"", "api_key"),
+            (
+                "Open \"C:\\Users\\Elliot\\Documents\\Open AI\\notes.txt\" now.",
+                "file_path",
+            ),
+            (r"Open \\server\share\folder\notes.txt now.", "file_path"),
+            ("Read /usr/local/share/app/config.json next.", "file_path"),
+            ("Edit src/TextPostProcessor.cs next.", "file_path"),
+            (
+                "Request req_abcDEF12345678901234567890 failed.",
+                "opaque_id",
+            ),
+        ];
+        for (input, kind) in cases {
+            let protected = Protection::new(input).unwrap();
+            assert_eq!(protected.entries.len(), 1, "{input}");
+            assert_eq!(protected.entries[0].kind, kind, "{input}");
+            assert_eq!(protected.restore(protected.text.clone()).unwrap(), input);
+        }
+        let input =
+            "github: [https://github.com/pmxi/purdue-sso](https://github.com/pmxi/purdue-sso)";
+        let protected = Protection::new(input).unwrap();
+        assert_eq!(protected.entries.len(), 1);
+        assert!(protected.entries[0].value.starts_with("[https://"));
+        assert_eq!(
+            protected
+                .restore(protected.text.replace("github", "GitHub"))
+                .unwrap(),
+            input.replacen("github", "GitHub", 1)
+        );
+        let input = "Keep __USC_LITERAL_0_1__ and https://example.com.";
+        let protected = Protection::new(input).unwrap();
+        assert!(
+            !protected.entries[0]
+                .placeholder
+                .starts_with("__USC_LITERAL_0_")
+        );
+        assert_eq!(protected.restore(protected.text.clone()).unwrap(), input);
     }
     #[test]
     fn replacements_do_not_cascade() {

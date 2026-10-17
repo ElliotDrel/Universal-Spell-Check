@@ -54,7 +54,22 @@ fn main() {
             code += &format!("pub const {rust}: &str = {v:?};\n");
         }
     }
-    code += "pub const VERSION: &str = env!(\"CARGO_PKG_VERSION\");\n";
+    for (rust, cs) in [
+        ("EVIDENCE_MUTEX", "DeveloperEvidenceMutexName"),
+        ("MIGRATION_MUTEX", "DataMigrationMutexName"),
+        ("LEGACY_FOLDER", "LegacyInstallFolder"),
+        ("BENCH_TITLE", "RustBenchmarkWindowTitle"),
+    ] {
+        let value = extract(&source, cs);
+        code += &format!("pub const {rust}: &str = {value:?};\n");
+    }
+    let bench_vk = extract(&source, "BenchmarkHotkeyVk");
+    code += &format!("pub const BENCH_VK:u32={bench_vk};\n");
+    let mut version = env::var("CARGO_PKG_VERSION").unwrap();
+    if dev && !version.ends_with("-dev") {
+        version.push_str("-dev");
+    }
+    code += &format!("pub const VERSION: &str = {version:?};\n");
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     fs::write(out.join("channel.rs"), code).unwrap();
     let ico = fs::canonicalize(if dev {

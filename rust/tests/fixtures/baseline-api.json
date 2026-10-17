@@ -1,0 +1,82 @@
+[
+  {
+    "id": "short",
+    "input": "This is a tset.",
+    "raw_ai_output": "This is a test.",
+    "output": "This is a test.",
+    "paste_text": "This is a test.",
+    "paste_html": ""
+  },
+  {
+    "id": "paragraph",
+    "input": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together.",
+    "raw_ai_output": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+    "output": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+    "paste_text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+    "paste_html": ""
+  },
+  {
+    "id": "long",
+    "input": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+    "raw_ai_output": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+    "output": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+    "paste_text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+    "paste_html": ""
+  },
+  {
+    "id": "unchanged",
+    "input": "The meeting starts at noon.",
+    "raw_ai_output": "The meeting starts at noon.",
+    "output": "The meeting starts at noon.",
+    "paste_text": "The meeting starts at noon.",
+    "paste_html": ""
+  },
+  {
+    "id": "brands",
+    "input": "We use open ai and github for this projcet.",
+    "raw_ai_output": "We use OpenAI and GitHub for this project.",
+    "output": "We use OpenAI and GitHub for this project.",
+    "paste_text": "We use OpenAI and GitHub for this project.",
+    "paste_html": ""
+  },
+  {
+    "id": "literals",
+    "input": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "raw_ai_output": "Please check __USC_LITERAL_0_1__ and __USC_LITERAL_0_2__ for session __USC_LITERAL_0_3__.",
+    "output": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "paste_text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "paste_html": ""
+  },
+  {
+    "id": "unicode",
+    "input": "The caf\u00E9 opens tomorow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
+    "raw_ai_output": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
+    "output": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
+    "paste_text": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
+    "paste_html": ""
+  },
+  {
+    "id": "multiline",
+    "input": "Please chek the notes.\n\nThen send the documants.",
+    "raw_ai_output": "Please check the notes.\n\nThen send the documents.",
+    "output": "Please check the notes.\n\nThen send the documents.",
+    "paste_text": "Please check the notes.\n\nThen send the documents.",
+    "paste_html": ""
+  },
+  {
+    "id": "rich-link",
+    "input": "Please chek the guide.",
+    "raw_ai_output": "Please check the guide.",
+    "output": "Please check the guide.",
+    "paste_text": "Please check the guide.",
+    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000287\r\nStartFragment:0000000141\r\nEndFragment:0000000251\r\n\u003Chtml\u003E\r\n\u003Cbody\u003E\r\n\u003C!--StartFragment--\u003E\u003Cp data-pm-slice=\u00220 0 []\u0022\u003EPlease \u003Cstrong\u003Echeck\u003C/strong\u003E the \u003Ca href=\u0022https://example.com/guide\u0022\u003Eguide\u003C/a\u003E.\u003C/p\u003E\u003C!--EndFragment--\u003E\r\n\u003C/body\u003E\r\n\u003C/html\u003E"
+  },
+  {
+    "id": "rich-list",
+    "input": "1. First itme.\n2. Second itme.",
+    "raw_ai_output": "1. First item.  \n2. Second item.",
+    "output": "1. First item.  \n2. Second item.",
+    "paste_text": "1. First item.  \n2. Second item.",
+    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000266\r\nStartFragment:0000000141\r\nEndFragment:0000000230\r\n\u003Chtml\u003E\r\n\u003Cbody\u003E\r\n\u003C!--StartFragment--\u003E\u003Col data-pm-slice=\u00220 0 []\u0022\u003E\u003Cli\u003E\u003Cp\u003EFirst item.  \u003C/p\u003E\u003C/li\u003E\u003Cli\u003E\u003Cp\u003ESecond item.\u003C/p\u003E\u003C/li\u003E\u003C/ol\u003E\u003C!--EndFragment--\u003E\r\n\u003C/body\u003E\r\n\u003C/html\u003E"
+  }
+]

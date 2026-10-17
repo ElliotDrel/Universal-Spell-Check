@@ -217,3 +217,20 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 - Verify text, CF_HTML, native Docs bytes, mode and fallback metadata against the existing C# formatting tests using `rust/tests/parity.py`.
 - Preserve the completed C# baseline in the primary checkout; ignored baseline files are not copied into the Rust worktree.
 - Treat the Rust app as unfinished until tray/dashboard, updater, developer evidence, native acceptance and matched measurements pass.
+
+## Rust implementation details
+
+- Keep one correction worker with a clipboard-listener window and one outstanding correction; reject overlapping hotkeys rather than queuing them.
+- Assign fully rendered clipboard memory to the tray's pumping window, avoiding an OLE clipboard writer or a fixed paste-settle delay.
+- Own clipboard backup formats before copy, including duplicated GDI/metafile objects; restore on failure only after a sequence change, and retain corrected text once published.
+- Wait for physical modifiers before copy and paste; inject each chord with one `SendInput` batch and clean up partially inserted keys.
+- Use one app-lifetime native WinHTTP session/connection with automatic proxy discovery and HTTP/2 enabled. Keep each request's body, headers and read buffer alive through `HANDLE_CLOSING`; enforce a 30-second deadline per attempt, matching two attempts and a 500 ms retry interval.
+- Keep shared stamped log timestamps at event time while writing asynchronously; flush through a bounded barrier on orderly shutdown.
+- Save the existing named DPAPI key collection with synchronized temporary-file contents and atomic replacement. Preserve corrupt files rather than overwriting them with defaults.
+- Keep bounded screenshot, UIA and clipboard-readback workers off the correction path; preserve the existing cross-channel conservative evidence quota and explicit failure/busy statuses.
+- Queue and deduplicate restart requests during update checks. Use the existing updater's `start --waitPid` wire behavior, then let normal startup own the unified update check/install flow.
+- Keep synthetic C# golden cases under `rust/tests/fixtures/`; do not add real runtime logs, copied selections or credentials to source control.
+
+- Keep the dashboard lazy on its own native UI thread; load 30 activity rows before background statistics, forward wheel input from child controls, and bound text previews while copying full output.
+- Use actual separate native rich-edit controls for side-by-side diffs and reset formatting before reuse. Handle close and deferred notices without holding UI borrows across a clipboard pump.
+- Build with a static C runtime; package the executable, replacements and embedded-font licenses with `rust/package.ps1`. Candidate CI uploads this folder without changing the C# production release workflow.

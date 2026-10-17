@@ -4,6 +4,9 @@ namespace UniversalSpellCheck;
 
 internal static class BuildChannel
 {
+    public const uint BenchmarkHotkeyVk = 0x42; // Ctrl+Alt+B, isolated from both product channels.
+    public const string RustBenchmarkWindowTitle = "UniversalSpellCheck.Bench.Rust";
+    public const string DataMigrationMutexName = "UniversalSpellCheck.DataMigration.v1";
     public const string DeveloperEvidenceMutexName = "Local\\UniversalSpellCheck.DeveloperEvidence";
     public const string SharedDataFolder = "UniversalSpellCheck.Data";
     public const string LegacyInstallFolder = "UniversalSpellCheck";

@@ -1,0 +1,32 @@
+name: Rust checks
+on:
+  push:
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', '.github/workflows/rust-checks.yml']
+  pull_request:
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', '.github/workflows/rust-checks.yml']
+permissions:
+  contents: read
+jobs:
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust tools
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - name: Format
+        run: cargo fmt --manifest-path rust/Cargo.toml --check
+      - name: Lint
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+      - name: Dev regressions
+        run: cargo test --locked --manifest-path rust/Cargo.toml
+      - name: Prod regressions
+        run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
+      - name: Optimized native build
+        run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
+      - name: Assemble candidate with replacements and font licenses
+        run: ./rust/package.ps1 -SkipBuild -Output rust/dist/prod
+      - name: Upload candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rust-native-candidate
+          path: rust/dist/prod/

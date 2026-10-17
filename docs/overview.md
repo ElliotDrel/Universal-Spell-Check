@@ -103,3 +103,12 @@ Universal Spell Check/
 ## Tone when collaborating
 
 Speed first, simplicity second, minimal UI/overhead third. Treat every added abstraction or fallback as a cost. Concise, action-oriented responses. Decide fast.
+
+## Rust candidate
+
+- Find the native Rust candidate in `rust/`; keep `src/` as the C# reference during acceptance.
+- Use native Windows controls through `native-windows-gui`, direct Win32 clipboard/keyboard/DPAPI calls, native asynchronous WinHTTP, and the matching Velopack Rust SDK.
+- Keep the dashboard on its own thread; the resident tray has no GPU, WebView, asynchronous runtime or continuous render loop.
+- Build Dev by default; add `--no-default-features` for Prod. Keep the pinned toolchain in `rust-toolchain.toml` and dependencies in `rust/Cargo.lock`.
+- Read `rust/AGENTS.md` for candidate commands and `docs/bench.md` for comparison boundaries.
+- Keep production release packaging on the established C# path until native desktop acceptance and matched measurements are complete; the Rust checks workflow uploads a candidate without publishing or installing it.

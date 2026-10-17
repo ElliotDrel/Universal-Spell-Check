@@ -34,6 +34,10 @@ fn pump_wait(ms: u32) {
         MsgWaitForMultipleObjectsEx(0, null(), ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         let mut msg = zeroed();
         while PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) != 0 {
+            if msg.message == WM_QUIT {
+                PostQuitMessage(msg.wParam as i32);
+                break;
+            }
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -127,14 +131,16 @@ pub fn read(hwnd: HWND) -> Result<Clipboard, String> {
     let sequence = unsafe { GetClipboardSequenceNumber() };
     let raw = bytes(13, 16 * 1024 * 1024)?;
     let units: Vec<u16> = raw
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|c| u16::from_le_bytes([c[0], c[1]]))
         .take_while(|u| *u != 0)
         .collect();
     let text = String::from_utf16_lossy(&units);
     let html = utf8(bytes(format("HTML Format"), 16 * 1024 * 1024)?);
     let rtf = utf8(bytes(format("Rich Text Format"), 16 * 1024 * 1024)?);
-    let native = if html.contains("docs-internal-guid-") {
+    let native = if unsafe { IsClipboardFormatAvailable(format(docs_native::FORMAT)) } != 0 {
         bytes(format(docs_native::FORMAT), 1024 * 1024)?
     } else {
         Vec::new()
@@ -280,12 +286,11 @@ pub fn capture(hwnd: HWND) -> Result<Clipboard, String> {
         chord(0x43)?;
         let start = Instant::now();
         while start.elapsed() < Duration::from_millis(700) {
-            if unsafe { GetClipboardSequenceNumber() } != before {
-                if let Ok(data) = read(hwnd) {
-                    if !data.text.trim().is_empty() {
-                        return Ok(data);
-                    }
-                }
+            if unsafe { GetClipboardSequenceNumber() } != before
+                && let Ok(data) = read(hwnd)
+                && !data.text.trim().is_empty()
+            {
+                return Ok(data);
             }
             pump_wait(25);
         }
@@ -338,29 +343,133 @@ impl Drop for WorkerWindow {
         }
     }
 }
-pub struct Backup(*mut std::ffi::c_void);
-impl Backup {
-    pub fn capture() -> Option<Self> {
+// Own a snapshot rather than retaining OLE's potentially forwarding IDataObject.
+struct SavedFormat {
+    format: u32,
+    handle: HANDLE,
+}
+impl Drop for SavedFormat {
+    fn drop(&mut self) {
         unsafe {
-            let mut object = null_mut();
-            if OleGetClipboard(&mut object) >= 0 && !object.is_null() {
-                Some(Self(object))
-            } else {
-                None
+            if self.handle.is_null() {
+                return;
+            }
+            match self.format {
+                2 | 9 | 0x82 => {
+                    windows_sys::Win32::Graphics::Gdi::DeleteObject(self.handle);
+                }
+                14 | 0x8e => {
+                    windows_sys::Win32::Graphics::Gdi::DeleteEnhMetaFile(self.handle);
+                }
+                3 | 0x83 => {
+                    let data = GlobalLock(self.handle);
+                    if !data.is_null() {
+                        let meta = &*(data
+                            as *const windows_sys::Win32::System::DataExchange::METAFILEPICT);
+                        windows_sys::Win32::Graphics::Gdi::DeleteMetaFile(meta.hMF);
+                        GlobalUnlock(self.handle);
+                    }
+                    GlobalFree(self.handle);
+                }
+                _ => {
+                    GlobalFree(self.handle);
+                }
             }
         }
     }
-    pub fn restore(&self) -> bool {
-        unsafe { OleSetClipboard(self.0) >= 0 && OleFlushClipboard() >= 0 }
+}
+pub struct Backup {
+    formats: Vec<SavedFormat>,
+    owner: HWND,
+    sequence: u32,
+    armed: bool,
+}
+impl Backup {
+    pub fn capture(owner: HWND) -> Result<Self, String> {
+        let _open = open(owner, Duration::from_millis(320))?;
+        let sequence = unsafe { GetClipboardSequenceNumber() };
+        let mut formats = Vec::new();
+        let mut format = 0;
+        let mut allocated = 0usize;
+        unsafe {
+            loop {
+                format = EnumClipboardFormats(format);
+                if format == 0 {
+                    break;
+                }
+                if formats.len() >= 128 {
+                    return Err(
+                        "Clipboard backup has too many formats; selection was left unchanged."
+                            .into(),
+                    );
+                }
+                if format == 0x80 || (0x200..=0x3ff).contains(&format) {
+                    return Err("Clipboard uses an unsupported owner-managed format; selection was left unchanged.".into());
+                }
+                let source = GetClipboardData(format);
+                if source.is_null() {
+                    return Err("Clipboard backup could not render a source format; selection was left unchanged.".into());
+                }
+                if !matches!(format, 2 | 3 | 9 | 14 | 0x82 | 0x83 | 0x8e) {
+                    allocated = allocated.saturating_add(GlobalSize(source));
+                    if allocated > 64 * 1024 * 1024 {
+                        return Err(
+                            "Clipboard backup exceeds 64 MiB; selection was left unchanged.".into(),
+                        );
+                    }
+                }
+                let handle = if matches!(format, 14 | 0x8e) {
+                    windows_sys::Win32::Graphics::Gdi::CopyEnhMetaFileW(source, null())
+                } else {
+                    OleDuplicateData(source, format as u16, GMEM_MOVEABLE)
+                };
+                if handle.is_null() {
+                    return Err(
+                        "Clipboard backup could not be duplicated; selection was left unchanged."
+                            .into(),
+                    );
+                }
+                formats.push(SavedFormat { format, handle });
+            }
+        }
+        Ok(Self {
+            formats,
+            owner,
+            sequence,
+            armed: true,
+        })
+    }
+    pub fn disarm(&mut self) {
+        self.armed = false;
+    }
+    pub fn restore(&mut self) -> bool {
+        self.armed = false;
+        if unsafe { GetClipboardSequenceNumber() } == self.sequence {
+            return true;
+        }
+        let Ok(_open) = open(self.owner, Duration::from_millis(320)) else {
+            return false;
+        };
+        if unsafe { EmptyClipboard() } == 0 {
+            return false;
+        }
+        let mut success = true;
+        for format in &mut self.formats {
+            unsafe {
+                if SetClipboardData(format.format, format.handle).is_null() {
+                    success = false;
+                } else {
+                    format.handle = null_mut();
+                }
+            }
+        }
+        success
     }
 }
 impl Drop for Backup {
     fn drop(&mut self) {
-        unsafe {
-            let vtable = *(self.0 as *const *const usize);
-            let release: unsafe extern "system" fn(*mut std::ffi::c_void) -> u32 =
-                std::mem::transmute(*vtable.add(2));
-            release(self.0);
+        if self.armed {
+            self.restore();
         }
     }
 }

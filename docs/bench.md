@@ -226,3 +226,31 @@ are excluded. Preserve the first launch separately rather than claiming cold boo
   separate; the installed-app memory figure is one aged-process snapshot, not a
   repeated baseline. Pure text processing is about 0.5 ms, so a language change
   alone does not establish a meaningful end-to-end speedup.
+
+## Rust candidate and comparison
+
+- Build the candidate with `cargo build --manifest-path rust/Cargo.toml --release --no-default-features`.
+- Keep the installed C# app and the frozen package unchanged while validating the candidate.
+- Run `cargo test --manifest-path rust/Cargo.toml` for native mock HTTP/deadline, key isolation, update-queue, activity-reader, statistical, 76 C# golden formatting and ten frozen-workload regressions.
+- Run `rust/tests/parity.py` to re-record the real C# formatting suite and compare its outputs with the Rust candidate. Its generated oracle and reports belong in ignored `benchmark_runs/` directories.
+- Use `--bench-compute` for the same protection, payload serialization/parser, frozen-response lookup, response parser, postprocessing and rich-mapping boundaries as C#.
+- Use `--bench-desktop --mode local|e2e --allow-desktop` only during an explicitly authorized idle-desktop window.
+- Require explicit `--settings` for live keys; offline replay never creates a live HTTP client or reads/writes production keys.
+- Require `--evidence-log-dir` with developer logging so the store/quota condition can match C#; do not silently compare a fresh private evidence store with the full shared reference store.
+- Match `hotkey_trigger=posted_registered_message`; Rust records dispatch acknowledgment and the native editor procedure's actual paste completion separately.
+- Retain every attempted warmup and measured trial, including aborted trials, editor/HTML mismatch, clipboard failure, missing dispatch and evidence timeout.
+- Treat native editor text/CF_HTML checks as payload acceptance; verify real browser/editor rendering separately.
+- Run `bench/compare-rust.ps1` for C#/Rust/Rust/C# block ordering and before/after settings and encrypted-key integrity checks.
+
+```powershell
+./bench/compare-rust.ps1 -Mode compute `
+  -RustExe <Rust-release-executable> `
+  -BaselinePackage <primary-checkout>/benchmark_runs/rust-baseline-2026-10-16 `
+  -Dotnet <portable-sdk>/dotnet.exe `
+  -DataDirectory "$env:LOCALAPPDATA/UniversalSpellCheck.Data" `
+  -Output <fresh-ignored-output-directory>
+```
+
+- Add `-Mode local -AllowDesktop` or `-Mode e2e -AllowDesktop` only after the user has confirmed the desktop is idle.
+- Use the existing startup measurement helper for matched standalone starts; it stops/restores only the explicitly named installed executable and reads ready milestones through the approved log reader.
+- Keep desktop and startup comparisons pending until they have actually run; compilation and golden tests do not establish an end-to-end speedup.

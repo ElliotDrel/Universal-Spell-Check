@@ -39,7 +39,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Naming, style, error-handling, comments, C#/Python conventions | `docs/conventions.md` |
 | Dashboard UI / WPF / colors / fonts / mockups / visual changes | `DESIGN.md` (always, before any visual change) |
 | Working inside the WPF dashboard folder | `src/UI/AGENTS.md` + `DESIGN.md` |
-| Running, building, manual acceptance-testing the native app | `src/AGENTS.md` |
+| Running, building, manual acceptance-testing the native app | `src/AGENTS.md`; Rust candidate: `rust/AGENTS.md` |
 | Python fine-tune dataset tooling, benchmarks, eval runs | `tests/AGENTS.md` |
 | Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
 | Starting the Rust port, resuming after compaction, or investigating hotkey/clipboard speed after the port | `.planning/rust-port-performance-handoff.md` |
