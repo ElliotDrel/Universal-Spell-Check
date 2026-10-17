@@ -1,5 +1,15 @@
 # Resume Hotkey Performance Work After the Rust Port
 
+## October 16 Baseline Supersedes the Old Comparison Harness
+
+- Read `docs/bench.md` before using the historical investigation below.
+- Find the completed C# reference in the primary checkout at `benchmark_runs/rust-baseline-2026-10-16/README.md` and `baseline-completion.json`.
+- Preserve live desktop results at 100/100 measured verified replacements, median 996.8639 ms and p95 2,118.2642 ms; local replay retained two measured clipboard failures, median 370.3875 ms and p95 6,178.29305 ms among successes.
+- Preserve ten startup readiness samples with median 575.4677 ms, plus two complete local-processing blocks near 0.5 ms median.
+- Use the repaired safe runner and frozen product, not quarantined older benchmark entrypoints; credential recovery is complete and encrypted storage was verified unchanged after the final runs.
+- Match the recorded logging/evidence condition and retain all failures; the October 10 observations below are historical hypotheses, not a substitute for the new fixed-workload baseline.
+- Free disk space before Rust builds; the completed benchmark left only about 49 MiB free, and an earlier incomplete live attempt stopped on disk-full.
+
 ## Read This First
 
 - Resume the goal of reducing **selected-text hotkey → verified editor replacement by at least 2×**.

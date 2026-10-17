@@ -16,9 +16,9 @@ Do not execute older archived benchmark clients: their entry points are quaranti
 The repair derives omitted key paths from the configured data directory, passes
 both paths explicitly in the harness, and rejects the placeholder before any live
 request. Tests assert destinations before writes and verify that an offline smoke
-leaves the production encrypted file byte-identical. The live desktop baseline
-and startup remain incomplete pending another idle window; credential recovery
-is complete.
+leaves the production encrypted file byte-identical. Credential recovery, the live
+desktop baseline and ten startup measurements are complete. The installed app was
+restored; encrypted credentials and settings were unchanged by the completed runs.
 
 ## Scope
 
@@ -62,6 +62,11 @@ sandbox redirects LocalAppData. Never put a key in a command or result file.
 Each case has its own excluded warmups. Ten cases with ten runs and two warmups
 make 120 correction requests, before service retries. There is no parallel request
 load. First-use warmups are retained in raw output rather than silently discarded.
+Check free output-volume space before running and monitor it between blocks. The
+October 16 live attempt hit disk-full after 50 successful measured replacements;
+retain that incomplete block as diagnostics, including potentially truncated
+summary/fixture files. Its successful full restart began with at least 32 MiB
+free. Free substantially more space before compiling the Rust port.
 
 Desktop tests MUST wait until Elliot has stopped using the computer. Preparing the
 command or building the runner does not authorize running it during active use.
@@ -202,6 +207,22 @@ are excluded. Preserve the first launch separately rather than claiming cold boo
   local block. Retain earlier incomplete fixture diagnostics separately.
 - Exclude `desktop/e2e-native-final` from latency analysis: invalid placeholder
   authentication caused HTTP 401 responses before testing was stopped.
-- Keep live desktop E2E and startup incomplete until a renewed idle window;
-  credential recovery is complete. Original-editor visual acceptance remains separate. The
-  installed-app memory figure is one aged-process snapshot, not a repeated baseline.
+- Use `desktop/e2e-space-verified-final` as the completed live desktop block:
+  100/100 measured verified replacements and 20/20 successful warmups; total median
+  996.8639 ms, p95 2,118.2642 ms and mean 1,164.046523 ms.
+- Retain 95/100 exact expected-text matches; the five measured and two warmup
+  mismatches were checked and differ only by two spaces before the first list newline.
+- Preserve API/capture/paste phase medians of 722/108/150 ms from that live block;
+  do not add phase medians or subtract medians from separate blocks.
+- Preserve all 120 live developer-evidence completions as `storage_limit`; match
+  this condition or explicitly record its change for the Rust comparison.
+- Exclude `desktop/e2e-recovered-final`: disk-full interrupted it after 50 successful
+  measured trials. No failures or partial trials from it are folded into the restart.
+- Preserve `startup-final`: ten successful readiness samples, median 575.4677 ms,
+  p95 708.828935 ms and mean 516.40215 ms; first launch 503.9401 ms, with no cold-cache claim.
+- Read the completed package's `README.md`, `baseline-completion.json` and
+  `post-run-integrity.json` for validation and restored installed-app checks.
+- Treat the C# baseline as complete. Original-editor visual acceptance remains
+  separate; the installed-app memory figure is one aged-process snapshot, not a
+  repeated baseline. Pure text processing is about 0.5 ms, so a language change
+  alone does not establish a meaningful end-to-end speedup.
