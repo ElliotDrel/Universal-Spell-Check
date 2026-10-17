@@ -94,13 +94,19 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
         else
             TriggerHotkey();
         var returnedMs = Elapsed(start);
-        var dispatchedAt = form is null ? 0 : await _dispatch!.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        var detail = await pending.WaitAsync(TimeSpan.FromSeconds(70));
+        long dispatchedAt;
+        try { dispatchedAt = form is null ? 0 : await _dispatch!.Task.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { throw new TimeoutException("No registered hotkey dispatch acknowledgment within two seconds."); }
+        JsonElement detail;
+        try { detail = await pending.WaitAsync(TimeSpan.FromSeconds(70)); }
+        catch (TimeoutException) { throw new TimeoutException($"Hotkey acknowledged but no coordinator detail within 70 seconds; coordinator task={CoordinatorTask()?.Status}."); }
         if (form is not null && CoordinatorTask() is { } running) await running;
         if (form is not null && detail.GetProperty("developer_evidence").TryGetProperty("status", out var evidenceStatus)
             && evidenceStatus.GetString() == "pending")
         {
-            var completed = await logger.EvidenceCompleted.WaitAsync(TimeSpan.FromSeconds(15));
+            JsonElement completed;
+            try { completed = await logger.EvidenceCompleted.WaitAsync(TimeSpan.FromSeconds(15)); }
+            catch (TimeoutException) { throw new TimeoutException("Coordinator completed but developer evidence did not finish within 15 seconds."); }
             if (completed.GetProperty("run_id").GetString() != detail.GetProperty("run_id").GetString())
                 throw new InvalidOperationException("Evidence completion belongs to another trial.");
         }

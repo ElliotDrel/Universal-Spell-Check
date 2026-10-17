@@ -81,6 +81,7 @@ internal static class Program
             if (opts.Desktop)
             {
                 Application.EnableVisualStyles();
+                Application.ThreadException += (_, e) => logger.FailCurrentTrial(e.Exception);
                 using var form = new BenchTargetForm();
                 using var hotkey = new HotkeyWindow("UniversalSpellCheck.Benchmark");
                 clipboardOwner = hotkey.Handle;
@@ -160,6 +161,8 @@ internal sealed class CapturingLogger(string path) : DiagnosticsLogger(path)
     private TaskCompletionSource<JsonElement>? _pending;
     private TaskCompletionSource<JsonElement>? _evidence;
     internal Task<JsonElement> EvidenceCompleted => _evidence!.Task;
+    internal void FailCurrentTrial(Exception error) => _pending?.TrySetException(
+        new InvalidOperationException("Benchmark UI exception: " + error, error));
     internal Task<JsonElement> BeginTrial()
     {
         _pending = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -29,6 +29,10 @@ internal static class BenchTests
         Check(!logger.EvidenceCompleted.IsCompleted, "pipeline detail does not imply evidence completion");
         logger.LogData("developer_evidence_completed", new { run_id = "test" });
         Check(logger.EvidenceCompleted.IsCompletedSuccessfully, "separate evidence completion observed");
+        var failedFixture = logger.BeginTrial();
+        logger.FailCurrentTrial(new InvalidOperationException("copy fixture failure"));
+        Check(failedFixture.IsFaulted && failedFixture.Exception!.ToString().Contains("copy fixture failure"),
+            "fixture UI errors reach the trial instead of a modal dialog or silent timeout");
         using (var window = new HotkeyWindow("UniversalSpellCheck.Benchmark.Tests." + Guid.NewGuid().ToString("N")))
         {
             int dispatched = 0;

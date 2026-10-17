@@ -53,8 +53,7 @@ internal sealed class BenchTargetForm : Form
             // A synthetic source supplies stable CF_HTML; this is not a claim about browser copy behavior.
             if ((m.Msg == 0x301 || (m.Msg == 0x102 && m.WParam == new IntPtr(0x03))) && Html.Length > 0)
             {
-                var data = new DataObject(); data.SetData(DataFormats.UnicodeText, SelectedText);
-                data.SetData(DataFormats.Html, Html); Clipboard.SetDataObject(data, true); return;
+                FixtureClipboard.Copy(Handle, SelectedText, Html); return;
             }
             base.WndProc(ref m);
             // WM_PASTE is observed even when unchanged text is replaced with identical text.

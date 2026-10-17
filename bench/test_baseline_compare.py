@@ -17,6 +17,7 @@ class ComparisonTests(unittest.TestCase):
             "schema_version": 2, "cases_sha256": "cases", "replacements_sha256": "rules",
             "fixture_sha256": "fixture", "model": "gpt-4.1", "prompt": "fixed",
             "developer_logging": False, "machine_name": "same-machine", "case_ids": ["short"],
+            "hotkey_trigger": "posted_registered_message",
             "options": {"mode": "local", "runs": 20, "warmup": 2},
         }
 
@@ -24,7 +25,7 @@ class ComparisonTests(unittest.TestCase):
         validate(self.manifest, copy.deepcopy(self.manifest))
 
     def test_reject_changed_contract(self):
-        for key in ("cases_sha256", "fixture_sha256", "replacements_sha256", "model", "prompt", "developer_logging", "machine_name", "case_ids"):
+        for key in ("cases_sha256", "fixture_sha256", "replacements_sha256", "model", "prompt", "developer_logging", "machine_name", "case_ids", "hotkey_trigger"):
             with self.subTest(key=key):
                 other = copy.deepcopy(self.manifest)
                 other[key] = "different"

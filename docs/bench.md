@@ -12,8 +12,8 @@ logs. Version a new case file if the workload changes.
 |---|---|---|
 | `headless` | Real coordinator, live API, protection/post-processing; no capture, target hooks or rich mapping | No |
 | `compute` | Real protection, payload construction, response parser, post-processing and rich mapper with recorded AI output | No |
-| `local` | Real hotkey/coordinator/capture/formatting/paste; only HTTP transport replaced with recorded output | Yes |
-| `e2e` | Real hotkey/coordinator/capture/formatting/live API/paste | Yes |
+| `local` | Registered hotkey message/coordinator/capture/formatting/paste; only HTTP transport replaced with recorded output | Yes |
+| `e2e` | Registered hotkey message/coordinator/capture/formatting/live API/paste | Yes |
 | `self-test` | Measurement invariants and real-mapper fixture checks | No |
 
 `compute` is a component measurement, not a substitute for the full local pipeline.
@@ -52,7 +52,15 @@ dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode lo
 dotnet bench/bin/Release/net10.0-windows/UniversalSpellCheck.Bench.dll --mode e2e --runs 10 --warmup 2 --allow-desktop --output bench/results/csharp-e2e-a
 ```
 
-The visible benchmark editor uses Ctrl+Alt+B, separate from Prod/Dev. It allows
+The benchmark registers Ctrl+Alt+B, separate from Prod/Dev. Its measured trigger
+posts WM_HOTKEY to the real registered window and requires an explicit dispatch
+acknowledgment within two seconds. This measures queue/handler-to-editor behavior,
+not physical key delivery or a human's modifier-release delay. The earlier SendInput
+block was retained as incomplete diagnostics after a missing coordinator record;
+do not combine its totals with the acknowledged-message baseline. Native message
+dispatch is checked 100 times by the offline harness suite.
+
+The visible editor allows
 up to three seconds of unmeasured activation/selection preparation, then verifies
 foreground, full selection and fixture text before injection. A normal STA
 `Application.Run` message loop replaces the old `DoEvents`/sleep polling loop.
@@ -76,6 +84,11 @@ Rich fixtures provide synthetic CF_HTML on copy, exercising the production mappe
 and rich clipboard writer. The textbox verifies text and clipboard HTML, not visual
 bold/link/list rendering in a browser. Original-editor acceptance remains separate.
 Desktop runs change focus and leave corrected text on the clipboard, like the app.
+The rich source publishes Unicode/UTF-8 CF_HTML with bounded native clipboard calls;
+it must not use an OLE flush inside the test editor's copy handler. A discovered
+source-side Clipboard.SetDataObject exception previously escaped the coordinator
+and left it waiting; those attempts remain diagnostics. UI exceptions now fail the
+current trial explicitly instead of opening an unobserved WinForms error dialog.
 The registered benchmark window also supplies the real clipboard-history owner,
 so the production history-exclusion step runs. The harness has no loading overlay,
 tray, updater or dashboard; production observations remain separate context.
