@@ -211,3 +211,9 @@ Verification after any activity-feed or startup change:
 ## Dashboard auto-open on startup
 
 `SpellCheckAppContext` hooks `Application.Idle` to auto-open the dashboard once on startup. This surfaces WPF failures immediately rather than requiring the user to find the tray menu. Check `dashboard_auto_open_attempt` and subsequent `dashboard_open step=` entries in the log if the dashboard doesn't appear. Step values: `construct` → `show` → `activate` → `done`. A missing `done` with an error after `construct` means the `MainWindow` constructor or XAML initialization threw.
+
+## Rust native handlers and diagnostic clipboard readers
+
+NWG reserves raw event-handler IDs through `0xFFFF`. Application handlers must call `style::raw_handler_id`; a low literal panics at window setup. The real desktop smoke exposed this despite passing non-GUI core regressions.
+
+`SendInput` returning means input is queued, not consumed by the target. Never start an asynchronous clipboard content readback immediately afterward: it can hold `OpenClipboard` while the target tries its paste, leaving the source text unchanged. The live desktop verifier caught this on a brands trial with corrected output and a delivered paste message. Rust now verifies developer clipboard publication before injection using a non-waiting open attempt, and writes verification payloads as sidecars. This does not prove editor rendering. Keep actual editor-text assertions and failed trials in the desktop harness.
