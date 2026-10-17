@@ -190,6 +190,13 @@ are excluded. Preserve the first launch separately rather than claiming cold boo
 - Keep the 30-run production observation separate: v0.12.3, October 15-16, developer
   logging enabled, 27 successful and three failed; logged successful total median
   2,625 ms and p95 8,464.8 ms do not prove verified editor replacement.
-- Leave local clipboard/E2E, original-editor acceptance and startup timing unmeasured
-  until the requested idle-desktop turn. The installed-app memory figure is one
-  aged-process snapshot, not a steady-state comparison.
+- Preserve `desktop/local-native-final`: 98/100 measured verified editor replacements,
+  two clipboard-write failures, median 370.3875 ms, p95 6,178.29305 ms and mean
+  1,899.12704 ms among successful attempts; warmups were 19/20 successful.
+- Use the acknowledged WM_HOTKEY boundary and native rich-copy producer for that
+  local block. Retain earlier incomplete fixture diagnostics separately.
+- Exclude `desktop/e2e-native-final` from latency analysis: invalid placeholder
+  authentication caused HTTP 401 responses before testing was stopped.
+- Keep live desktop E2E and startup incomplete until credential recovery and a
+  renewed idle window. Original-editor visual acceptance remains separate. The
+  installed-app memory figure is one aged-process snapshot, not a repeated baseline.
