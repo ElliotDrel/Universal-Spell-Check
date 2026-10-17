@@ -384,6 +384,9 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         )?;
         corrected_on_clipboard = true;
         if let Some(backup)=backup.as_mut(){backup.disarm();}
+        if settings.developer_logging {
+            detail["clipboard_readback"] = crate::evidence::readback_before_input(owner, sequence);
+        }
         // Fully-rendered native memory is already published; CloseClipboard precedes the input batch.
         clipboard::modifiers_released(Duration::from_millis(1200))?;
         clipboard::chord(0x56)?;
@@ -456,6 +459,9 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                     .is_some_and(|s| !s.is_empty())
             ),
         );
+    }
+    if let Some(readback) = detail.get("clipboard_readback") {
+        inline["clipboard_readback"] = json!({"status":readback["status"],"boundary":readback["boundary"],"sequence":readback["sequence"]});
     }
     logger.data("spellcheck_detail", inline);
     if bus.observe_trials {

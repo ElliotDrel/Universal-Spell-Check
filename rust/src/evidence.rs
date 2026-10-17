@@ -21,7 +21,6 @@ use windows_sys::Win32::{
 };
 static IMAGE_BUSY: AtomicBool = AtomicBool::new(false);
 static UIA_BUSY: AtomicBool = AtomicBool::new(false);
-static READBACK_BUSY: AtomicBool = AtomicBool::new(false);
 static ACTIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 fn now() -> String {
     time::OffsetDateTime::now_utc()
@@ -63,24 +62,14 @@ impl Evidence {
         mut self,
         store: Store,
         logger: Logger,
-        mut detail: Value,
+        detail: Value,
         paste: (usize, u32, String),
     ) {
         let after = context("after-paste", paste.clone(), true);
         let before = self.before.take().unwrap();
-        let readback = readback(
-            detail["clipboard_write_sequence"]
-                .as_u64()
-                .map(|n| n as u32),
-        );
         let _ = thread::Builder::new()
             .name("evidence-save".into())
             .spawn(move || {
-                if let Some(rx) = readback
-                    && let Ok(value) = rx.recv_timeout(Duration::from_millis(500))
-                {
-                    detail["clipboard_readback"] = value;
-                }
                 let result = save_inner(&store, &detail, &self.source, &paste, vec![before, after]);
                 logger.data(
                     "developer_evidence_completed",
@@ -418,21 +407,25 @@ fn save_inner(
             .unwrap_or_else(|| json!({"status":"busy_or_timeout"}));
         captured.push(json!({"phase":context.phase,"requested_at":context.requested,"target_hwnd":context.target.0,"image":image,"accessibility":uia}));
     }
-    let manifest = json!({"schema_version":1,"run_id":id,"channel":channel::CHANNEL,"app_version":channel::VERSION,"created_at":now(),"source_target":{"hwnd":source.0,"pid":source.1,"process":source.2},"paste_target":{"hwnd":paste.0,"pid":paste.1,"process":paste.2},"payloads":payloads,"contexts":captured,"capture_contract":"Native screen pixels and bounded UIA; no rendering-completion claim"});
+    let manifest = json!({"schema_version":1,"run_id":id,"channel":channel::CHANNEL,"app_version":channel::VERSION,"created_at":now(),"source_target":{"hwnd":source.0,"pid":source.1,"process":source.2},"paste_target":{"hwnd":paste.0,"pid":paste.1,"process":paste.2},"payloads":payloads,"contexts":captured,"clipboard_readback_boundary":detail["clipboard_readback"]["boundary"],"capture_contract":"Native screen pixels and bounded UIA; no rendering-completion claim"});
     let bytes = serde_json::to_vec(&manifest).unwrap_or_default();
     let result = quota_write(&root, id, "manifest.json", &bytes);
     json!({"schema_version":1,"manifest_path":format!("developer-evidence/{id}/manifest.json"),"status":result["status"]})
 }
-fn readback(sequence: Option<u32>) -> Option<Receiver<Value>> {
-    let sequence = sequence?;
-    if READBACK_BUSY.swap(true, Ordering::AcqRel) {
-        return None;
-    }
-    let (tx, rx) = mpsc::sync_channel(1);
-    let started=thread::Builder::new().name("clipboard-readback".into()).spawn(move||{let _=crate::clipboard::initialize_sta();let value=if unsafe{windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber()}!=sequence{json!({"status":"source_changed"})}else{match crate::clipboard::read(null_mut()){Ok(data)if data.sequence==sequence=>{use base64::Engine;json!({"status":"ok","captured_at":now(),"sequence":sequence,"readback_text":data.text,"readback_html":data.html,"readback_rtf":data.rtf,"readback_formats":data.formats,"readback_chromium_mime_base64":base64::engine::general_purpose::STANDARD.encode(data.native)})},_=>json!({"status":"failed_or_changed"})}};let _=tx.send(value);READBACK_BUSY.store(false,Ordering::Release);});
-    if started.is_err() {
-        READBACK_BUSY.store(false, Ordering::Release);
-        return None;
-    }
-    Some(rx)
+// Verify before injecting input: a reader after SendInput can lock out the target's paste.
+// Diagnostics never wait for clipboard access and never open it in a post-input worker.
+pub fn readback_before_input(owner: usize, sequence: u32) -> Value {
+    use base64::Engine;
+    let mut value = match crate::clipboard::read_immediate(owner as _) {
+        Ok(data) if data.sequence == sequence => json!({
+            "status":"ok", "captured_at":now(), "sequence":sequence,
+            "readback_text":data.text, "readback_html":data.html, "readback_rtf":data.rtf,
+            "readback_formats":data.formats,
+            "readback_chromium_mime_base64":base64::engine::general_purpose::STANDARD.encode(data.native)
+        }),
+        Ok(_) => json!({"status":"source_changed"}),
+        Err(_) => json!({"status":"busy_or_unavailable"}),
+    };
+    value["boundary"] = json!("after_clipboard_write_before_input");
+    value
 }

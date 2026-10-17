@@ -254,11 +254,13 @@ impl Run {
         );
         let requested = detail["paste_text"].as_str().unwrap_or("");
         let requested_html = detail["paste_html"].as_str().unwrap_or("");
+        let mut observed_clipboard = Value::Null;
         let mut output = String::new();
         let mut error = None;
         let mut success = !failed;
         match completion {
             Some(Ok(paste)) => {
+                observed_clipboard = json!({"text":paste.clipboard.text,"html":paste.clipboard.html,"sequence":paste.clipboard.sequence});
                 output = paste.text;
                 timings.insert(
                     "total_ms".into(),
@@ -313,7 +315,7 @@ impl Run {
                 return;
             }
         }
-        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"output":output,"error":error,"run_id":detail["run_id"]});
+        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
         if let Err(error) = writeln!(self.raw, "{trial}").and_then(|_| self.raw.flush()) {
             self.abort(&format!("Cannot preserve benchmark trial: {error}"));
             return;

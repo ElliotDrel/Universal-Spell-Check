@@ -127,7 +127,13 @@ fn utf8(bytes: Vec<u8>) -> String {
     String::from_utf8_lossy(bytes.split(|c| *c == 0).next().unwrap_or_default()).into_owned()
 }
 pub fn read(hwnd: HWND) -> Result<Clipboard, String> {
-    let _open = open(hwnd, Duration::from_millis(320))?;
+    read_with_budget(hwnd, Duration::from_millis(320))
+}
+pub fn read_immediate(hwnd: HWND) -> Result<Clipboard, String> {
+    read_with_budget(hwnd, Duration::ZERO)
+}
+fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
+    let _open = open(hwnd, budget)?;
     let sequence = unsafe { GetClipboardSequenceNumber() };
     let raw = bytes(13, 16 * 1024 * 1024)?;
     let units: Vec<u16> = raw

@@ -227,10 +227,13 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 - Use one app-lifetime native WinHTTP session/connection with automatic proxy discovery and HTTP/2 enabled. Keep each request's body, headers and read buffer alive through `HANDLE_CLOSING`; enforce a 30-second deadline per attempt, matching two attempts and a 500 ms retry interval.
 - Keep shared stamped log timestamps at event time while writing asynchronously; flush through a bounded barrier on orderly shutdown.
 - Save the existing named DPAPI key collection with synchronized temporary-file contents and atomic replacement. Preserve corrupt files rather than overwriting them with defaults.
-- Keep bounded screenshot, UIA and clipboard-readback workers off the correction path; preserve the existing cross-channel conservative evidence quota and explicit failure/busy statuses.
+- Keep bounded screenshot and UIA workers off the correction path; preserve the existing cross-channel conservative evidence quota and explicit failure/busy statuses.
 - Queue and deduplicate restart requests during update checks. Use the existing updater's `start --waitPid` wire behavior, then let normal startup own the unified update check/install flow.
 - Keep synthetic C# golden cases under `rust/tests/fixtures/`; do not add real runtime logs, copied selections or credentials to source control.
 
 - Keep the dashboard lazy on its own native UI thread; load 30 activity rows before background statistics, forward wheel input from child controls, and bound text previews while copying full output.
 - Use actual separate native rich-edit controls for side-by-side diffs and reset formatting before reuse. Handle close and deferred notices without holding UI borrows across a clipboard pump.
 - Build with a static C runtime; package the executable, replacements and embedded-font licenses with `rust/package.ps1`. Candidate CI uploads this folder without changing the C# production release workflow.
+
+- Verify developer clipboard readback synchronously before input injection with a single non-waiting open attempt. A post-input reader can lock the clipboard while the target attempts to paste. Persist full verification payloads only in evidence sidecars and retain summary metadata inline. This is publication verification, not proof the target rendered the text.
+- Treat WinHTTP send/receive subphases as callback completion intervals, not directly comparable wire-upload/server-processing phases. Use whole `request_ms` for C#/Rust API comparisons.
