@@ -55,6 +55,18 @@ try
         Path.Combine(otherChannelRoot, "apikey.dat"));
     Assert(otherStore.LoadApiKey() is null, "A separate channel unexpectedly shared API keys.");
 
+    var implicitRoot = Path.Combine(testRoot, "implicit-key-path");
+    var implicitStore = new SettingsStore(logger, implicitRoot);
+    var resolvedKeyPath = (string)typeof(SettingsStore)
+        .GetField("_apiKeyPath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+        .GetValue(implicitStore)!;
+    // Validate the destination BEFORE any write, so a regression can never damage a real key.
+    Assert(Path.GetFullPath(resolvedKeyPath) == Path.Combine(implicitRoot, Path.GetFileName(AppPaths.ApiKeyPath)),
+        "Custom data directory escaped to the production credential path; refusing any test write.");
+    implicitStore.SaveApiKey("offline-isolation-test-value");
+    Assert(File.Exists(resolvedKeyPath) && implicitStore.LoadApiKey() == "offline-isolation-test-value",
+        "Implicit credential path did not stay inside the configured data directory.");
+
     var corruptRoot = Path.Combine(testRoot, "corrupt-channel");
     Directory.CreateDirectory(corruptRoot);
     var corruptPath = Path.Combine(corruptRoot, "apikey.dat");

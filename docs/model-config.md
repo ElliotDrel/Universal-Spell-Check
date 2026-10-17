@@ -13,6 +13,13 @@ Named API keys are saved as one DPAPI-encrypted collection through `SettingsStor
 
 The collection, including names and active-key selection, is never written to `settings.json` or any plain-text file. Prod and Dev collections remain isolated because `BuildChannel.AppDataFolder` differs. Existing single-key encrypted files load as a `Default` entry and migrate to the collection format on the next key change. Legacy install-directory migration copies `apikey.dat` only when the durable destination is missing, so it cannot replace an existing collection.
 
+When `SettingsStore` receives a custom data directory, an omitted key-path override
+must resolve inside that directory. The earlier independent fallback to
+`AppPaths.ApiKeyPath` is superseded: it let an offline benchmark overwrite the
+active saved credential. Regression tests inspect the resolved path before any
+write, then verify encrypted round-trip isolation. Benchmarks also pass both paths
+explicitly and reject the offline placeholder in live mode before any request.
+
 ---
 
 ## Standard vs. Reasoning models — do not mix parameters

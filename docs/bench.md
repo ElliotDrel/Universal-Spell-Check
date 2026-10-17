@@ -1,5 +1,20 @@
 # C# / Rust Baseline
 
+## Credential isolation incident and recovery hold
+
+The October 16 offline harness originally supplied a custom settings directory
+without overriding the key path. The old SettingsStore default still pointed
+the key path at production, so SaveApiKey replaced the saved active key with the
+offline placeholder. Live testing was stopped; the installed process was kept
+running with its cached key. Do not restart it until recovery or manual re-entry.
+Do not execute older archived benchmark clients: their entry points are quarantined.
+
+The repair derives omitted key paths from the configured data directory, passes
+both paths explicitly in the harness, and rejects the placeholder before any live
+request. Tests assert destinations before writes and verify that an offline smoke
+leaves the production encrypted file byte-identical. The live desktop baseline
+and startup remain incomplete pending credential recovery and another idle window.
+
 ## Scope
 
 The October 16, 2026 harness replaces the old benchmark. Use Release builds and

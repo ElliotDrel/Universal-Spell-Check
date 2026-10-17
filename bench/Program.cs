@@ -41,11 +41,18 @@ internal static class Program
             var logger = new CapturingLogger(Path.Combine(opts.Output, $"spellcheck-{DateTime.Now:yyyy-MM-dd}.jsonl"));
             var store = opts.Live
                 ? new SettingsStore(logger, opts.Settings, Path.Combine(opts.Settings, "apikey.dat"))
-                : new SettingsStore(logger, Path.Combine(opts.Output, "offline-settings"));
+                : new SettingsStore(logger, Path.Combine(opts.Output, "offline-settings"),
+                    Path.Combine(opts.Output, "offline-settings", Path.GetFileName(AppPaths.ApiKeyPath)));
             // Replay cannot reach the network and does not read or change user keys/settings.
-            if (!opts.Live) store.SaveApiKey("offline-replay-no-network");
+            if (!opts.Live)
+            {
+                VerifyOfflineKeyPath(store, Path.Combine(opts.Output, "offline-settings"));
+                store.SaveApiKey("offline-replay-no-network");
+            }
             var cached = new CachedSettings(store);
             if (string.IsNullOrWhiteSpace(cached.ApiKey)) throw new InvalidOperationException("No saved API key available.");
+            if (opts.Live && cached.ApiKey == "offline-replay-no-network")
+                throw new InvalidOperationException("Offline placeholder found in live settings; refusing all network requests.");
             var model = opts.Model ?? store.Load().Model;
             if (model != OpenAiSpellcheckService.DefaultModel && model != OpenAiSpellcheckService.Gpt54MiniModel)
                 throw new ArgumentException("Use one of the app's supported models.");
@@ -109,6 +116,14 @@ internal static class Program
     }
 
     internal static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+    internal static void VerifyOfflineKeyPath(SettingsStore store, string directory)
+    {
+        var actual = (string?)typeof(SettingsStore).GetField("_apiKeyPath",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(store);
+        var expected = Path.Combine(directory, Path.GetFileName(AppPaths.ApiKeyPath));
+        if (actual is null || !string.Equals(Path.GetFullPath(actual), Path.GetFullPath(expected), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Offline credential destination escaped its run directory; refusing any write.");
+    }
     private static string Git(string args)
     {
         using var p = Process.Start(new ProcessStartInfo("git", args)

@@ -22,7 +22,7 @@ internal sealed class SettingsStore
     {
         _logger = logger;
         _appDataDirectory = appDataDirectory ?? AppPaths.AppDataDirectory;
-        _apiKeyPath = apiKeyPath ?? AppPaths.ApiKeyPath;
+        _apiKeyPath = apiKeyPath ?? Path.Combine(_appDataDirectory, Path.GetFileName(AppPaths.ApiKeyPath));
         _settingsPath = Path.Combine(_appDataDirectory, Path.GetFileName(AppPaths.SettingsPath));
         Directory.CreateDirectory(_appDataDirectory);
     }

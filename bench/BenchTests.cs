@@ -33,6 +33,14 @@ internal static class BenchTests
         logger.FailCurrentTrial(new InvalidOperationException("copy fixture failure"));
         Check(failedFixture.IsFaulted && failedFixture.Exception!.ToString().Contains("copy fixture failure"),
             "fixture UI errors reach the trial instead of a modal dialog or silent timeout");
+        var isolationRoot = Path.Combine("bench", "results", "isolation-tests", Guid.NewGuid().ToString("N"));
+        var isolated = new SettingsStore(logger, isolationRoot, Path.Combine(isolationRoot, Path.GetFileName(AppPaths.ApiKeyPath)));
+        Program.VerifyOfflineKeyPath(isolated, isolationRoot);
+        var misdirected = new SettingsStore(logger, isolationRoot, Path.Combine(isolationRoot, "wrong-key-file.dat"));
+        bool writeRefused = false;
+        try { Program.VerifyOfflineKeyPath(misdirected, isolationRoot); } catch (InvalidOperationException) { writeRefused = true; }
+        Check(writeRefused && !File.Exists(Path.Combine(isolationRoot, "wrong-key-file.dat")),
+            "misdirected offline key path rejected before any write");
         using (var window = new HotkeyWindow("UniversalSpellCheck.Benchmark.Tests." + Guid.NewGuid().ToString("N")))
         {
             int dispatched = 0;
