@@ -1,4 +1,29 @@
-# Resume Hotkey Performance Work After the Rust Port
+# Rust Port and Performance Handoff
+
+## Compaction Handoff — Start Here
+
+- Elliot wants this Windows spell checker ported to Rust for speed, using KISS/MVP judgment; the requested pre-port baseline is finished, and no Rust implementation has started.
+- The current task is cleanup and compaction preparation. Start the port when Elliot resumes with that instruction; do not interpret the historical investigation below as the current task.
+- Continue from the primary checkout's local `main`, which contains the completed benchmark and credential-isolation repair. It was 14 commits ahead of `origin/main` at benchmark completion; this handoff adds another commit. Do not reset to `origin/main` or lose those unpublished changes.
+- The benchmark worktree `codex/rust-baseline` is being archived after its work is committed and fast-forwarded into `main`; use a fresh worktree based on local `main` for the Rust port.
+- Preserve the unrelated `.worktrees/chatgpt-formatting` checkout, other branches, existing backups, user data and installed Prod app. Cleanup is scoped to this benchmark session.
+- Read root `AGENTS.md`, `docs/overview.md`, `docs/architecture.md`, `docs/bench.md`, `docs/model-config.md` and the routed rich-text/formatting documents before implementation. Preserve the select → hotkey → corrected replacement behavior and existing feature contracts.
+- Choose the simplest viable Windows Rust implementation after inspecting the current code; no Rust UI framework or migration architecture has been selected.
+- Verify the Rust toolchain and available disk space first. Elliot is handling the disk-space problem; do not expand the task into general disk cleanup.
+- Keep Prod and Dev channel separation, safe data paths, DPAPI-protected named keys, shared stamped logs, replacements, rich formatting and literal protection intact. Never use production credential storage for offline tests.
+- Installed Prod was restored as version `0.12.3+c370110ec95b5b5f70816e9494a3c2c8dc3f3e76`; PID 31036 was verified after the final run, but recheck current process state before acting. No deployment or publication occurred.
+- Require a fresh explicit idle-desktop window before any future focus/clipboard benchmark. The completed idle window has ended; ordinary coding can proceed without desktop control.
+- Preserve `benchmark_runs/rust-baseline-2026-10-16/` in the primary checkout: `README.md`, `baseline-completion.json`, `post-run-integrity.json`, raw trials, fixtures, frozen Release binaries, repaired source archive and `checksums.json`. These ignored artifacts do not travel with a normal Git checkout.
+- The portable `.dotnet/sdk-runtime` remains available to run/rebuild the C# reference; session FSharp compiler files were removed during the disk-full incident, while the C# compiler and runtime were retained.
+- Canonical live results: `desktop/e2e-space-verified-final`, 100/100 measured replacements and 20/20 warmups; median 996.8639 ms, p95 2,118.2642 ms. Five measured expected-text differences were only trailing list spaces.
+- Canonical local desktop results: `desktop/local-native-final`, 98/100 measured successes and 19/20 warmups; median 370.3875 ms, p95 6,178.29305 ms among successful attempts. Keep clipboard failures in the reliability counts.
+- Canonical compute results: `compute-final-a` and `compute-final-b`, each 200/200 measured successes, medians 0.50595/0.54315 ms. Startup: `startup-final`, ten successes, median 575.4677 ms, p95 708.828935 ms with no cold-cache claim.
+- Most visible latency is API/clipboard work; a faster language alone does not establish a speedup. Compare matched C#/Rust/Rust/C# blocks on this machine, keeping correctness, failures and successful-only timing distributions together.
+- The earlier harness overwrote the active encrypted key with an offline placeholder. The isolation fix is committed, and explicitly approved cached-key recovery restored the credential with HTTP 200 and encrypted readback. Final live/startup runs left encrypted credentials and settings unchanged. Do not repeat recovery or inspect process memory as routine port work.
+- Use only `reference/safe-runner/UniversalSpellCheck.Bench.dll` for the frozen C# benchmark. Older entrypoints remain quarantined as `.UNSAFE-DO-NOT-RUN`; older source archives are historical and must not be executed without the repaired credential guards.
+- All 120 final live developer-evidence completions reported `storage_limit`; match or explicitly record any change to this logging/evidence condition. Synthetic editor checks do not prove visual formatting acceptance in the original browser/editor.
+- Treat `desktop/e2e-native-final` (HTTP 401), `desktop/e2e-recovered-final` (disk-full), earlier fixture diagnostics and `compute-a`/`compute-b` as excluded diagnostics, never canonical latency samples.
+
 
 ## October 16 Baseline Supersedes the Old Comparison Harness
 
@@ -10,7 +35,7 @@
 - Match the recorded logging/evidence condition and retain all failures; the October 10 observations below are historical hypotheses, not a substitute for the new fixed-workload baseline.
 - Free disk space before Rust builds; the completed benchmark left only about 49 MiB free, and an earlier incomplete live attempt stopped on disk-full.
 
-## Read This First
+## Historical October 10 Investigation — After the Port
 
 - Resume the goal of reducing **selected-text hotkey → verified editor replacement by at least 2×**.
 - Treat this as the October 10, 2026 investigation snapshot, not a description of the future Rust implementation.
