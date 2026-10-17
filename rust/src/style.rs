@@ -31,16 +31,8 @@ pub fn font(family: &str, size: u32) -> Result<nwg::Font, nwg::NwgError> {
     Ok(font)
 }
 pub fn icon() -> Result<nwg::Icon, nwg::NwgError> {
-    let mut icon = nwg::Icon::default();
-    let bytes = if crate::channel::IS_DEV {
-        include_bytes!("../../src/Assets/app-dev.ico").as_slice()
-    } else {
-        include_bytes!("../../src/Assets/app.ico").as_slice()
-    };
-    nwg::Icon::builder()
-        .source_bin(Some(bytes))
-        .build(&mut icon)?;
-    Ok(icon)
+    let resources = nwg::EmbedResource::load(None)?;
+    nwg::Icon::from_embed(&resources, Some(1), None)
 }
 pub fn paint_background(
     hwnd: windows_sys::Win32::Foundation::HWND,
@@ -63,6 +55,29 @@ pub const fn raw_handler_id(local: usize) -> usize {
     assert!(local <= 0xFFFF);
     0x10000 + local
 }
+pub fn text_background(dc: HDC) -> isize {
+    static BRUSH: OnceLock<usize> = OnceLock::new();
+    let color = 245 | (241 << 8) | (234 << 16);
+    let brush = *BRUSH.get_or_init(|| unsafe { CreateSolidBrush(color) as usize });
+    unsafe {
+        SetBkColor(dc, color);
+        SetTextColor(dc, 26 | (26 << 8) | (26 << 16));
+    }
+    brush as isize
+}
+
+pub fn dpi_scale() -> f64 {
+    unsafe {
+        let dc = GetDC(null_mut());
+        if dc.is_null() {
+            return 1.0;
+        }
+        let dpi = GetDeviceCaps(dc, LOGPIXELSX as i32);
+        ReleaseDC(null_mut(), dc);
+        f64::from(dpi.max(96)) / 96.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

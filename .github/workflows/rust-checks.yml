@@ -23,6 +23,11 @@ jobs:
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
       - name: Optimized native build
         run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
+      - name: Native tray and resource startup smoke
+        shell: pwsh
+        run: |
+          $env:LOCALAPPDATA=Join-Path $env:RUNNER_TEMP 'usc-rust-startup-smoke'
+          python -c "import subprocess; subprocess.run([r'rust\target\release\universal-spell-check.exe','--startup-smoke'],check=True,timeout=15)"
       - name: Assemble candidate with replacements and font licenses
         run: ./rust/package.ps1 -SkipBuild -Output rust/dist/prod
       - name: Upload candidate

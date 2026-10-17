@@ -498,8 +498,8 @@ impl Ui {
         place!(update_label, 272, 596, 720, 25);
         place!(status, 272, 632, 750, 45);
         for (index, (left, top, width)) in [
-            (272, 100, 720),
-            (272, 165, 720),
+            (272, 100, 400),
+            (272, 165, 400),
             (272, 225, 720),
             (272, 315, 160),
             (272, 365, 160),
@@ -646,8 +646,8 @@ fn render_row(row: &mut Row) {
         "See original"
     });
     if row.original_shown {
-        row.body.append("ORIGINAL TEXT - NOT SPELL-CHECKED\r\n");
-        row.body.append(input);
+        append_text(&row.body, "ORIGINAL TEXT - NOT SPELL-CHECKED\r\n");
+        append_text(&row.body, input);
     } else if row.side_shown {
         if row.secondary.is_none() {
             let mut second = nwg::RichTextBox::default();
@@ -670,10 +670,10 @@ fn render_row(row: &mut Row) {
                 row.secondary = Some(second);
             }
         }
-        row.body.append("ORIGINAL\r\n");
+        append_text(&row.body, "ORIGINAL\r\n");
         if let Some(second) = &row.secondary {
             reset_text(second);
-            second.append("CORRECTED\r\n");
+            append_text(second, "CORRECTED\r\n");
             for edit in diff(
                 &input.encode_utf16().collect::<Vec<_>>(),
                 &output.encode_utf16().collect::<Vec<_>>(),
@@ -698,10 +698,10 @@ fn render_row(row: &mut Row) {
     if row.timing_shown
         && let Some(timings) = row.entry.data["timings"].as_object()
     {
-        row.body.append("\r\n\r\nTIMING\r\n");
+        append_text(&row.body, "\r\n\r\nTIMING\r\n");
         for (k, v) in timings {
             if !v.is_null() {
-                row.body.append(&format!("{k}: {v} ms\r\n"));
+                append_text(&row.body, &format!("{k}: {v} ms\r\n"));
             }
         }
     }
@@ -1073,6 +1073,9 @@ fn run_dashboard(
             if msg == WM_ERASEBKGND {
                 return Some(style::paint_background(hwnd.cast(), w as _));
             }
+            if msg == WM_CTLCOLORSTATIC {
+                return Some(style::text_background(w as _));
+            }
             if msg == WM_DESTROY {
                 unsafe {
                     PostQuitMessage(0);
@@ -1128,8 +1131,9 @@ fn run_dashboard(
             if msg == WM_GETMINMAXINFO {
                 unsafe {
                     let info = &mut *(l as *mut MINMAXINFO);
-                    info.ptMinTrackSize.x = 900;
-                    info.ptMinTrackSize.y = 600;
+                    let scale = style::dpi_scale();
+                    info.ptMinTrackSize.x = (900.0 * scale).round() as i32;
+                    info.ptMinTrackSize.y = (600.0 * scale).round() as i32;
                 }
             }
             None
@@ -1142,6 +1146,9 @@ fn run_dashboard(
         move |hwnd, msg, w, l| {
             if msg == WM_ERASEBKGND {
                 return Some(style::paint_background(hwnd.cast(), w as _));
+            }
+            if msg == WM_CTLCOLORSTATIC {
+                return Some(style::text_background(w as _));
             }
             let ui = weak.upgrade()?;
             if msg == WM_MOUSEWHEEL {
@@ -1317,7 +1324,7 @@ fn reset_text(body: &nwg::RichTextBox) {
 }
 fn append_segment(body: &nwg::RichTextBox, text: &str, kind: Kind) {
     let from = rich_length(body);
-    body.append(text);
+    append_text(body, text);
     let to = rich_length(body);
     body.set_selection(from..to);
     body.set_char_format(&nwg::CharFormat {
@@ -1333,4 +1340,16 @@ fn append_segment(body: &nwg::RichTextBox, text: &str, kind: Kind) {
         }),
         ..Default::default()
     });
+}
+
+fn append_text(body: &nwg::RichTextBox, text: &str) {
+    let end = rich_length(body);
+    let text = crate::store::wide(text);
+    let hwnd = body.handle.hwnd().unwrap().cast();
+    body.set_selection(end..end);
+    unsafe {
+        SendMessageW(hwnd, 0x00CF, 0, 0); // EM_SETREADONLY
+        SendMessageW(hwnd, 0x00C2, 0, text.as_ptr() as isize); // EM_REPLACESEL preserves earlier formatting.
+        SendMessageW(hwnd, 0x00CF, 1, 0);
+    }
 }
