@@ -613,7 +613,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let weak = Rc::downgrade(&state);
     let raw = nwg::bind_raw_event_handler(
         &state.borrow().window.handle,
-        920,
+        crate::style::raw_handler_id(920),
         move |_, message, w, _| {
             let state = weak.upgrade()?;
             let Ok(mut state) = state.try_borrow_mut() else {

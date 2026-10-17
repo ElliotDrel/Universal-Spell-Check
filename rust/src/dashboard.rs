@@ -1066,8 +1066,10 @@ fn run_dashboard(
     let weak = Rc::downgrade(&ui);
     let pending_page_handler = pending_page.clone();
     let pending_update_handler = pending_update.clone();
-    let raw =
-        nwg::bind_raw_event_handler(&ui.borrow().window.handle, 900, move |hwnd, msg, w, l| {
+    let raw = nwg::bind_raw_event_handler(
+        &ui.borrow().window.handle,
+        crate::style::raw_handler_id(900),
+        move |hwnd, msg, w, l| {
             if msg == WM_ERASEBKGND {
                 return Some(style::paint_background(hwnd.cast(), w as _));
             }
@@ -1131,10 +1133,13 @@ fn run_dashboard(
                 }
             }
             None
-        })?;
+        },
+    )?;
     let weak = Rc::downgrade(&ui);
-    let panel_raw =
-        nwg::bind_raw_event_handler(&ui.borrow().panel.handle, 901, move |hwnd, msg, w, l| {
+    let panel_raw = nwg::bind_raw_event_handler(
+        &ui.borrow().panel.handle,
+        crate::style::raw_handler_id(901),
+        move |hwnd, msg, w, l| {
             if msg == WM_ERASEBKGND {
                 return Some(style::paint_background(hwnd.cast(), w as _));
             }
@@ -1176,7 +1181,8 @@ fn run_dashboard(
                 click_row(&ui, l as usize);
             }
             None
-        })?;
+        },
+    )?;
     state.hwnd.store(
         ui.borrow().window.handle.hwnd().unwrap() as usize,
         Ordering::Release,
@@ -1223,20 +1229,24 @@ fn body_handler(
 ) -> Result<nwg::RawEventHandler, nwg::NwgError> {
     let parent = parent.hwnd().unwrap() as usize;
     let copy = copy.hwnd().unwrap() as usize;
-    nwg::bind_raw_event_handler(body, 930, move |_, message, w, l| {
-        if message == WM_MOUSEWHEEL {
-            unsafe {
-                PostMessageW(parent as _, message, w, l);
+    nwg::bind_raw_event_handler(
+        body,
+        crate::style::raw_handler_id(930),
+        move |_, message, w, l| {
+            if message == WM_MOUSEWHEEL {
+                unsafe {
+                    PostMessageW(parent as _, message, w, l);
+                }
+                return Some(0);
             }
-            return Some(0);
-        }
-        if message == WM_LBUTTONUP {
-            unsafe {
-                PostMessageW(parent as _, WM_COMMAND, 0, copy as isize);
+            if message == WM_LBUTTONUP {
+                unsafe {
+                    PostMessageW(parent as _, WM_COMMAND, 0, copy as isize);
+                }
             }
-        }
-        None
-    })
+            None
+        },
+    )
 }
 
 struct CopyJob {

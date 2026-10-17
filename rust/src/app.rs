@@ -293,44 +293,48 @@ pub fn run(
     let raw_updater = updater.clone();
     let update_message =
         unsafe { RegisterWindowMessageW(wide(&channel::update_message()).as_ptr()) };
-    let raw = nwg::bind_raw_event_handler(&ui.window.handle, 910, move |_, msg, w, _| {
-        let ui = weak.upgrade()?;
-        if msg == WM_HOTKEY && w == 1 {
-            if raw_restart.load(Ordering::Acquire) || raw_check.load(Ordering::Acquire) {
-                raw_logger.event("guard_rejected reason=updating");
-            } else {
-                raw_worker.trigger(&raw_logger);
-            }
-            return Some(0);
-        }
-        if msg == update_message {
-            if channel::IS_DEV {
+    let raw = nwg::bind_raw_event_handler(
+        &ui.window.handle,
+        crate::style::raw_handler_id(910),
+        move |_, msg, w, _| {
+            let ui = weak.upgrade()?;
+            if msg == WM_HOTKEY && w == 1 {
+                if raw_restart.load(Ordering::Acquire) || raw_check.load(Ordering::Acquire) {
+                    raw_logger.event("guard_rejected reason=updating");
+                } else {
+                    raw_worker.trigger(&raw_logger);
+                }
                 return Some(0);
             }
-            if !raw_restart.swap(true, Ordering::AcqRel) {
-                ui.tray.show(
-                    "Restarting Universal Spell Check and checking for updates...",
-                    Some("Restarting"),
-                    Some(nwg::TrayNotificationFlags::INFO_ICON),
-                    None,
-                );
-                if !raw_worker.busy.load(Ordering::Acquire) {
-                    raw_updater.check(Trigger::Restart);
+            if msg == update_message {
+                if channel::IS_DEV {
+                    return Some(0);
                 }
+                if !raw_restart.swap(true, Ordering::AcqRel) {
+                    ui.tray.show(
+                        "Restarting Universal Spell Check and checking for updates...",
+                        Some("Restarting"),
+                        Some(nwg::TrayNotificationFlags::INFO_ICON),
+                        None,
+                    );
+                    if !raw_worker.busy.load(Ordering::Acquire) {
+                        raw_updater.check(Trigger::Restart);
+                    }
+                }
+                return Some(1);
             }
-            return Some(1);
-        }
-        if msg == WM_TIMER && w == 1 {
-            let phase = raw_phase.borrow();
-            ui.overlay_text.set_text(&format!(
-                "{}     {:.1}s",
-                phase.0,
-                phase.1.elapsed().as_secs_f64()
-            ));
-            return Some(0);
-        }
-        None
-    })?;
+            if msg == WM_TIMER && w == 1 {
+                let phase = raw_phase.borrow();
+                ui.overlay_text.set_text(&format!(
+                    "{}     {:.1}s",
+                    phase.0,
+                    phase.1.elapsed().as_secs_f64()
+                ));
+                return Some(0);
+            }
+            None
+        },
+    )?;
     unsafe {
         if RegisterHotKey(
             hwnd.cast(),

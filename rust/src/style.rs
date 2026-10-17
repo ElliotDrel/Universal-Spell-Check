@@ -57,3 +57,18 @@ pub fn paint_background(
     }
     1
 }
+
+// NWG owns IDs through 0xFFFF; all application subclasses use the next range.
+pub const fn raw_handler_id(local: usize) -> usize {
+    assert!(local <= 0xFFFF);
+    0x10000 + local
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn application_handlers_are_outside_nwg_reserved_range() {
+        for local in [0, 900, 901, 910, 920, 930, 0xFFFF] {
+            assert!(super::raw_handler_id(local) > 0xFFFF);
+        }
+    }
+}
