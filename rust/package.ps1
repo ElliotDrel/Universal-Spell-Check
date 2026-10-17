@@ -20,4 +20,5 @@ Copy-Item -LiteralPath (Join-Path $repo 'replacements.json') -Destination $Outpu
 $licenses=Join-Path $Output 'licenses'
 New-Item -ItemType Directory -Path $licenses | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets') -Filter '*OFL*' | Copy-Item -Destination $licenses
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor/native-windows-gui/LICENSE') -Destination (Join-Path $licenses 'native-windows-gui-MIT.txt')
 Write-Output "Prepared local candidate: $Output"

@@ -405,6 +405,7 @@ impl Ui {
             .position((110, 0))
             .size((560, 100))
             .readonly(true)
+            .limit(128 * 1024)
             .font(Some(&self.body_font))
             .flags(
                 nwg::RichTextBoxFlags::VISIBLE
@@ -654,6 +655,7 @@ fn render_row(row: &mut Row) {
             if nwg::RichTextBox::builder()
                 .parent(row.parent)
                 .readonly(true)
+                .limit(128 * 1024)
                 .size((300, 100))
                 .flags(
                     nwg::RichTextBoxFlags::VISIBLE
@@ -724,7 +726,7 @@ fn run_dashboard(
     nwg::Window::builder()
         .title(crate::channel::DISPLAY_NAME)
         .size((1100, 720))
-        .position((160, 120))
+        .center(true)
         .flags(nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE)
         .icon(Some(&icon))
         .build(&mut window)?;
@@ -1135,6 +1137,7 @@ fn run_dashboard(
                     info.ptMinTrackSize.x = (900.0 * scale).round() as i32;
                     info.ptMinTrackSize.y = (600.0 * scale).round() as i32;
                 }
+                return Some(0);
             }
             None
         },

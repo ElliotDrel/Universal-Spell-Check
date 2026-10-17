@@ -33,3 +33,6 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 panic = "unwind"
+
+[patch.crates-io]
+native-windows-gui = { path = "vendor/native-windows-gui" }
