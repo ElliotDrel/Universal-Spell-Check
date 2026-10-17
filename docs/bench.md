@@ -268,4 +268,36 @@ Sequential `compute-abba-02` used the frozen safe C# runner and optimized Rust c
 
 These component medians improved 2.21–2.73 times; Rust tail latency did not improve. This establishes neither an end-to-end speedup nor statistical significance. All 131 baseline hashes, settings and encrypted key hashes were unchanged. Final Release differential formatting passed 76/76 original C# cases.
 
-Exclude `compute-abba-01`: the initial PowerShell wrapper did not wait for GUI-subsystem native executables, allowing possible overlap. The repaired wrapper explicitly waits for each process and drains stdout/stderr concurrently. Keep the failed-method diagnostics. Desktop, startup and visual acceptance remain pending an explicitly idle computer.
+Exclude `compute-abba-01`: the initial PowerShell wrapper did not wait for GUI-subsystem native executables, allowing possible overlap. The repaired wrapper explicitly waits for each process and drains stdout/stderr concurrently. Keep the failed-method diagnostics. Desktop, startup and visual acceptance were pending at this earlier checkpoint; the completed results below supersede that status.
+
+
+### Final Rust desktop/startup checkpoint, October 17, 2026
+
+User-authorized idle-desktop testing completed. Canonical ignored artifacts are under primary `benchmark_runs/rust-port/`; preserve `README.md`, `final-results.json`, raw trials, manifests, failures and integrity reports. The measured optimized candidate is `candidate-prod-final`, app code through `3f60b70`, executable SHA-256 `541AB7110BFB2E8C030B6D1C74567B4FC0CE5761502095B4BD30328A4A08E27E`.
+
+Each desktop block used ten cases, three measured trials and one warmup per case in C#/Rust/Rust/C# order. Every block passed 30/30 measured replacements and 10/10 warmups, verified against actual native editor completion. All 320 developer-evidence completions reported `storage_limit`, matching the reference store condition. Expected-text differences were only the known two rich-list spaces before LF.
+
+| Mode / block | Median total ms | p95 total ms |
+|---|---:|---:|
+| Local C# A | 256.634 | 271.355 |
+| Local Rust A | 89.136 | 99.423 |
+| Local Rust B | 87.026 | 97.135 |
+| Local C# B | 262.748 | 269.932 |
+| Live C# A | 1094.421 | 1736.269 |
+| Live Rust A | 888.976 | 1448.907 |
+| Live Rust B | 838.941 | 1494.596 |
+| Live C# B | 1079.575 | 1485.474 |
+
+Local median ratios are 2.88/3.02. Live ratios are 1.23/1.29, or 18.8%/22.3% less elapsed time. Live p95 improved in pair A and was slightly worse in pair B. These are observed block differences, not significance tests; API variation cannot all be attributed to the port.
+
+`startup-abba-final-02` used three launches per block, six per implementation: median C# A/B 596.056/636.925 ms, Rust A/B 80.587/75.606 ms. The process-to-ready boundary excludes installed update checks and automatic dashboard rendering; caches remain warm. Preserve first launches separately.
+
+`startup-abba-final` is an excluded helper diagnostic: implicit JSON DateTime conversion lost fractional seconds during reparse and rejected a valid same-second readiness event. Preserve ISO strings with `ConvertFrom-Json -DateKind String` before `DateTimeOffset.Parse`.
+
+`compute-abba-final` passed all 200 measured frozen-output/mapping checks and 20 warmups per block. C# A/B medians 0.28190/0.23405 ms and p95 1.18511/1.301635 ms; Rust A/B medians 0.09175/0.14525 ms and p95 1.17747/1.27845 ms. All blocks retain 180/200 handwritten expected-text matches because of identical frozen list spacing.
+
+Keep the original 50 ms clipboard publication settling interval. Zero-delay `local-abba-01` speed claims are superseded after live paste failures; incomplete `e2e-abba-01`, `e2e-abba-02` and focused diagnostics are excluded. Moving developer readback before injection removed one contention risk but did not alone resolve all failures. Forty focused settled live attempts passed before final matched runs; their timings overlap compilation and are not canonical.
+
+Final Dev/Prod configurations each pass 19 unit tests and one GDI integration test. Format, both Clippy configurations and all 76 optimized C# formatting parity cases pass; upstream vendor warnings remain. Native Chrome acceptance includes physical hotkey, plain/unchanged paste, an instrumented formatted copy producer, no-selection and overlap guards. It does not prove original Google Docs/ChatGPT rendering or OS clipboard-history retention, and fixture elapsed fields include observation delays.
+
+All 131 frozen baseline hashes, settings and encrypted credential bytes remain unchanged. Installed C# v0.12.3 is restored; task browser windows/server are closed. No Rust installation, publication or installed updater validation occurred. Future focus/clipboard tests require a new idle-desktop authorization.

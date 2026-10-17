@@ -237,3 +237,6 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 - Verify developer clipboard readback synchronously before input injection with a single non-waiting open attempt. A post-input reader can lock the clipboard while the target attempts to paste. Persist full verification payloads only in evidence sidecars and retain summary metadata inline. This is publication verification, not proof the target rendered the text.
 - Treat WinHTTP send/receive subphases as callback completion intervals, not directly comparable wire-upload/server-processing phases. Use whole `request_ms` for C#/Rust API comparisons.
+
+- Use NWG's embedded-resource icon path and the local high-DPI screen-DC release patch (`rust/vendor/native-windows-gui/PROVENANCE.md`). The app uses native controls with a dedicated dashboard thread; no webview or renderer is loaded.
+- Append dashboard diff text with native `EM_REPLACESEL`; NWG's convenience append replaces all text and erases previously applied diff styles. Bound previews and retain full copied output. Minimum dashboard tracking size scales 900 by 600 logical pixels to the active DPI.

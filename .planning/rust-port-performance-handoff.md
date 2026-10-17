@@ -1,38 +1,53 @@
 # Rust Port and Performance Handoff
 
-## Active Rust Port — October 17
+## Active Rust Port - October 17, 2026
 
-- Continue in the attached worktree `C:/Users/2supe/.codex/worktrees/rust-port/Universal Spell Check`, branch `codex/rust-port`, based on the primary checkout's local `main` at `8c919a7`.
-- Preserve primary `main` and its fifteen unpublished baseline commits; do not reset it to `origin/main`.
-- Preserve the ignored C# baseline package in the primary checkout and the unrelated `.worktrees/chatgpt-formatting` checkout.
-- Find the Rust implementation, native GUI, worker, native async WinHTTP, clipboard/keyboard/DPAPI, updater, developer evidence and benchmark in `rust/`.
-- Keep the deployed C# app running until the authorized desktop/startup comparison; no Rust installation or publication has occurred.
-- Use `claude -p --safe-mode --model claude-opus-5-5 --effort medium --tools '' --strict-mcp-config --no-session-persistence` for the requested thinking/adversarial partner. Supply bounded code through stdin; save reports under primary `benchmark_runs/rust-port/`. The first consultation with normal hooks produced an irrelevant follow-up, so later reviews disable hooks.
-- Read `rust/AGENTS.md`, the Rust sections of `docs/architecture.md` and `docs/bench.md`, and current Git status before continuing.
-- Preserve reports in primary `benchmark_runs/rust-port/`: `parity-a/` recorded 76 calls from the existing C# formatting tests; `parity-b.json` verified all 76 exact matches. Synthetic expected outputs are also committed as Rust golden fixtures.
-- Require a fresh explicitly idle desktop before any focus/clipboard test. The previous idle window ended; no Rust desktop benchmark has run.
-- Treat this active section as superseding the cleanup-only instructions below; keep the historical C# baseline and performance investigation intact.
+This section supersedes the historical cleanup and pre-port instructions below.
 
-### Verified candidate checkpoint
+- Continue in `C:/Users/2supe/.codex/worktrees/rust-port/Universal Spell Check`, branch `codex/rust-port`, based on primary local `main` at `8c919a7`. Preserve main's fifteen unpublished baseline commits, the frozen baseline, backups, and unrelated formatting worktree.
+- The native Rust implementation is in `rust/`. Read `rust/AGENTS.md`, `docs/architecture.md`, `docs/bench.md`, and Git status before continuing. The installed product remains C#; no Rust installation or publication is authorized by this test run.
+- Use KISS/MVP judgment. Native Windows controls, clipboard, `SendInput`, DPAPI, and asynchronous WinHTTP implement the app without a web renderer. Channel constants still come from `src/BuildChannel.cs` at build time.
+- Requested thinking/adversarial reviews used `claude -p --safe-mode --model claude-opus-5-5 --effort medium --tools '' --strict-mcp-config --no-session-persistence`. Reports are retained under primary `benchmark_runs/rust-port/claude-*-review*.json`; normal hooks in the first report caused an irrelevant follow-up, so later reviews disable hooks.
+- The completed desktop window was explicitly authorized by Elliot's `run tests now`. Desktop automation has ended and installed C# is restored. Require fresh idle authorization in a later turn.
 
-- Native app milestone: `c61207b`; benchmark process-wait repair: `6e04289`. Keep working on `codex/rust-port` in the attached Rust worktree.
-- Both Dev and Prod pass 18 Rust tests. Formatting and both Clippy configurations pass with warnings denied. The final optimized executable matches all 76 newly recorded C# formatting calls exactly (`parity-final-release/report.json`) and all ten frozen processing fixtures.
-- Candidate is at primary `benchmark_runs/rust-port/candidate-prod/`: 7,472,128-byte `UniversalSpellCheck.exe`, replacements, and three font licenses. SHA-256: `02409a8050fa0fe00affa0b7f6f6674962930c26e0a5727a24328502b9315cc1`. It is a static-CRT production-channel candidate, not an installation or release.
-- Valid sequential comparison is `benchmark_runs/rust-port/compute-abba-02/`: C#/Rust/Rust/C#, each 200/200 measured and 20/20 warmup frozen-output checks. C# median 0.26205/0.26515 ms, Rust 0.11835/0.09715 ms. Rust p95 1.208485/2.255075 ms versus C# 1.11392/1.135035 ms: median improved, tail did not. Do not extrapolate a desktop speedup.
-- All blocks retain 180/200 matches to hand-written expected text: the same frozen rich-list response has two spaces before LF. Preserve this difference; all 200 outputs and rich mappings match the frozen reference.
-- `compute-abba-01` is excluded: PowerShell's call operator returned before GUI-subsystem executables exited, so blocks could overlap. The repaired wrapper uses `ProcessStartInfo.ArgumentList`, concurrent stdout/stderr draining and `WaitForExit`. Preserve the excluded diagnostics.
-- All 131 frozen baseline checksums match. Valid comparison verified settings and encrypted credentials unchanged. `release-cli-guards.json` proves the Release desktop CLI refuses missing `--allow-desktop`; it also exercises JSON CLI without desktop access.
-- Final Claude reports: `claude-core-review-clean.json`, `claude-integration-review.json`, `claude-gui-review.json`. Confirmed issues were repaired. Retain conservative evidence reservation-before-write to match C#; do not adopt a reviewer suggestion that would weaken the shared quota. Terminal comparison keeps existing C# semantics. Direct Win32 clipboard writes do not require STA, but dashboard initialization is consistent with the other native threads.
-- A deadline regression initially failed its 150 ms elapsed-time assertion during a concurrent optimized build. It now asserts the timeout result and asynchronous callback-state release; the OS scheduler is measured by benchmarks, not a narrow unit-test timing threshold.
+### Candidate and correctness
 
-### Next authorized desktop window
+- Native GUI/resource fixes through `3f60b70` are packaged in primary `benchmark_runs/rust-port/candidate-prod-final/`. Earlier candidate folders are marked superseded. Static CRT, replacements, three font licenses and NWG MIT license are packaged. No production release has occurred.
+- Dev and Prod each pass 19 unit tests plus one GDI integration test, covering ten frozen processing fixtures and 76 C# rich-formatting cases. Format and both Clippy configurations pass; existing upstream vendor warnings remain. The final optimized candidate again matched all 76 recorded C# cases exactly (`final-regressions/release-parity.json`).
+- Every final timing block must match settings, prompt, cases, developer logging and shared evidence-store quota. Use only the frozen `reference/safe-runner/UniversalSpellCheck.Bench.dll`, never quarantined older runners.
+- `bench/compare-rust.ps1` waits for actual native process exit with `ProcessStartInfo` and drains stdout/stderr concurrently. `compute-abba-01` is excluded because the old PowerShell invocation could overlap GUI-subsystem children.
 
-1. End the current turn before taking focus or touching the clipboard. Ask Elliot to reply `Run` when idle. No Rust GUI, clipboard benchmark, native editor acceptance, browser formatting acceptance, or startup comparison has run yet.
-2. Read the current installed process path and settings/key hashes. Installed C# Prod was still running at checkpoint; PID 18020 is only a snapshot. No Rust process remains running.
-3. Use `bench/compare-rust.ps1 -Mode local -AllowDesktop` and then `-Mode e2e -AllowDesktop`, with explicit candidate, safe frozen runner, portable dotnet, primary baseline, real data directory and fresh output directories. Match developer logging and the full shared evidence quota. Stop if clipboard/foreground/fixture safety aborts; retain every failure.
-4. Run matched startup readiness with `bench/measure-startup.ps1` (stop and restore only the exact installed executable in `finally`). Check its arguments before use; never remove the first-run registration flag.
-5. Launch the rebuilt Rust Dev candidate for visual/native acceptance without replacing Prod. Check tray, lazy dashboard, minimum-size layout, large-corpus first page and paging, multi-line and side-by-side diff colors, copy feedback, settings/key isolation, progress overlay, no-selection and overlap guards, actual browser/Docs formatting, and foreground-at-paste behavior. Preserve real credentials and backups. CLI offline transforms are not visual acceptance.
-6. Rebuild after fixes, rerun relevant regressions and affected measurements, then update this checkpoint. Change production packaging/install only after acceptance and the user's release instruction.
+### Desktop failures repaired
+
+- NWG reserves raw handler IDs through `0xFFFF`; application handlers use `style::raw_handler_id` above that range. A real startup smoke caught this panic, which pure processing tests missed.
+- Immediate post-input developer clipboard readback could contend with the target paste. It now runs once, without waiting, before injection; full bytes live in sidecars. This verifies publication, not rendering. Moving the reader alone did not fix every missed paste.
+- Zero-delay clipboard publication still produced unchanged editors with corrected clipboard bytes and full source selection. The exact external contention source is unproven. Retain the original C# 50 ms settling interval, implemented as a full pumping deadline; never blindly repaste. Forty focused live attempts then passed. Their timing is diagnostic because compilation overlapped that run.
+- Exclude incomplete `e2e-abba-01`, `e2e-abba-02`, and zero-delay paste diagnostics from final timing. `local-abba-01` passed but its zero-delay binary subsequently failed live tests, so its roughly tenfold speedup is superseded.
+- Startup uses the embedded PE icon resource; NWG binary icon decoding requires an optional feature and previously panicked. CI now executes optimized `--startup-smoke` in isolated app data.
+- Dashboard diffs append through `EM_REPLACESEL` to preserve earlier formatting; the NWG convenience append erased previous spans. Model labels no longer cover the selector; the window centers and scales its 900 by 600 logical minimum.
+- NWG 1.0.13 leaked a screen DC on each DPI query. The narrow vendor patch releases it. Primitive reproduction leaked 100 objects without release and zero with release; final dashboard GDI counts remained 85 across three resize cycles. Regression checks 100 actual library calls. Keep provenance, license and upstream issue with the vendor; do not edit unrelated upstream code.
+
+### Native acceptance and limits
+
+- Actual Chrome paste tests passed plain correction, a ProseMirror-style formatted sample preserving bold/link, unchanged-text paste, no-selection recovery, overlap rejection, and physical Ctrl+Alt+U with Chrome retaining focus.
+- The browser fixture uses an explicit copy producer and real Chrome paste/render. It is not acceptance in original ChatGPT or Google Docs. Its elapsed fields include observation delays and are not timing evidence.
+- Dashboard checks passed Home/Settings, masked keys without editing them, diff color/strikeout, output copy, separate side-by-side controls, timing expansion, initial 30-entry page and scrolling into the next page. The model selector is present at the minimum physical 1125 by 750 size on this display. Activity refresh is explicit; no automatic watcher is claimed.
+- Original-editor visual acceptance, OS Win+V retention, installed updater/release behavior, and wider-machine acceptance remain unverified. Do not equate clipboard payload tests with those checks.
+
+### Final matched measurements
+
+All final results are under primary `benchmark_runs/rust-port/`; `README.md` and `final-results.json` summarize the raw blocks.
+
+- `candidate-prod-final/UniversalSpellCheck.exe`: 7,430,656 bytes; SHA-256 `541AB7110BFB2E8C030B6D1C74567B4FC0CE5761502095B4BD30328A4A08E27E`. App code is through `3f60b70`; subsequent startup-helper fix `80ac2e4` does not change this executable.
+- `local-abba-final`: C#/Rust/Rust/C#, each 30/30 measured and 10/10 warmup verified pastes. Median C# 256.634/262.748 ms versus Rust 89.136/87.026 ms; matched ratios 2.88/3.02. Local p95 C# 271.355/269.932 versus Rust 99.423/97.135 ms.
+- `e2e-abba-final`: same counts/order and live API, every actual paste passed. Median C# 1094.421/1079.575 ms versus Rust 888.976/838.941 ms; 18.8%/22.3% less elapsed time (1.23/1.29 times faster). Live p95 C# 1736.269/1485.474 versus Rust 1448.907/1494.596 ms. Do not claim consistent tail improvement, significance, or that all API variation is a language effect.
+- All 320 local/live developer-evidence completions reported `storage_limit`, matching the full shared store. C# completion records use `developer_evidence`; Rust completion records use `reference`; both statuses were inspected through the approved log reader. Expected-text differences were only the known rich-list trailing spaces.
+- `startup-abba-final-02`: three samples per block, six per implementation. Median C# 596.056/636.925 ms versus Rust 80.587/75.606 ms. Warm-cache OS-process-to-ready boundary excludes installed updater and automatic dashboard rendering. Preserve every individual launch; no cold-boot claim.
+- `startup-abba-final` is excluded. PowerShell implicitly converted ISO JSON timestamps to DateTime, then lost fractional seconds when reparsing; a real same-second ready milestone fell before its recorded launch. The helper now uses `ConvertFrom-Json -DateKind String` so precision and offsets survive.
+- `compute-abba-final`: 200/200 measured frozen-output/mapping checks plus 20/20 warmups per block. Median C# 0.28190/0.23405 ms versus Rust 0.09175/0.14525 ms. p95 C# 1.18511/1.301635 versus Rust 1.17747/1.27845 ms. All blocks retain 180/200 handwritten expected-text matches because of the identical frozen list spaces.
+- `post-test-integrity.json`: all 131 baseline hashes, settings and encrypted credentials unchanged. Installed C# Prod v0.12.3 (`c370110ec95b5b5f70816e9494a3c2c8dc3f3e76`) restored and verified running, PID 5600 at closeout. Recheck PID in later turns.
+- Both task Chrome fixture windows and their loopback server are closed. No Rust GUI/benchmark/Claude/compiler remains running. Preserve the ignored browser profile and diagnostic artifacts, including any backups.
+- Original Google Docs/ChatGPT visual acceptance and installed updater/release validation remain pending. The candidate is tested, portable and reviewable; deployment still requires the user's release instruction.
 
 ## Completed Baseline Handoff
 
