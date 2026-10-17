@@ -223,3 +223,14 @@ NWG reserves raw event-handler IDs through `0xFFFF`. Application handlers must c
 NWG 1.0.13's high-DPI helper acquired a screen DC on every query without releasing it. Real dashboard resizing increased GDI objects on every layout. The narrowly patched local dependency releases that DC; `rust/tests/dpi_resources.rs` checks 100 real library queries. Repeated final dashboard resize checks stayed at 85 GDI objects. Keep the vendor override until an upstream release contains this fix; provenance and license sources are recorded with the vendor.
 
 Use embedded PE icon resources at startup. NWG `source_bin` requires its optional image decoder and panics without it. CI runs the optimized executable's isolated `--startup-smoke`, since non-GUI processing tests cannot catch tray construction failures.
+
+
+## Downloaded updates must survive feed unavailability
+
+Rust Restart previously invoked only `Update.exe start` even when a verified package was already downloaded. With automatic staged application disabled, an unavailable launch feed left the old version running. Restart now applies the in-memory pending target or the SDK's cached pending package before falling back to a plain restart. The isolated updater acceptance cycle must hide its feed index after download and require the new version to start offline.
+
+## Ancillary clipboard reads are best-effort
+
+Require valid Unicode and one consistent clipboard sequence. Read HTML, RTF and native Docs MIME independently; an optional format exceeding its cap or failing to render must not abort otherwise usable text. Preserve `ok`, `absent`, `too_large` and `read_failed` statuses in diagnostics. A regression covers optional failure-to-fallback policy without touching the clipboard; original-editor tests still establish the visual result.
+
+The native HTTP timeout mock permits connection reset/abort only in its intentional cancellation scenario. A deadline can close the client before the server finishes reading headers; that expected cancellation must not panic the server thread or mask the actual deadline/lifetime assertions. The normal mock HTTP success path remains strict.

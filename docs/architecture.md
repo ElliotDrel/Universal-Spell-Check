@@ -240,3 +240,11 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 - Use NWG's embedded-resource icon path and the local high-DPI screen-DC release patch (`rust/vendor/native-windows-gui/PROVENANCE.md`). The app uses native controls with a dedicated dashboard thread; no webview or renderer is loaded.
 - Append dashboard diff text with native `EM_REPLACESEL`; NWG's convenience append replaces all text and erases previously applied diff styles. Bound previews and retain full copied output. Minimum dashboard tracking size scales 900 by 600 logical pixels to the active DPI.
+
+
+### Acceptance-only updater build
+
+- Compile `acceptance` only with `--no-default-features`. Bind a canonical root and one whitelisted prerelease version at build time; ordinary builds always use the existing GitHub source and channel behavior.
+- Generate the QA package/mutex/display identity from `BuildChannel.cs`. Disable correction-hotkey registration and startup-registry writes for QA; retain the same updater worker, download/apply/restart logic and native dashboard.
+- Validate canonical executable, data/log, feed and updater paths before bootstrap or restart forwarding. Validate the installed package ID before creating the private FileSource manager. Keep synthetic data outside the test install directory, and preserve production settings, credentials and startup registration.
+- Run installed acceptance only after explicit idle authorization. The complete preparation and authorized run sequence are in `docs/bench.md`; `bench/prepare-rust-acceptance.py` only builds/packages, while mutation helpers require `--allow-desktop`.

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "targets": [
+    "Google Docs",
+    "ChatGPT composer"
+  ],
+  "implementations": [
+    "frozen C# control",
+    "reviewed Rust candidate"
+  ],
+  "cases": [
+    {
+      "id": "plain-literals",
+      "html": "<p>This is a tset. Visit https://example.com/reprot and keep C:\\USC-Acceptance\\draft.txt unchanged.</p>",
+      "expected_text": "This is a test. Visit https://example.com/reprot and keep C:\\USC-Acceptance\\draft.txt unchanged.",
+      "verify": [
+        "Correct tset to test",
+        "Preserve URL and Windows path literally",
+        "Replace once without focus loss"
+      ]
+    },
+    {
+      "id": "inline-formatting",
+      "html": "<p>This is a <strong>tset</strong> with <em>italic text</em> and a <a href=\"https://example.com/acceptance\">lnik</a>.</p>",
+      "expected_text": "This is a test with italic text and a link.",
+      "verify": [
+        "Keep corrected test bold",
+        "Keep italic text italic",
+        "Keep corrected link clickable with the exact source href",
+        "Keep one paragraph"
+      ]
+    },
+    {
+      "id": "heading-nested-list",
+      "html": "<h2>Project notes</h2><ul><li>Fix teh first item.</li><li>Keep the parent item.<ul><li>Check teh nested item.</li></ul></li><li>Keep the final item.</li></ul>",
+      "expected_text": "Project notes\nFix the first item.\nKeep the parent item.\nCheck the nested item.\nKeep the final item.",
+      "verify": [
+        "Keep heading style",
+        "Keep list markers and nesting levels",
+        "Keep paragraph order and count",
+        "Keep final item and no extra blank paragraph"
+      ]
+    },
+    {
+      "id": "unchanged-formatted",
+      "html": "<p>This sentence is <strong>already correct</strong>, with a <a href=\"https://example.com/acceptance\">link</a>.</p>",
+      "expected_text": "This sentence is already correct, with a link.",
+      "verify": [
+        "Paste unchanged output once",
+        "Keep bold and exact link href",
+        "Do not duplicate or drop content"
+      ]
+    }
+  ],
+  "pass_rule": "Verify actual editor rendering against its own seeded state and the C# control. Log success or exact clipboard readback alone does not pass acceptance."
+}

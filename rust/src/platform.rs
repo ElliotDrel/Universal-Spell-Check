@@ -48,7 +48,7 @@ pub fn open(path: impl AsRef<Path>) {
     }
 }
 pub fn startup(enabled: bool) -> Result<(), String> {
-    if channel::IS_DEV {
+    if channel::IS_DEV || cfg!(feature = "acceptance") {
         return Ok(());
     }
     unsafe {

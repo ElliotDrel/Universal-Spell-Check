@@ -14,7 +14,9 @@ use std::{
     thread,
     time::Duration,
 };
-use velopack::{UpdateCheck, UpdateInfo, UpdateManager, sources::GithubSource};
+#[cfg(not(feature = "acceptance"))]
+use velopack::sources::GithubSource;
+use velopack::{UpdateCheck, UpdateInfo, UpdateManager};
 #[derive(Clone, Copy, Debug)]
 pub enum Trigger {
     Launch,
@@ -43,15 +45,20 @@ impl Updater {
         let queued = restart_queued.clone();
         let status = state.clone();
         thread::Builder::new().name("updates".into()).spawn(move||{
-            let manager=if channel::IS_DEV{None}else{std::panic::catch_unwind(||UpdateManager::new(GithubSource::new("https://github.com/ElliotDrel/Universal-Spell-Check",None,false),None,None)).ok().and_then(Result::ok)};
+            let manager=if channel::IS_DEV{None}else{std::panic::catch_unwind(new_manager).ok().and_then(Result::ok)};
             let mut pending:Option<Box<UpdateInfo>>=None;
             loop{
                 let trigger=match rx.recv_timeout(Duration::from_secs(4*60*60)){Ok(trigger)=>trigger,Err(mpsc::RecvTimeoutError::Timeout)=>Trigger::Periodic,Err(_)=>break};active.store(true,Ordering::Release);
                 let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||->Result<(),String>{
                     let Some(manager)=manager.as_ref()else{if matches!(trigger,Trigger::Restart){return Err("Restart updates require an installed production app.".into());}return Ok(());};
                     if matches!(trigger,Trigger::Restart){
-                        let locator=velopack::locator::auto_locate_app_manifest(velopack::locator::LocationContext::FromCurrentExe).map_err(|e|e.to_string())?;
-                        restart_command(&locator.get_update_path(),std::process::id()).spawn().map_err(|e|e.to_string())?;
+                        let downloaded=pending.as_ref().map(|u|u.TargetFullRelease.clone()).or_else(||manager.get_update_pending_restart());
+                        if let Some(update)=downloaded {
+                            manager.wait_exit_then_apply_updates(&update,true,true,Vec::<String>::new()).map_err(|e|e.to_string())?;
+                        } else {
+                            let locator=velopack::locator::auto_locate_app_manifest(velopack::locator::LocationContext::FromCurrentExe).map_err(|e|e.to_string())?;
+                            restart_command(&locator.get_update_path(),std::process::id()).spawn().map_err(|e|e.to_string())?;
+                        }
                         bus.send(UiEvent::ReadyToExit);return Ok(());
                     }
                     *status.lock().unwrap_or_else(|p|p.into_inner())="Checking for updates...".into();bus.send(UiEvent::Update("Checking for updates...".into()));
@@ -106,6 +113,33 @@ impl Updater {
         }
         true
     }
+}
+fn new_manager() -> Result<UpdateManager, velopack::Error> {
+    #[cfg(feature = "acceptance")]
+    {
+        crate::acceptance::validate().map_err(velopack::Error::Other)?;
+        let locator = velopack::locator::auto_locate_app_manifest(
+            velopack::locator::LocationContext::FromCurrentExe,
+        )?;
+        crate::acceptance::validate_install(&locator).map_err(velopack::Error::Other)?;
+        UpdateManager::new(
+            velopack::sources::FileSource::new(
+                std::path::Path::new(channel::ACCEPTANCE_ROOT).join("feed"),
+            ),
+            None,
+            None,
+        )
+    }
+    #[cfg(not(feature = "acceptance"))]
+    UpdateManager::new(
+        GithubSource::new(
+            "https://github.com/ElliotDrel/Universal-Spell-Check",
+            None,
+            false,
+        ),
+        None,
+        None,
+    )
 }
 fn restart_command(path: &Path, pid: u32) -> std::process::Command {
     use std::os::windows::process::CommandExt;

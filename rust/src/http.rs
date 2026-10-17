@@ -467,7 +467,10 @@ mod tests {
         io::{Read, Write},
         net::TcpListener,
     };
-    fn local_request(delay: Duration) -> (Request, Handle, Handle, std::thread::JoinHandle<()>) {
+    fn local_request(
+        delay: Duration,
+        allow_disconnect: bool,
+    ) -> (Request, Handle, Handle, std::thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         listener.set_nonblocking(true).unwrap();
@@ -492,7 +495,20 @@ mod tests {
             let mut received = Vec::new();
             let mut b = [0; 1024];
             while !received.windows(4).any(|s| s == b"\r\n\r\n") {
-                let n = stream.read(&mut b).unwrap();
+                let n = match stream.read(&mut b) {
+                    Ok(n) => n,
+                    Err(error)
+                        if allow_disconnect
+                            && matches!(
+                                error.kind(),
+                                std::io::ErrorKind::ConnectionReset
+                                    | std::io::ErrorKind::ConnectionAborted
+                            ) =>
+                    {
+                        return;
+                    }
+                    Err(error) => panic!("Mock HTTP read failed: {error}"),
+                };
                 if n == 0 {
                     return;
                 }
@@ -509,7 +525,20 @@ mod tests {
                 })
                 .unwrap_or(0);
             while received.len() < header_end + length {
-                let n = stream.read(&mut b).unwrap();
+                let n = match stream.read(&mut b) {
+                    Ok(n) => n,
+                    Err(error)
+                        if allow_disconnect
+                            && matches!(
+                                error.kind(),
+                                std::io::ErrorKind::ConnectionReset
+                                    | std::io::ErrorKind::ConnectionAborted
+                            ) =>
+                    {
+                        return;
+                    }
+                    Err(error) => panic!("Mock HTTP read failed: {error}"),
+                };
                 if n == 0 {
                     return;
                 }
@@ -547,7 +576,7 @@ mod tests {
     }
     #[test]
     fn native_async_reads_mock_http() {
-        let (mut request, _connection, _session, server) = local_request(Duration::ZERO);
+        let (mut request, _connection, _session, server) = local_request(Duration::ZERO, false);
         let deadline = Instant::now() + Duration::from_secs(2);
         request.send(deadline).unwrap();
         assert_eq!(request.receive(deadline).unwrap(), 200);
@@ -562,7 +591,7 @@ mod tests {
     #[test]
     fn native_timeout_keeps_state_alive_until_handle_closes() {
         let (mut request, _connection, _session, server) =
-            local_request(Duration::from_millis(200));
+            local_request(Duration::from_millis(200), true);
         let weak = Arc::downgrade(&request.state);
         let started = Instant::now();
         let deadline = started + Duration::from_millis(20);

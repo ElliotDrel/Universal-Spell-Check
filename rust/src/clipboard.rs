@@ -20,6 +20,9 @@ pub struct Clipboard {
     pub native: Vec<u8>,
     pub formats: String,
     pub sequence: u32,
+    pub html_status: &'static str,
+    pub rtf_status: &'static str,
+    pub native_status: &'static str,
 }
 struct Open;
 impl Drop for Open {
@@ -123,6 +126,14 @@ fn bytes(format: u32, limit: usize) -> Result<Vec<u8>, String> {
         Ok(result)
     }
 }
+fn optional_format(result: Result<Vec<u8>, String>) -> (Vec<u8>, &'static str) {
+    match result {
+        Ok(data) if data.is_empty() => (data, "absent"),
+        Ok(data) => (data, "ok"),
+        Err(error) if error == "Clipboard format exceeds size limit" => (Vec::new(), "too_large"),
+        Err(_) => (Vec::new(), "read_failed"),
+    }
+}
 fn utf8(bytes: Vec<u8>) -> String {
     String::from_utf8_lossy(bytes.split(|c| *c == 0).next().unwrap_or_default()).into_owned()
 }
@@ -144,13 +155,12 @@ fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
         .take_while(|u| *u != 0)
         .collect();
     let text = String::from_utf16_lossy(&units);
-    let html = utf8(bytes(format("HTML Format"), 16 * 1024 * 1024)?);
-    let rtf = utf8(bytes(format("Rich Text Format"), 16 * 1024 * 1024)?);
-    let native = if unsafe { IsClipboardFormatAvailable(format(docs_native::FORMAT)) } != 0 {
-        bytes(format(docs_native::FORMAT), 1024 * 1024)?
-    } else {
-        Vec::new()
-    };
+    // Unicode is required; unavailable ancillary formats must not discard usable text.
+    let (html, html_status) = optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024));
+    let (rtf, rtf_status) = optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024));
+    let (native, native_status) = optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024));
+    let html = utf8(html);
+    let rtf = utf8(rtf);
     let mut formats = Vec::new();
     unsafe {
         let mut f = 0;
@@ -184,6 +194,9 @@ fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
         native,
         formats: formats.join(","),
         sequence,
+        html_status,
+        rtf_status,
+        native_status,
     })
 }
 pub fn write(
@@ -515,5 +528,24 @@ pub fn foreground() -> (usize, u32, String) {
             CloseHandle(handle);
         }
         (hwnd as usize, pid, name)
+    }
+}
+
+#[cfg(test)]
+mod ancillary_format_tests {
+    use super::optional_format;
+    #[test]
+    fn ancillary_failures_preserve_plain_fallback_and_report_the_reason() {
+        let (bytes, status) = optional_format(Err("Clipboard format exceeds size limit".into()));
+        assert!(bytes.is_empty());
+        assert_eq!(status, "too_large");
+        let (bytes, status) = optional_format(Err("Producer failed to render format".into()));
+        assert!(bytes.is_empty());
+        assert_eq!(status, "read_failed");
+        assert_eq!(optional_format(Ok(Vec::new())).1, "absent");
+        assert_eq!(
+            optional_format(Ok(b"usable HTML".to_vec())),
+            (b"usable HTML".to_vec(), "ok")
+        );
     }
 }

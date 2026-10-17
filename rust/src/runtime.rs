@@ -321,13 +321,15 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         if settings.developer_logging{use base64::Engine;detail["clipboard_chromium_mime_base64"]=json!(base64::engine::general_purpose::STANDARD.encode(&captured.native));}
         detail["clipboard_rtf"] = json!(captured.rtf);
         detail["clipboard_formats"] = json!(captured.formats);
-        detail["clipboard_chromium_mime_status"] = json!(if settings.developer_logging
-            && !captured.native.is_empty()
-        {
-            "ok"
-        } else {
-            "disabled"
-        });
+        detail["clipboard_html_status"] = json!(captured.html_status);
+        detail["clipboard_rtf_status"] = json!(captured.rtf_status);
+        detail["clipboard_chromium_mime_status"] = json!(
+            if settings.developer_logging || captured.native_status != "ok" {
+                captured.native_status
+            } else {
+                "disabled"
+            }
+        );
         let history = clipboard::write(owner as _, &captured.text, "", None, true).is_ok();
         detail["captured_text_history_excluded"] = json!(history);
         let input = crate::terminal::normalize(&captured.text, &target.2);

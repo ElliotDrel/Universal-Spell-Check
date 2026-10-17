@@ -20,10 +20,9 @@ use std::{
     },
     time::Instant,
 };
-use windows_sys::Win32::{
-    Foundation::*,
-    UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*},
-};
+#[cfg(not(feature = "acceptance"))]
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
+use windows_sys::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
 pub fn run(
     store: Store,
     start_dashboard: bool,
@@ -335,6 +334,7 @@ pub fn run(
             None
         },
     )?;
+    #[cfg(not(feature = "acceptance"))]
     unsafe {
         if RegisterHotKey(
             hwnd.cast(),
@@ -370,6 +370,7 @@ pub fn run(
     }
     nwg::dispatch_thread_events();
     unsafe {
+        #[cfg(not(feature = "acceptance"))]
         UnregisterHotKey(hwnd.cast(), 1);
         KillTimer(hwnd.cast(), 1);
     }

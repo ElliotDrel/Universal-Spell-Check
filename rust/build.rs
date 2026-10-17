@@ -2,6 +2,11 @@ use std::{env, fs, path::PathBuf};
 fn main() {
     let source = fs::read_to_string("../src/BuildChannel.cs").unwrap();
     let dev = env::var_os("CARGO_FEATURE_DEV").is_some();
+    let acceptance = env::var_os("CARGO_FEATURE_ACCEPTANCE").is_some();
+    assert!(
+        !acceptance || !dev,
+        "Acceptance builds require --no-default-features"
+    );
     let conditional = source.split("#if DEV").nth(1).unwrap();
     let selected = if dev {
         conditional.split("#else").next().unwrap()
@@ -44,7 +49,13 @@ fn main() {
         ("MUTEX", "MutexName"),
         ("HOTKEY_VK", "HotkeyVk"),
     ] {
-        let mut v = extract(selected, cs);
+        let mut v = if acceptance && rust == "MUTEX" {
+            extract(&source, "AcceptanceMutexName")
+        } else if acceptance && rust == "DISPLAY_NAME" {
+            extract(&source, "AcceptanceDisplayName")
+        } else {
+            extract(selected, cs)
+        };
         if v == "SharedDataFolder" {
             v = shared.clone();
         }
@@ -66,6 +77,31 @@ fn main() {
     let bench_vk = extract(&source, "BenchmarkHotkeyVk");
     code += &format!("pub const BENCH_VK:u32={bench_vk};\n");
     let mut version = env::var("CARGO_PKG_VERSION").unwrap();
+    if acceptance {
+        version = env::var("USC_ACCEPTANCE_VERSION").expect("Set USC_ACCEPTANCE_VERSION");
+        assert!(
+            [
+                "0.13.0-acceptance.1",
+                "0.13.0-acceptance.2",
+                "0.13.0-acceptance.3"
+            ]
+            .contains(&version.as_str())
+        );
+        let root =
+            fs::canonicalize(env::var("USC_ACCEPTANCE_ROOT").expect("Set USC_ACCEPTANCE_ROOT"))
+                .expect("Acceptance root must exist");
+        code += &format!(
+            "pub const ACCEPTANCE_ROOT: &str = {:?};\n",
+            root.to_string_lossy()
+        );
+        code += &format!(
+            "pub const ACCEPTANCE_PACKAGE_ID: &str = {:?};\n",
+            extract(&source, "AcceptancePackageId")
+        );
+    }
+    for name in ["USC_ACCEPTANCE_VERSION", "USC_ACCEPTANCE_ROOT"] {
+        println!("cargo:rerun-if-env-changed={name}");
+    }
     if dev && !version.ends_with("-dev") {
         version.push_str("-dev");
     }
