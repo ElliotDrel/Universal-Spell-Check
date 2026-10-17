@@ -9,6 +9,19 @@ namespace UniversalSpellCheck.Bench;
 /// </summary>
 internal static class HotkeyInjector
 {
+    // Read the product's registration ID without changing the frozen product binary.
+    private static readonly IntPtr RegistrationId = new((int)typeof(HotkeyWindow)
+        .GetField("HotkeyId", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+        .GetRawConstantValue()!);
+    public static void PostRegisteredMessage(IntPtr window)
+    {
+        if (!PostMessage(window, 0x0312, RegistrationId, IntPtr.Zero))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+    }
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_MENU = 0x12;       // Alt
     private const ushort VK_B = 0x42;

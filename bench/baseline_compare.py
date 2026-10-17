@@ -12,7 +12,7 @@ def load(directory):
 
 
 def validate(before, after):
-    keys = ("schema_version", "cases_sha256", "replacements_sha256", "fixture_sha256", "model", "prompt", "developer_logging", "machine_name", "case_ids")
+    keys = ("schema_version", "cases_sha256", "replacements_sha256", "fixture_sha256", "model", "prompt", "developer_logging", "machine_name", "case_ids", "hotkey_trigger")
     differences = [key for key in keys if before.get(key) != after.get(key)]
     for key in ("mode", "runs", "warmup"):
         if before["options"].get(key) != after["options"].get(key):

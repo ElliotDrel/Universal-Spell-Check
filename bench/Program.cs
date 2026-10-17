@@ -71,6 +71,7 @@ internal static class Program
                 harness_sha256 = Hash(typeof(Program).Assembly.Location),
                 fixture_sha256 = opts.Fixtures is null ? null : Hash(opts.Fixtures),
                 configuration, developer_logging = opts.Desktop && opts.DeveloperLogging, saved_developer_logging = cached.DeveloperLogging,
+                hotkey_trigger = opts.Desktop ? "posted_registered_message" : null,
                 machine_name = Environment.MachineName, case_ids = cases.Select(c => c.Id).ToArray(),
                 notes = "Headless excludes clipboard/target hooks/rich mapping. Compute excludes clipboard/network. Local uses the real coordinator with recorded-output HTTP transport. Live quality_match is informational; replay requires exact output. Null timing means unmeasured."
             };
@@ -85,7 +86,8 @@ internal static class Program
                 clipboardOwner = hotkey.Handle;
                 hotkey.Register(HotkeyInjector.HotkeyModifiers, HotkeyInjector.HotkeyVk);
                 Task? running = null;
-                hotkey.HotkeyPressed += (_, _) => running = coordinator.RunAsync();
+                hotkey.HotkeyPressed += (_, _) => { harness.MarkDispatched(); running = coordinator.RunAsync(); };
+                harness.TriggerHotkey = () => HotkeyInjector.PostRegisteredMessage(hotkey.Handle);
                 harness.CoordinatorTask = () => running;
                 exit = 2;
                 form.Shown += async (_, _) =>

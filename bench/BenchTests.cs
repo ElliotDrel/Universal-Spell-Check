@@ -29,6 +29,17 @@ internal static class BenchTests
         Check(!logger.EvidenceCompleted.IsCompleted, "pipeline detail does not imply evidence completion");
         logger.LogData("developer_evidence_completed", new { run_id = "test" });
         Check(logger.EvidenceCompleted.IsCompletedSuccessfully, "separate evidence completion observed");
+        using (var window = new HotkeyWindow("UniversalSpellCheck.Benchmark.Tests." + Guid.NewGuid().ToString("N")))
+        {
+            int dispatched = 0;
+            window.HotkeyPressed += (_, _) => dispatched++;
+            for (int i = 0; i < 100; i++)
+            {
+                HotkeyInjector.PostRegisteredMessage(window.Handle);
+                System.Windows.Forms.Application.DoEvents();
+                Check(dispatched == i + 1, $"acknowledged native hotkey message {i + 1}");
+            }
+        }
         var cases = JsonSerializer.Deserialize<List<BenchCase>>(File.ReadAllText("bench/baseline-cases.json"), Program.Json)!;
         Check(cases.Count == 10 && cases.Select(c => c.Id).Distinct().Count() == 10, "ten distinct fixed cases");
         foreach (var c in cases.Where(c => c.Html.Length > 0))

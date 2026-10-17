@@ -12,6 +12,9 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
 {
     internal List<ReplayFixture> Fixtures { get; } = fixtures;
     internal Func<Task?> CoordinatorTask { get; set; } = () => null;
+    internal Action TriggerHotkey { get; set; } = () => throw new InvalidOperationException("No hotkey target.");
+    private TaskCompletionSource<long>? _dispatch;
+    internal void MarkDispatched() => _dispatch?.TrySetResult(Stopwatch.GetTimestamp());
 
     internal async Task<int> RunAsync(BenchTargetForm? form)
     {
@@ -84,12 +87,14 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
             form.Arm();
         }
         var pending = logger.BeginTrial();
+        if (form is not null) _dispatch = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var start = Stopwatch.GetTimestamp();
         if (form is null)
             await coordinator.RunHeadlessAsync(c.Text);
         else
-            HotkeyInjector.FireCtrlAltB();
+            TriggerHotkey();
         var returnedMs = Elapsed(start);
+        var dispatchedAt = form is null ? 0 : await _dispatch!.Task.WaitAsync(TimeSpan.FromSeconds(2));
         var detail = await pending.WaitAsync(TimeSpan.FromSeconds(70));
         if (form is not null && CoordinatorTask() is { } running) await running;
         if (form is not null && detail.GetProperty("developer_evidence").TryGetProperty("status", out var evidenceStatus)
@@ -106,6 +111,7 @@ internal sealed class BenchHarness(Options opts, List<BenchCase> cases, List<Rep
         // These production log fields are placeholders, not measurements.
         timings["payload_ms"] = null; timings["parse_ms"] = null;
         timings["coordinator_total_ms"] = timings["total_ms"];
+        timings["hotkey_dispatch_ms"] = form is null ? null : (dispatchedAt - start) * 1000.0 / Stopwatch.Frequency;
         timings["total_ms"] = form is null ? returnedMs
             : form.LastPasteTicks == 0 ? null : (form.LastPasteTicks - start) * 1000.0 / Stopwatch.Frequency;
         if (form is null)
