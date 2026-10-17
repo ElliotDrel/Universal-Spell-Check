@@ -28,6 +28,25 @@ foreach($path in $protectedPaths){if(Test-Path -LiteralPath $path){$before[$path
 $free=([IO.DriveInfo]::new([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($Output)))).AvailableFreeSpace
 if($free -lt 256MB){throw 'Free at least 256 MiB before a comparison block.'}
 New-Item -ItemType Directory -Path $Output | Out-Null
+function Invoke-BenchmarkProcess([string]$Executable,[string[]]$Arguments,[string]$Stdout,[string]$Stderr) {
+    $start=[Diagnostics.ProcessStartInfo]::new($Executable)
+    $start.UseShellExecute=$false
+    $start.CreateNoWindow=$true
+    $start.RedirectStandardOutput=$true
+    $start.RedirectStandardError=$true
+    foreach($argument in $Arguments){$start.ArgumentList.Add($argument)}
+    $process=[Diagnostics.Process]::new()
+    $process.StartInfo=$start
+    try {
+        if(-not $process.Start()){throw "Cannot start $Executable"}
+        $outputTask=$process.StandardOutput.ReadToEndAsync()
+        $errorTask=$process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        [IO.File]::WriteAllText($Stdout,$outputTask.GetAwaiter().GetResult())
+        [IO.File]::WriteAllText($Stderr,$errorTask.GetAwaiter().GetResult())
+        return $process.ExitCode
+    } finally { $process.Dispose() }
+}
 $blocks=@(@{name='csharp-a';rust=$false},@{name='rust-a';rust=$true},@{name='rust-b';rust=$true},@{name='csharp-b';rust=$false})
 try {
     foreach($block in $blocks){
@@ -42,13 +61,11 @@ try {
             $arguments=@($kind)+$arguments+@('--replacements',$replacements)
             if($Mode -ne 'compute'){$arguments+=@('--evidence-log-dir',(Join-Path $DataDirectory 'logs'))}
             if($Mode -eq 'e2e'){$arguments+=@('--settings',$DataDirectory)}
-            # Call operator waits for a GUI-subsystem executable when its output is redirected.
-            & $RustExe @arguments 1> $stdout 2> $stderr
+            $blockExit=Invoke-BenchmarkProcess $RustExe $arguments $stdout $stderr
         }else{
             $arguments=@($runner)+$arguments+@('--settings',$DataDirectory)
-            & $Dotnet @arguments 1> $stdout 2> $stderr
+            $blockExit=Invoke-BenchmarkProcess $Dotnet $arguments $stdout $stderr
         }
-        $blockExit=$LASTEXITCODE
         if($blockExit -ne 0){
             $summaryPath=Join-Path $directory 'summary.json'
             if(-not(Test-Path -LiteralPath $summaryPath)){throw "Block $($block.name) ended with $blockExit before a summary."}
