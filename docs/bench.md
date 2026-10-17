@@ -1,19 +1,24 @@
 # C# / Rust Baseline
 
-## Credential isolation incident and recovery hold
+## Credential isolation incident and completed recovery
 
 The October 16 offline harness originally supplied a custom settings directory
 without overriding the key path. The old SettingsStore default still pointed
 the key path at production, so SaveApiKey replaced the saved active key with the
 offline placeholder. Live testing was stopped; the installed process was kept
-running with its cached key. Do not restart it until recovery or manual re-entry.
+running with its cached key. After Elliot explicitly approved read-only recovery,
+the cached field was recovered on October 16, validated with HTTP 200, and restored
+to DPAPI-encrypted storage. Encrypted readback verified the recovered value and
+all other key-store entries and metadata. No dump or plaintext key file was created;
+the app remained running. The encrypted pre-recovery file was preserved.
 Do not execute older archived benchmark clients: their entry points are quarantined.
 
 The repair derives omitted key paths from the configured data directory, passes
 both paths explicitly in the harness, and rejects the placeholder before any live
 request. Tests assert destinations before writes and verify that an offline smoke
 leaves the production encrypted file byte-identical. The live desktop baseline
-and startup remain incomplete pending credential recovery and another idle window.
+and startup remain incomplete pending another idle window; credential recovery
+is complete.
 
 ## Scope
 
@@ -197,6 +202,6 @@ are excluded. Preserve the first launch separately rather than claiming cold boo
   local block. Retain earlier incomplete fixture diagnostics separately.
 - Exclude `desktop/e2e-native-final` from latency analysis: invalid placeholder
   authentication caused HTTP 401 responses before testing was stopped.
-- Keep live desktop E2E and startup incomplete until credential recovery and a
-  renewed idle window. Original-editor visual acceptance remains separate. The
+- Keep live desktop E2E and startup incomplete until a renewed idle window;
+  credential recovery is complete. Original-editor visual acceptance remains separate. The
   installed-app memory figure is one aged-process snapshot, not a repeated baseline.
