@@ -49,7 +49,7 @@ dotnet run --project tests/ProtectedTextTests/UniversalSpellCheck.ProtectedTextT
 dotnet run --project tests/TargetFormattingTests/UniversalSpellCheck.TargetFormattingTests.csproj -c Release
 ```
 
-UpdateCommandTests uses a unique hidden receiver window, a temporary Velopack locator and recorded process calls: it does not touch installed apps, user data, or the network. It checks startup installation, background preparation, overlap, failures, and graceful restart arguments. Release CI runs it before packing.
+UpdateCommandTests uses a unique hidden receiver window, a temporary Velopack locator and recorded process calls: it does not touch installed apps, user data, or the network. It checks startup installation, background preparation, overlap, failures, and graceful restart arguments. It remains a C# reference check. Production release CI now runs Rust regressions and fresh-installer startup before publication.
 
 To replay one captured `spellcheck_detail` record against the rich-text mapper without a live paste,
 pipe one JSON object from the `read-logs` skill into `TargetFormattingTests` with `--replay-stdin`.
