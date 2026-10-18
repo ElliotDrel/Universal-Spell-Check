@@ -5,12 +5,28 @@
 This section supersedes the historical cleanup and pre-port instructions below.
 
 - Continue in `C:/Users/2supe/.codex/worktrees/rust-port/Universal Spell Check`, branch `codex/rust-port`, based on primary local `main` at `8c919a7`. Preserve main's fifteen unpublished baseline commits, the frozen baseline, backups, and unrelated formatting worktree.
-- The native Rust implementation is in `rust/`. Read `rust/AGENTS.md`, `docs/architecture.md`, `docs/bench.md`, and Git status before continuing. The installed product remains C#; no Rust installation or publication is authorized by this test run.
+- The native Rust implementation is in `rust/`. Read `rust/AGENTS.md`, `docs/architecture.md`, `docs/bench.md`, and Git status before continuing. The installed product remains C#; no Rust production installation or publication is authorized by this test run.
 - Use KISS/MVP judgment. Native Windows controls, clipboard, `SendInput`, DPAPI, and asynchronous WinHTTP implement the app without a web renderer. Channel constants still come from `src/BuildChannel.cs` at build time.
 - Requested thinking/adversarial reviews used `claude -p --safe-mode --model claude-opus-5-5 --effort medium --tools '' --strict-mcp-config --no-session-persistence`. Reports are retained under primary `benchmark_runs/rust-port/claude-*-review*.json`; normal hooks in the first report caused an irrelevant follow-up, so later reviews disable hooks.
 - The completed desktop window was explicitly authorized by Elliot's `run tests now`. Desktop automation has ended and installed C# is restored. Require fresh idle authorization in a later turn.
 
-### Active acceptance preparation - stop before desktop control
+### Completed original-editor and installed-updater acceptance - October 18, 2026
+
+- Elliot explicitly authorized desktop control with “Run it now, I'm stepping away from my computer.” The run is finished; require a fresh idle window before any further desktop tests.
+- Reviewed normal candidate SHA-256 remained `762b007961e6baf956b2162fe23012c66a11a7f3d0e4508c9b96baa0d7e2c598`. Run the frozen safe C# product as the control, then the reviewed Rust candidate; each completed four cases in actual Google Docs and four in a temporary, unsent ChatGPT composer. Rust PID was 26096; C# control PID was 27948.
+- All eight editor/case pairs match C#. Docs API readback confirms exact text, bold/italic/link styles and href, five heading/list paragraphs, preserved heading IDs, list IDs, nesting and indentation. Rust used `docs_native` in all four Docs runs and `aligned_html` in all four ChatGPT runs. Actual copied-back ChatGPT text and HTML are byte-identical between implementations.
+- Keep one inherited limitation explicit: ChatGPT converts links to rich-link chips. Both C# and Rust preserve the misspelled chip label `lnik` while correcting ordinary `tset`, keeping the exact href and styles. Thus eight of eight parity pairs pass, but only 14/16 individual runs meet every handwritten fixture expectation. Do not call the chip-label requirement fixed or silently relax the fixture.
+- Private QA installation passed current/no-update, manual check/download, offline cached v1-to-v2 apply, damaged-v3 checksum rejection while v2 remained usable, automatic launch v2-to-v3 apply, same-version restart with new PID, and private uninstall. Checksum rejection was observed in the real Settings UI and approved runtime-log reader, not inferred from helper exit alone.
+- QA uninstall entry and install payload are gone. Synthetic settings/key remain outside the removed install root; all frozen fixture and production settings/encrypted-key/startup values match the run baseline. Production C# v0.12.3 is restored at its exact installed path, PID 27476 at closeout. Recheck PID on later turns.
+- Preserve primary `benchmark_runs/rust-port/acceptance-prep/`: `acceptance-result.json`, `verify-editor-evidence.py`, copied-back clipboard JSON, native Docs structure snapshots, synthetic-only screenshots, approved-reader runtime exports, updater per-action results and `updater-final-status.json`. The verification script passed parity, structure and Rust run-identity checks, computes strict text totals against the unchanged fixtures, and asserts retained QA checksum/start/version/integrity/cleanup evidence from `updater-runtime.jsonl` and helper reports. Visual rendering and GUI sequencing were separately observed. Astra reviewed the closeout and confirmed no remaining blocking findings after the runtime export and computed-total improvements.
+- Preserve the private synthetic [Google Doc](https://docs.google.com/document/d/1xEG9S90fm-uqyRO5RZBwY7hKXWrqIM698PyuEB1F7V0/edit) as evidence. Both task Chrome windows are closed; ChatGPT draft was cleared and no message was sent. Existing personal Docs/Spotify windows remain.
+- Exclude initial missing-selection and incorrectly focused ChatGPT/page-copy attempts, stale updater control IDs and premature v2 verification from application acceptance verdicts. Raw diagnostics remain. Munim browser extension was disconnected; native fallback needed explicit foreground-window targeting and DPI-aware coordinates.
+- Tool feedback: [query filtering #30](https://github.com/munimtechnologies/munim-computer-use/issues/30), [DPI coordinates #31](https://github.com/munimtechnologies/munim-computer-use/issues/31), [offscreen click #32](https://github.com/munimtechnologies/munim-computer-use/issues/32), [window activation #33](https://github.com/munimtechnologies/munim-computer-use/issues/33).
+- Acceptance is behavior evidence, not a new speed measurement. The earlier measured candidate/results remain frozen. No public release, production install replacement, or production C#-to-Rust updater transition was performed; private QA feed acceptance does not establish those release steps. A four-hour periodic wait and every race in the broader manual checklist were outside this MVP cycle.
+
+### Historical acceptance preparation (superseded October 18)
+
+This records the pre-run state. The completed acceptance results above supersede its pending/not-installed statements.
 
 - Elliot asked to finish original Google Docs/ChatGPT and installed updater acceptance, prepare everything, then END THE TURN BEFORE taking computer control. He also requested an Astra subagent review. The review is complete; no active agent remains.
 - Do not reuse the previous idle window. No focus, clipboard, browser UI, tray UI, installer or update tests ran during this preparation. Wait for his next explicit `Run`.
@@ -64,7 +80,7 @@ All final results are under primary `benchmark_runs/rust-port/`; `README.md` and
 - `compute-abba-final`: 200/200 measured frozen-output/mapping checks plus 20/20 warmups per block. Median C# 0.28190/0.23405 ms versus Rust 0.09175/0.14525 ms. p95 C# 1.18511/1.301635 versus Rust 1.17747/1.27845 ms. All blocks retain 180/200 handwritten expected-text matches because of the identical frozen list spaces.
 - `post-test-integrity.json`: all 131 baseline hashes, settings and encrypted credentials unchanged. Installed C# Prod v0.12.3 (`c370110ec95b5b5f70816e9494a3c2c8dc3f3e76`) restored and verified running, PID 5600 at closeout. Recheck PID in later turns.
 - Both task Chrome fixture windows and their loopback server are closed. No Rust GUI/benchmark/Claude/compiler remains running. Preserve the ignored browser profile and diagnostic artifacts, including any backups.
-- Original Google Docs/ChatGPT visual acceptance and installed updater/release validation remain pending. The candidate is tested, portable and reviewable; deployment still requires the user's release instruction.
+- Original Google Docs/ChatGPT and private installed-updater acceptance completed October 18; see the current acceptance section above. Public release and the production C#-to-Rust updater transition remain untested and require a release instruction.
 
 ## Completed Baseline Handoff
 

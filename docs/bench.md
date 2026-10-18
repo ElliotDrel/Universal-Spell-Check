@@ -303,7 +303,19 @@ Final Dev/Prod configurations each pass 19 unit tests and one GDI integration te
 All 131 frozen baseline hashes, settings and encrypted credential bytes remain unchanged. Installed C# v0.12.3 is restored; task browser windows/server are closed. No Rust installation, publication or installed updater validation occurred. Future focus/clipboard tests require a new idle-desktop authorization.
 
 
-### Prepared original-editor and installed-updater acceptance
+### Completed original-editor and private updater acceptance, October 18, 2026
+
+- Completed the authorized idle-desktop cycle with reviewed candidate SHA-256 `762b007961e6baf956b2162fe23012c66a11a7f3d0e4508c9b96baa0d7e2c598` and frozen safe C# control. Retain the earlier speed results and measured binary unchanged.
+- Passed all eight C#/Rust editor/case parity comparisons: four synthetic cases each in actual Google Docs and the ChatGPT composer. Read back native Docs text/styles/hrefs/heading IDs/list nesting and actual ChatGPT rendered/copied-back content; all four ChatGPT after-text/HTML pairs are byte-identical. Rust logged four `docs_native` and four `aligned_html` successes.
+- Record 14/16 strict fixture runs, rather than an unqualified 16/16: both implementations preserve ChatGPT rich-link chip labels verbatim, leaving `lnik` inside the chip while correcting normal text. The href, bold, italic and paragraph structure survive. This is inherited behavior, not a Rust regression; the original handwritten link-label correction requirement is still unmet for that editor.
+- Passed private installed updater current/no-update, manual download, offline cached v1-to-v2 apply, damaged-v3 rejection with v2 intact, automatic v2-to-v3 launch apply, same-version restart and uninstall. Verify exact package hashes/PIDs, real Settings state and approved-reader milestones. The private QA uninstall entry and payload are gone, with fixtures and production settings/key/startup unchanged.
+- Restored exact installed C# Prod v0.12.3, PID 27476 at closeout. Closed both test browser windows and cleared the unsent composer; retained only the synthetic Google Doc and local evidence. No production installation/publication occurred. Require fresh idle authorization for another interactive test.
+- Preserve primary `benchmark_runs/rust-port/acceptance-prep/acceptance-result.json` and `verify-editor-evidence.py`, Docs snapshots, copied-back HTML/text, screenshots, approved-reader runtime exports, updater action reports, approved-reader `updater-runtime.jsonl` checksum/start milestones and final integrity status. The verifier computes strict text totals from the unchanged fixture expectations and asserts these retained QA milestones; visual appearance and GUI sequencing remain separately reviewed observations. Initial focus/selection/control-ID failures remain excluded diagnostics, not hidden application successes or regressions.
+- Treat this as acceptance, not a timing run. Private QA does not validate public release publication or migration from installed C# to Rust; a four-hour periodic wait and the full race-condition checklist were outside this MVP cycle.
+
+### Original-editor and installed-updater acceptance rerun playbook
+
+The following preparation/run sequence was executed October 18. Its pre-run state is historical; the completed verdict above is current. Require a new idle authorization before repeating it.
 
 - Stop before desktop control. Elliot asked to prepare everything and end the turn before testing. Require his next explicit `Run` before browser navigation, focus, clipboard, app/installer launch, update application or uninstall.
 - Continue in `codex/rust-port`. Use primary `benchmark_runs/rust-port/acceptance-prep/` for retained packages, results and local tooling. Keep the earlier measured `candidate-prod-final` and its results unchanged; the reviewed editor candidate includes later fixes and has not had original-editor acceptance yet.
