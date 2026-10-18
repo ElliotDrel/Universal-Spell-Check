@@ -1,11 +1,11 @@
 # Prod Deploy
 
 Ship a production release by pushing a semver tag to origin. This triggers
-`.github/workflows/release.yml` → `dotnet publish` → `vpk pack` → `vpk upload github`
+`.github/workflows/release.yml` → production Rust build → `vpk pack` → `vpk upload github`
 → GitHub Release created. All installed prod copies auto-update via Velopack.
 
 For pipeline details, read `.github/workflows/release.yml`. For version constants
-and channel configuration, read `src/BuildChannel.cs`.
+read `rust/Cargo.toml`; channel constants remain in `src/BuildChannel.cs`.
 
 **This is irreversible.** A pushed tag immediately starts the CI pipeline and
 creates a public GitHub Release. A clear user request to publish, release, or
@@ -35,7 +35,7 @@ Before determining a version or publishing, confirm the code compiles in
 Release config:
 
 ```powershell
-dotnet build src/UniversalSpellCheck.csproj -c Release
+cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
 ```
 
 If the build fails, stop immediately. Do not propose a version. Do not proceed.
@@ -225,7 +225,7 @@ explicitly report the release as pending or incomplete.
 
 A good prod release satisfies **all** of the following:
 - Branch was `main`, clean, up to date with origin before tagging.
-- `dotnet build -c Release` passed with no new errors.
+- `production Rust release build` passed with no new errors.
 - The tag is strictly higher than the previous latest tag.
 - The user explicitly requested production publication, and the stated version and commits match that authorized scope. No redundant approval was requested.
 - The `main` branch was pushed alongside the tag (`git push origin main vX.Y.Z`) — `origin/main` is not behind the released commit.

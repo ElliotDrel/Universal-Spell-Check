@@ -121,7 +121,50 @@ fn main() {
         .to_string_lossy()
         .replace('\\', "/");
     let rc = out.join("app.rc");
-    fs::write(&rc, format!("1 24 \"{manifest}\"\n1 ICON \"{ico}\"\n")).unwrap();
+    let numeric = [
+        "CARGO_PKG_VERSION_MAJOR",
+        "CARGO_PKG_VERSION_MINOR",
+        "CARGO_PKG_VERSION_PATCH",
+    ]
+    .map(|key| env::var(key).unwrap())
+    .join(",");
+    let title = if acceptance {
+        extract(&source, "AcceptanceDisplayName")
+    } else {
+        extract(selected, "DisplayName")
+    };
+    fs::write(
+        &rc,
+        format!(
+            r#"1 24 "{manifest}"
+1 ICON "{ico}"
+1 VERSIONINFO
+FILEVERSION {numeric},0
+PRODUCTVERSION {numeric},0
+FILEFLAGSMASK 0x3fL
+FILEOS 0x40004L
+FILETYPE 0x1L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904b0"
+  BEGIN
+   VALUE "FileDescription", "{title}"
+   VALUE "FileVersion", "{version}"
+   VALUE "ProductName", "{title}"
+   VALUE "ProductVersion", "{version}"
+   VALUE "OriginalFilename", "UniversalSpellCheck.exe"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END
+"#
+        ),
+    )
+    .unwrap();
     embed_resource::compile(rc, embed_resource::NONE)
         .manifest_required()
         .unwrap();

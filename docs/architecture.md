@@ -2,7 +2,9 @@
 
 ## Overview
 
-The product is a C#/.NET 10 WinForms tray app with an embedded WPF dashboard, living under `src/`. It bootstraps via Velopack, registers a global hotkey, and runs a clipboard-capture → API-request → post-process → paste pipeline. AHK is archived at `.archive/ahk-legacy/` and is not part of the active system.
+The product is the native Rust tray app and dashboard under `rust/`. `main.rs` bootstraps Velopack; `app.rs` owns tray/hotkey lifetime; `runtime.rs` runs corrections; `dashboard.rs` owns the GUI; `update.rs` owns serialized update work; `store.rs` and `platform.rs` retain compatible settings, DPAPI keys and legacy-data migration. Channel constants are generated from `src/BuildChannel.cs`.
+
+The sections below document the retained C#/.NET 10 reference under `src/`. It bootstraps via Velopack, registers a global hotkey, and runs a clipboard-capture → API-request → post-process → paste pipeline. AHK is archived at `.archive/ahk-legacy/` and is not part of the active system.
 
 ---
 

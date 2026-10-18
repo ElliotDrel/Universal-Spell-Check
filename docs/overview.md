@@ -4,18 +4,18 @@ Full project context. Routed from root `AGENTS.md` when overview, stack, or repo
 
 ## What this is
 
-**Universal Spell Check** — a Windows-wide AI spell checker. The C#/.NET WinForms tray app under `src/` is the product: select text, press the hotkey, corrected text replaces the selection in place. The legacy AutoHotkey path is archived under `.archive/ahk-legacy/` for history only.
+**Universal Spell Check** — a Windows-wide AI spell checker. The native Rust tray app and dashboard under `rust/` are the product; `src/` retains the C# reference and shared build constants: select text, press the hotkey, corrected text replaces the selection in place. The legacy AutoHotkey path is archived under `.archive/ahk-legacy/` for history only.
 
 **Core value:** spell checking must feel instant and invisible — select, hotkey, done. Speed is the product.
 
 ## Stack
 
-- C#/.NET 10 WinForms tray app + WPF dashboard (`src/`)
+- Native Rust / Windows GUI tray app and dashboard (`rust/`); C# reference under `src/`
 - Velopack for auto-update + GitHub Releases for distribution
 - OpenAI Responses API
 - Windows only
 - Python 3 used only for fine-tune dataset tooling under `tests/`
-- Build: `dotnet build src/UniversalSpellCheck.csproj`
+- Build: `cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features`; package with `rust/package.ps1`
 
 ## Developer setup
 

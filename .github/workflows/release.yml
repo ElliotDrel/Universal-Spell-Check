@@ -28,44 +28,36 @@ jobs:
           $semver = $tag.TrimStart('v')
           "semver=$semver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Restore
-        run: dotnet restore src/UniversalSpellCheck.csproj
+      - name: Install pinned Rust tools
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
 
-      - name: Publish
+      - name: Verify release version
         shell: pwsh
         run: |
-          dotnet publish src/UniversalSpellCheck.csproj `
-            -c Release -r win-x64 --self-contained false `
-            /p:Version=${{ steps.ver.outputs.semver }} `
-            /p:AssemblyVersion=${{ steps.ver.outputs.semver }}.0 `
-            /p:FileVersion=${{ steps.ver.outputs.semver }}.0 `
-            -o publish
+          $version = (cargo metadata --no-deps --format-version 1 --manifest-path rust/Cargo.toml | ConvertFrom-Json).packages[0].version
+          if ($version -ne '${{ steps.ver.outputs.semver }}') { throw "Tag and Cargo version disagree: $version" }
 
-      - name: Startup smoke test
+      - name: Format and production regressions
         shell: pwsh
         run: |
-          # Launch the published app in --startup-smoke mode: it constructs the
-          # real tray app context (the path that crashed in 0.7.0) and self-exits.
-          # A GUI-subsystem exe does not block PowerShell, so wait explicitly and
-          # read the real exit code. Non-zero or a hang aborts the release before
-          # anything is packed or uploaded.
-          $p = Start-Process -FilePath "publish/UniversalSpellCheck.exe" `
-            -ArgumentList "--startup-smoke" -PassThru
-          try {
-            $p | Wait-Process -Timeout 60 -ErrorAction Stop
-          } catch {
-            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            Write-Error "Startup smoke timed out (>60s) — app hung on launch. Aborting release."
-            exit 1
-          }
-          if ($p.ExitCode -ne 0) {
-            Write-Error "Startup smoke failed (exit $($p.ExitCode)) — app crashes on construction. Aborting release."
-            exit 1
-          }
-          Write-Host "Startup smoke passed (exit 0)."
+          cargo fmt --manifest-path rust/Cargo.toml --check
+          if ($LASTEXITCODE -ne 0) { throw 'Rust format failed' }
+          cargo clippy --locked --manifest-path rust/Cargo.toml --no-default-features --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Rust lint failed' }
+          cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
+          if ($LASTEXITCODE -ne 0) { throw 'Rust regressions failed' }
+          python -m unittest discover -s bench -p test_rust_acceptance.py
+          if ($LASTEXITCODE -ne 0) { throw 'Protected-data regressions failed' }
 
-      - name: Native update command regression tests
-        run: dotnet run --project tests/UpdateCommandTests/UniversalSpellCheck.UpdateCommandTests.csproj -c Release
+      - name: Build and assemble production Rust app
+        run: ./rust/package.ps1 -Output publish
+
+      - name: Native startup smoke in isolated data
+        shell: pwsh
+        run: |
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'usc-release-startup-smoke'
+          python -c "import subprocess; subprocess.run([r'publish\UniversalSpellCheck.exe','--startup-smoke'],check=True,timeout=30)"
+          if ($LASTEXITCODE -ne 0) { throw 'Native startup smoke failed' }
 
       - name: Install vpk
         run: dotnet tool install --global vpk --version 1.2.161
@@ -79,7 +71,37 @@ jobs:
             --packDir publish `
             --mainExe UniversalSpellCheck.exe `
             --packTitle "Universal Spell Check" `
+            --runtime win-x64 `
+            --channel win `
             --icon src/Assets/app.ico
+
+      - name: Verify fresh installer before publication
+        shell: pwsh
+        run: |
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'usc-release-install-data'
+          $install = Join-Path $env:RUNNER_TEMP 'usc-release-install'
+          $setup = Get-ChildItem Releases -Filter '*-Setup.exe'
+          if (@($setup).Count -ne 1) { throw 'Expected one Windows installer' }
+          $setupProcess = Start-Process -FilePath $setup.FullName -ArgumentList @('--silent','--installto',$install) -PassThru -Wait
+          if ($setupProcess.ExitCode -ne 0) { throw "Installer failed: $($setupProcess.ExitCode)" }
+          $exe = [IO.Path]::GetFullPath((Join-Path $install 'current/UniversalSpellCheck.exe'))
+          if ((Get-FileHash $exe).Hash -ne (Get-FileHash 'publish/UniversalSpellCheck.exe').Hash) { throw 'Installed binary differs from production build' }
+          if ((Get-Item $exe).VersionInfo.ProductVersion -ne '${{ steps.ver.outputs.semver }}') { throw 'Installed version disagrees with release' }
+          if (Test-Path (Join-Path $install 'current/UniversalSpellCheck.dll')) { throw 'Unexpected C# payload in Rust installer' }
+          foreach ($file in @('replacements.json','licenses/native-windows-gui-MIT.txt')) {
+            if (-not (Test-Path (Join-Path $install "current/$file"))) { throw "Missing installed file: $file" }
+          }
+          # Setup must not make a duplicate-process no-op look like a startup pass.
+          Get-Process UniversalSpellCheck -ErrorAction SilentlyContinue | Where-Object Path -eq $exe | ForEach-Object {
+            Stop-Process -Id $_.Id
+            $_.WaitForExit()
+          }
+          $ready = Join-Path $env:RUNNER_TEMP 'usc-fresh-install.ready'
+          python -c "import subprocess,sys; subprocess.run([sys.argv[1],'--startup-smoke','--ready-file='+sys.argv[2]],check=True,timeout=30)" $exe $ready
+          if (-not (Test-Path $ready)) { throw 'Installed app did not initialize its native tray/hotkey path' }
+          if ($LASTEXITCODE -ne 0) { throw 'Fresh installed app startup failed' }
+          $uninstall = Start-Process -FilePath (Join-Path $install 'Update.exe') -ArgumentList @('--silent','--rootDir',$install,'uninstall') -PassThru -Wait
+          if ($uninstall.ExitCode -ne 0) { throw 'CI installer cleanup failed' }
 
       - name: Upload to GitHub Releases
         env:

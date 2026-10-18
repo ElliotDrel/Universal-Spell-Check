@@ -6,11 +6,11 @@
 
 ## Grounding (always-loaded context)
 
-**Universal Spell Check** is a Windows-wide AI spell checker. Select text → press hotkey → corrected text replaces selection in place. C#/.NET 10 WinForms tray app + WPF dashboard under `src/` is the product; legacy AHK is archived under `.archive/ahk-legacy/`.
+**Universal Spell Check** is a Windows-wide AI spell checker. Select text → press hotkey → corrected text replaces selection in place. Native Rust tray app + dashboard under `rust/` is the product; `src/` retains the C# reference and canonical `BuildChannel.cs`. Legacy AHK is archived under `.archive/ahk-legacy/`.
 
 **Core value:** select, hotkey, done. **Speed is the product** — instant and invisible. Every added abstraction or fallback is a cost.
 
-**Two channels run side-by-side:** Prod (`Release`, Ctrl+Alt+U) and Dev (`Dev` config, Ctrl+Alt+D). Settings are isolated per channel; logs are unified into one shared corpus stamped per-line with `channel`/`app_version`/`pid` (this matters for fine-tune work). All channel constants live in `src/BuildChannel.cs` — never hardcode them elsewhere.
+**Two channels run side-by-side:** Prod (Rust `--no-default-features`, Ctrl+Alt+U) and Dev (default Rust features, Ctrl+Alt+D). Settings are isolated per channel; logs are unified into one shared corpus stamped per-line with `channel`/`app_version`/`pid` (this matters for fine-tune work). All channel constants live in `src/BuildChannel.cs` — never hardcode them elsewhere.
 
 **Collaboration tone:** speed first, simplicity second, minimal UI/overhead third. Concise, action-oriented. Decide fast.
 
@@ -25,7 +25,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Intent | Read this first |
 |---|---|
 | Project overview, stack, repo map, channel summary | `docs/overview.md` |
-| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md` |
+| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md` + `rust/AGENTS.md` |
 | Adding app/site-specific formatting rules or Chrome target detection | `.planning/app-site-formatting-customizations.md` |
 | Clipboard formatting fidelity, CF_HTML, preserving bold/links/spacing through a correction | `.planning/rich-text-clipboard-pipeline.md` |
 | Channel separation, hotkey/mutex/path constants, version stamping | `src/BuildChannel.cs` (canonical source) |
@@ -33,7 +33,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 | Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
 | Reading, filtering, or analyzing runtime logs | Use the `read-logs` skill — run `python .agents/skills/read-logs/scripts/logs.py --help` for options. Use `--grep-detail <term>` or `--grep-detail field:term` to search inside spellcheck_detail blobs. Never manually parse log files. |
 | Pushing to Dev channel or releasing to Production | Use the `deploy` skill. Always. Do not push or tag manually. |
-| Auto-update flow, Velopack, release pipeline | `src/UpdateService.cs`, `.github/workflows/release.yml` |
+| Auto-update flow, Velopack, release pipeline | `rust/src/update.rs` (C# reference: `src/UpdateService.cs`), `.github/workflows/release.yml` |
 | Debugging a bug, verification standards, runtime diagnostics | `docs/debugging-principles.md` |
 | Clipboard/hotkey edge cases, loading overlay checks, cache pitfalls | `docs/watchlist.md` |
 | Naming, style, error-handling, comments, C#/Python conventions | `docs/conventions.md` |
@@ -57,7 +57,7 @@ For full project overview, stack details, and repo map → load `docs/overview.m
 
 1. **Channels are owned by `BuildChannel`.** Never hardcode a hotkey, mutex name, app-data folder, or display string. Add the constant to `BuildChannel.cs` and consume it.
 2. **Logs are shared, settings are isolated.** `AppPaths.LogDirectory` returns the shared path; `AppDataDirectory` uses `BuildChannel.AppDataFolder`. Do not split logs by channel — the unified corpus is required for fine-tune work, and per-line `channel`/`app_version` stamps are the filter.
-3. **One update flow.** Every entry point (launch, periodic, tray, dashboard) calls `UpdateService.CheckAsync(UpdateTrigger)`. Do not add parallel update paths.
+3. **One update flow.** Every entry point (launch, periodic, tray, dashboard) uses the single `Updater` worker in `rust/src/update.rs` (C# reference: `UpdateService.CheckAsync(UpdateTrigger)`). Do not add parallel update paths.
 4. **Releases ship via tag.** A semver `v*.*.*` tag triggers `.github/workflows/release.yml`. Do not run `vpk` manually for production. Before ending a publishing turn, verify every session change is pushed, the Dev app/server is stopped and cleared, and session-created scratch/processes are cleaned up; after CI and release publication succeed, update/restart the local installed Prod app and verify its running version. Follow the `deploy` skill closeout checklist.
 5. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
 6. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.

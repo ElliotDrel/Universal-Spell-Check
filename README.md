@@ -28,7 +28,8 @@ The tray icon menu has version info, "Check for Updates", "Open Dashboard", and 
 ## Repo layout
 
 ```
-src/                       # The product — C# .NET 10 WinForms + WPF
+rust/                      # The product — native Rust tray app and dashboard
+src/                       # Frozen C# reference; BuildChannel.cs remains canonical
 .github/workflows/         # Tag-triggered Velopack release pipeline
 replacements.json          # Brand/casing post-processing rules
 docs/                      # Architecture, conventions, debugging notes
@@ -40,24 +41,19 @@ tests/                     # Native tests plus Python fine-tune and benchmark to
 
 ```powershell
 # Run a Dev build alongside the installed Prod app (Ctrl+Alt+D, separate settings)
-dotnet run --project src/UniversalSpellCheck.csproj -c Dev
+cargo run --manifest-path rust/Cargo.toml --release
 
 # Build a release-style local artifact
-dotnet publish src/UniversalSpellCheck.csproj -c Release -r win-x64 --self-contained false
+./rust/package.ps1 -Output rust/dist/prod
 ```
 
 Prod and Dev settings are isolated (`%LocalAppData%\UniversalSpellCheck.Data\` vs `%LocalAppData%\UniversalSpellCheck.Dev\`). Logs are intentionally unified at `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl` with per-line `channel`, `app_version`, and `pid` stamps. `%LocalAppData%\UniversalSpellCheck\` is reserved for Velopack installation files.
 
 ## Release
 
-Push a semver tag:
+Use the repository's deploy skill. A version tag on clean, verified `main` triggers the Rust release workflow: locked production build, regressions, startup smoke, Velopack packaging, fresh-installer execution on a disposable CI runner, then publication. The tag must match `rust/Cargo.toml`. Push the intended `main` commit and only its release tag together.
 
-```bash
-git tag v0.1.0
-git push --tags
-```
-
-The GitHub Actions workflow builds the project, runs `vpk pack`, and uploads `Setup.exe` + delta packages to the GitHub Release. Installed Prod copies pick it up on the next periodic check or launch.
+Rust releases retain the existing package ID, `UniversalSpellCheck.exe` name, installation path and update feed. Existing C# installations upgrade through their built-in restart/update flow; settings and encrypted keys remain under `%LocalAppData%\UniversalSpellCheck.Data`. New installs do not require .NET. Installer-owned program files are replaced during updates; user data remains outside that directory. Keep any shared .NET runtime installed for other applications.
 
 ## License
 

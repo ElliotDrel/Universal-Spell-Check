@@ -43,7 +43,7 @@ shipping to production users.**
 ### Dev channel
 
 - **What it means:** Push code to `origin/main`. The Dev channel is updated by
-  doing `git pull` + `dotnet run -c Dev`. No versioning, no CI, no installer.
+  doing `git pull` + `cargo run --manifest-path rust/Cargo.toml --release`. No versioning, no CI, no installer.
 - **Hotkey when running:** Ctrl+Alt+D (yellow background on the Dev app icon)
 - **Auto-update:** None — Dev never auto-updates. It's always a manual pull + relaunch.
 - **Approval needed:** No. Push whenever changes are stable enough to test.
@@ -53,7 +53,7 @@ shipping to production users.**
 
 - **What it means:** Push a semver tag (`v*.*.*`) to origin, **along with the
   `main` branch** so `origin/main` is never left behind the released commit. The
-  tag triggers `.github/workflows/release.yml` — `dotnet publish` → `vpk pack` →
+  tag triggers `.github/workflows/release.yml` — production Rust build via `rust/package.ps1` → `vpk pack` →
   `vpk upload github` → GitHub Release created. All installed prod copies
   install updates via Velopack on startup/restart; the 4-hour periodic check prepares downloads for the next restart.
 - **Hotkey when running:** Ctrl+Alt+U
@@ -108,7 +108,7 @@ Run cleanup even when production approval or an external failure prevents public
 - Loading both sub-files on ambiguous intent — ask the user instead.
 - Asking for redundant approval after a clear production publish request.
 - Pushing a dirty working tree under any circumstances, even if the user asks.
-- Pushing a prod tag without a preceding `dotnet build -c Release` passing.
+- Pushing a prod tag without a preceding `cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features` passing.
 - Skipping the acceptance checklist because "the build passed."
 - Pushing from any branch other than `main`.
 

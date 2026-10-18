@@ -4,7 +4,7 @@
 numbers, create tags, trigger CI, or affect the Prod channel in any way.
 
 Push current changes to `origin/main` so the Dev channel can be updated via
-`git pull` + `dotnet run -c Dev`. No versioning, no approval gate, no CI pipeline.
+`git pull` + `cargo run --manifest-path rust/Cargo.toml --release`. No versioning, no approval gate, no CI pipeline.
 
 ---
 
@@ -28,7 +28,7 @@ git branch --show-current
 Confirm the code compiles before testing anything:
 
 ```powershell
-dotnet build src/UniversalSpellCheck.csproj -c Dev
+cargo build --locked --manifest-path rust/Cargo.toml --release
 ```
 
 If the build fails, stop. Fix the build error first. Do not proceed to testing a
@@ -41,7 +41,7 @@ broken build.
 Start the Dev channel:
 
 ```powershell
-dotnet run --project src/UniversalSpellCheck.csproj -c Dev
+cargo run --manifest-path rust/Cargo.toml --release
 ```
 
 `src/AGENTS.md` holds the current manual acceptance checklist. Run the checks
@@ -102,4 +102,4 @@ If any of these are not true, the deploy is not complete.
 ## Done
 
 Dev channel is updated. Report to the user: branch (`main`), commit SHA that
-landed on origin, and that `git pull` + `dotnet run -c Dev` will pick up the changes.
+landed on origin, and that `git pull` + `cargo run --manifest-path rust/Cargo.toml --release` will pick up the changes.

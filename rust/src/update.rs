@@ -52,8 +52,10 @@ impl Updater {
                 let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||->Result<(),String>{
                     let Some(manager)=manager.as_ref()else{if matches!(trigger,Trigger::Restart){return Err("Restart updates require an installed production app.".into());}return Ok(());};
                     if matches!(trigger,Trigger::Restart){
+                        logger.event("restart_requested");
                         let downloaded=pending.as_ref().map(|u|u.TargetFullRelease.clone()).or_else(||manager.get_update_pending_restart());
                         if let Some(update)=downloaded {
+                            logger.event(format!("update_apply_now version={}",update.Version));
                             manager.wait_exit_then_apply_updates(&update,true,true,Vec::<String>::new()).map_err(|e|e.to_string())?;
                         } else {
                             let locator=velopack::locator::auto_locate_app_manifest(velopack::locator::LocationContext::FromCurrentExe).map_err(|e|e.to_string())?;
@@ -61,17 +63,21 @@ impl Updater {
                         }
                         bus.send(UiEvent::ReadyToExit);return Ok(());
                     }
+                    logger.event(format!("update_check_start trigger={trigger:?}"));
                     *status.lock().unwrap_or_else(|p|p.into_inner())="Checking for updates...".into();bus.send(UiEvent::Update("Checking for updates...".into()));
                     match manager.check_for_updates().map_err(|e|e.to_string())?{
                         UpdateCheck::UpdateAvailable(update)=>{
                             *status.lock().unwrap_or_else(|p|p.into_inner())=format!("Downloading {}",update.TargetFullRelease.Version);
+                            logger.event(format!("update_download_start version={}",update.TargetFullRelease.Version));
                             manager.download_updates(&update,None).map_err(|e|e.to_string())?;
+                            logger.event(format!("update_download_done version={}",update.TargetFullRelease.Version));
                             *status.lock().unwrap_or_else(|p|p.into_inner())=format!("Version {} ready — restart to update",update.TargetFullRelease.Version);
                             pending=Some(update);
-                            if matches!(trigger,Trigger::Launch){manager.wait_exit_then_apply_updates(&**pending.as_ref().unwrap(),true,true,Vec::<String>::new()).map_err(|e|e.to_string())?;bus.send(UiEvent::ReadyToExit);}
+                            if matches!(trigger,Trigger::Launch){logger.event(format!("update_apply_now version={}",pending.as_ref().unwrap().TargetFullRelease.Version));manager.wait_exit_then_apply_updates(&**pending.as_ref().unwrap(),true,true,Vec::<String>::new()).map_err(|e|e.to_string())?;bus.send(UiEvent::ReadyToExit);}
                         }
                         _=>{pending=None;*status.lock().unwrap_or_else(|p|p.into_inner())="Up to date".into();if matches!(trigger,Trigger::Manual){bus.send(UiEvent::Notify("Up to date".into(),format!("You're on the latest version (v{}).",channel::VERSION)));}}
                     }
+                    logger.event(format!("update_check_done trigger={trigger:?} result={}",serde_json::to_string(&*status.lock().unwrap_or_else(|p|p.into_inner())).unwrap_or_default()));
                     let _=std::fs::write(store.directory.join("last-update-check.txt"),time::OffsetDateTime::now_utc().to_string());Ok(())
                 })).unwrap_or_else(|_|Err("The update check stopped after an internal error; the current app remains available.".into()));
                 if let Err(error)=result{

@@ -9,7 +9,7 @@ published, invoke the installed production executable with its native command:
 
 Use the actual installed path with normal machine access; sandbox LocalAppData redirection is not the installation. On builds with `--restart`, it requests a graceful restart through Velopack; normal startup checks/downloads/installs the newest release automatically. It sends one progress notice; failure sends an additional notice and leaves the current version available. `--update` remains a compatibility alias. No repository script, GitHub CLI, Python, or UI automation is needed to trigger it.
 
-For a running instance, exit 0 acknowledges the request, not installation completion. Exit 1 means delivery failed or Dev was invoked. Verify completion using the read-logs skill: `restart_command_received`, `restart_requested`, a fresh Prod `started`, and `update_check_done` for the new PID. When an update exists, also expect `update_download_done` and `update_apply_now` before the final restart. Verify the running process and installed DLL version match the expected release. A current app still restarts when requested. Poll in bounded intervals; after five minutes without convergence, inspect failure logs and report installation as incomplete.
+For a running instance, exit 0 acknowledges the request, not installation completion. Exit 1 means delivery failed or Dev was invoked. Verify completion using the read-logs skill: `restart_command_received`, `restart_requested`, a fresh Prod `started`, and `update_check_done` for the new PID. When an update exists, also expect `update_download_done` and `update_apply_now` before the final restart. Verify the running process and installed executable ProductVersion and package manifest version match the expected release. A current app still restarts when requested. Poll in bounded intervals; after five minutes without convergence, inspect failure logs and report installation as incomplete.
 
 Do not independently download releases, hash staged packages, stop/restart the
 app from PowerShell, or invoke `Update.exe` during normal publishing. The app owns
@@ -21,3 +21,5 @@ For the one release that introduces it, use the existing app's downloaded update
 prompt (or the installed updater to apply its already-staged package) once. Never
 pass `--update` to an older binary and claim it performed an update. Subsequent
 publishes use only the native command above.
+
+Rust releases use the same native command and package identity. Rust logs retain `started`, `update_check_start`, `update_download_done`, `update_apply_now`, `restart_requested`, and `update_check_done`; match implementation/version/PID rather than requiring C#-specific event fields. Verify `current/UniversalSpellCheck.exe` ProductVersion, the running PID/path and fresh started event. There is no production C# DLL in the Rust payload.
