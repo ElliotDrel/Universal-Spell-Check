@@ -1,6 +1,18 @@
 # Rust Port and Performance Handoff
 
-## Active Rust Port - October 17, 2026
+## Production Rust release - October 18, 2026
+
+- Published [v0.13.0](https://github.com/ElliotDrel/Universal-Spell-Check/releases/tag/v0.13.0), release commit `2f214400b231cc7cca6f9c2d9bba3bffbe84d809`. [Release CI](https://github.com/ElliotDrel/Universal-Spell-Check/actions/runs/39175621953) and both independent Rust checks succeeded. CI runs the actual generated installer, compares exact installed/build bytes and version, requires real native startup readiness, and removes its disposable test installation before publication.
+- Elliot explicitly authorized publication and observing the actual laptop update instead of another private transition. Used only installed `UniversalSpellCheck.exe --restart`; no manual package application or replacement of installed files.
+- Observed C# PID 27476 restart to C# PID 10204, download/apply v0.13.0, then Rust PID 33684 from the same installed executable path. A second built-in Rust restart started PID 11784 and checked the public feed as `Up to date`. Installed executable ProductVersion and `sq.version` both report 0.13.0; the manifest retains package ID UniversalSpellCheck, channel win, win-x64 and the original executable name.
+- Verified byte-identical settings and encrypted API keys, unchanged login startup registration, original data/log directory and no old C# DLL in `current`. The installed payload contains the Rust exe, replacements, package manifest and all four license files. Shared .NET runtimes and user data were not removed.
+- Preserve primary `benchmark_runs/rust-port/production-release/`: before/after integrity, published release and CI metadata, approved-reader `upgrade-runtime.jsonl`, `release-completion.json` and verification scripts. The completed public transition had no update failures; no application patch/republication was needed. Retain prior benchmark/acceptance evidence and all backups.
+- The source-of-truth checkout is now primary `main`. All port, release, closeout and tooling fixes are pushed. The managed Rust-port worktree is archived at closeout; inspect attached artifacts before attempting reuse. Preserve the unrelated formatting worktree.
+- Fixed a log-reader export issue discovered during closeout: empty `--json` results now put human status on stderr rather than contaminating JSONL stdout. Two new CLI cases and the existing cross-midnight case passed through stdlib invocation; pytest is not installed. This tooling-only follow-up does not require a new app version.
+- [Issue #5](https://github.com/ElliotDrel/Universal-Spell-Check/issues/5) tracks inherited ChatGPT rich-link chip-label preservation. Do not claim it fixed. Legacy migration stress, rollback and every historical installation remain outside this MVP acceptance.
+- Release/updater restarts were authorized for this run. New focus/clipboard tests still require a fresh idle-desktop window. Continue development in a fresh worktree following normal project rules.
+
+## Historical Rust Port - October 17, 2026
 
 This section supersedes the historical cleanup and pre-port instructions below.
 

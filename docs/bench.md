@@ -346,3 +346,10 @@ The following preparation/run sequence was executed October 18. Its pre-run stat
 - Stop only task-created editor candidates/windows, restore the exact installed C# executable if it was stopped, and verify its running version plus byte-identical settings/encrypted key and unchanged login startup entry. Preserve the private synthetic Google Doc as evidence; leave the ChatGPT composer unsent and clear its test draft before closing.
 
 Installer argument sources: [Velopack Windows setup CLI](https://docs.velopack.io/reference/cli/content/setup-windows), [Windows updater CLI](https://docs.velopack.io/reference/cli/content/update-windows). The private feed tests installed package behavior, not public GitHub publication or the production C#-to-Rust release transition.
+
+### Public Rust release transition, October 18, 2026
+
+- Published v0.13.0 from commit `2f21440` after release CI and independent Dev/Prod checks passed. The release workflow builds locked production Rust, preserves the old package identity/feed, validates native version metadata, and actually installs/launches the generated installer before upload.
+- The laptop's existing installed C# v0.12.3 accepted its built-in `--restart` request, restarted, downloaded/applied v0.13.0 and launched Rust PID33684. A second native Rust restart launched PID11784 and completed a successful public-feed `Up to date` check.
+- Verified installed executable and package manifest version 0.13.0, unchanged settings/encrypted keys/login startup, and removal of the old C# DLL from the active payload. No manual package apply, data deletion or app patch release was needed.
+- Retain primary `benchmark_runs/rust-port/production-release/` release/CI metadata, integrity snapshots, approved-reader upgrade events and completion report. This validates one current C# installation transition plus CI fresh install; it is not a new speed run or a guarantee about every older configuration.
