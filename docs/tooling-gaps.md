@@ -25,3 +25,9 @@ through the shell. No browser connection or browser actions occurred. The
 runtime exposes no callable feedback path in this session; this records the
 individual tool gap locally. Fix the runtime sandbox's access to its installed
 plugin path; do not bypass the mandatory browser surface with another driver.
+
+## Resolved: empty JSON log-reader results (2026-10-18)
+
+- Public C#-to-Rust upgrade evidence export encountered an empty optional event filter. The reader's JSON mode wrote a human status sentence to stdout, breaking JSONL consumers.
+- Empty-file and empty-filter status now goes to stderr in JSON mode; stdout remains an empty JSONL stream. Human output is unchanged.
+- Two CLI regressions cover both empty paths and the human-readable control. This is tooling-only; it does not change the released application.

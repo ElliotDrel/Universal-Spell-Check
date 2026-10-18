@@ -352,7 +352,8 @@ def main():
     if not files and args.save_replay_case:
         parser.error("No log files found for replay export")
     if not files:
-        print(f"No log files found for {from_date} to {to_date}")
+        print(f"No log files found for {from_date} to {to_date}",
+              file=sys.stderr if args.json_out else sys.stdout)
         sys.exit(0)
 
     results = []
@@ -450,7 +451,7 @@ def main():
         return
 
     if not results:
-        print("No matching log entries found.")
+        print("No matching log entries found.", file=sys.stderr if args.json_out else sys.stdout)
         return
 
     for ts, channel, version, pid, event, rest, raw in results:

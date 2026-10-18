@@ -285,3 +285,25 @@ def test_export_hydrates_native_docs_payload_and_checks_integrity(tmp_path):
     (path.parent / "native.txt").write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="integrity"):
         _reader().make_replay_case(entry, tmp_path)
+
+
+def test_json_empty_directory_keeps_stdout_parseable(tmp_path):
+    result = subprocess.run([sys.executable, str(SCRIPT), "--log-dir", str(tmp_path),
+                             "--json"], capture_output=True, text=True, check=True)
+    assert result.stdout == ""
+    assert "No log files found" in result.stderr
+
+
+def test_json_empty_filter_keeps_stdout_parseable(tmp_path):
+    today = date.today()
+    (tmp_path / f"spellcheck-{today}.jsonl").write_text(
+        f"{today}T12:00:00 channel=prod app_version=0.13.0 pid=1 started implementation=rust\n",
+        encoding="utf-8",
+    )
+    command = [sys.executable, str(SCRIPT), "--log-dir", str(tmp_path),
+               "--event", "update_apply_failed"]
+    result = subprocess.run(command + ["--json"], capture_output=True, text=True, check=True)
+    assert result.stdout == ""
+    assert "No matching log entries" in result.stderr
+    human = subprocess.run(command, capture_output=True, text=True, check=True)
+    assert "No matching log entries" in human.stdout
