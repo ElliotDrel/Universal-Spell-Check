@@ -288,8 +288,29 @@ UTF-8 sidecars for `input_text`, `clipboard_html`, `clipboard_rtf`, `clipboard_f
 `readback_text/html/rtf/formats`. Entries expose relative `path`, SHA-256 `sha256`, UTF-8 `bytes`,
 .NET UTF-16 `chars`, `complete` and `status`. Empty source markup is complete only when the format list confirms that flavor is absent.
 An offered-but-empty flavor or an unavailable format list is explicitly incomplete, as are null values. Inline 512K markup caps remain, but the sidecars preserve
-larger ordinary selections. A 16MiB per-payload cap and 256MiB total evidence store cap explicitly
-return `size_limit` / `storage_limit` instead of deleting existing data. Evidence is local and can
+larger ordinary selections. The Rust store retains the 16MiB per-payload cap (`size_limit`) and 256MiB total
+cap. The former stop-at-full policy is superseded: when a write needs space,
+Rust reconciles the quota counter against actual files, then removes oldest
+eligible whole-run folders until the pending write fits near 192MiB. This runs
+on the optional evidence worker under the existing shared cross-channel mutex;
+it adds no clipboard/UI work or correction-thread waits. Ordinary JSONL logs,
+settings, keys, and separately exported replay cases are not rotated.
+
+Only 32-hex run folders containing known regular evidence files are eligible.
+Current runs, incomplete runs modified within 24 hours, backups/custom files,
+nested directories, and reparse points are preserved. Incomplete abandoned
+runs become eligible after 24 hours. If protected content or an I/O error
+prevents reclamation, evidence reports `storage_limit` or `failed`; corrections
+continue. `developer_evidence_pruned` records removed run/byte counts;
+`developer_evidence_storage_failed` records storage errors. A locked run is skipped
+so other runs can be reclaimed; `developer_evidence_storage_pressure` records
+blocked-run counts or insufficient reclaimable capacity. Storage warnings are
+limited to one per run. A partly pruned run can retain its manifest with missing
+payloads; replay reports required missing data explicitly and omits missing optional
+payloads. Optional storage workers wait up to 15 seconds for their shared mutex;
+the correction thread never waits for this work. Historical manifest
+references may expire; export a replay case before preserving a specific incident.
+The retained C# reference keeps its historical stop-at-full policy. Evidence is local and can
 contain selected text and surrounding editor content; API key/settings files are never included.
 
 `contexts` links automatic `before-source` and `after-paste` captures with requested/captured/completed
@@ -310,7 +331,7 @@ best-effort background STA worker with a 500ms deadline and clipboard sequence c
 blocks later readback jobs rather than accumulating workers. Absent formats, failures and races are
 explicit; a successful read proves the clipboard state at its timestamp, not the editor rendering.
 Evidence admission permits at most two in-flight runs. Shared cross-channel quota reservations
-are serialized with a named mutex; a failed write may conservatively overcount space.
+are serialized with a named mutex; a failed write may conservatively overcount space until the next pressure-triggered reconciliation.
 
 `--developer-evidence-smoke` runs the rebuilt native executable with a disposable RichTextBox,
 real Ctrl+C/Ctrl+V, enabled readback and automatic images, disabled readback, live settings cache

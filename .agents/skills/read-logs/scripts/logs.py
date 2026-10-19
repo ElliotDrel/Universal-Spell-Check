@@ -63,9 +63,9 @@ def make_replay_case(entry, log_dir):
                 manifest = json.loads(path.read_text(encoding="utf-8"))
             except FileNotFoundError as exc:
                 if developer.get("status") != "pending":
-                    raise ValueError("Developer evidence is not saved yet; retry after capture finishes") from exc
+                    raise ValueError("Developer evidence manifest is missing (possibly pruned); use a saved replay case or complete inline inputs") from exc
                 manifest_pending = True
-                evidence_warning = "Developer evidence is pending; replay uses validated complete inline inputs only"
+                evidence_warning = "Developer evidence is pending or pruned; replay uses validated complete inline inputs only"
             if manifest is not None and (not isinstance(manifest, dict)
                     or manifest.get("schema_version") != 1 or manifest.get("run_id") != detail.get("run_id")):
                 raise ValueError("Developer evidence schema or run identity does not match")
@@ -82,7 +82,12 @@ def make_replay_case(entry, log_dir):
                 if required:
                     raise ValueError(f"Incomplete developer evidence: {field}")
                 return None
-            raw = _contained_path(path.parent, item["path"]).read_bytes()
+            try:
+                raw = _contained_path(path.parent, item["path"]).read_bytes()
+            except FileNotFoundError as exc:
+                if required:
+                    raise ValueError(f"Missing replay evidence (possibly partially pruned): {field}") from exc
+                return None
             if len(raw) != item.get("bytes") or hashlib.sha256(raw).hexdigest() != item.get("sha256"):
                 raise ValueError(f"Developer evidence integrity check failed: {field}")
             value = raw.decode("utf-8")
@@ -94,7 +99,7 @@ def make_replay_case(entry, log_dir):
         if (not isinstance(value, str) or detail.get(field + "_truncated")
                 or detail.get(count_key, _utf16_chars(value) if isinstance(value, str) else -1) != _utf16_chars(value or "")):
             if required:
-                note = "; developer evidence is pending, retry after capture finishes" if manifest_pending else ""
+                note = "; developer evidence is pending or pruned; retry pending capture or use a saved replay case" if manifest_pending else ""
                 raise ValueError(f"Missing or truncated replay evidence: {field}{note}")
             return None
         return value

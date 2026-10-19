@@ -2,7 +2,7 @@
 
 ## Overview
 
-The product is the native Rust tray app and dashboard under `rust/`. `main.rs` bootstraps Velopack; `app.rs` owns tray/hotkey lifetime; `runtime.rs` runs corrections; `dashboard.rs` owns the GUI; `update.rs` owns serialized update work; `store.rs` and `platform.rs` retain compatible settings, DPAPI keys and legacy-data migration. Channel constants are generated from `src/BuildChannel.cs`.
+The product is the native Rust tray app and dashboard under `rust/`. `main.rs` bootstraps Velopack; `app.rs` owns tray/hotkey lifetime; `runtime.rs` runs corrections; `dashboard.rs` owns the GUI; `update.rs` owns serialized update work; `store.rs` and `platform.rs` retain compatible settings, DPAPI keys and legacy-data migration. Channel constants are generated from `src/BuildChannel.cs`. Optional evidence uses `evidence.rs` for capture and `evidence_storage.rs` for bounded storage and oldest-first retention; both channels share its existing named mutex.
 
 The sections below document the retained C#/.NET 10 reference under `src/`. It bootstraps via Velopack, registers a global hotkey, and runs a clipboard-capture → API-request → post-process → paste pipeline. AHK is archived at `.archive/ahk-legacy/` and is not part of the active system.
 
@@ -229,7 +229,7 @@ Triggered by `v*.*.*` tags. Steps: checkout → dotnet publish Release win-x64 �
 - Use one app-lifetime native WinHTTP session/connection with automatic proxy discovery and HTTP/2 enabled. Keep each request's body, headers and read buffer alive through `HANDLE_CLOSING`; enforce a 30-second deadline per attempt, matching two attempts and a 500 ms retry interval.
 - Keep shared stamped log timestamps at event time while writing asynchronously; flush through a bounded barrier on orderly shutdown.
 - Save the existing named DPAPI key collection with synchronized temporary-file contents and atomic replacement. Preserve corrupt files rather than overwriting them with defaults.
-- Keep bounded screenshot and UIA workers off the correction path; preserve the existing cross-channel conservative evidence quota and explicit failure/busy statuses.
+- Keep bounded screenshot and UIA workers off the correction path; preserve the existing cross-channel bounded evidence storage with oldest-first Rust retention and explicit failure/busy statuses.
 - Queue and deduplicate restart requests during update checks. Use the existing updater's `start --waitPid` wire behavior, then let normal startup own the unified update check/install flow.
 - Keep synthetic C# golden cases under `rust/tests/fixtures/`; do not add real runtime logs, copied selections or credentials to source control.
 
