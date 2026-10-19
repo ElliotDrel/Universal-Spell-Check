@@ -1,7 +1,7 @@
 # Model Configuration & API Integration
 
 **Endpoint (all models):** `https://api.openai.com/v1/responses`
-**Timeouts (Rust):** WinHTTP resolve/connect 5s each; send/receive 30s each (`rust/src/http.rs`). These phase limits are not a single total-request deadline.
+**Timeouts (Rust):** Each attempt shares one 30s deadline across send, receive, and body reads (`Client::once` in `rust/src/http.rs`). WinHTTP additionally sets resolve/connect limits of 5s each and send/receive limits of 30s each. A retryable failure or response can trigger one second attempt after a 500ms pause, so the overall call can exceed 30s.
 
 ## Current caller
 
