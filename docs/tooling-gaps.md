@@ -31,3 +31,9 @@ plugin path; do not bypass the mandatory browser surface with another driver.
 - Public C#-to-Rust upgrade evidence export encountered an empty optional event filter. The reader's JSON mode wrote a human status sentence to stdout, breaking JSONL consumers.
 - Empty-file and empty-filter status now goes to stderr in JSON mode; stdout remains an empty JSONL stream. Human output is unchanged.
 - Two CLI regressions cover both empty paths and the human-readable control. This is tooling-only; it does not change the released application.
+
+## Resolved: failed Rust corrections missing from error audits (2026-10-18)
+
+- The post-release audit found a failed copy in `spellcheck_detail` and `run_completed`, but `logs.py --errors` hid both because it matched only a fixed list of event names.
+- Error filtering now includes failure event names and structured correction failure statuses while retaining legacy retry/guard events. It does not interpret successful selected text or evidence-storage diagnostics as correction failures.
+- A synthetic CLI regression covers Rust failures, legacy events, successful runs, unrelated diagnostics, and malformed detail payloads. This changes audit tooling only; no production capture behavior changes.

@@ -307,3 +307,31 @@ def test_json_empty_filter_keeps_stdout_parseable(tmp_path):
     assert "No matching log entries" in result.stderr
     human = subprocess.run(command, capture_output=True, text=True, check=True)
     assert "No matching log entries" in human.stdout
+
+
+def test_errors_includes_rust_failures_and_preserves_legacy_events(tmp_path):
+    today = date.today()
+    events = [
+        ('run_completed', 'run_id=test status=run_failed total_ms=3'),
+        ('spellcheck_detail', json.dumps({'status': 'run_failed', 'error_message': 'No text copied'})),
+        ('spellcheck_detail', json.dumps({'status': 'request_failed'})),
+        ('update_check_failed', 'reason=test'),
+        ('run_failed', 'reason=panic'),
+        ('request_retrying', 'attempt=1'),
+        ('guard_rejected', 'reason=updating'),
+        ('run_completed', 'status=success total_ms=2'),
+        ('spellcheck_detail', json.dumps({'status': 'success', 'input_text': 'request_failed'})),
+        ('developer_evidence_completed', 'status=storage_limit'),
+        ('spellcheck_detail', '{malformed'),
+        ('spellcheck_detail', '[]'),
+        ('spellcheck_detail', json.dumps({'status': None})),
+    ]
+    lines = [f'{today}T12:00:00 channel=prod app_version=0.13.0 pid=1 {event} {rest}\n'
+             for event, rest in events]
+    (tmp_path / f'spellcheck-{today}.jsonl').write_text(''.join(lines), encoding='utf-8')
+    result = subprocess.run([sys.executable, str(SCRIPT), '--log-dir', str(tmp_path),
+                             '--today', '--errors', '--json'],
+                            capture_output=True, text=True, check=True)
+    rows = [json.loads(line) for line in result.stdout.splitlines()]
+    assert len(rows) == 7
+    assert [row['event'] for row in rows] == [event for event, _ in events[:7]]

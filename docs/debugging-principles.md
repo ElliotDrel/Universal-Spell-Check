@@ -5,7 +5,7 @@
 When root cause is unclear, add logging first, analyze the output, then fix. No guessing patches.
 
 1. Add targeted log lines around the suspected failure point.
-2. Rebuild and relaunch — a code change is not running until the process is stopped and rebuilt (`dotnet run -c Dev` or publish+install for Prod).
+2. Rebuild and relaunch — a code change is not running until the process is stopped and rebuilt (Rust Dev: `cargo build --manifest-path rust/Cargo.toml --release`, then relaunch the built app; Prod: publish and install). `dotnet run -c Dev` applies only to the retained C# reference.
 3. Reproduce the failure and read the log.
 4. Implement a fix based on data, not assumptions.
 

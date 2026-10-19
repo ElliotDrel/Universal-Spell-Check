@@ -126,10 +126,14 @@ Every run logs what the source app offered: `clipboard_html` (CF_HTML verbatim),
 
 ## Error events caught by `--errors`
 
-`request_failed`, `request_retrying`, `capture_failed`, `paste_failed`,
-`replacements_reload_failed`, `guard_rejected`, `connection_warm_failed`,
-`data_migration_failed`, `activity_load_failed`. A successful `spellcheck_detail`
-can still represent wrong or missing text; `--errors` cannot detect that.
+All events ending in `_failed`, plus legacy `request_retrying` and
+`guard_rejected` events. Failed `run_completed` and `spellcheck_detail` rows
+are also included when their status is `failed` or ends in `_failed`, covering
+Rust's `run_failed` and `request_failed` completion statuses. The same failed
+run may appear as both a summary and a detail row; match `run_id` when counting.
+A successful `spellcheck_detail` can still represent wrong or missing text;
+`--errors` cannot detect that. Evidence statuses such as `storage_limit` remain
+separate diagnostics.
 
 ## Key event names (for `--event`)
 
