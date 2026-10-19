@@ -1,11 +1,11 @@
 # Model Configuration & API Integration
 
 **Endpoint (all models):** `https://api.openai.com/v1/responses`
-**Timeout:** 30s (set on `HttpClient` in `OpenAiSpellcheckService`)
+**Timeouts (Rust):** Each attempt shares one 30s deadline across send, receive, and body reads (`Client::once` in `rust/src/http.rs`). WinHTTP additionally sets resolve/connect limits of 5s each and send/receive limits of 30s each. A retryable failure or response can trigger one second attempt after a 500ms pause, so the overall call can exceed 30s.
 
 ## Current caller
 
-`src/OpenAiSpellcheckService.cs` — persistent app-lifetime `HttpClient`, sends directly to the Responses API. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
+`rust/src/http.rs` — persistent app-lifetime WinHTTP session/connection, sends directly to the Responses API. `src/OpenAiSpellcheckService.cs` is the retained C# reference with its own `HttpClient`. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
 ## API key storage
 

@@ -143,6 +143,23 @@ def parse_kv(s):
     return result
 
 
+def is_error_event(event, rest):
+    """Recognize both legacy error events and Rust correction failure statuses."""
+    if event in ERROR_EVENTS or event.endswith("_failed"):
+        return True
+    if event == "spellcheck_detail":
+        try:
+            detail = json.loads(rest)
+        except json.JSONDecodeError:
+            return False
+        status = detail.get("status") if isinstance(detail, dict) else None
+    elif event == "run_completed":
+        status = parse_kv(rest).get("status")
+    else:
+        return False
+    return isinstance(status, str) and (status == "failed" or status.endswith("_failed"))
+
+
 def format_detail(d, ts, channel):
     status = d.get("status", "?")
     model = d.get("model", "?")
@@ -379,7 +396,7 @@ def main():
                     continue
 
                 if args.errors:
-                    if event not in ERROR_EVENTS:
+                    if not is_error_event(event, rest):
                         continue
                 elif args.event and event != args.event:
                     continue
