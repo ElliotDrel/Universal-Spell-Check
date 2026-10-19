@@ -4,9 +4,7 @@ use crate::{
     store::{Store, wide},
 };
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::{
-    fs,
     path::Path,
     ptr::{null, null_mut},
     sync::{
@@ -70,7 +68,14 @@ impl Evidence {
         let _ = thread::Builder::new()
             .name("evidence-save".into())
             .spawn(move || {
-                let result = save_inner(&store, &detail, &self.source, &paste, vec![before, after]);
+                let result = save_inner(
+                    &store,
+                    &logger,
+                    &detail,
+                    &self.source,
+                    &paste,
+                    vec![before, after],
+                );
                 logger.data(
                     "developer_evidence_completed",
                     json!({"run_id":detail["run_id"],"reference":result}),
@@ -284,7 +289,14 @@ fn screenshot(hwnd: usize) -> Result<Vec<u8>, String> {
         Ok(png)
     }
 }
-fn quota_write(root: &Path, id: &str, name: &str, bytes: &[u8]) -> Value {
+fn quota_write(
+    root: &Path,
+    id: &str,
+    name: &str,
+    bytes: &[u8],
+    logger: &Logger,
+    warned: &mut bool,
+) -> Value {
     if bytes.len() > 16 * 1024 * 1024 {
         return json!({"status":"size_limit","complete":false});
     }
@@ -293,61 +305,50 @@ fn quota_write(root: &Path, id: &str, name: &str, bytes: &[u8]) -> Value {
         if mutex.is_null() {
             return json!({"status":"storage_busy"});
         }
-        let status = WaitForSingleObject(mutex, 1000);
+        let status = WaitForSingleObject(mutex, 15_000);
         if status != WAIT_OBJECT_0 && status != WAIT_ABANDONED {
             CloseHandle(mutex);
             return json!({"status":"storage_busy"});
         }
-        let result = (|| -> Result<Value, String> {
-            fs::create_dir_all(root).map_err(|e| e.to_string())?;
-            let counter = root.join(".reserved-bytes");
-            let used = fs::read_to_string(&counter)
-                .ok()
-                .and_then(|s| s.trim().parse::<u64>().ok())
-                .unwrap_or_else(|| size(root));
-            if used + bytes.len() as u64 > 256 * 1024 * 1024 {
-                return Ok(json!({"status":"storage_limit","complete":false}));
-            }
-            fs::write(counter, (used + bytes.len() as u64).to_string())
-                .map_err(|e| e.to_string())?;
-            let directory = root.join(id);
-            fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-            fs::write(directory.join(name), bytes).map_err(|e| e.to_string())?;
-            Ok(
-                json!({"path":name,"sha256":format!("{:x}",Sha256::digest(bytes)),"bytes":bytes.len(),"complete":true,"status":"ok"}),
-            )
-        })();
+        let result = crate::evidence_storage::write_locked(
+            root,
+            id,
+            name,
+            bytes,
+            crate::evidence_storage::STORE_LIMIT,
+        );
         ReleaseMutex(mutex);
         CloseHandle(mutex);
-        result.unwrap_or_else(|_| json!({"status":"failed","complete":false}))
-    }
-}
-fn size(root: &Path) -> u64 {
-    let mut total = 0;
-    let mut count = 0;
-    let mut pending = vec![root.to_path_buf()];
-    while let Some(dir) = pending.pop() {
-        for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-            count += 1;
-            if count > 20000 {
-                return 256 * 1024 * 1024;
-            }
-            if let Ok(meta) = entry.metadata() {
-                if meta.is_dir() {
-                    pending.push(entry.path());
-                } else {
-                    total += meta.len();
+        match result {
+            Ok((value, rotation)) => {
+                if rotation.bytes > 0 {
+                    logger.data(
+                        "developer_evidence_pruned",
+                        json!({"runs":rotation.runs,"bytes":rotation.bytes}),
+                    );
                 }
+                if (rotation.blocked_runs > 0 || value["status"] == "storage_limit") && !*warned {
+                    logger.data("developer_evidence_storage_pressure", json!({"run_id":id,"status":value["status"],"blocked_runs":rotation.blocked_runs,"stored_bytes":value["stored_bytes"],"required_bytes":value["required_bytes"]}));
+                    *warned = true;
+                }
+                value
             }
-            if total > 256 * 1024 * 1024 {
-                return total;
+            Err(error) => {
+                if !*warned {
+                    logger.data(
+                        "developer_evidence_storage_failed",
+                        json!({"run_id":id,"error":error.to_string()}),
+                    );
+                    *warned = true;
+                }
+                json!({"status":"failed","complete":false})
             }
         }
     }
-    total
 }
 fn save_inner(
     store: &Store,
+    logger: &Logger,
     detail: &Value,
     source: &(usize, u32, String),
     paste: &(usize, u32, String),
@@ -356,6 +357,7 @@ fn save_inner(
     let id = detail["run_id"].as_str().unwrap_or("unknown");
     let root = store.log_directory.join("developer-evidence");
     let mut payloads = serde_json::Map::new();
+    let mut storage_warned = false;
     let mut detail = detail.clone();
     if let Some(readback) = detail["clipboard_readback"].as_object().cloned() {
         for (key, value) in readback {
@@ -383,7 +385,14 @@ fn save_inner(
     ] {
         let result = match detail[name].as_str() {
             Some(text) => {
-                let mut v = quota_write(&root, id, &format!("{name}.txt"), text.as_bytes());
+                let mut v = quota_write(
+                    &root,
+                    id,
+                    &format!("{name}.txt"),
+                    text.as_bytes(),
+                    logger,
+                    &mut storage_warned,
+                );
                 v["chars"] = json!(text.encode_utf16().count());
                 v
             }
@@ -395,7 +404,14 @@ fn save_inner(
     for context in contexts {
         let image = match context.image {
             Some(rx) => match rx.recv_timeout(Duration::from_millis(1500)) {
-                Ok(Ok(bytes)) => quota_write(&root, id, &format!("{}.png", context.phase), &bytes),
+                Ok(Ok(bytes)) => quota_write(
+                    &root,
+                    id,
+                    &format!("{}.png", context.phase),
+                    &bytes,
+                    logger,
+                    &mut storage_warned,
+                ),
                 Ok(Err(e)) => json!({"status":e}),
                 Err(_) => json!({"status":"timeout"}),
             },
@@ -409,7 +425,14 @@ fn save_inner(
     }
     let manifest = json!({"schema_version":1,"run_id":id,"channel":channel::CHANNEL,"app_version":channel::VERSION,"created_at":now(),"source_target":{"hwnd":source.0,"pid":source.1,"process":source.2},"paste_target":{"hwnd":paste.0,"pid":paste.1,"process":paste.2},"payloads":payloads,"contexts":captured,"clipboard_readback_boundary":detail["clipboard_readback"]["boundary"],"capture_contract":"Native screen pixels and bounded UIA; no rendering-completion claim"});
     let bytes = serde_json::to_vec(&manifest).unwrap_or_default();
-    let result = quota_write(&root, id, "manifest.json", &bytes);
+    let result = quota_write(
+        &root,
+        id,
+        "manifest.json",
+        &bytes,
+        logger,
+        &mut storage_warned,
+    );
     json!({"schema_version":1,"manifest_path":format!("developer-evidence/{id}/manifest.json"),"status":result["status"]})
 }
 // Verify before injecting input: a reader after SendInput can lock out the target's paste.

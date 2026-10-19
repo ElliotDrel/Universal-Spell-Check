@@ -13,6 +13,7 @@ mod desktop_bench;
 mod diff;
 mod docs_native;
 mod evidence;
+mod evidence_storage;
 mod http;
 mod logging;
 mod platform;

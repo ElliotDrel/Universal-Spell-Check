@@ -221,7 +221,7 @@ def test_pending_missing_manifest_uses_complete_inline_but_rejects_truncated(tmp
     assert "pending" in case["source"]["evidence_warning"]
     assert case["detail"]["clipboard_formats"] == "UnicodeText"
     entry["detail"]["clipboard_html_truncated"] = True
-    with pytest.raises(ValueError, match="pending, retry"):
+    with pytest.raises(ValueError, match="pending or pruned"):
         _reader().make_replay_case(entry, tmp_path)
 
 
@@ -335,3 +335,38 @@ def test_errors_includes_rust_failures_and_preserves_legacy_events(tmp_path):
     rows = [json.loads(line) for line in result.stdout.splitlines()]
     assert len(rows) == 7
     assert [row['event'] for row in rows] == [event for event, _ in events[:7]]
+
+
+def test_pruned_manifest_diagnostic_does_not_promise_eventual_availability(tmp_path):
+    entry = _replay_entry()
+    entry["detail"]["developer_evidence"] = {
+        "schema_version": 1, "status": "pending", "manifest_path": "expired/manifest.json"}
+    case = _reader().make_replay_case(entry, tmp_path)
+    assert "pruned" in case["source"]["evidence_warning"]
+    entry["detail"]["clipboard_html_truncated"] = True
+    try:
+        _reader().make_replay_case(entry, tmp_path)
+    except ValueError as error:
+        assert "pending or pruned" in str(error)
+    else:
+        raise AssertionError("Missing full evidence must not accept truncated inline inputs")
+    entry["detail"]["developer_evidence"]["status"] = "ok"
+    try:
+        _reader().make_replay_case(entry, tmp_path)
+    except ValueError as error:
+        assert "possibly pruned" in str(error)
+    else:
+        raise AssertionError("A missing saved manifest must fail explicitly")
+
+
+def test_partially_pruned_payload_has_explicit_diagnostic(tmp_path):
+    entry, path, manifest = _developer_entry(tmp_path)
+    (path.parent / "paste_text.txt").unlink()
+    assert _reader().make_replay_case(entry, tmp_path)["detail"]["input_text"] == entry["detail"]["input_text"]
+    (path.parent / "input_text.txt").unlink()
+    try:
+        _reader().make_replay_case(entry, tmp_path)
+    except ValueError as error:
+        assert "partially pruned" in str(error)
+    else:
+        raise AssertionError("Required missing payload must fail explicitly")
