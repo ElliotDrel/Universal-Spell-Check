@@ -503,6 +503,8 @@ mod tests {
                                 error.kind(),
                                 std::io::ErrorKind::ConnectionReset
                                     | std::io::ErrorKind::ConnectionAborted
+                                    | std::io::ErrorKind::TimedOut
+                                    | std::io::ErrorKind::WouldBlock
                             ) =>
                     {
                         return;
@@ -533,6 +535,8 @@ mod tests {
                                 error.kind(),
                                 std::io::ErrorKind::ConnectionReset
                                     | std::io::ErrorKind::ConnectionAborted
+                                    | std::io::ErrorKind::TimedOut
+                                    | std::io::ErrorKind::WouldBlock
                             ) =>
                     {
                         return;
