@@ -27,22 +27,35 @@ impl Protection {
         let mut entries = Vec::new();
         let mut output = String::with_capacity(text.len());
         let mut cursor = 0;
+        let mut spans = Vec::new();
         for found in LITERALS.captures_iter(text) {
             let cap = found.map_err(|_| "Literal protection exceeded its work limit")?;
             let m = cap.get(0).unwrap();
-            output.push_str(&text[cursor..m.start()]);
             let kind = ["url", "api_key", "uuid", "file_path", "opaque_id"]
                 .into_iter()
                 .find(|n| cap.name(n).is_some())
                 .unwrap();
+            spans.push((m.start(), m.end(), kind));
+        }
+        spans.extend(
+            crate::rich_links::literal_ranges(text)
+                .into_iter()
+                .map(|(start, end)| (start, end, "url")),
+        );
+        spans.sort_by_key(|(start, end, _)| (*start, std::cmp::Reverse(*end)));
+        for (start, end, kind) in spans {
+            if start < cursor {
+                continue;
+            }
+            output.push_str(&text[cursor..start]);
             let placeholder = format!("__USC_LITERAL_{namespace}_{}__", entries.len() + 1);
             output.push_str(&placeholder);
             entries.push(Literal {
                 placeholder,
-                value: m.as_str().to_owned(),
+                value: text[start..end].to_owned(),
                 kind: kind.to_owned(),
             });
-            cursor = m.end();
+            cursor = end;
         }
         output.push_str(&text[cursor..]);
         Ok(Self {
@@ -234,6 +247,29 @@ impl Default for Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn markdown_links_are_protected_as_complete_literals_before_the_model() {
+        for link in [
+            r"[Inbox](https://example.com/a_(b\))",
+            r"[Inbox](https://example.com/a_\(b\))",
+            r"[Inbox](https://example.com/a\))",
+            "[Project [2026]](https://example.com/a_(b))",
+        ] {
+            let input = format!("Fix teh word and keep {link} intact.");
+            let protection = Protection::new(&input).unwrap();
+            assert_eq!(protection.entries.len(), 1, "{link}");
+            assert_eq!(protection.entries[0].value, link);
+            assert_eq!(
+                protection.text,
+                "Fix teh word and keep __USC_LITERAL_0_1__ intact."
+            );
+            let result = Replacements::default()
+                .process(&protection.text.replace("teh", "the"), &protection)
+                .unwrap()
+                .0;
+            assert_eq!(result, input.replace("teh", "the"));
+        }
+    }
     #[test]
     fn protected_literal_failure_is_atomic() {
         let p = Protection::new("Use https://example.com and C:\\Data\\x.txt").unwrap();

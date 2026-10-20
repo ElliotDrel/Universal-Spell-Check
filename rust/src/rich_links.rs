@@ -18,11 +18,11 @@ struct LinkedNode {
     label: String,
     chip: bool,
 }
-struct Link<'a> {
+struct Link {
     start: usize,
     end: usize,
     label: String,
-    href: &'a str,
+    href: String,
 }
 pub struct Projection {
     pub html: String,
@@ -88,7 +88,7 @@ fn unescape(text: &str) -> String {
     }
     out
 }
-fn links(text: &str) -> Vec<Link<'_>> {
+fn links(text: &str) -> Vec<Link> {
     let bytes = text.as_bytes();
     let mut found = Vec::new();
     let mut i = 0;
@@ -128,6 +128,14 @@ fn links(text: &str) -> Vec<Link<'_>> {
         end = href_start;
         depth = 1;
         while end < bytes.len() && depth > 0 {
+            if bytes[end] == b'\\' && bytes.get(end + 1).is_some_and(u8::is_ascii_punctuation) {
+                // Codex escapes closing URL parentheses even when their opening partner is literal.
+                if bytes[end + 1] == b')' && depth > 1 {
+                    depth -= 1;
+                }
+                end += 2;
+                continue;
+            }
             match bytes[end] {
                 b'(' => depth += 1,
                 b')' => depth -= 1,
@@ -155,13 +163,22 @@ fn links(text: &str) -> Vec<Link<'_>> {
             start,
             end: end + 1,
             label: unescape(&text[start + 1..label_end]),
-            href,
+            href: unescape(href),
         });
         i = end + 1;
     }
     found
 }
-fn normalize(text: &str, links: &[Link<'_>], selected: &[usize]) -> String {
+pub(crate) fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
+    if !text.contains("](") {
+        return Vec::new();
+    }
+    links(text)
+        .into_iter()
+        .map(|link| (link.start, link.end))
+        .collect()
+}
+fn normalize(text: &str, links: &[Link], selected: &[usize]) -> String {
     let mut out = String::new();
     let mut cursor = 0;
     for &index in selected {
@@ -243,6 +260,25 @@ pub fn project(
 mod tests {
     use super::*;
     use crate::rich::{build_cf_html, fragment, rewrite};
+    #[test]
+    fn copied_codex_escaped_parentheses_survive_the_complete_request_pipeline() {
+        let source = r"Fix teh word and keep [Inbox](https://example.com/a_(b\)) and [Inbox](https://example.com/c?x=1&y=2).";
+        let protection = crate::core::Protection::new(source).unwrap();
+        assert_eq!(protection.entries.len(), 2);
+        assert!(!protection.text.contains("__)"));
+        let corrected = crate::core::Replacements::default()
+            .process(&protection.text.replace("teh", "the"), &protection)
+            .unwrap()
+            .0;
+        let chip = "<span rich-link-source-app-id=''><span>Inbox</span></span>";
+        let f = format!("<p data-pm-slice=\"0 0 []\">Fix teh word and keep {chip} and {chip}.</p>");
+        let out = rewrite(&build_cf_html(&f), source, &corrected, &[]);
+        assert!(out.applied, "{}", out.reason);
+        assert_eq!(out.link_status, "verified");
+        assert_eq!(out.text, "Fix the word and keep Inbox and Inbox.");
+        assert!(out.html.contains("href=\"https://example.com/a_(b)\""));
+        assert!(!out.html.contains("a_(b\\"));
+    }
     #[test]
     fn varied_nested_markup_repeated_labels_and_parenthesized_urls() {
         for tag in [

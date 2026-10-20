@@ -39,6 +39,7 @@ Before the API call, `ProtectedText.Protect` replaces exact literals with collis
 placeholders. It protects:
 
 - `http://` and `https://` URLs
+- In Rust, complete copied Markdown links, including nested/escaped parentheses, using the same parser as link reconstruction. The inherited regex alone can stop before a link's closing delimiter; its shorter match is superseded by the complete parsed literal before the model sees the request.
 - UUIDs and long opaque IDs containing both letters and digits
 - common prefixed API keys/tokens, JWTs, and values assigned to key/token/secret/session fields
 - Windows drive paths, UNC paths, POSIX paths, and slash-delimited relative paths
