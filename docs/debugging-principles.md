@@ -90,6 +90,15 @@ Use full JSON parse when many nested fields are needed or structure varies. Keep
 
 ## Local formatting replay
 
+For Rust changes, use the built executable's `--rich-json` entry point with `source_html`, `input`,
+`output` and optional `native_base64` from the validated saved case. The C# replay below remains the
+reference oracle. Include varied structure and length checks, not only the reported selection:
+the October 20 mixed-list failure was actually the shared diff's one-million-cell cutoff collapsing
+precise edits into a wholesale multiline replacement. A list-specific bypass reproduced a fix but
+left blockquotes, headings and longer single paragraphs exposed. Regression coverage now checks
+those structures, sparse edit correctness, explicit budget refusals, and link projection independently
+of exact span shape, label uniqueness and URL parentheses. Original-editor acceptance remains separate.
+
 Formatting incidents can be frozen and replayed through the actual `RichTextClipboard` implementation
 without an API request, live clipboard write, running editor, or server. The replay scope is the
 rich-text mapper: original `input_text` + `clipboard_html` + recorded post-processed `output_text`.

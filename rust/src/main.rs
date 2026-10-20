@@ -18,6 +18,7 @@ mod http;
 mod logging;
 mod platform;
 mod rich;
+mod rich_links;
 mod runtime;
 mod store;
 mod style;

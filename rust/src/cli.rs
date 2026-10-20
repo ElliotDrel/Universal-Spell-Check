@@ -56,7 +56,7 @@ pub fn rich_stdin() -> Result<(), String> {
             value["output"].as_str().unwrap_or(""),
             &native,
         );
-        writeln!(stdout,"{}",json!({"text":result.text,"html":result.html,"mode":result.mode,"applied":result.applied,"reason":result.reason,"paragraph_count":result.paragraph_count,"native_base64":result.native.as_ref().map(|n|STANDARD.encode(n)).unwrap_or_default(),"native_status":result.native_docs_status})).map_err(|e|e.to_string())?;
+        writeln!(stdout,"{}",json!({"text":result.text,"html":result.html,"mode":result.mode,"applied":result.applied,"reason":result.reason,"paragraph_count":result.paragraph_count,"link_status":result.link_status,"native_base64":result.native.as_ref().map(|n|STANDARD.encode(n)).unwrap_or_default(),"native_status":result.native_docs_status})).map_err(|e|e.to_string())?;
         stdout.flush().map_err(|e| e.to_string())?;
     }
     Ok(())

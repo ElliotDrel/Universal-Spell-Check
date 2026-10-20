@@ -218,10 +218,11 @@ flavor uses one newline per paragraph boundary; it does not re-paste Chrome's do
 copy separators. Unsupported markup or changed content structure keeps the plain fallback.
 This path uses the existing `rich_text.mode=html` telemetry.
 
-Dev rich-text runs also read the replacement clipboard back immediately before the paste. The
-`rich_text` object records requested HTML size, whether the clipboard contained the exact generated
-CF_HTML (`exact_match`, `missing_html`, or `mismatch`), its readback size, and its post-write formats.
-Prod skips this diagnostic readback so it adds no production hot-path work.
+The retained C# reference restricts immediate CF_HTML diagnostic readback to Dev. Rust developer
+logging records `clipboard_readback` immediately before input injection in either channel, using
+one non-waiting clipboard-open attempt. This supersedes the old Dev-only rule for the shipped app.
+Readback verifies publication, not the destination's rendered paste; full payloads remain in the
+opt-in evidence sidecars, with summary status and the capture boundary in ordinary records.
 
 `output_text` is the corrected text before rich-text replacement. `paste_text` and `paste_html` are
 the final Unicode and CF_HTML strings requested in the clipboard write, including any text recovered
@@ -229,6 +230,15 @@ from source HTML. Each has `_chars` (full length) and `_truncated` siblings; the
 capped at 512K characters. An empty `paste_html` means the app requested a plain-text paste. These
 fields describe the requested payload, even if the write or paste later fails. They do not prove how
 the destination editor rendered the result. Older runs lack these fields.
+
+Rust rich mapping reports `reason=alignment_budget_exceeded` when it cannot compute a precise
+edit map within its fixed work/edit budgets. The dashboard may display a coarse diff, but formatting
+and native style-position mapping cannot use that approximation. `rich_text.link_status` is
+`not_applicable`, `verified`, or an explicit refusal (`unverified_markup`, `unverified_destinations`,
+`unverified_occurrences`, `unverified_order`, `unverified_alignment`, `projection_budget_exceeded`).
+`applied=true` describes HTML text mapping; an unverified link status explicitly means link semantics
+were not established. A plain fallback retains the original Unicode link destinations. These fields
+are also available through `--rich-json`; no screenshots or clipboard access are needed for replay.
 
 `logs.py --has-html` filters to runs that carried markup. The formatted view prints only the size;
 `--json` includes the markup. Plain `--grep-detail` deliberately does not search this field (it would

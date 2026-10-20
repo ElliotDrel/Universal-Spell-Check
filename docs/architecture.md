@@ -222,7 +222,8 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 ## Rust implementation details
 
-- ProseMirror mixed list/paragraph fallback verifies each copied line against its paragraph body and aligns corrections inside that body. It preserves nested list wrappers, inline spans and blank paragraphs; changed list prefixes or paragraph counts decline the fallback. Codex rich-link spans that omit `href` recover a destination only from one matching HTTP(S) Markdown link in the copied Unicode, emitting a real anchor for paste. No browser lookup or destination inference is used.
+- Formatting consumes `diff::try_diff`, which returns a precise edit map or an explicit refusal. Above the small LCS budget, unchanged line boundaries anchor per-line edits; larger sparse changes use a bounded Myers search. A wholesale display diff must never be consumed as a formatting map. This supersedes the temporary mixed-list paragraph fallback, which only bypassed the underlying size-limit failure for one markup family.
+- `rich_links.rs` reconciles Codex link chips with their HTTP(S) Markdown destinations in the copied Unicode before text alignment. HTML tags/attributes are tokenized independently of nesting, quoting, attribute order and inline styling. Repeated labels are matched by verified occurrence order; source/output destination sequences must agree. The same projection supplies HTML anchors and Unicode labels. Ambiguity retains original Unicode destinations and reports an unverified `link_status`; it never guesses a destination. Ordinary typed Markdown remains literal.
 
 - Keep one correction worker with a clipboard-listener window and one outstanding correction; reject overlapping hotkeys rather than queuing them.
 - Assign fully rendered clipboard memory to the tray's pumping window, avoiding an OLE clipboard writer while retaining the existing 50 ms clipboard settling period.
