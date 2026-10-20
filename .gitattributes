@@ -1,1 +1,2 @@
 rust/vendor/** -whitespace
+bench/records/** text eol=lf
