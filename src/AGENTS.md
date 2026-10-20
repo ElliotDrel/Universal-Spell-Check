@@ -1,8 +1,10 @@
-# src/ — Native App (the product)
+# src/ — Retained C# Reference
 
 ## Grounding
 
-This is **the product**: a C#/.NET 10 WinForms tray app + WPF dashboard. Select text → press hotkey → AI corrects it in place. **Speed is the product** — every ms and every added abstraction is a cost. Two channels (Prod = Ctrl+Alt+U, Dev = Ctrl+Alt+D) run side-by-side; all channel constants live in `BuildChannel.cs`.
+The Rust app under `rust/` supersedes this C# implementation as the shipped product. Read `rust/AGENTS.md` for current build/run commands. The C# commands below remain for reference and differential tests; `BuildChannel.cs` still owns the shared channel constants.
+
+This retained reference is a C#/.NET 10 WinForms tray app + WPF dashboard. Select text → press hotkey → AI corrects it in place. **Speed is the product** — every ms and every added abstraction is a cost. Two channels (Prod = Ctrl+Alt+U, Dev = Ctrl+Alt+D) run side-by-side; all channel constants live in `BuildChannel.cs`.
 
 ## Read first
 
