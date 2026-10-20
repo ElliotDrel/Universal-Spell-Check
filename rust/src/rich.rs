@@ -161,6 +161,101 @@ fn replace_paragraphs(fragment: &str, p: &[Paragraph], bodies: &[String]) -> Str
     rebuilt
 }
 pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
+    let repaired = fragment(html)
+        .filter(|f| f.contains("data-pm-slice") && f.contains("rich-link-source-app-id="))
+        .map(|f| build_cf_html(&restore_link_destinations(f, source)));
+    let html = repaired.as_deref().unwrap_or(html);
+    let mut result = rewrite_base(html, source, corrected, native);
+    if result.applied && repaired.is_some() {
+        result.text = re!(r"\[([^\]\r\n]+)\]\((https?://[^\s<>]+)\)")
+            .replace_all(&result.text, |c: &regex::Captures| {
+                let href = encode(&c[2]).replace('"', "&quot;").replace('\'', "&#39;");
+                if html.contains(&format!("<a href=\"{href}\">{}</a>", encode(&c[1]))) {
+                    c[1].to_owned()
+                } else {
+                    c[0].to_owned()
+                }
+            })
+            .into_owned();
+    }
+    if !result.applied
+        && let Some(f) = fragment(html).filter(|f| f.contains("data-pm-slice"))
+    {
+        if let Some(mapped) = mixed_blocks(f, source, corrected) {
+            return mapped;
+        }
+    }
+    result
+}
+
+fn restore_link_destinations(fragment: &str, source: &str) -> String {
+    // Codex copies rich-link labels without href, but retains destinations in Unicode Markdown.
+    re!(r#"(?is)<span\b[^>]*\brich-link-source-app-id="[^"]*"[^>]*><span\b[^>]*>([^<]+)</span></span>"#)
+        .replace_all(fragment, |c: &regex::Captures| {
+            let label = decode(&c[1]);
+            let links: Vec<_> = re!(r"\[([^\]\r\n]+)\]\((https?://[^\s<>]+)\)")
+                .captures_iter(source).filter(|m| m[1] == label).collect();
+            if links.len() != 1 { return c[0].to_owned(); }
+            let href = encode(&links[0][2]).replace('"', "&quot;").replace('\'', "&#39;");
+            format!("<a href=\"{href}\">{}</a>", &c[1])
+        }).into_owned()
+}
+
+fn mixed_blocks(fragment: &str, source: &str, corrected: &str) -> Option<Rich> {
+    let blocks: Vec<_> = re!(r"(?is)<p\b[^>]*>(.*?)</p>")
+        .captures_iter(fragment)
+        .collect();
+    let rest = re!(r"(?is)<p\b[^>]*>.*?</p>").replace_all(fragment, "");
+    if blocks.len() < 2
+        || !re!(r"(?i)</?(?:ol|ul|li)\b[^>]*>")
+            .replace_all(&rest, "")
+            .trim()
+            .is_empty()
+    {
+        return None;
+    }
+    let source = source.replace("\r\n", "\n");
+    let target = corrected.replace("\r\n", "\n");
+    let lines: Vec<_> = source.split('\n').collect();
+    let targets: Vec<_> = target.split('\n').collect();
+    if lines.len() != blocks.len() || targets.len() != blocks.len() {
+        return None;
+    }
+    let mut rebuilt = String::new();
+    let mut cursor = 0;
+    for ((block, line), target) in blocks.iter().zip(lines).zip(targets) {
+        let inner = block.get(1)?;
+        let (prefix, body) = split_prefix(line);
+        let (next_prefix, next_body) = split_prefix(target);
+        if prefix != next_prefix || body != visible(inner.as_str()) {
+            return None;
+        }
+        let mapped = if body.is_empty() {
+            if !next_body.is_empty() {
+                return None;
+            }
+            inner.as_str().to_owned()
+        } else {
+            let mapped = align(inner.as_str(), body, next_body, false);
+            if !mapped.applied {
+                return None;
+            }
+            self::fragment(&mapped.html)?.to_owned()
+        };
+        rebuilt.push_str(&fragment[cursor..inner.start()]);
+        rebuilt.push_str(&mapped);
+        cursor = inner.end();
+    }
+    rebuilt.push_str(&fragment[cursor..]);
+    Some(Rich::made(
+        corrected.into(),
+        &rebuilt,
+        "structured_list_html",
+        blocks.len(),
+    ))
+}
+
+fn rewrite_base(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
     if html.is_empty() {
         return Rich::plain("no_html", corrected);
     }
@@ -675,6 +770,53 @@ fn docs_rewrite(fragment: &str, copied: &str, corrected: &str, native: &[u8]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mixed_nested_lists_preserve_inline_markup_and_blank_paragraphs() {
+        let f = "<ul data-pm-slice=\"0 0 []\"><li><p>teh parent</p><ul><li><p>child <strong>teh word</strong></p></li></ul></li></ul><p></p><p>Next <span>steps:</span></p><ol start=\"1\"><li><p>teh end</p></li></ol>";
+        let source = "- teh parent\n  - child teh word\n\nNext steps:\n1. teh end";
+        let target = "- the parent\n  - child the word\n\nNext steps:\n1. the end";
+        let out = rewrite(&build_cf_html(f), source, target, &[]);
+        assert!(out.applied, "{}", out.reason);
+        assert_eq!(fragment(&out.html), Some(f.replace("teh", "the").as_str()));
+        assert_eq!(out.text, target);
+        assert!(mixed_blocks(f, source, &target.replace("  -", "-")).is_none());
+        assert!(
+            !rewrite(
+                &build_cf_html(f),
+                source,
+                &target.replace("\n\n", "\nnew\n"),
+                &[]
+            )
+            .applied
+        );
+    }
+    #[test]
+    fn codex_rich_link_recovers_only_an_unambiguous_copied_web_destination() {
+        let f = "<p data-pm-slice=\"0 0 []\">teh <span rich-link-source-app-id=\"\" class=\"mention\"><span class=\"label\">Inbox</span></span></p>";
+        let source = "teh [Inbox](https://example.com/mail?id=1&view=all)";
+        let out = rewrite(
+            &build_cf_html(f),
+            source,
+            &source.replacen("teh", "the", 1),
+            &[],
+        );
+        assert!(out.applied);
+        assert!(
+            out.html
+                .contains("<a href=\"https://example.com/mail?id=1&amp;view=all\">Inbox</a>")
+        );
+        assert!(out.html.contains("the "));
+        assert_eq!(out.text, "the Inbox");
+        assert_eq!(restore_link_destinations(f, "teh Inbox"), f);
+        assert_eq!(
+            restore_link_destinations(f, "[Inbox](javascript:alert(1))"),
+            f
+        );
+        assert_eq!(
+            restore_link_destinations(f, "[Inbox](https://a.example) [Inbox](https://b.example)"),
+            f
+        );
+    }
     #[test]
     fn cfhtml_offsets_are_utf8_bytes() {
         let f = "<p>Crab 🦀 & café</p>";

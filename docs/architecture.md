@@ -222,6 +222,8 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 ## Rust implementation details
 
+- ProseMirror mixed list/paragraph fallback verifies each copied line against its paragraph body and aligns corrections inside that body. It preserves nested list wrappers, inline spans and blank paragraphs; changed list prefixes or paragraph counts decline the fallback. Codex rich-link spans that omit `href` recover a destination only from one matching HTTP(S) Markdown link in the copied Unicode, emitting a real anchor for paste. No browser lookup or destination inference is used.
+
 - Keep one correction worker with a clipboard-listener window and one outstanding correction; reject overlapping hotkeys rather than queuing them.
 - Assign fully rendered clipboard memory to the tray's pumping window, avoiding an OLE clipboard writer while retaining the existing 50 ms clipboard settling period.
 - Own clipboard backup formats before copy, including duplicated GDI/metafile objects; restore on failure only after a sequence change, and retain corrected text once published.
