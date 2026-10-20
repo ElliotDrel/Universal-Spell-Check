@@ -1,0 +1,51 @@
+{
+  "curated_on": "2026-10-20",
+  "portable_record": "bench/records/2026-10-rust-port",
+  "removed": [
+    {
+      "path": "usc-history-cleanup-backup",
+      "files": 138,
+      "bytes": 80870056.0,
+      "sha256": null
+    },
+    {
+      "path": "benchmark_runs/rust-baseline-2026-10-16/checksums.BEFORE-completed-baseline.json",
+      "files": 1,
+      "bytes": 12134.0,
+      "sha256": "99021d08887889d2f985f8a457b29e3873b0edf11e754fa6980bd9247fcf37ff"
+    },
+    {
+      "path": "benchmark_runs/rust-baseline-2026-10-16/checksums.BEFORE-credential-incident.json",
+      "files": 1,
+      "bytes": 4781.0,
+      "sha256": "952102a9927f9c08237e5f4a3664cda4739274e4ba83913e9ed9bacf6829dc59"
+    },
+    {
+      "path": "benchmark_runs/rust-baseline-2026-10-16/README.BEFORE-completed-baseline.md",
+      "files": 1,
+      "bytes": 6165.0,
+      "sha256": "fb92fd9c6f5de8da8d946a9fdb9933fe785553f23668101101ebaf434e95120c"
+    },
+    {
+      "path": "benchmark_runs/rust-baseline-2026-10-16/README.BEFORE-credential-incident.md",
+      "files": 1,
+      "bytes": 4480.0,
+      "sha256": "6476dda59319876335bd9fc2eb0325a15bd266803543681cbfc6d45832e5552f"
+    },
+    {
+      "path": "benchmark_runs/rust-baseline-2026-10-16/reference/run-desktop-baseline.BEFORE-isolation-fix.ps1",
+      "files": 1,
+      "bytes": 1641.0,
+      "sha256": "9336f5139ba020bd2e2d823955aab9b21c62b3f77efdd64f5d1d69b0fe4bfc77"
+    },
+    {
+      "path": "benchmark_runs/rust-port/baseline-integrity-before-rust-comparison.json",
+      "files": 1,
+      "bytes": 72.0,
+      "sha256": "e1702c225fc125ca74f6eb9213b544ebe7d34acc1d397908d6dc51d4b8c8746b"
+    }
+  ],
+  "baseline_manifest_before_sha256": "5528e37aabb6b09dc345f923623a85f1ad0840019922d0d74cf4ef5fd99ba9dc",
+  "baseline_manifest_after_sha256": "16c28fd874129e65e2727e302ad86a772d959e826574261642054dff70c0ce1b",
+  "reason": "Committed canonical synthetic measurement evidence; removed superseded backup copies and obsolete private history archive. Original benchmark/replay packages remain local."
+}

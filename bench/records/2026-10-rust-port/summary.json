@@ -1,0 +1,274 @@
+{
+  "baseline/api": {
+    "attempted": 100,
+    "succeeded": 100,
+    "failed": 0,
+    "quality_matches": 94,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 100,
+      "median": 843.72785,
+      "mean": 1027.880262,
+      "p95": 1892.87067,
+      "min": 609.7471,
+      "max": 4091.2584
+    }
+  },
+  "baseline/compute-a": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.50595,
+      "mean": 0.6387535,
+      "p95": 1.5937749999999997,
+      "min": 0.2725,
+      "max": 2.4227
+    }
+  },
+  "baseline/compute-b": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.54315,
+      "mean": 0.758058,
+      "p95": 1.8719849999999985,
+      "min": 0.2416,
+      "max": 5.7876
+    }
+  },
+  "baseline/local": {
+    "attempted": 100,
+    "succeeded": 98,
+    "failed": 2,
+    "quality_matches": 90,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 19,
+    "total_ms": {
+      "count": 98,
+      "median": 370.3875,
+      "mean": 1899.1270397959183,
+      "p95": 6178.293049999999,
+      "min": 254.9292,
+      "max": 8451.0838
+    }
+  },
+  "baseline/e2e": {
+    "attempted": 100,
+    "succeeded": 100,
+    "failed": 0,
+    "quality_matches": 95,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 100,
+      "median": 996.8639000000001,
+      "mean": 1164.046523,
+      "p95": 2118.2642,
+      "min": 807.4781,
+      "max": 2727.5491
+    }
+  },
+  "matched/local/csharp-a": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 27,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 256.63374999999996,
+      "mean": 258.7618766666667,
+      "p95": 271.35504000000003,
+      "min": 249.7502,
+      "max": 285.736
+    }
+  },
+  "matched/local/rust-a": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 27,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 89.13550000000001,
+      "mean": 88.98544333333334,
+      "p95": 99.422885,
+      "min": 69.8394,
+      "max": 103.9114
+    }
+  },
+  "matched/local/rust-b": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 27,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 87.0262,
+      "mean": 88.79248666666666,
+      "p95": 97.134995,
+      "min": 79.8713,
+      "max": 107.7443
+    }
+  },
+  "matched/local/csharp-b": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 27,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 262.74784999999997,
+      "mean": 261.96339,
+      "p95": 269.932265,
+      "min": 249.2735,
+      "max": 270.6969
+    }
+  },
+  "matched/e2e/csharp-a": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 27,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 1094.4212,
+      "mean": 1193.46822,
+      "p95": 1736.2687349999997,
+      "min": 828.4468,
+      "max": 2408.0674
+    }
+  },
+  "matched/e2e/rust-a": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 29,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 888.9758,
+      "mean": 946.2984133333333,
+      "p95": 1448.9066549999998,
+      "min": 750.9765000000001,
+      "max": 1480.912
+    }
+  },
+  "matched/e2e/rust-b": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 28,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 838.9406,
+      "mean": 913.6956033333333,
+      "p95": 1494.5958599999997,
+      "min": 662.2302,
+      "max": 1615.2044999999998
+    }
+  },
+  "matched/e2e/csharp-b": {
+    "attempted": 30,
+    "succeeded": 30,
+    "failed": 0,
+    "quality_matches": 28,
+    "warmup_attempted": 10,
+    "warmup_succeeded": 10,
+    "total_ms": {
+      "count": 30,
+      "median": 1079.57465,
+      "mean": 1122.9689466666666,
+      "p95": 1485.4736649999998,
+      "min": 799.5574,
+      "max": 1825.8328
+    }
+  },
+  "matched/compute/csharp-a": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.28190000000000004,
+      "mean": 0.402971,
+      "p95": 1.1851099999999999,
+      "min": 0.1832,
+      "max": 3.8149
+    }
+  },
+  "matched/compute/rust-a": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.09175,
+      "mean": 0.244753,
+      "p95": 1.1774699999999994,
+      "min": 0.0584,
+      "max": 2.1639
+    }
+  },
+  "matched/compute/rust-b": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.14525,
+      "mean": 0.293395,
+      "p95": 1.2784499999999999,
+      "min": 0.06499999999999999,
+      "max": 2.1285000000000003
+    }
+  },
+  "matched/compute/csharp-b": {
+    "attempted": 200,
+    "succeeded": 200,
+    "failed": 0,
+    "quality_matches": 180,
+    "warmup_attempted": 20,
+    "warmup_succeeded": 20,
+    "total_ms": {
+      "count": 200,
+      "median": 0.23404999999999998,
+      "mean": 0.368211,
+      "p95": 1.3016349999999997,
+      "min": 0.1437,
+      "max": 2.874
+    }
+  }
+}

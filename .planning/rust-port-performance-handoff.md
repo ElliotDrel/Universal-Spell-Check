@@ -1,5 +1,13 @@
 # Rust Port and Performance Handoff
 
+The October 16–17 measurement record is now committed under
+`bench/records/2026-10-rust-port/`: canonical attempts including failures/warmups,
+sanitized manifests, synthetic fixtures, startup samples and checksum/statistics
+verification. Use this portable record to inspect results. References below to
+ignored `benchmark_runs/` identify optional local replay/source evidence, not
+files available in a normal Git checkout. Superseded `BEFORE` snapshots and the
+old private history-cleanup backup were removed after curation on October 20.
+
 ## Production Rust release - October 18, 2026
 
 - Published [v0.13.0](https://github.com/ElliotDrel/Universal-Spell-Check/releases/tag/v0.13.0), release commit `2f214400b231cc7cca6f9c2d9bba3bffbe84d809`. [Release CI](https://github.com/ElliotDrel/Universal-Spell-Check/actions/runs/39175621953) and both independent Rust checks succeeded. CI runs the actual generated installer, compares exact installed/build bytes and version, requires real native startup readiness, and removes its disposable test installation before publication.

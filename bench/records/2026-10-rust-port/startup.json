@@ -1,0 +1,187 @@
+{
+  "baseline": {
+    "boundary": "Standalone Release OS process start -> started log after real hotkey registration and tray/context initialization; excludes installed updater checks and automatic dashboard rendering.",
+    "clock": "Cross-process wall-clock timestamps; no clock adjustment observed; not a stopwatch measurement of the child.",
+    "cold_limit": "Retain first launch separately; subsequent runs use warm filesystem/OS caches. No reboot/cold-cache claim.",
+    "trials": [
+      {
+        "index": 1,
+        "startup_ready_ms": 503.9401,
+        "process_through_exit_ms": 2907.5106
+      },
+      {
+        "index": 2,
+        "startup_ready_ms": 752.4401,
+        "process_through_exit_ms": 2090.2762
+      },
+      {
+        "index": 3,
+        "startup_ready_ms": 655.5264,
+        "process_through_exit_ms": 2031.6204
+      },
+      {
+        "index": 4,
+        "startup_ready_ms": 615.8866,
+        "process_through_exit_ms": 2009.1402
+      },
+      {
+        "index": 5,
+        "startup_ready_ms": 593.5158,
+        "process_through_exit_ms": 2013.6838
+      },
+      {
+        "index": 6,
+        "startup_ready_ms": 568.1249,
+        "process_through_exit_ms": 2182.7716
+      },
+      {
+        "index": 7,
+        "startup_ready_ms": 389.2281,
+        "process_through_exit_ms": 2027.983
+      },
+      {
+        "index": 8,
+        "startup_ready_ms": 351.4737,
+        "process_through_exit_ms": 2185.0721
+      },
+      {
+        "index": 9,
+        "startup_ready_ms": 151.0753,
+        "process_through_exit_ms": 2566.5859
+      },
+      {
+        "index": 10,
+        "startup_ready_ms": 582.8105,
+        "process_through_exit_ms": 2702.2881
+      }
+    ],
+    "ready_ms": {
+      "count": 10,
+      "median": 575.4677,
+      "mean": 516.40215,
+      "p95": 708.8289349999999,
+      "min": 151.0753,
+      "max": 752.4401
+    }
+  },
+  "matched/csharp-a": {
+    "boundary": "Standalone Release OS process start -> started log after real hotkey registration and tray/context initialization; excludes installed updater checks and automatic dashboard rendering.",
+    "clock": "Cross-process wall-clock timestamps; no clock adjustment observed; not a stopwatch measurement of the child.",
+    "cold_limit": "Retain first launch separately; subsequent runs use warm filesystem/OS caches. No reboot/cold-cache claim.",
+    "trials": [
+      {
+        "index": 1,
+        "startup_ready_ms": 592.0166,
+        "process_through_exit_ms": 1637.0779
+      },
+      {
+        "index": 2,
+        "startup_ready_ms": 615.653,
+        "process_through_exit_ms": 1526.9022
+      },
+      {
+        "index": 3,
+        "startup_ready_ms": 596.0563,
+        "process_through_exit_ms": 1523.7847
+      }
+    ],
+    "ready_ms": {
+      "count": 3,
+      "median": 596.0563,
+      "mean": 601.2419666666667,
+      "p95": 613.6933300000001,
+      "min": 592.0166,
+      "max": 615.653
+    }
+  },
+  "matched/rust-a": {
+    "boundary": "Standalone Release OS process start -> started log after real hotkey registration and tray/context initialization; excludes installed updater checks and automatic dashboard rendering.",
+    "clock": "Cross-process wall-clock timestamps; no clock adjustment observed; not a stopwatch measurement of the child.",
+    "cold_limit": "Retain first launch separately; subsequent runs use warm filesystem/OS caches. No reboot/cold-cache claim.",
+    "trials": [
+      {
+        "index": 1,
+        "startup_ready_ms": 80.5869,
+        "process_through_exit_ms": 121.1739
+      },
+      {
+        "index": 2,
+        "startup_ready_ms": 84.6725,
+        "process_through_exit_ms": 134.8359
+      },
+      {
+        "index": 3,
+        "startup_ready_ms": 72.0868,
+        "process_through_exit_ms": 112.8668
+      }
+    ],
+    "ready_ms": {
+      "count": 3,
+      "median": 80.5869,
+      "mean": 79.1154,
+      "p95": 84.26394,
+      "min": 72.0868,
+      "max": 84.6725
+    }
+  },
+  "matched/rust-b": {
+    "boundary": "Standalone Release OS process start -> started log after real hotkey registration and tray/context initialization; excludes installed updater checks and automatic dashboard rendering.",
+    "clock": "Cross-process wall-clock timestamps; no clock adjustment observed; not a stopwatch measurement of the child.",
+    "cold_limit": "Retain first launch separately; subsequent runs use warm filesystem/OS caches. No reboot/cold-cache claim.",
+    "trials": [
+      {
+        "index": 1,
+        "startup_ready_ms": 75.6063,
+        "process_through_exit_ms": 112.8238
+      },
+      {
+        "index": 2,
+        "startup_ready_ms": 82.1047,
+        "process_through_exit_ms": 126.6212
+      },
+      {
+        "index": 3,
+        "startup_ready_ms": 75.3261,
+        "process_through_exit_ms": 119.3283
+      }
+    ],
+    "ready_ms": {
+      "count": 3,
+      "median": 75.6063,
+      "mean": 77.67903333333334,
+      "p95": 81.45486,
+      "min": 75.3261,
+      "max": 82.1047
+    }
+  },
+  "matched/csharp-b": {
+    "boundary": "Standalone Release OS process start -> started log after real hotkey registration and tray/context initialization; excludes installed updater checks and automatic dashboard rendering.",
+    "clock": "Cross-process wall-clock timestamps; no clock adjustment observed; not a stopwatch measurement of the child.",
+    "cold_limit": "Retain first launch separately; subsequent runs use warm filesystem/OS caches. No reboot/cold-cache claim.",
+    "trials": [
+      {
+        "index": 1,
+        "startup_ready_ms": 700.2263,
+        "process_through_exit_ms": 1752.8818
+      },
+      {
+        "index": 2,
+        "startup_ready_ms": 636.9251,
+        "process_through_exit_ms": 1577.5968
+      },
+      {
+        "index": 3,
+        "startup_ready_ms": 592.831,
+        "process_through_exit_ms": 1571.1661
+      }
+    ],
+    "ready_ms": {
+      "count": 3,
+      "median": 636.9251,
+      "mean": 643.3274666666667,
+      "p95": 693.8961800000001,
+      "min": 592.831,
+      "max": 700.2263
+    }
+  }
+}

@@ -1,5 +1,15 @@
 # C# / Rust Baseline
 
+The portable historical measurement record is committed at
+[`bench/records/2026-10-rust-port/`](../bench/records/2026-10-rust-port/README.md).
+It includes synthetic cases/responses, canonical per-attempt samples, sanitized
+manifests, startup measurements and a verifier. Run its `verify.py` to check the
+record without local binaries or desktop access. Original ignored packages below
+remain optional local replay material; their superseded `BEFORE` snapshots were
+removed after curation. New completed benchmark checkpoints should commit a
+bounded record with attempts, failures, provenance and verification, excluding
+private logs, credentials, browser profiles and generated executables.
+
 ## Credential isolation incident and completed recovery
 
 The October 16 offline harness originally supplied a custom settings directory
