@@ -99,6 +99,16 @@ left blockquotes, headings and longer single paragraphs exposed. Regression cove
 those structures, sparse edit correctness, explicit budget refusals, and link projection independently
 of exact span shape, label uniqueness and URL parentheses. Original-editor acceptance remains separate.
 
+October 20 live Codex acceptance passed on the rebuilt Rust Dev application: nested bullets plus
+numbering/blank paragraphs/bold; a 3,485-character heading/blockquote/bold/link selection; and three
+web links including repeated `Inbox` labels, query parameters, an Outlook deep link and escaped URL
+parentheses. Actual editor Unicode/HTML copyback verified corrected text, unchanged structure and
+exact link labels/destinations; the final link run `091da9b73e70128f36d74a0fba0af156` reports
+`aligned_html`, `link_status=verified`, and completed evidence `ok`. The live test also exposed the
+inherited regex's truncated Markdown literal protection; the shared link parser now protects the
+entire copied link before the model and decodes its destination for reconstruction. Drafts were
+cleared and the original clipboard restored. These are Dev acceptance results, not a Production release.
+
 Formatting incidents can be frozen and replayed through the actual `RichTextClipboard` implementation
 without an API request, live clipboard write, running editor, or server. The replay scope is the
 rich-text mapper: original `input_text` + `clipboard_html` + recorded post-processed `output_text`.
