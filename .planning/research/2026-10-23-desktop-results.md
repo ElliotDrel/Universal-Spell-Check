@@ -46,3 +46,72 @@ Public per-attempt timings, warmups, sanitized provenance and preflights are in 
 ## Settlement investigation completed later October 23
 
 The recommendation-only status above is superseded by the authorized experiment in [the settlement record](../../bench/records/2026-10-desktop-latency/settlement/README.md). A high-resolution wait retains the 50-ms minimum and message pumping, with the original wait as fallback. All 480 matched desktop attempts passed delivery checks; candidate median local completion improved about 10–13 ms. Seven actual-hotkey candidate runs delivered complete text; supported rich structure matched the installed baseline. One unsupported-rich formatting loss reproduced in installed Production and is tracked separately in issue #18. The candidate remains on PR #8; no release was published.
+
+## Performance follow-up and iteration tooling
+
+PR #8 was marked ready for review at Elliot's request. The timer improvement is
+one verified step, not an assertion that the application is optimally fast.
+`AGENTS.md` now explicitly prioritizes speed, low-level/KISS implementation,
+questioning unnecessary work and building reusable verification when friction
+slows iteration.
+
+The requested independent consultation was attempted with `claude -p --effort
+medium`: the `fable` alias resolved to `claude-fable-5-1`; after Elliot selected
+Fable 5.1, that exact model was retried. Both reported usage credits required.
+The attempted 5.5 identifier was rejected as unrecognized. No independent model
+assessment was obtained, and no substitute model or purchased credits were used.
+
+### Larger opportunities, ranked by current evidence
+
+1. **Understand request latency before changing transport.** The seven live
+   candidate runs averaged 1,206.55 ms total and 1,132.67 ms request time. These
+   small acceptance samples establish priority, not a stable performance baseline.
+   `http::Client` already retains the WinHTTP session/connection, enables HTTP/2
+   and warms the service. Replacing WinHTTP or adding more warm requests without
+   measuring actual negotiation/reuse would be guessing. A focused next experiment
+   should expose non-secret WinHTTP DNS/connect/TLS/request lifecycle milestones
+   and negotiated protocol/reuse where supported, then compare cold and warm live
+   requests. Do not infer server computation from the existing header-wait bucket.
+2. **Question repeated remote work.** An exact-request cache might avoid the
+   dominant delay on repeated selections, but observed hit rate is unknown. First
+   measure repeated-request frequency using bounded, non-content identifiers.
+   Any cache must account for model, prompt, replacements and target context,
+   credential boundaries and protected-literal restoration. Do not add it merely
+   because hashing is cheap, or claim a general speedup from repeated fixtures.
+3. **Consider overlap only after measuring the work to hide.** `runtime::run`
+   performs history exclusion and request preparation before starting the remote
+   request. Much of the remaining local path is small compared with the request;
+   moving work concurrently risks clipboard ownership/order and should have a
+   measured benefit before introducing synchronization. The 50-ms settlement,
+   original clipboard recovery and complete atomic replacement remain requirements.
+4. **Avoid cosmetic low-level rewrites.** Current capture and RTF reads are already
+   small in the matched desktop record. More unsafe code, custom sockets, busy
+   polling or removing reliability waits is not evidence of better performance.
+   Keep the verified native timer change; select the next experiment by complete
+   editor-replacement latency and reliability, not a component microbenchmark alone.
+
+### Reusable report, rather than another throwaway analysis script
+
+`bench/phase_report.py --block NAME=DIRECTORY` accepts repeated ordered blocks and
+emits JSON with successful measured median/p95/mean, nested coordinator phases,
+sample counts, all failures, warmup failures and incomplete case coverage. Missing
+timings stay missing. It checks workload/settings/machine/trigger identity within
+each diagnostic mode and also checks benchmark hotkey/setup limits. It neither
+pools modes nor awards an automatic winning verdict. Parent/nested intervals
+overlap and must not be added together. `--output` exclusively creates a fresh
+file, preserving prior evidence.
+
+Example, from the worktree root with retained local artifacts:
+
+```powershell
+python bench/phase_report.py --block A1=benchmark_runs/settlement-2026-10-23/off-a1 --block B1=benchmark_runs/settlement-2026-10-23/off-b1 --block B2=benchmark_runs/settlement-2026-10-23/off-b2 --block A2=benchmark_runs/settlement-2026-10-23/off-a2 --output <fresh-report.json>
+```
+
+This command reads only benchmark artifacts; it never launches the app, touches
+the clipboard or credentials, or reads runtime logs. The four new guards and five
+existing comparison tests pass. The real retained ABBA blocks produced a complete
+report. CI now runs the new guards. Foreground activation and live editor acceptance
+still require the approved desktop tools; this report does not solve those layers
+or replace the correctness gates. No additional product optimization or desktop
+test was performed in this follow-up. Resume Fable consultation when usage access
+is available, then choose and verify one measured product experiment.

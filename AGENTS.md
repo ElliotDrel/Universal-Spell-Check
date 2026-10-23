@@ -8,7 +8,7 @@
 
 **Universal Spell Check** is a Windows-wide AI spell checker. Select text → press hotkey → corrected text replaces selection in place. Native Rust tray app + dashboard under `rust/` is the product; `src/` retains the C# reference and canonical `BuildChannel.cs`. Legacy AHK is archived under `.archive/ahk-legacy/`.
 
-**Core value:** select, hotkey, done. **Speed is the product** — instant and invisible. Every added abstraction or fallback is a cost.
+**Core value:** select, hotkey, done. **Performance and speed come first.** Prefer the lowest-level, simplest practical implementation that measurably improves the complete correction path while preserving correctness. Question unnecessary work before tuning it; keep abstractions and fallbacks only when their measured benefit or reliability requirement justifies the cost. Build small, reusable verification and baseline tools whenever testing friction slows reliable iteration; retain failed attempts, provenance and editor correctness gates.
 
 **Two channels run side-by-side:** Prod (Rust `--no-default-features`, Ctrl+Alt+U) and Dev (default Rust features, Ctrl+Alt+D). Settings are isolated per channel; logs are unified into one shared corpus stamped per-line with `channel`/`app_version`/`pid` (this matters for fine-tune work). All channel constants live in `src/BuildChannel.cs` — never hardcode them elsewhere.
 
