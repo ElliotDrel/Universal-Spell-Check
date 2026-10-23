@@ -279,7 +279,7 @@ pub fn settle_publication() {
             null(),
             null(),
             CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
-            TIMER_MODIFY_STATE | SYNCHRONIZE,
+            TIMER_MODIFY_STATE | SYNCHRONIZATION_SYNCHRONIZE,
         )
     });
     settle_until(until, timer.0);
