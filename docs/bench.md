@@ -450,8 +450,8 @@ output and requires a nonzero result plus an explicitly retained failed trial.
 Neither setup failure nor missing rows counts as a successful negative control.
 The gate is `bench/check_native_contracts.py`; evidence uploads even after failure.
 Existing Dev/Prod unit tests include protected literals/model parameters, native
-HTTP reads/deadlines/lifetime, and a gated loopback response proving send completes
-before the mock is allowed to produce response headers. No provider key is in CI.
+HTTP reads/deadlines/lifetime, and a gated loopback response proving the shared deadline expires even while
+the mock withholds response headers. Send completion ordering is not assumed. No provider key is in CI.
 These deterministic contracts prevent covered regressions; they cannot guarantee
 live service latency, all editor rendering, or every possible correction.
 

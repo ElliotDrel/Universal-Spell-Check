@@ -373,6 +373,7 @@ impl Failure {
 pub struct Client {
     connection: Handle,
     session: Handle,
+    collect_native_diagnostics: bool,
 }
 // WinHTTP supports concurrent requests on an app-lifetime session/connection. Each Request owns its callback state.
 unsafe impl Send for Client {}
@@ -422,8 +423,14 @@ impl Client {
             Ok(Self {
                 connection,
                 session,
+                collect_native_diagnostics: false,
             })
         }
+    }
+    pub fn diagnostic() -> Result<Self, String> {
+        let mut client = Self::new()?;
+        client.collect_native_diagnostics = true;
+        Ok(client)
     }
     pub fn request(
         &self,
@@ -490,7 +497,11 @@ impl Client {
         let download_ms = download.elapsed().as_secs_f64() * 1000.;
         let raw = String::from_utf8_lossy(&body).into_owned();
         let body = parse_body(status, &body)?;
-        let native = request.diagnostics();
+        let native = if self.collect_native_diagnostics {
+            request.diagnostics()
+        } else {
+            Value::Null
+        };
         Ok(Response {
             native,
             body,
@@ -661,21 +672,16 @@ mod tests {
         server.join().unwrap();
     }
     #[test]
-    fn send_completion_does_not_require_response_release() {
+    fn request_deadline_does_not_require_response_release() {
         let (release, gate) = std::sync::mpsc::channel();
         let (mut request, _connection, _session, server) =
             local_request(Duration::ZERO, false, Some(gate));
-        let deadline = Instant::now() + Duration::from_secs(5);
-        let sent = request.send(deadline);
-        // The mock cannot produce headers until send has completed. No latency threshold.
-        release.send(()).unwrap();
-        sent.unwrap();
-        assert_eq!(request.receive(deadline).unwrap(), 200);
-        let bytes = request.read(deadline).unwrap();
-        assert_eq!(
-            serde_json::from_slice::<Value>(&bytes).unwrap()["output_text"],
-            "the test"
-        );
+        let deadline = Instant::now() + Duration::from_millis(100);
+        let outcome = request.send(deadline).and_then(|_| request.receive(deadline));
+        // WinHTTP may complete send after headers arrive. Enforce the deadline,
+        // without assuming one platform-specific callback ordering or speed.
+        let _ = release.send(());
+        assert_eq!(outcome.unwrap_err().message, "The OpenAI request timed out.");
         drop(request);
         server.join().unwrap();
     }

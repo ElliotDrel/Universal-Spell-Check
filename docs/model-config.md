@@ -119,3 +119,7 @@ Primary API contracts consulted this session:
 [request times](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ns-winhttp-winhttp_request_times),
 [time entries](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ne-winhttp-winhttp_request_time_entry),
 [request stats](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ns-winhttp-winhttp_request_stats).
+
+Native option queries are opt-in to the request-only diagnostic client; ordinary
+corrections do not pay for these queries and report null `native` metadata.
+The API-call/completion-wait split remains available in ordinary correction logs.

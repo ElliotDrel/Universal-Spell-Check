@@ -23,7 +23,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let settings = store.load_settings()?;
     let keys = store.load_keys()?;
     let key = keys.active().ok_or("No active saved key")?;
-    let client = Client::new()?;
+    let client = Client::diagnostic()?;
     fs::create_dir(&output).map_err(|e| e.to_string())?;
     let prewarm = args.iter().any(|s| s == "--prewarm");
     let manifest = json!({"schema_version":1,"model":settings.model,"fixture":"This is a tset.","runs":runs,"prewarm":prewarm,"binary_sha256":crate::benchmark::hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"boundary":"Client::request; no clipboard, mapper, GUI or physical hotkey"});
