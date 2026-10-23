@@ -124,3 +124,7 @@ the old three-PR program or later optimization experiments automatically.
    source editor if the capture bottleneck is not reproduced synthetically.
 8. Update PR/checkpoint with evidence and one next-change recommendation. Stop there;
    no optimization implementation, main push or production release.
+
+## Desktop continuation completed
+
+The [October 23 desktop results](2026-10-23-desktop-results.md) supersede the pending desktop-installation and baseline statements above. Installation repair and controlled local blocks are complete; original-browser rendering and the next optimization remain outside the verified scope.

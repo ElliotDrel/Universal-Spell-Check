@@ -1,0 +1,31 @@
+[
+  {
+    "block": "probe",
+    "error": "Hot key is already registered. (os error 1409)",
+    "attempts": 0
+  },
+  {
+    "block": "probe-85",
+    "case_id": "short",
+    "foreground_matches": false,
+    "focus_matches": true,
+    "selection_start": 0,
+    "selection_end": 15,
+    "editor_utf16_chars": 15,
+    "expected_utf16_chars": 15,
+    "text_matches": true,
+    "attempts": 0
+  },
+  {
+    "block": "off-01",
+    "case_id": "short",
+    "foreground_matches": false,
+    "focus_matches": true,
+    "selection_start": 0,
+    "selection_end": 15,
+    "editor_utf16_chars": 15,
+    "expected_utf16_chars": 15,
+    "text_matches": true,
+    "attempts": 0
+  }
+]
