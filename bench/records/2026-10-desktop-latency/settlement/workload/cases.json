@@ -1,0 +1,54 @@
+[
+  {
+    "id": "short",
+    "text": "This is a tset.",
+    "expected": "This is a test."
+  },
+  {
+    "id": "paragraph",
+    "text": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together.",
+    "expected": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together."
+  },
+  {
+    "id": "long",
+    "text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+    "expected": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions."
+  },
+  {
+    "id": "unchanged",
+    "text": "The meeting starts at noon.",
+    "expected": "The meeting starts at noon."
+  },
+  {
+    "id": "brands",
+    "text": "We use open ai and github for this projcet.",
+    "expected": "We use OpenAI and GitHub for this project."
+  },
+  {
+    "id": "literals",
+    "text": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "expected": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000."
+  },
+  {
+    "id": "unicode",
+    "text": "The café opens tomorow. Bring your résumé. 🙂",
+    "expected": "The café opens tomorrow. Bring your résumé. 🙂"
+  },
+  {
+    "id": "multiline",
+    "text": "Please chek the notes.\n\nThen send the documants.",
+    "expected": "Please check the notes.\n\nThen send the documents."
+  },
+  {
+    "id": "rich-link",
+    "text": "Please chek the guide.",
+    "expected": "Please check the guide.",
+    "html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000278\r\nStartFragment:0000000137\r\nEndFragment:0000000246\r\n<html><body><!--StartFragment--><p data-pm-slice=\"0 0 []\">Please <strong>chek</strong> the <a href=\"https://example.com/guide\">guide</a>.</p><!--EndFragment--></body></html>"
+  },
+  {
+    "id": "rich-list",
+    "text": "1. First itme.\n2. Second itme.",
+    "expected": "1. First item.\n2. Second item.",
+    "html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000256\r\nStartFragment:0000000137\r\nEndFragment:0000000224\r\n<html><body><!--StartFragment--><ol data-pm-slice=\"0 0 []\"><li><p>First itme.</p></li><li><p>Second itme.</p></li></ol><!--EndFragment--></body></html>"
+  }
+]

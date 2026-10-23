@@ -9,16 +9,19 @@ the old three-PR program or later optimization experiments automatically.
   desktop changes. Reuse an appropriate checkout/worktree or create an isolated one
   following the repository skills. Do not reset or force-push.
 - Continue [PR #8: Measure local correction latency before choosing an optimization](https://github.com/ElliotDrel/Universal-Spell-Check/pull/8).
-- Use source code commit `3a258d2abb847c3a2ec30a7dd6498734c951c26b` or its newer
-  handoff-only descendant. The original measurement commit is `14befa6`; the local
+- Use the fetched current head of `origin/codex/local-latency-measurements`, including
+  the verified settlement timer and newer request diagnostics. The original measurement commit is `14befa6`; the local
   frozen binary at that revision lacks the newer setup diagnostics.
-- Keep the PR draft. Main remains untouched by this work; no merge, production
+- The PR is ready for review. Main remains untouched by this work; no merge, production
   installation, tag or publication is authorized.
 - Read root `AGENTS.md`, applicable PR/coding skills, `rust/AGENTS.md`,
   `docs/bench.md`, `docs/replacements-and-logging.md`, and the October 22 latency
   audit/checkpoint before acting. Follow their routing for other changes.
 
-## User direction and permissions
+## Historical session direction and permissions
+
+These grants describe only the originating October 23 session. They are not
+standing authorization for other sessions; use the current user instructions.
 
 - Question requirements, delete unnecessary work, then simplify/optimize the measured
   bottleneck. Exclude AI generation when prioritizing local work, but do not equate
@@ -128,3 +131,14 @@ the old three-PR program or later optimization experiments automatically.
 ## Desktop continuation completed
 
 The [October 23 desktop results](2026-10-23-desktop-results.md) supersede the pending desktop-installation and baseline statements above. Installation repair and controlled local blocks are complete; original-browser rendering and the next optimization remain outside the verified scope.
+
+## Superseding continuation status
+
+The original measurement-only stop below is historical. Elliot subsequently
+authorized the settlement experiment, which completed and is documented under
+"Settlement investigation completed" in the linked desktop results. PR #8 is
+ready for review. Continue from its fetched head; do not merge or publish.
+The controlled desktop checkpoint used ee08a5f; the later settlement A/B comparison
+used baseline f60aacd and candidate 9b6033a. Rich browser acceptance used a declared
+synthetic contenteditable producer, not Google Docs or ChatGPT. Current work is
+request-boundary attribution and deterministic CI; do not assume a request speedup.

@@ -26,7 +26,7 @@ class LatencyStatsTests(unittest.TestCase):
         stats = reader.compute_stats([{"timings": {"total_ms": 0, "request_ms": None}}])
         self.assertIn("0ms total / unavailable request", stats)
         self.assertIn("total=1/1, request=0/1", stats)
-        self.assertIn("unavailable", reader.compute_stats([{"timings": None}]))
+        self.assertIn("Avg latency:     unavailable total / unavailable request", reader.compute_stats([{"timings": None}]))
 
     def test_nonfinite_and_malformed_values_are_not_measurements(self):
         stats = reader.compute_stats([
@@ -35,6 +35,8 @@ class LatencyStatsTests(unittest.TestCase):
         ])
         self.assertIn("total=0/2, request=0/2", stats)
         self.assertEqual(reader._display_ms(None), "unavailable")
+        self.assertEqual(reader._display_ms(10**1000), "unavailable")
+        self.assertIn("total=0/1", reader.compute_stats([{"timings":{"total_ms":10**1000}}]))
 
 
 if __name__ == "__main__":

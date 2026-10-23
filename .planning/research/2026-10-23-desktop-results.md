@@ -115,3 +115,8 @@ still require the approved desktop tools; this report does not solve those layer
 or replace the correctness gates. No additional product optimization or desktop
 test was performed in this follow-up. Resume Fable consultation when usage access
 is available, then choose and verify one measured product experiment.
+
+Provenance clarification: the controlled desktop measurement used ee08a5f;
+the subsequent 10–13 ms settlement comparison used baseline f60aacd against
+candidate 9b6033a. Browser rich acceptance used synthetic contenteditable markup,
+not actual Google Docs or ChatGPT; its limitations remain in the settlement record.

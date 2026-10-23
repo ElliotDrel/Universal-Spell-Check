@@ -12,7 +12,7 @@ def flatten(value, prefix=''):
     if isinstance(value, dict):
         for key, child in value.items():
             yield from flatten(child, prefix + key + '.')
-    elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+    elif prefix.rstrip('.').endswith('_ms') and isinstance(value, (int, float)) and not isinstance(value, bool) and abs(value) < 1e300 and math.isfinite(value):
         yield prefix.rstrip('.'), value
 
 

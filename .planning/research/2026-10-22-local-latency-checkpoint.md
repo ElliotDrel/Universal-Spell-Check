@@ -1,3 +1,5 @@
+> Historical preflight-only snapshot; the baseline-pending status below is superseded by [completed desktop results](2026-10-23-desktop-results.md).
+
 # Local latency measurement checkpoint — October 22, 2026
 
 ## Finding

@@ -80,3 +80,10 @@ Speed first, simplicity second, minimal UI/overhead third. Treat every added abs
 - Build Dev by default; add `--no-default-features` for Prod. Keep the pinned toolchain in `rust-toolchain.toml` and dependencies in `rust/Cargo.lock`.
 - Read `rust/AGENTS.md` for native commands and `docs/bench.md` for comparison boundaries.
 - Production packaging uses Rust through the tag-triggered release workflow; the Rust checks workflow uploads a candidate without publishing a production release.
+
+Python tooling setup from a fresh checkout:
+
+```powershell
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+```

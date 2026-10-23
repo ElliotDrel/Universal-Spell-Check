@@ -185,7 +185,7 @@ def format_detail(d, ts, channel):
 
     lines = [
         f"[{ts[:19]}] [{status_icon}] {channel} | {model} | {app} | {changed_icon} | status={status}",
-        f"  {input_chars}->{output_chars} chars | {_display_ms(total_ms)} total ({_display_ms(request_ms)} request) | {tokens.get('total', 0)} tokens",
+        f"  {input_chars}->{output_chars} chars | {_display_ms(total_ms)} total ({_display_ms(request_ms)} request) | {tokens.get('total') if _finite_measurement(tokens.get('total')) else 'unavailable'} tokens",
     ]
     if title:
         lines.append(f"  window: {title}")
@@ -229,8 +229,12 @@ def format_generic(event, rest, ts, channel):
     return f"[{ts[:19]}] {channel} | {event} {rest_str}"
 
 
+def _finite_measurement(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and abs(value) < 1e300 and math.isfinite(value)
+
+
 def _display_ms(value):
-    return f"{value:g}ms" if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else "unavailable"
+    return f"{value:g}ms" if _finite_measurement(value) else "unavailable"
 
 
 def compute_stats(details):
@@ -242,8 +246,7 @@ def compute_stats(details):
     changed = sum(1 for d in details if d.get("text_changed", False))
     def measured(section, field):
         values = ((d.get(section) or {}).get(field) for d in details)
-        return [v for v in values if isinstance(v, (int, float))
-                and not isinstance(v, bool) and math.isfinite(v)]
+        return [v for v in values if _finite_measurement(v)]
 
     total_ms_vals = measured("timings", "total_ms")
     request_ms_vals = measured("timings", "request_ms")

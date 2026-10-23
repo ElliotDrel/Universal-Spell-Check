@@ -56,7 +56,7 @@ Prepared October 22, 2026. Retain this file until the receiving thread has incor
 - Never copy real credentials into fixtures, print keys, or use an old quarantined benchmark client.
 - Offline benchmarks must isolate settings AND key paths and cannot overwrite production data.
 
-## First Batch: Three Atomic PRs
+## Historical proposal: Three Atomic PRs (superseded)
 
 | PR | Scope | Acceptance |
 |---|---|---|
@@ -114,6 +114,6 @@ Prepared October 22, 2026. Retain this file until the receiving thread has incor
 - Inspect Git status and fetch upstream without discarding local changes.
 - Ensure this handoff and audit are present from `origin/main`; fast-forward only when safe.
 - Inspect existing PRs and branches before creating duplicates.
-- Implement PR 1, then PR 2, then PR 3 with separate reviewable changes and focused verification.
+- Continue existing PR #8 and its current measured checkpoint. The old three-PR sequence is superseded; do not implement it automatically.
 - Keep a current task list and clearly distinguish completed code, tested behavior, and pending live validation.
-- Return the three PR links, test results, measurement limitations, and evidence-ranked next step; stop before conditional optimization PRs.
+- Return the current PR link, test results, measurement limitations, and evidence-ranked next step; stop before conditional optimization PRs.

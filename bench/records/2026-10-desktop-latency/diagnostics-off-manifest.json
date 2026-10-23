@@ -36,5 +36,6 @@
   "setup_timeout_ms": 30000,
   "notes": "Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard.",
   "machine_identity": "desktop (name omitted)",
-  "external_activation": "Supported computer-use activation during unmeasured setup; all correctness gates retained"
+  "external_activation": "Supported computer-use activation during unmeasured setup; all correctness gates retained",
+  "binary_source_commit": "ee08a5f"
 }

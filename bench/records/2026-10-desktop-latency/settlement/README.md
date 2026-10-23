@@ -98,3 +98,14 @@ synthetic correction fields from approved-reader exports. `editor.html` is the
 disposable fixture; screenshots are PR attachments, not committed review media.
 The implementation is retained based on these bounded reliability checks.
 Investigation: [#17](https://github.com/ElliotDrel/Universal-Spell-Check/issues/17).
+
+The native benchmark workload is frozen in `workload/`; its cases, replay fixtures
+and replacements hashes are checked by the verifier. `editor.html` is a separate
+browser acceptance fixture and is not the native benchmark replay fixture.
+Computer Use activated the editor during unmeasured setup; the runner then checked
+foreground, focus, full selection and exact fixture text before posting each
+measured hotkey. No correctness gate or timed boundary was bypassed.
+Manifest timestamps are normalized to RFC 3339 with their original strings retained;
+`worktree_clean` makes the existing empty git-porcelain result explicit.
+The wait-only probe now requires a fresh `--output` JSONL path and journals every
+attempt, including failures. Its original `wait-probe.json` measurement is unchanged.

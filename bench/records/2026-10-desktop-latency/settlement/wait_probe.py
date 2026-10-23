@@ -56,13 +56,29 @@ def sample(mode):
         if timer:
             k.CloseHandle(timer)
 
+import argparse
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output', type=Path, required=True, help='Fresh JSONL journal; never overwritten')
+parser.add_argument('--samples', type=int, default=52)
+args = parser.parse_args()
+if not 3 <= args.samples <= 1000:
+    parser.error('--samples must be 3..1000, including two warmups')
 rows = []
-for block, mode in enumerate(['timeout', 'high_resolution', 'ordinary_timer', 'high_resolution', 'timeout']):
-    for i in range(52):
-        rows.append(dict(block=block, warmup=i<2, **sample(mode)))
-out = Path(__file__).with_name('wait-probe.json')
-out.write_text(json.dumps(rows, indent=2))
+with args.output.open('x', encoding='utf-8') as journal:
+    for block, mode in enumerate(['timeout', 'high_resolution', 'ordinary_timer', 'high_resolution', 'timeout']):
+        for i in range(args.samples):
+            row = dict(block=block, mode=mode, warmup=i<2)
+            try:
+                row.update(sample(mode), success=True)
+            except Exception as error:
+                row.update(success=False, error=str(error))
+                journal.write(json.dumps(row)+'\n')
+                journal.flush()
+                raise
+            journal.write(json.dumps(row)+'\n')
+            journal.flush()
+            rows.append(row)
 for block in range(5):
     selected = [r for r in rows if r['block']==block and not r['warmup']]
     values = sorted(r['elapsed_ms'] for r in selected)
-    print(json.dumps({'block': block, 'mode': selected[0]['mode'], 'n': len(values), 'min': min(values), 'median': statistics.median(values), 'mean': statistics.mean(values), 'p95': values[47], 'max': max(values), 'wait_calls': sorted(set(len(r['waits']) for r in selected))}))
+    print(json.dumps({'block': block, 'mode': selected[0]['mode'], 'n': len(values), 'min': min(values), 'median': statistics.median(values), 'mean': statistics.mean(values), 'max': max(values)}))

@@ -1,7 +1,7 @@
 {
   "worktree_commit": "9b6033a7de96a1c55d6e51323e98a5d4a7bed6b9",
   "dirty": "",
-  "created_utc": "2026-10-23 16:34:36.0372181 +00:00:00",
+  "created_utc": "2026-10-23T16:34:36.0372181Z",
   "timing_schema_version": 1,
   "schema_version": 2,
   "implementation": "rust",
@@ -36,5 +36,7 @@
   "setup_timeout_ms": 30000,
   "notes": "Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard.",
   "binary_source_commit": "f60aacd329d9e80325abe08f9ef5e397996acbd1",
-  "provenance_note": "worktree_commit is launch-time checkout state; binary_source_commit identifies downloaded CI artifact. Supported Computer Use activated the disposable editor before strict setup gates passed."
+  "provenance_note": "worktree_commit is launch-time checkout state; binary_source_commit identifies downloaded CI artifact. Supported Computer Use activated the disposable editor before strict setup gates passed.",
+  "created_utc_original": "2026-10-23 16:34:36.0372181 +00:00:00",
+  "worktree_clean": true
 }

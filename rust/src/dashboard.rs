@@ -702,7 +702,7 @@ fn render_row(row: &mut Row) {
     {
         append_text(&row.body, "\r\n\r\nTIMING\r\n");
         for (k, v) in timings {
-            if !v.is_null() {
+            if k.ends_with("_ms") && v.is_number() {
                 append_text(&row.body, &format!("{k}: {v} ms\r\n"));
             }
         }
