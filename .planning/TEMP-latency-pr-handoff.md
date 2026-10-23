@@ -2,6 +2,13 @@
 
 Prepared October 22, 2026. Retain this file until the receiving thread has incorporated its context; remove it in a later explicit cleanup commit once superseded.
 
+## Desktop move — October 23, read this first
+
+- Continue from [the current desktop handoff](research/2026-10-23-desktop-latency-handoff.md).
+- Use PR #8's branch, not the old main-only research state. Its latest code measures
+  the local path and diagnoses fixture setup; no optimization or release has occurred.
+- Treat the three-PR batch below as superseded historical proposals.
+
 ## Scope update — October 22, receiving session
 
 - Supersede the mandatory three-PR batch below with Elliot's narrower checkpoint:
