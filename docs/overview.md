@@ -14,101 +14,69 @@ Full project context. Routed from root `AGENTS.md` when overview, stack, or repo
 - Velopack for auto-update + GitHub Releases for distribution
 - OpenAI Responses API
 - Windows only
-- Python 3 used only for fine-tune dataset tooling under `tests/`
+- Python 3 for regression, benchmark and fine-tune tooling
 - Build: `cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features`; package with `rust/package.ps1`
 
 ## Developer setup
 
-Install the .NET 10 SDK selected by `global.json`, Python 3.14.8, and uv. The native app needs no Node.js, npm, AutoHotkey, or separately installed Windows workload. Its NuGet dependency restores during the build.
-
-From the checkout root:
-
-```powershell
-uv venv --python 3.14.8 .venv
-uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
-dotnet build src/UniversalSpellCheck.csproj -c Dev
-.venv/Scripts/python.exe -m pytest tests/ bench/ -q
-```
-
-Keep Python tooling in the ignored `.venv/`, never an agent's Python environment. `requirements-dev.txt` pins the direct test and fine-tune dependencies. Tests use mocked transports and need no API keys. Enter a key through the app's Settings only when testing live corrections.
-
-When using the portable SDK in the outer project folder on this machine, prepend it for the current PowerShell session:
+Install the pinned Rust toolchain from `rust-toolchain.toml` and the Windows MSVC
+build tools. From the checkout root:
 
 ```powershell
-$env:DOTNET_ROOT = (Resolve-Path ../.dotnet).Path
-$env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+cargo build --locked --manifest-path rust/Cargo.toml --release
+cargo test --locked --manifest-path rust/Cargo.toml
 ```
 
-The SDK includes the Windows Desktop runtime. Keep the Velopack library and release-packaging CLI on the same version. Repository-level regression gaps are recorded in `docs/tooling-gaps.md`; installing packages does not repair missing project functions.
+The default build is Dev. Add `--no-default-features` for Prod. The native app needs
+no Node.js, npm, AutoHotkey or .NET runtime. The retained C# reference and differential
+formatting oracle use the .NET SDK selected by `global.json`; Python regression and
+benchmark tooling uses the ignored `.venv/` with `requirements-dev.txt`.
+
+Keep the Velopack library and packaging CLI on the same version. Use `rust/package.ps1`
+for local packaging and the deploy skill for publishing. Enter live API credentials
+through Settings; ordinary offline tests need no real key.
 
 ## Channels
 
-- **Prod** (`Release` config) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck.Data\`. Auto-updates from GitHub Releases.
-- **Dev** (`Dev` config, `DEV` compile constant) — Ctrl+Alt+D, mutex `UniversalSpellCheck.Dev`, settings under `%LocalAppData%\UniversalSpellCheck.Dev\`, tray icon orange-tinted. Never auto-updates; updated via `git pull` + `dotnet run -c Dev`.
+- **Prod** (Rust `--no-default-features`) — Ctrl+Alt+U, mutex `UniversalSpellCheck`, settings under `%LocalAppData%\UniversalSpellCheck.Data\`. Auto-updates from GitHub Releases.
+- **Dev** (default Rust features) — Ctrl+Alt+D, mutex `UniversalSpellCheck.Dev`, settings under `%LocalAppData%\UniversalSpellCheck.Dev\`, tray icon golden yellow. Never auto-updates; updated via `git pull` + `cargo run --manifest-path rust/Cargo.toml --release`.
 
 **Logs are unified across channels:** both write to `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl`. Every line is stamped with `channel`, `app_version`, and `pid` so downstream tooling can filter while keeping the corpus together for fine-tune use. `%LocalAppData%\UniversalSpellCheck` is reserved for Velopack installation files and must never hold durable user data.
 
 All channel constants live in `src/BuildChannel.cs` — that file is the canonical source. Never hardcode channel-conditional values elsewhere.
 
-## Primary files
+## Primary files and repo map
 
-- `src/Program.cs` — entrypoint. `VelopackApp.Run()` first, safe-data migration second, then mutex + tray bootstrap.
-- `src/BuildChannel.cs` — Prod/Dev constants: hotkey, mutex, paths, version, display strings.
-- `src/AppPaths.cs` — settings/API isolated per channel; logs shared.
-- `src/SettingsStore.cs` — app settings plus DPAPI-encrypted named API-key collections.
-- `src/UpdateService.cs` — single unified update flow (Launch / Periodic / ManualTray / ManualDashboard).
-- `src/SpellcheckCoordinator.cs` — capture/request/post-process/paste pipeline.
-- `src/OpenAiSpellcheckService.cs` — persistent HttpClient + Responses API.
-- `src/TextPostProcessor.cs` — `replacements.json` + prompt-leak guard.
-- `src/HotkeyWindow.cs` — Win32 `RegisterHotKey`, hotkey from `BuildChannel`.
-- `src/SpellCheckAppContext.cs` — tray lifetime, shared restart and startup update handling.
-- `src/LoadingOverlayForm.cs` — bottom-center loading overlay with per-phase status text.
-- `src/UI/` — WPF dashboard (MainWindow + Activity/Settings pages + Styles/Components; Activity feed paginates shared JSONL logs).
-- `replacements.json` (repo root) — copied next to the exe at publish time.
-
-## Repo map
-
-```text
-Universal Spell Check/
-|-- src/                              # C#/.NET WinForms + WPF app (the product)
-|   |-- UniversalSpellCheck.csproj    # Configurations: Debug | Release | Dev (DEV constant)
-|   |-- Program.cs
-|   |-- BuildChannel.cs
-|   |-- AppPaths.cs
-|   |-- SettingsStore.cs
-|   |-- DiagnosticsLogger.cs          # JSONL append with channel/app_version/pid stamping
-|   |-- HotkeyWindow.cs
-|   |-- SpellCheckAppContext.cs
-|   |-- UpdateService.cs
-|   |-- SpellcheckCoordinator.cs
-|   |-- OpenAiSpellcheckService.cs
-|   |-- TextPostProcessor.cs
-|   |-- LoadingOverlayForm.cs
-|   `-- UI/                           # WPF dashboard (MainWindow + Pages + Styles/Components)
-|
-|-- .github/workflows/
-|   |-- release.yml                   # Tag v*.*.* -> publish + vpk pack + GitHub Release
-|   `-- claude-agents-sync.yml        # Agent definitions sync
-|-- replacements.json                 # Post-processing brand/casing replacements (copied to publish)
-|-- .archive/ahk-legacy/              # AHK + Python proxy + old version files (history only)
-|-- logs/                             # Legacy AHK logs (no longer written to)
-|-- benchmark_runs/                   # Dated benchmark outputs (gitignored content; structure preserved)
-|-- fine_tune_runs/                   # Dated fine-tune dataset/eval outputs
-|-- tests/                            # Python fine-tune dataset + benchmark tooling
-|-- docs/                             # Focused context docs - load via root AGENTS.md routing
-|-- DESIGN.md                         # WPF dashboard visual design - read before visual changes
-`-- AGENTS.md                         # Root resolver - routing table, not encyclopedia
-```
+- `rust/src/main.rs`, `app.rs` — bootstrap, tray, hotkey and application lifetime.
+- `rust/src/runtime.rs` — persistent correction worker and capture/request/paste pipeline.
+- `rust/src/clipboard.rs` — Win32 clipboard, modifier waits and input injection.
+- `rust/src/http.rs` — persistent native WinHTTP client and Responses API.
+- `rust/src/core.rs`, `rich.rs`, `docs_native.rs` — protection, post-processing and rich reconstruction.
+- `rust/src/timing.rs` — monotonic local-operation measurements, including failed stages.
+- `rust/src/dashboard.rs`, `activity.rs` — native dashboard and activity feed.
+- `rust/src/store.rs`, `platform.rs` — settings, DPAPI keys, paths and data migration.
+- `rust/src/update.rs` — unified updater.
+- `src/BuildChannel.cs` — canonical shared channel constants, generated into Rust at build time.
+- `src/` — retained C# WinForms/WPF reference and formatting oracle.
+- `.github/workflows/release.yml` — tag-triggered Rust packaging and production release.
+- `.github/workflows/rust-checks.yml` — native checks and candidate artifacts.
+- `replacements.json` — shared replacement rules, packaged beside the executable.
+- `bench/` — benchmark harness, public fixtures and portable historical records.
+- `benchmark_runs/` — ignored local artifacts; never transfer private data through Git.
+- `tests/`, `rust/tests/` — regression suites and differential tooling.
+- `docs/`, `.planning/` — focused subsystem guidance and research/handoffs.
+- `.agents/` — canonical agent instructions and helper skills.
+- `.archive/ahk-legacy/` — archived AHK/Python implementation.
 
 ## Tone when collaborating
 
 Speed first, simplicity second, minimal UI/overhead third. Treat every added abstraction or fallback as a cost. Concise, action-oriented responses. Decide fast.
 
-## Rust candidate
+## Native Rust product
 
-- Find the native Rust candidate in `rust/`; keep `src/` as the C# reference during acceptance.
+- Find the native Rust product in `rust/`; keep `src/` as the C# reference.
 - Use native Windows controls through `native-windows-gui`, direct Win32 clipboard/keyboard/DPAPI calls, native asynchronous WinHTTP, and the matching Velopack Rust SDK.
 - Keep the dashboard on its own thread; the resident tray has no GPU, WebView, asynchronous runtime or continuous render loop.
 - Build Dev by default; add `--no-default-features` for Prod. Keep the pinned toolchain in `rust-toolchain.toml` and dependencies in `rust/Cargo.lock`.
-- Read `rust/AGENTS.md` for candidate commands and `docs/bench.md` for comparison boundaries.
-- Keep production release packaging on the established C# path until native desktop acceptance and matched measurements are complete; the Rust checks workflow uploads a candidate without publishing or installing it.
+- Read `rust/AGENTS.md` for native commands and `docs/bench.md` for comparison boundaries.
+- Production packaging uses Rust through the tag-triggered release workflow; the Rust checks workflow uploads a candidate without publishing a production release.
