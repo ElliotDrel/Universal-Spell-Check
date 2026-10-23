@@ -647,7 +647,8 @@ mod tests {
     }
     #[test]
     fn native_async_reads_mock_http() {
-        let (mut request, _connection, _session, server) = local_request(Duration::ZERO, false, None);
+        let (mut request, _connection, _session, server) =
+            local_request(Duration::ZERO, false, None);
         let deadline = Instant::now() + Duration::from_secs(2);
         request.send(deadline).unwrap();
         assert_eq!(request.receive(deadline).unwrap(), 200);
@@ -671,7 +672,10 @@ mod tests {
         sent.unwrap();
         assert_eq!(request.receive(deadline).unwrap(), 200);
         let bytes = request.read(deadline).unwrap();
-        assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap()["output_text"], "the test");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&bytes).unwrap()["output_text"],
+            "the test"
+        );
         drop(request);
         server.join().unwrap();
     }
