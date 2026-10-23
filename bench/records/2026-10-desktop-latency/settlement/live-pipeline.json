@@ -1,0 +1,429 @@
+[
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "This is a tset. Please chek https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "output_text": "This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "paste_text": "This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "none",
+      "attempted": true,
+      "applied": false,
+      "reason": "unsupported_editor",
+      "paragraph_count": 0,
+      "source_html_present": true
+    },
+    "timings": {
+      "dispatch_ms": 0.1128,
+      "setup_ms": 0.7081,
+      "backup_ms": 3.6446,
+      "clipboard_ms": 10.8696,
+      "history_exclude_ms": 0.38180000000000003,
+      "prepare_ms": 7.5049,
+      "request_ms": 1201.9260000000002,
+      "replacements_ms": 0.0281,
+      "rich_mapping_ms": 0.5826,
+      "diagnostics_ms": 0.0837,
+      "paste_ms": 53.0589,
+      "capture": {
+        "modifiers_ms": 0.1039,
+        "copy_input_ms": 6.573200000000001,
+        "wait_ms": 2.818,
+        "read_ms": 1.2778,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.1124,
+          "unicode_ms": 0.2698,
+          "html_ms": 0.3169,
+          "rtf_ms": 0.0349,
+          "native_ms": 0.029,
+          "enumerate_ms": 0.4353,
+          "decode_ms": 0.0039
+        }
+      },
+      "paste": {
+        "write_ms": 0.4139,
+        "readback_ms": null,
+        "settle_ms": 50.4357,
+        "modifiers_ms": 0.0097,
+        "input_ms": 2.1941
+      },
+      "total_ms": 1279.0154,
+      "unattributed_ms": 0.11429999999995744,
+      "recovery_ms": null,
+      "api_ms": 1201.9260000000002,
+      "request_send_ms": 1201.6734,
+      "request_wait_ms": 0.026,
+      "response_download_ms": 0.0376
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "This is a tset with italic text and a link.\r\n\r\n\r\n\r\nFix teh first item.\r\nKeep the second item.",
+    "output_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "paste_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "aligned_html",
+      "attempted": true,
+      "applied": true,
+      "reason": "",
+      "paragraph_count": 0,
+      "source_html_present": true
+    },
+    "timings": {
+      "dispatch_ms": 0.0694,
+      "setup_ms": 0.1373,
+      "backup_ms": 1.5459,
+      "clipboard_ms": 14.7257,
+      "history_exclude_ms": 0.7302,
+      "prepare_ms": 0.12669999999999998,
+      "request_ms": 910.1273,
+      "replacements_ms": 0.0211,
+      "rich_mapping_ms": 1.0373999999999999,
+      "diagnostics_ms": 0.03560000000000001,
+      "paste_ms": 52.545500000000004,
+      "capture": {
+        "modifiers_ms": 0.0652,
+        "copy_input_ms": 8.8909,
+        "wait_ms": 3.2049000000000003,
+        "read_ms": 2.5202,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.19440000000000002,
+          "unicode_ms": 0.6064,
+          "html_ms": 0.455,
+          "rtf_ms": 0.0292,
+          "native_ms": 0.0389,
+          "enumerate_ms": 1.0690000000000002,
+          "decode_ms": 0.0053
+        }
+      },
+      "paste": {
+        "write_ms": 0.495,
+        "readback_ms": null,
+        "settle_ms": 50.3717,
+        "modifiers_ms": 0.11739999999999999,
+        "input_ms": 1.5601
+      },
+      "total_ms": 981.4361,
+      "unattributed_ms": 0.33399999999994634,
+      "recovery_ms": null,
+      "api_ms": 910.1273,
+      "request_send_ms": 909.9188,
+      "request_wait_ms": 0.0285,
+      "response_download_ms": 0.032499999999999994
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "This sentence is already correct, with a link.",
+    "output_text": "This sentence is already correct, with a link.",
+    "paste_text": "This sentence is already correct, with a link.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "none",
+      "attempted": true,
+      "applied": false,
+      "reason": "unsupported_editor",
+      "paragraph_count": 0,
+      "source_html_present": true
+    },
+    "timings": {
+      "dispatch_ms": 0.0441,
+      "setup_ms": 0.1251,
+      "backup_ms": 1.2209,
+      "clipboard_ms": 12.3099,
+      "history_exclude_ms": 1.1258,
+      "prepare_ms": 0.079,
+      "request_ms": 1842.6074999999998,
+      "replacements_ms": 0.017,
+      "rich_mapping_ms": 0.0097,
+      "diagnostics_ms": 0.0332,
+      "paste_ms": 53.0033,
+      "capture": {
+        "modifiers_ms": 0.0369,
+        "copy_input_ms": 6.9198,
+        "wait_ms": 3.2898,
+        "read_ms": 2.0079,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.1496,
+          "unicode_ms": 0.6761999999999999,
+          "html_ms": 0.505,
+          "rtf_ms": 0.0259,
+          "native_ms": 0.0195,
+          "enumerate_ms": 0.494,
+          "decode_ms": 0.0039
+        }
+      },
+      "paste": {
+        "write_ms": 1.34,
+        "readback_ms": null,
+        "settle_ms": 50.0751,
+        "modifiers_ms": 0.025,
+        "input_ms": 1.5612
+      },
+      "total_ms": 1910.8597,
+      "unattributed_ms": 0.2841999999998279,
+      "recovery_ms": null,
+      "api_ms": 1842.6074999999998,
+      "request_send_ms": 1842.2174,
+      "request_wait_ms": 0.0275,
+      "response_download_ms": 0.23220000000000002
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "Please chek the notes.\r\n\r\nThen send the documants. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "output_text": "Please check the notes.\n\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "paste_text": "Please check the notes.\n\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "none",
+      "attempted": false,
+      "applied": false,
+      "reason": "no_html",
+      "paragraph_count": 0,
+      "source_html_present": false
+    },
+    "timings": {
+      "dispatch_ms": 0.2367,
+      "setup_ms": 0.31329999999999997,
+      "backup_ms": 2.4152,
+      "clipboard_ms": 15.3751,
+      "history_exclude_ms": 2.1378999999999997,
+      "prepare_ms": 0.135,
+      "request_ms": 950.3329,
+      "replacements_ms": 0.0196,
+      "rich_mapping_ms": 0.0011,
+      "diagnostics_ms": 0.0419,
+      "paste_ms": 52.578399999999995,
+      "capture": {
+        "modifiers_ms": 0.09129999999999999,
+        "copy_input_ms": 10.0016,
+        "wait_ms": 2.1037999999999997,
+        "read_ms": 3.0833000000000004,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.4374,
+          "unicode_ms": 1.9315,
+          "html_ms": 0.031900000000000005,
+          "rtf_ms": 0.0306,
+          "native_ms": 0.0419,
+          "enumerate_ms": 0.4543,
+          "decode_ms": 0.002
+        }
+      },
+      "paste": {
+        "write_ms": 0.773,
+        "readback_ms": null,
+        "settle_ms": 50.493,
+        "modifiers_ms": 0.0072,
+        "input_ms": 1.3041
+      },
+      "total_ms": 1024.0077,
+      "unattributed_ms": 0.4206000000001495,
+      "recovery_ms": null,
+      "api_ms": 950.3329,
+      "request_send_ms": 948.5162,
+      "request_wait_ms": 0.0301,
+      "response_download_ms": 1.6126
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "Please check the notes.\r\n\r\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "output_text": "Please check the notes.\n\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "paste_text": "Please check the notes.\n\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "none",
+      "attempted": false,
+      "applied": false,
+      "reason": "no_html",
+      "paragraph_count": 0,
+      "source_html_present": false
+    },
+    "timings": {
+      "dispatch_ms": 0.056799999999999996,
+      "setup_ms": 0.1306,
+      "backup_ms": 1.2995999999999999,
+      "clipboard_ms": 21.4377,
+      "history_exclude_ms": 0.8396,
+      "prepare_ms": 0.1036,
+      "request_ms": 720.1735,
+      "replacements_ms": 0.022,
+      "rich_mapping_ms": 0.0015999999999999999,
+      "diagnostics_ms": 0.0341,
+      "paste_ms": 53.2541,
+      "capture": {
+        "modifiers_ms": 16.5419,
+        "copy_input_ms": 2.5119000000000002,
+        "wait_ms": 1.1279000000000001,
+        "read_ms": 1.1742000000000001,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.158,
+          "unicode_ms": 0.7649,
+          "html_ms": 0.0115,
+          "rtf_ms": 0.0063,
+          "native_ms": 0.030800000000000004,
+          "enumerate_ms": 0.11,
+          "decode_ms": 0.0014
+        }
+      },
+      "paste": {
+        "write_ms": 0.8737,
+        "readback_ms": null,
+        "settle_ms": 50.123599999999996,
+        "modifiers_ms": 0.009099999999999999,
+        "input_ms": 2.2461
+      },
+      "total_ms": 797.6128,
+      "unattributed_ms": 0.2595999999999776,
+      "recovery_ms": null,
+      "api_ms": 720.1735,
+      "request_send_ms": 719.9671,
+      "request_wait_ms": 0.028900000000000002,
+      "response_download_ms": 0.033
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "This is a tset with italic text and a link.\r\n\r\n\r\n\r\nFix teh first item.\r\nKeep the second item.",
+    "output_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "paste_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "aligned_html",
+      "attempted": true,
+      "applied": true,
+      "reason": "",
+      "paragraph_count": 0,
+      "source_html_present": true
+    },
+    "timings": {
+      "dispatch_ms": 0.0813,
+      "setup_ms": 0.098,
+      "backup_ms": 1.5211999999999999,
+      "clipboard_ms": 23.1642,
+      "history_exclude_ms": 1.0093999999999999,
+      "prepare_ms": 0.1382,
+      "request_ms": 987.9480000000001,
+      "replacements_ms": 0.0222,
+      "rich_mapping_ms": 0.11220000000000001,
+      "diagnostics_ms": 0.057300000000000004,
+      "paste_ms": 53.0423,
+      "capture": {
+        "modifiers_ms": 17.2045,
+        "copy_input_ms": 3.2878,
+        "wait_ms": 1.7152999999999998,
+        "read_ms": 0.8721,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.1154,
+          "unicode_ms": 0.26699999999999996,
+          "html_ms": 0.307,
+          "rtf_ms": 0.0378,
+          "native_ms": 0.0149,
+          "enumerate_ms": 0.0826,
+          "decode_ms": 0.0035
+        }
+      },
+      "paste": {
+        "write_ms": 0.6684,
+        "readback_ms": null,
+        "settle_ms": 50.4181,
+        "modifiers_ms": 0.0382,
+        "input_ms": 1.9158
+      },
+      "total_ms": 1067.4285000000002,
+      "unattributed_ms": 0.23420000000010077,
+      "recovery_ms": null,
+      "api_ms": 987.9480000000001,
+      "request_send_ms": 987.648,
+      "request_wait_ms": 0.0304,
+      "response_download_ms": 0.0335
+    }
+  },
+  {
+    "status": "success",
+    "model": "gpt-4.1",
+    "input_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "output_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "paste_text": "This is a test with italic text and a link.\r\n\r\n\r\n\r\nFix the first item.\r\nKeep the second item.",
+    "rich_text": {
+      "native_docs_status": "not_applicable",
+      "link_status": "not_applicable",
+      "mode": "aligned_html",
+      "attempted": true,
+      "applied": true,
+      "reason": "",
+      "paragraph_count": 0,
+      "source_html_present": true
+    },
+    "timings": {
+      "dispatch_ms": 0.0472,
+      "setup_ms": 0.15560000000000002,
+      "backup_ms": 0.8513999999999999,
+      "clipboard_ms": 13.4418,
+      "history_exclude_ms": 0.9269999999999999,
+      "prepare_ms": 0.0997,
+      "request_ms": 1315.5748,
+      "replacements_ms": 0.0173,
+      "rich_mapping_ms": 0.0614,
+      "diagnostics_ms": 0.0341,
+      "paste_ms": 53.9831,
+      "capture": {
+        "modifiers_ms": 0.019700000000000002,
+        "copy_input_ms": 7.5543,
+        "wait_ms": 3.0642,
+        "read_ms": 2.7564,
+        "copy_attempts": 1,
+        "read_attempts": 1,
+        "reads": {
+          "open_ms": 0.1332,
+          "unicode_ms": 0.5503,
+          "html_ms": 0.545,
+          "rtf_ms": 0.0251,
+          "native_ms": 0.0316,
+          "enumerate_ms": 1.2216,
+          "decode_ms": 0.0028
+        }
+      },
+      "paste": {
+        "write_ms": 0.6311,
+        "readback_ms": null,
+        "settle_ms": 50.271,
+        "modifiers_ms": 0.07669999999999999,
+        "input_ms": 3.0023
+      },
+      "total_ms": 1385.4864,
+      "unattributed_ms": 0.2929999999998927,
+      "recovery_ms": null,
+      "api_ms": 1315.5748,
+      "request_send_ms": 1315.39,
+      "request_wait_ms": 0.0275,
+      "response_download_ms": 0.0287
+    }
+  }
+]

@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>USC settlement paste acceptance</title>
+<style>body{font:20px Arial;max-width:900px;margin:40px auto}#editor{border:2px solid #476;padding:20px;min-height:260px}button{font:inherit;margin:6px}#status{white-space:pre-wrap;font:14px monospace}</style>
+<h1>Disposable paste acceptance</h1>
+<p>Only synthetic text. Select inside the editor, then use the app's actual hotkey.</p>
+<button onclick="reset('plain')">Plain literals</button><button onclick="reset('rich')">Rich formatting</button><button onclick="reset('unchanged')">Unchanged formatting</button>
+<div id="editor" contenteditable="true" role="textbox" aria-label="Disposable editor"></div>
+<pre id="status"></pre>
+<script>
+const cases={plain:'<p>This is a tset. Please chek https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.</p>',rich:'<p>This is a <strong>tset</strong> with <em>italic text</em> and a <a href="https://example.com/acceptance?q=keep">link</a>.</p><p><br></p><ul><li>Fix teh first item.</li><li>Keep the second item.</li></ul>',unchanged:'<p>This sentence is <strong>already correct</strong>, with a <a href="https://example.com/acceptance?q=keep">link</a>.</p>'};
+let pastes=0;
+function report(){statusEl.textContent='Paste events: '+pastes+'\nText: '+editor.innerText+'\nHTML: '+editor.innerHTML;}
+const statusEl=document.getElementById('status');
+function reset(name){editor.innerHTML=cases[name];if(name!=='plain')editor.firstElementChild.setAttribute('data-pm-slice','0 0 []');pastes=0;report();}
+editor.addEventListener('paste',()=>{pastes++;setTimeout(report,0)});
+editor.addEventListener('input',report);reset('plain');
+</script>

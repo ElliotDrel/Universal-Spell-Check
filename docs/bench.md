@@ -435,3 +435,7 @@ For desktop automation that cannot activate the window within the default three
 seconds, use `--setup-timeout-ms 30000` (bounded to 3,000–120,000). This only extends
 unmeasured setup; all foreground, focus, complete-selection and fixture-text gates
 still must pass before any hotkey is posted. The manifest records the setup limit.
+
+### Settlement wait follow-up, October 23, 2026
+
+The bounded [settlement comparison record](../bench/records/2026-10-desktop-latency/settlement/README.md) contains eight alternating blocks, 480 retained deliveries, a native wait-only probe and real-hotkey editor acceptance. The high-resolution wait preserves at least 50 ms and message pumping; native timer failures use the previous timeout path. Candidate local completion medians are about 70–71 ms versus baseline 81–83 ms on this desktop. Keep the unsupported-rich formatting limitation and frozen rich-list spacing discrepancy separate from delivery success.
