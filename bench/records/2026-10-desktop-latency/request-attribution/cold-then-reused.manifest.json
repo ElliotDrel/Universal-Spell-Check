@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "model": "gpt-4.1",
+  "fixture": "This is a tset.",
+  "runs": 3,
+  "prewarm": false,
+  "binary_sha256": "9f8478b0f675eaa0a56b4b8c74c6e6bc34bab47753e7e38f51ec264cefef50e2",
+  "boundary": "Client::request; no clipboard, mapper, GUI or physical hotkey",
+  "binary_source_commit": "db48f0b0d73366f8af33cfde9b36ec3265691f7a"
+}

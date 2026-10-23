@@ -37,6 +37,7 @@ jobs:
         run: |
           python -O bench/records/2026-10-desktop-latency/verify.py
           python -O bench/records/2026-10-desktop-latency/settlement/verify.py
+          python -O bench/records/2026-10-desktop-latency/request-attribution/verify.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
       - name: Lint

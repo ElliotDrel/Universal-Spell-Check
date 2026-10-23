@@ -120,3 +120,21 @@ Provenance clarification: the controlled desktop measurement used ee08a5f;
 the subsequent 10–13 ms settlement comparison used baseline f60aacd against
 candidate 9b6033a. Browser rich acceptance used synthetic contenteditable markup,
 not actual Google Docs or ChatGPT; its limitations remain in the settlement record.
+
+## Completed Opus request investigation
+
+The historical Fable access blocker above is superseded for this investigation:
+Elliot requested and approved Opus 5.5, which completed the read-only consultation
+at medium effort in auto permission mode. The approved source and native probe
+findings are summarized in the [request attribution record](../../bench/records/2026-10-desktop-latency/request-attribution/README.md).
+Seven fixed requests returned exact expected text. Native send API calls took
+0.3–4.1 ms; most request time occurred after native transmission and before response
+headers. That interval combines remote network/proxy/service work and is not an
+isolated measurement of model generation. No new request-speed optimization is
+retained, and prewarming differences are not a causal speedup claim.
+
+The optimized native pipeline now has deterministic CI positive/negative controls,
+coverage/hash checks with optimized-Python mutation tests, and gated request-deadline
+tests. The live probe requires explicit API opt-in and avoids desktop/startup work.
+Local pinned formatting and cached CI reduce iteration friction. Production stays
+installed and running; its saved data was preserved. No release was published.

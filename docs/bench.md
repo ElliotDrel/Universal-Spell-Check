@@ -470,3 +470,16 @@ JSONL. It does not initialize the tray, updater, migration or startup registrati
 fails if the directory exists. Compare cold first and subsequent same-client
 requests using native metadata, not labels alone. This is a diagnostic probe,
 not an end-to-end editor speed measurement.
+
+The completed [request attribution record](../bench/records/2026-10-desktop-latency/request-attribution/README.md)
+contains seven verified synthetic requests and the Opus 5.5 medium/auto assessment
+follow-up. Native timing shows a predominantly send-end-to-response-headers wait,
+not a one-second local upload. No request-speed change was justified or retained.
+
+Before pushing Rust edits, use `./bench/format-rust.ps1` (check by default), or
+`./bench/format-rust.ps1 -Rustfmt <verified-portable-rustfmt.exe>` when Cargo is
+unavailable. `-Write` opts into source formatting. The pinned official portable
+formatter/runtime on this desktop is retained under the primary checkout's
+ignored `benchmark_runs/tooling/rustfmt-1.99.1/`, with checksum/source provenance.
+CI uses a SHA-pinned official cache action for Cargo registry/git/build outputs;
+all correctness, mutation and safety gates still run after restoration.
