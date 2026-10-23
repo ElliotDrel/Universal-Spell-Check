@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from phase_report import distribution, report
+from phase_report import distribution, report, flatten
 
 
 class ReportTests(unittest.TestCase):
@@ -47,6 +47,9 @@ class ReportTests(unittest.TestCase):
                 (after/'manifest.json').write_text(json.dumps(manifest))
                 with self.assertRaises(ValueError):
                     report([('before',before),('after',after)])
+
+    def test_counters_and_overflow_are_not_timing_samples(self):
+        self.assertEqual(dict(flatten({"copy_attempts": 1, "read_ms": 0, "bad_ms":10**1000})), {"read_ms":0})
 
     def test_percentiles_keep_zero(self):
         self.assertEqual(distribution([0,10,20])['p95'],19)

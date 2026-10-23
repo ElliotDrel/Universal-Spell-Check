@@ -441,3 +441,32 @@ still must pass before any hotkey is posted. The manifest records the setup limi
 The bounded [settlement comparison record](../bench/records/2026-10-desktop-latency/settlement/README.md) contains eight alternating blocks, 480 retained deliveries, a native wait-only probe and real-hotkey editor acceptance. The high-resolution wait preserves at least 50 ms and message pumping; native timer failures use the previous timeout path. Candidate local completion medians are about 70–71 ms versus baseline 81–83 ms on this desktop. Keep the unsupported-rich formatting limitation and frozen rich-list spacing discrepancy separate from delivery success.
 
 For ordered raw-block phase comparisons use python bench/phase_report.py --block NAME=DIRECTORY (repeat the block flag). Optional --output exclusively creates a fresh JSON report. It checks matching workloads within each diagnostic mode, reports nested phase distributions with sample counts, and retains failures and incomplete coverage. It does not launch desktop tests or award an automatic speed/reliability verdict. See the desktop-results follow-up for an ABBA example.
+
+### Deterministic correction and request investigation gates
+
+CI runs the actual optimized executable over the frozen ten-case compute workload
+and requires exact output, paste text and CF_HTML. It then mutates one expected
+output and requires a nonzero result plus an explicitly retained failed trial.
+Neither setup failure nor missing rows counts as a successful negative control.
+The gate is `bench/check_native_contracts.py`; evidence uploads even after failure.
+Existing Dev/Prod unit tests include protected literals/model parameters, native
+HTTP reads/deadlines/lifetime, and a gated loopback response proving send completes
+before the mock is allowed to produce response headers. No provider key is in CI.
+These deterministic contracts prevent covered regressions; they cannot guarantee
+live service latency, all editor rendering, or every possible correction.
+
+Evidence checks use explicit failures, per-case warmup/measured coverage, frozen
+workload hashes and the recorded A/B claim. CI also corrupts case coverage under
+`python -O` and requires rejection. The saved-record speed check validates an
+existing observation, not a wall-clock threshold on shared CI hardware.
+
+For request attribution without clipboard/focus changes, the optimized binary
+supports `--bench-request --allow-api --settings <saved-data-directory> --output
+<fresh-directory> --runs 3`, optionally `--prewarm`. It reads saved settings and
+encrypted credentials without writing them, sends only `This is a tset.` to the
+unchanged saved model/endpoint, reuses one client, and retains every result in
+JSONL. It does not initialize the tray, updater, migration or startup registration.
+`--allow-api` explicitly opts into these bounded real API calls. Output creation
+fails if the directory exists. Compare cold first and subsequent same-client
+requests using native metadata, not labels alone. This is a diagnostic probe,
+not an end-to-end editor speed measurement.

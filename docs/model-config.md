@@ -94,3 +94,28 @@ For any model change, also verify:
 - Failure paths still return a `SpellcheckResult` and do not paste over the user's selected text.
 - Logs include `request_ms`, `request_attempts`, `status_code`, and `error_code` for failures.
 - Post-processing (`TextPostProcessor`) still runs after successful model output and before paste.
+
+## Native request attribution (October 23 follow-up)
+
+The observed 720–1,843 ms desktop request samples put almost all time in the
+existing `request_send_ms`, with about 0.03 ms in the header-wait bucket. These
+labels are API-call boundaries, not proof of upload or server computation time.
+Microsoft documents that WinHttpSendRequest may operate synchronously even on an
+asynchronous session. The native diagnostics now split the API call from waiting
+for its SENDREQUEST_COMPLETE callback without changing transport or payload.
+
+`spellcheck_detail.request_native` contains `successful_attempt`, `send_api_ms`,
+`send_completion_wait_ms` and `native`. These describe the final successful
+attempt; legacy aggregate request times still include retries/backoff. Replay
+has null native data. Optional native queries record request-times QPC values,
+their frequency, connection request index, request-stat flags and negotiated
+protocol flags. Unsupported queries remain null; zero raw timestamp entries are
+not evidence of a measured zero-duration phase. No headers, key or host identity
+is captured by these diagnostics. Collection occurs after body read and has not
+been shown to accelerate corrections.
+
+Primary API contracts consulted this session:
+[WinHttpSendRequest](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpsendrequest),
+[request times](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ns-winhttp-winhttp_request_times),
+[time entries](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ne-winhttp-winhttp_request_time_entry),
+[request stats](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/ns-winhttp-winhttp_request_stats).

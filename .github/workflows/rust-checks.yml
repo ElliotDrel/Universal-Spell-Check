@@ -21,6 +21,12 @@ jobs:
         run: python -m unittest discover -s bench -p test_phase_report.py
       - name: Deterministic gate negative controls
         run: python -m unittest discover -s bench -p test_native_contract_gate.py
+      - name: Evidence corruption negative controls
+        run: python -m unittest discover -s bench -p test_evidence_gate.py
+      - name: Verify frozen desktop evidence under optimized Python
+        run: |
+          python -O bench/records/2026-10-desktop-latency/verify.py
+          python -O bench/records/2026-10-desktop-latency/settlement/verify.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
       - name: Lint
