@@ -1,0 +1,52 @@
+[
+  {
+    "run": "40038816667",
+    "step": "Cache pinned Cargo dependencies and build outputs",
+    "seconds": 0.0
+  },
+  {
+    "run": "40038816667",
+    "step": "Lint",
+    "seconds": 63.0
+  },
+  {
+    "run": "40038816667",
+    "step": "Dev regressions",
+    "seconds": 56.0
+  },
+  {
+    "run": "40038816667",
+    "step": "Prod regressions",
+    "seconds": 9.0
+  },
+  {
+    "run": "40038816667",
+    "step": "Optimized native build",
+    "seconds": 124.0
+  },
+  {
+    "run": "40039465313",
+    "step": "Cache pinned Cargo dependencies and build outputs",
+    "seconds": 21.0
+  },
+  {
+    "run": "40039465313",
+    "step": "Lint",
+    "seconds": 7.0
+  },
+  {
+    "run": "40039465313",
+    "step": "Dev regressions",
+    "seconds": 11.0
+  },
+  {
+    "run": "40039465313",
+    "step": "Prod regressions",
+    "seconds": 9.0
+  },
+  {
+    "run": "40039465313",
+    "step": "Optimized native build",
+    "seconds": 51.0
+  }
+]

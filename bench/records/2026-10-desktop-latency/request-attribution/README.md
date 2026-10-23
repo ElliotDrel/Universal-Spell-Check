@@ -80,7 +80,7 @@ now has the official checksum-verified formatter/runtime for the pinned Rust
 The formatter reports rustfmt 1.10.0-stable. Source and SHA-256 provenance are
 retained beside the tools. CI caches only Cargo registry/git/build outputs using
 the SHA-pinned official actions/cache v5 action, and still runs all gates.
-The local format check passed; no quantified CI-cache speedup is claimed yet.
+The local format check passed. In the recorded cold/cache-restored pair, lint plus Dev/Prod tests and optimized build took 252 vs 78 seconds; cache restore added 21 seconds (99 seconds combined). These are observed CI stage times across two runners, not a universal timing guarantee; see ci-iteration.json.
 
 `samples.json` retains relative measurements without credentials, host identity
 or raw machine-uptime counters. Native indices follow Microsoft's
