@@ -10,6 +10,8 @@ for block,count in [('cold-then-reused',3),('prewarmed',3),('verified-probe',1)]
     if len(selected)!=count or sorted(r['index'] for r in selected)!=list(range(count)):
         raise ValueError('Missing/duplicate block attempts')
     manifest=json.loads((root/(block+'.manifest.json')).read_text())
+    if manifest['prewarm'] is not (block != 'cold-then-reused'):
+        raise ValueError('Warmup provenance mismatch')
     if manifest['model']!='gpt-4.1' or manifest['fixture']!='This is a tset.' or manifest['runs']!=count:
         raise ValueError('Workload/model mismatch')
 for row in rows:

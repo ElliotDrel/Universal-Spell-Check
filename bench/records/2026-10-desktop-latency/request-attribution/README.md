@@ -101,7 +101,7 @@ client: 836.82 ms total, 0.364 ms in the send API, 836.20 ms completion wait,
 native send-end and headers-end. It returned the exact expected text in one
 attempt. Saved data presence and encrypted credential contents remained unchanged.
 This confirmation is the seventh sample and is separate from the initial blocks.
-Run `python .../request-attribution/verify.py` to check the retained facts.
+Run `python bench/records/2026-10-desktop-latency/request-attribution/verify.py` to check the retained facts.
 
 The later CI/tooling source 728a8b2 also passed
 [CI run 40038816667](https://github.com/ElliotDrel/Universal-Spell-Check/actions/runs/40038816667).
