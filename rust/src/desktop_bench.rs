@@ -439,6 +439,13 @@ pub fn run(args: &[String]) -> Result<(), String> {
     if mode != "local" && mode != "e2e" {
         return Err("Invalid desktop mode".into());
     }
+    let benchmark_vk = option(args, "--benchmark-vk")
+        .map(|value| value.parse::<u32>().map_err(|_| "Invalid --benchmark-vk"))
+        .transpose()?
+        .unwrap_or(channel::BENCH_VK);
+    if !(1..=254).contains(&benchmark_vk) {
+        return Err("--benchmark-vk must be a Windows virtual-key code from 1 to 254".into());
+    }
     let live = mode == "e2e";
     let output = PathBuf::from(option(args, "--output").ok_or("--output required")?);
     if output.exists()
@@ -551,7 +558,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
-    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","notes":"Registered Ctrl+Alt+B; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
@@ -620,7 +627,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             hwnd.cast(),
             1,
             MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
-            channel::BENCH_VK,
+            benchmark_vk,
         ) == 0
         {
             return Err(clipboard::error());

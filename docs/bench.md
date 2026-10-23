@@ -424,3 +424,9 @@ foreground/focus/selection/text-length and text-match prerequisites, excluding
 text contents. `summary.json.block_error` retains the abort reason even if setup
 failed before the first attempted warmup. Keep these zero-trial blocks as fixture
 diagnostics; they cannot establish app latency or a product failure rate.
+
+An occupied benchmark chord can be overridden explicitly with `--benchmark-vk N`
+(decimal Windows virtual-key code). The default remains `BuildChannel.BenchmarkHotkeyVk`.
+The manifest records `benchmark_vk`; this only changes the isolated registered
+benchmark chord, not product hotkeys, posted-message dispatch or correctness gates.
+Preserve registration failures as zero-trial preflight aborts.
