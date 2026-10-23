@@ -106,6 +106,8 @@ unsafe extern "system" fn callback(
 struct Request {
     handle: Handle,
     state: Arc<State>,
+    send_api_ms: f64,
+    send_completion_wait_ms: f64,
 }
 impl Request {
     fn new(
@@ -174,7 +176,12 @@ impl Request {
                 drop(Arc::from_raw(context as *const State));
                 return Err(std::io::Error::last_os_error().to_string());
             }
-            let request = Self { handle, state };
+            let request = Self {
+                handle,
+                state,
+                send_api_ms: 0.,
+                send_completion_wait_ms: 0.,
+            };
             let redirect = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
             if WinHttpSetOption(
                 request.handle.0,
@@ -231,7 +238,8 @@ impl Request {
         }
     }
     fn send(&mut self, deadline: Instant) -> Result<(), Failure> {
-        unsafe {
+        let started = Instant::now();
+        let accepted = unsafe {
             Self::accepted(WinHttpSendRequest(
                 self.handle.0,
                 self.state.headers.as_ptr(),
@@ -240,9 +248,14 @@ impl Request {
                 self.state.body.len() as u32,
                 self.state.body.len() as u32,
                 Arc::as_ptr(&self.state) as usize,
-            ))?;
-        }
-        self.wait(deadline, WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE)?;
+            ))
+        };
+        self.send_api_ms = started.elapsed().as_secs_f64() * 1000.;
+        accepted?;
+        let started = Instant::now();
+        let completed = self.wait(deadline, WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE);
+        self.send_completion_wait_ms = started.elapsed().as_secs_f64() * 1000.;
+        completed?;
         Ok(())
     }
     fn receive(&mut self, deadline: Instant) -> Result<u32, Failure> {
@@ -327,6 +340,8 @@ pub struct Response {
     pub raw: String,
     pub status: u32,
     pub send_ms: f64,
+    pub send_api_ms: Option<f64>,
+    pub send_completion_wait_ms: Option<f64>,
     pub wait_ms: f64,
     pub download_ms: f64,
     pub total_ms: f64,
@@ -437,6 +452,8 @@ impl Client {
             raw,
             status,
             send_ms,
+            send_api_ms: Some(request.send_api_ms),
+            send_completion_wait_ms: Some(request.send_completion_wait_ms),
             wait_ms,
             download_ms,
             total_ms: started.elapsed().as_secs_f64() * 1000.,

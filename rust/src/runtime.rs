@@ -360,6 +360,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         // Retain existing transport labels; these are not isolated upload/server phases.
         if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
         measure(&mut timings.diagnostics_ms, || {
+        detail["request_native"] = json!({"successful_attempt":response.attempts,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms});
         detail["status_code"] = json!(response.status);
         detail["request_attempts"] = json!(response.attempts);
         detail["raw_response"] = json!(response.raw);
@@ -569,6 +570,8 @@ impl Replay {
             body,
             status: 200,
             send_ms: 0.,
+            send_api_ms: None,
+            send_completion_wait_ms: None,
             wait_ms: 0.,
             download_ms: 0.,
             total_ms: ms(started),

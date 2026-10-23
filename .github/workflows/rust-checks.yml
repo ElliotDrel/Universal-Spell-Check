@@ -1,9 +1,9 @@
 name: Rust checks
 on:
   push:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
   pull_request:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -19,6 +19,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_latency_log_stats.py
       - name: Benchmark phase report guards
         run: python -m unittest discover -s bench -p test_phase_report.py
+      - name: Deterministic gate negative controls
+        run: python -m unittest discover -s bench -p test_native_contract_gate.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
       - name: Lint
@@ -29,6 +31,14 @@ jobs:
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
       - name: Optimized native build
         run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
+      - name: Frozen correction and formatting contracts
+        run: python bench/check_native_contracts.py --exe rust/target/release/universal-spell-check.exe --output benchmark_runs/ci-native-contracts
+      - name: Retain correctness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-contract-evidence
+          path: benchmark_runs/ci-native-contracts/
       - name: Native tray and resource startup smoke
         shell: pwsh
         run: |
