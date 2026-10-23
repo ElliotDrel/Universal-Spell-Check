@@ -430,3 +430,8 @@ An occupied benchmark chord can be overridden explicitly with `--benchmark-vk N`
 The manifest records `benchmark_vk`; this only changes the isolated registered
 benchmark chord, not product hotkeys, posted-message dispatch or correctness gates.
 Preserve registration failures as zero-trial preflight aborts.
+
+For desktop automation that cannot activate the window within the default three
+seconds, use `--setup-timeout-ms 30000` (bounded to 3,000–120,000). This only extends
+unmeasured setup; all foreground, focus, complete-selection and fixture-text gates
+still must pass before any hotkey is posted. The manifest records the setup limit.

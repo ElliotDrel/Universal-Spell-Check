@@ -139,6 +139,7 @@ struct Run {
     output: PathBuf,
     error: Option<String>,
     prepare_started: Option<Instant>,
+    setup_timeout: Duration,
     deadline: Instant,
 }
 impl Run {
@@ -196,7 +197,7 @@ impl Run {
             && b as usize == editor_chars
             && text_matches;
         if !ready {
-            if self.prepare_started.unwrap().elapsed() > Duration::from_secs(3) {
+            if self.prepare_started.unwrap().elapsed() > self.setup_timeout {
                 self.logger.data("benchmark_setup_failed", json!({
                     "case_id": self.cases[self.case].id,
                     "foreground_matches": foreground == parent.cast(),
@@ -446,6 +447,13 @@ pub fn run(args: &[String]) -> Result<(), String> {
     if !(1..=254).contains(&benchmark_vk) {
         return Err("--benchmark-vk must be a Windows virtual-key code from 1 to 254".into());
     }
+    let setup_ms = option(args, "--setup-timeout-ms")
+        .map(|value| value.parse::<u64>().map_err(|_| "Invalid --setup-timeout-ms"))
+        .transpose()?
+        .unwrap_or(3000);
+    if !(3000..=120000).contains(&setup_ms) {
+        return Err("--setup-timeout-ms must be between 3000 and 120000".into());
+    }
     let live = mode == "e2e";
     let output = PathBuf::from(option(args, "--output").ok_or("--output required")?);
     if output.exists()
@@ -558,7 +566,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
-    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
@@ -659,6 +667,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         output,
         error: None,
         prepare_started: None,
+        setup_timeout: Duration::from_millis(setup_ms),
         deadline: Instant::now(),
     }));
     let weak = Rc::downgrade(&state);
