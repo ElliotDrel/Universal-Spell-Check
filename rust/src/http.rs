@@ -242,16 +242,34 @@ impl Request {
             let mut times: WINHTTP_REQUEST_TIMES = std::mem::zeroed();
             times.cTimes = WinHttpRequestTimeLast as u32;
             let mut size = std::mem::size_of_val(&times) as u32;
-            let times_ok = WinHttpQueryOption(self.handle.0, WINHTTP_OPTION_REQUEST_TIMES, (&mut times as *mut WINHTTP_REQUEST_TIMES).cast(), &mut size) != 0;
+            let times_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_REQUEST_TIMES,
+                (&mut times as *mut WINHTTP_REQUEST_TIMES).cast(),
+                &mut size,
+            ) != 0;
             let mut stats: WINHTTP_REQUEST_STATS = std::mem::zeroed();
             stats.cStats = WinHttpRequestStatLast as u32;
             let mut size = std::mem::size_of_val(&stats) as u32;
-            let stats_ok = WinHttpQueryOption(self.handle.0, WINHTTP_OPTION_REQUEST_STATS, (&mut stats as *mut WINHTTP_REQUEST_STATS).cast(), &mut size) != 0;
+            let stats_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_REQUEST_STATS,
+                (&mut stats as *mut WINHTTP_REQUEST_STATS).cast(),
+                &mut size,
+            ) != 0;
             let mut protocol = 0u32;
             let mut size = 4;
-            let protocol_ok = WinHttpQueryOption(self.handle.0, WINHTTP_OPTION_HTTP_PROTOCOL_USED, (&mut protocol as *mut u32).cast(), &mut size) != 0;
+            let protocol_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_HTTP_PROTOCOL_USED,
+                (&mut protocol as *mut u32).cast(),
+                &mut size,
+            ) != 0;
             let mut frequency = 0i64;
-            let frequency_ok = windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency) != 0 && frequency > 0;
+            let frequency_ok =
+                windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency)
+                    != 0
+                    && frequency > 0;
             serde_json::json!({
                 "qpc_frequency":if frequency_ok {Some(frequency)} else {None},
                 "request_times_qpc":if times_ok {Some(&times.rgullTimes[..(times.cTimes as usize).min(times.rgullTimes.len())])} else {None},

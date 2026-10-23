@@ -11,7 +11,7 @@ import subprocess
 
 
 def check_rows(folder, case_ids, must_succeed):
-    rows=[json.loads(line) for line in (folder/'trials.jsonl').read_text().splitlines()]
+    rows=[json.loads(line) for line in (folder/'trials.jsonl').read_text(encoding='utf-8-sig').splitlines()]
     if len(rows)!=len(case_ids) or sorted(r['case_id'] for r in rows)!=sorted(case_ids):
         raise ValueError('Missing, extra or duplicate workload cases')
     if any(r['warmup'] for r in rows):
@@ -32,11 +32,11 @@ def main():
     output=args.output.resolve()
     output.mkdir(parents=True,exist_ok=False)
     workload=root/'bench/records/2026-10-rust-port'
-    cases=json.loads((workload/'cases.json').read_text())
-    fixtures=json.loads((workload/'fixtures.json').read_text())
+    cases=json.loads((workload/'cases.json').read_text(encoding='utf-8-sig'))
+    fixtures=json.loads((workload/'fixtures.json').read_text(encoding='utf-8-sig'))
     bad=output/'mutated-fixtures.json'
     fixtures[0]['output']+=' NEGATIVE CONTROL MUST FAIL'
-    bad.write_text(json.dumps(fixtures))
+    bad.write_text(json.dumps(fixtures),encoding='utf-8')
     env=os.environ.copy()
     env['LOCALAPPDATA']=str(output/'isolated-data')
     for name,fixture,positive in [('positive',workload/'fixtures.json',True),('negative',bad,False)]:

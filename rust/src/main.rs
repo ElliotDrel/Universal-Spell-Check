@@ -36,7 +36,11 @@ fn main() {
     let application_mode = !args.get(1).is_some_and(|arg| {
         matches!(
             arg.as_str(),
-            "--transform-json" | "--rich-json" | "--bench-desktop" | "--bench-compute" | "--bench-request"
+            "--transform-json"
+                | "--rich-json"
+                | "--bench-desktop"
+                | "--bench-compute"
+                | "--bench-request"
         )
     });
     let result = if args.get(1).is_some_and(|s| s == "--transform-json") {
