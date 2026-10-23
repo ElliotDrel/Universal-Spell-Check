@@ -532,6 +532,7 @@ mod tests {
     fn local_request(
         delay: Duration,
         allow_disconnect: bool,
+        response_gate: Option<std::sync::mpsc::Receiver<()>>,
     ) -> (Request, Handle, Handle, std::thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -610,6 +611,10 @@ mod tests {
                 }
                 received.extend_from_slice(&b[..n]);
             }
+            assert_eq!(&received[header_end..header_end + length], b"{}");
+            if let Some(gate) = response_gate {
+                gate.recv_timeout(Duration::from_secs(10)).unwrap();
+            }
             std::thread::sleep(delay);
             let body = b"{\"output_text\":\"the test\"}";
             let header = format!(
@@ -642,7 +647,7 @@ mod tests {
     }
     #[test]
     fn native_async_reads_mock_http() {
-        let (mut request, _connection, _session, server) = local_request(Duration::ZERO, false);
+        let (mut request, _connection, _session, server) = local_request(Duration::ZERO, false, None);
         let deadline = Instant::now() + Duration::from_secs(2);
         request.send(deadline).unwrap();
         assert_eq!(request.receive(deadline).unwrap(), 200);
@@ -655,9 +660,25 @@ mod tests {
         server.join().unwrap();
     }
     #[test]
+    fn send_completion_does_not_require_response_release() {
+        let (release, gate) = std::sync::mpsc::channel();
+        let (mut request, _connection, _session, server) =
+            local_request(Duration::ZERO, false, Some(gate));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let sent = request.send(deadline);
+        // The mock cannot produce headers until send has completed. No latency threshold.
+        release.send(()).unwrap();
+        sent.unwrap();
+        assert_eq!(request.receive(deadline).unwrap(), 200);
+        let bytes = request.read(deadline).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap()["output_text"], "the test");
+        drop(request);
+        server.join().unwrap();
+    }
+    #[test]
     fn native_timeout_keeps_state_alive_until_handle_closes() {
         let (mut request, _connection, _session, server) =
-            local_request(Duration::from_millis(200), true);
+            local_request(Duration::from_millis(200), true, None);
         let weak = Arc::downgrade(&request.state);
         let started = Instant::now();
         let deadline = started + Duration::from_millis(20);
