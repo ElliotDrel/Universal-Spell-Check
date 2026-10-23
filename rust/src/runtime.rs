@@ -360,7 +360,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         // Retain existing transport labels; these are not isolated upload/server phases.
         if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
         measure(&mut timings.diagnostics_ms, || {
-        detail["request_native"] = json!({"successful_attempt":response.attempts,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms});
+        detail["request_native"] = json!({"successful_attempt":response.attempts,"native":response.native,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms});
         detail["status_code"] = json!(response.status);
         detail["request_attempts"] = json!(response.attempts);
         detail["raw_response"] = json!(response.raw);
@@ -566,6 +566,7 @@ impl Replay {
         )
         .map_err(|e| e.to_string())?;
         Ok(crate::http::Response {
+            native: Value::Null,
             raw: serde_json::to_string(&body).unwrap_or_default(),
             body,
             status: 200,
