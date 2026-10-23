@@ -104,7 +104,7 @@ file, preserving prior evidence.
 Example, from the worktree root with retained local artifacts:
 
 ```powershell
-python bench/phase_report.py --block A1=benchmark_runs/settlement-2026-10-23/off-a1 --block B1=benchmark_runs/settlement-2026-10-23/off-b1 --block B2=benchmark_runs/settlement-2026-10-23/off-b2 --block A2=benchmark_runs/settlement-2026-10-23/off-a2 --output <fresh-report.json>
+python bench/phase_report.py --block A1=benchmark_runs/settlement-2026-10-23/off-a1 --block B1=benchmark_runs/settlement-2026-10-23/off-b1 --block B2=benchmark_runs/settlement-2026-10-23/off-b2 --block A2=benchmark_runs/settlement-2026-10-23/off-a2 --output benchmark_runs/phase-report.json
 ```
 
 This command reads only benchmark artifacts; it never launches the app, touches
