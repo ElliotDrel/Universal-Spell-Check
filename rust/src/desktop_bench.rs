@@ -448,7 +448,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
         return Err("--benchmark-vk must be a Windows virtual-key code from 1 to 254".into());
     }
     let setup_ms = option(args, "--setup-timeout-ms")
-        .map(|value| value.parse::<u64>().map_err(|_| "Invalid --setup-timeout-ms"))
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .map_err(|_| "Invalid --setup-timeout-ms")
+        })
         .transpose()?
         .unwrap_or(3000);
     if !(3000..=120000).contains(&setup_ms) {
