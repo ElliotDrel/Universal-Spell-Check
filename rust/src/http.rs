@@ -677,11 +677,16 @@ mod tests {
         let (mut request, _connection, _session, server) =
             local_request(Duration::ZERO, false, Some(gate));
         let deadline = Instant::now() + Duration::from_millis(100);
-        let outcome = request.send(deadline).and_then(|_| request.receive(deadline));
+        let outcome = request
+            .send(deadline)
+            .and_then(|_| request.receive(deadline));
         // WinHTTP may complete send after headers arrive. Enforce the deadline,
         // without assuming one platform-specific callback ordering or speed.
         let _ = release.send(());
-        assert_eq!(outcome.unwrap_err().message, "The OpenAI request timed out.");
+        assert_eq!(
+            outcome.unwrap_err().message,
+            "The OpenAI request timed out."
+        );
         drop(request);
         server.join().unwrap();
     }
