@@ -52,3 +52,19 @@ plugin path; do not bypass the mandatory browser surface with another driver.
   and keeps every attempt in reliability counts. Plain output shows `unavailable`.
 - Stdlib regressions live in `tests/test_latency_log_stats.py`; run
   `python -m unittest discover -s tests -p test_latency_log_stats.py`.
+
+
+## Native baseline setup failure (2026-10-23, attribution pending)
+
+- Three authorized attempts on the receiving machine aborted before posting any
+  hotkey. No capture/paste trials ran. The generic foreground/selection error did
+  not say which precondition failed. External observation saw a verified selection
+  without foreground in one attempt; a later foreground request returned success
+  but the fixture still aborted. Do not identify a single cause from those facts.
+- The runner now logs `benchmark_setup_failed` with the same readiness snapshot:
+  foreground/focus comparisons, selection range, actual/expected UTF-16 counts,
+  exact text-match flag and relevant HWNDs. It records no text. `summary.json`
+  retains `block_error`, including failures before the first warmup.
+- Preserve the guard and failed setup artifacts. A setup abort with zero trials is
+  not a fast correction or a valid baseline. Require a new idle window before
+  retesting; the prior five-minute window ended with all fixture processes stopped.

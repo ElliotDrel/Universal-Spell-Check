@@ -417,3 +417,10 @@ python bench/records/2026-10-rust-port/verify.py
   clipboard recovery and active-target paste behavior unchanged at this checkpoint.
 - Do not call offline compute or historical/ordinary-use observations a new full
   hotkey-to-editor baseline. That baseline remains pending until live approval.
+
+
+Setup failures now emit `benchmark_setup_failed` with a single snapshot of the
+foreground/focus/selection/text-length and text-match prerequisites, excluding
+text contents. `summary.json.block_error` retains the abort reason even if setup
+failed before the first attempted warmup. Keep these zero-trial blocks as fixture
+diagnostics; they cannot establish app latency or a product failure rate.

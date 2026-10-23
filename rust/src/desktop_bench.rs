@@ -184,13 +184,30 @@ impl Run {
                 (&mut b as *mut u32) as isize,
             );
         }
-        let ready = unsafe { GetForegroundWindow() == parent.cast() && GetFocus() == child.cast() }
+        let foreground = unsafe { GetForegroundWindow() };
+        let focus = unsafe { GetFocus() };
+        let editor_text = self.editor.text();
+        let editor_chars = editor_text.encode_utf16().count();
+        let text_matches =
+            editor_text.replace("\r\n", "\n") == self.cases[self.case].text.replace("\r\n", "\n");
+        let ready = foreground == parent.cast()
+            && focus == child.cast()
             && a == 0
-            && b as usize == self.editor.text().encode_utf16().count()
-            && self.editor.text().replace("\r\n", "\n")
-                == self.cases[self.case].text.replace("\r\n", "\n");
+            && b as usize == editor_chars
+            && text_matches;
         if !ready {
             if self.prepare_started.unwrap().elapsed() > Duration::from_secs(3) {
+                self.logger.data("benchmark_setup_failed", json!({
+                    "case_id": self.cases[self.case].id,
+                    "foreground_matches": foreground == parent.cast(),
+                    "focus_matches": focus == child.cast(),
+                    "selection_start": a, "selection_end": b,
+                    "editor_utf16_chars": editor_chars,
+                    "expected_utf16_chars": self.cases[self.case].text.encode_utf16().count(),
+                    "text_matches": text_matches,
+                    "expected_window": parent as usize, "foreground_window": foreground as usize,
+                    "expected_editor": child as usize, "focused_window": focus as usize
+                }));
                 self.abort("Foreground/selection could not be verified; no hotkey posted.");
             } else {
                 self.timer(40);
@@ -401,8 +418,7 @@ impl Run {
                 )
             })
             .collect();
-        let summary =
-            json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups});
+        let summary = json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups,"block_error":self.error});
         fs::write(
             self.output.join("summary.json"),
             serde_json::to_vec_pretty(&summary).unwrap(),

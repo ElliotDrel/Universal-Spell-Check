@@ -105,3 +105,17 @@
 3. Inspect the request boundary separately if the full sub-second target remains the
    priority: its existing mean alone exceeds one second. Do not infer a transport
    switch is the answer from the current send/wait labels.
+
+
+## October 23 desktop attempt — baseline still pending
+
+- Use Elliot's explicit five-minute idle-desktop authorization for three bounded
+  offline attempts. All abort during setup before a posted hotkey; retain zero
+  measured trials and zero warmups. Diagnostics-on never starts.
+- Preserve initial, focus-observation and activation attempt directories under the
+  existing ignored checkpoint directory. The final activation returned success,
+  but the fixture still reported its combined foreground/selection failure.
+- Add setup-only diagnostics before claiming a cause. Preserve the strict guard;
+  do not discard the failed attempts or weaken the correctness prerequisite.
+- End desktop work and notify Elliot. Treat his notification acknowledgment as an
+  acknowledgment only, not renewed desktop authorization.
