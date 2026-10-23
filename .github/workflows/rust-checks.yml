@@ -1,9 +1,9 @@
 name: Rust checks
 on:
   push:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
   pull_request:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -15,6 +15,8 @@ jobs:
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - name: Acceptance helper data guards
         run: python -m unittest discover -s bench -p test_rust_acceptance.py
+      - name: Partial latency log compatibility
+        run: python -m unittest discover -s tests -p test_latency_log_stats.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
       - name: Lint

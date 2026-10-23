@@ -9,6 +9,8 @@ spellcheck_detail lines have a JSON blob after the event name.
 import argparse
 import hashlib
 import json
+import math
+import statistics
 import os
 import re
 import sys
@@ -174,8 +176,8 @@ def format_detail(d, ts, channel):
     output_chars = d.get("output_chars", 0)
     changed = d.get("text_changed", False)
     timings = d.get("timings", {})
-    total_ms = timings.get("total_ms", 0)
-    request_ms = timings.get("request_ms", 0)
+    total_ms = timings.get("total_ms")
+    request_ms = timings.get("request_ms")
     tokens = d.get("tokens", {})
 
     status_icon = "OK" if status == "success" else "FAIL"
@@ -183,7 +185,7 @@ def format_detail(d, ts, channel):
 
     lines = [
         f"[{ts[:19]}] [{status_icon}] {channel} | {model} | {app} | {changed_icon} | status={status}",
-        f"  {input_chars}->{output_chars} chars | {total_ms}ms total ({request_ms}ms API) | {tokens.get('total', 0)} tokens",
+        f"  {input_chars}->{output_chars} chars | {_display_ms(total_ms)} total ({_display_ms(request_ms)} request) | {tokens.get('total', 0)} tokens",
     ]
     if title:
         lines.append(f"  window: {title}")
@@ -227,6 +229,10 @@ def format_generic(event, rest, ts, channel):
     return f"[{ts[:19]}] {channel} | {event} {rest_str}"
 
 
+def _display_ms(value):
+    return f"{value:g}ms" if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else "unavailable"
+
+
 def compute_stats(details):
     total = len(details)
     if total == 0:
@@ -234,14 +240,18 @@ def compute_stats(details):
 
     successes = sum(1 for d in details if d.get("status") == "success")
     changed = sum(1 for d in details if d.get("text_changed", False))
-    total_ms_vals = [d.get("timings", {}).get("total_ms", 0) for d in details]
-    request_ms_vals = [d.get("timings", {}).get("request_ms", 0) for d in details]
-    token_vals = [d.get("tokens", {}).get("total", 0) for d in details]
+    def measured(section, field):
+        values = ((d.get(section) or {}).get(field) for d in details)
+        return [v for v in values if isinstance(v, (int, float))
+                and not isinstance(v, bool) and math.isfinite(v)]
 
-    avg_total = sum(total_ms_vals) / total
-    avg_request = sum(request_ms_vals) / total
-    avg_tokens = sum(token_vals) / total
-    p50_total = sorted(total_ms_vals)[total // 2]
+    total_ms_vals = measured("timings", "total_ms")
+    request_ms_vals = measured("timings", "request_ms")
+    token_vals = measured("tokens", "total")
+    avg_total = statistics.mean(total_ms_vals) if total_ms_vals else None
+    avg_request = statistics.mean(request_ms_vals) if request_ms_vals else None
+    avg_tokens = f"{statistics.mean(token_vals):.0f}/measured run" if token_vals else "unavailable"
+    p50_total = statistics.median(total_ms_vals) if total_ms_vals else None
 
     apps: dict[str, int] = {}
     for d in details:
@@ -258,9 +268,10 @@ def compute_stats(details):
         f"=== Stats: {total} spellcheck runs ===",
         f"Success rate:    {successes}/{total} ({100 * successes // total}%)",
         f"Text changed:    {changed}/{total} ({100 * changed // total}%)",
-        f"Avg latency:     {avg_total:.0f}ms total / {avg_request:.0f}ms API",
-        f"Median latency:  {p50_total}ms",
-        f"Avg tokens:      {avg_tokens:.0f}/run",
+        f"Avg latency:     {_display_ms(avg_total)} total / {_display_ms(avg_request)} request",
+        f"Median latency:  {_display_ms(p50_total)}",
+        f"Timing samples:  total={len(total_ms_vals)}/{total}, request={len(request_ms_vals)}/{total}; unavailable excluded",
+        f"Avg tokens:      {avg_tokens}",
         f"Models:          {', '.join(f'{m}={c}' for m, c in models.items())}",
         f"Top apps:        {', '.join(f'{a}={c}' for a, c in top_apps)}",
     ]

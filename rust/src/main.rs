@@ -23,6 +23,7 @@ mod runtime;
 mod store;
 mod style;
 mod terminal;
+mod timing;
 mod update;
 fn main() {
     let args: Vec<String> = std::env::args().collect();

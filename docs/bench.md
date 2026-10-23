@@ -363,3 +363,57 @@ Installer argument sources: [Velopack Windows setup CLI](https://docs.velopack.i
 - The laptop's existing installed C# v0.12.3 accepted its built-in `--restart` request, restarted, downloaded/applied v0.13.0 and launched Rust PID33684. A second native Rust restart launched PID11784 and completed a successful public-feed `Up to date` check.
 - Verified installed executable and package manifest version 0.13.0, unchanged settings/encrypted keys/login startup, and removal of the old C# DLL from the active payload. No manual package apply, data deletion or app patch release was needed.
 - Retain primary `benchmark_runs/rust-port/production-release/` release/CI metadata, integrity snapshots, approved-reader upgrade events and completion report. This validates one current C# installation transition plus CI fresh install; it is not a new speed run or a guarantee about every older configuration.
+
+
+## Local latency measurement checkpoint
+
+Use the existing Rust desktop runner; a new harness is unnecessary. Build the
+instrumented branch in Release. Keep all output in a fresh ignored directory and
+record whether developer evidence is enabled. Do not execute desktop commands
+without Elliot's explicit idle-desktop window.
+
+The raw `trials.jsonl` now retains complete `coordinator_timings`, its schema and
+boundary, including partial timings for product failures. Its existing `timings`
+also retains new top-level fields, but `total_ms` remains the external
+posted-hotkey-to-native-editor-completion duration; `coordinator_total_ms` remains
+trigger-to-input-return. Nested capture/paste durations stay in
+`coordinator_timings`. Never sum both layers or infer editor time by subtracting
+percentiles from different trials. Native editor completion can occur before the
+input API returns, so their difference is not universally an editor-wait duration.
+The desktop manifest now records commit, dirty state and UTC creation time in
+addition to binary/workload/replacements hashes and machine identity.
+
+Prepare these commands from the instrumented worktree root. PowerShell should use
+`Start-Process -Wait -PassThru` or a waiting subprocess wrapper for the GUI binary.
+
+```powershell
+# Noninteractive: validate the portable historical record.
+python bench/records/2026-10-rust-port/verify.py
+
+# IDLE DESKTOP APPROVAL REQUIRED: 30 measured trials + ten retained warmups.
+# No API requests; both settings and credentials remain isolated by local mode.
+# Replace <candidate.exe> and <fresh-output> with absolute paths.
+<candidate.exe> --bench-desktop --mode local --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 3 --warmup 1 --allow-desktop --output <fresh-output>
+```
+
+- Run the first block without developer logging; use a second matched block with
+  `--developer-logging --evidence-log-dir <fresh-private-evidence-directory>` to
+  expose diagnostic cost. Keep the directory separate from ordinary production
+  evidence and record that its fresh-store condition differs from the historical
+  full-store benchmark. Keep both block results; do not pool logging modes.
+- Read runtime detail records through the approved log-reader CLI with explicit
+  `--log-dir <fresh-output>`; ordinary benchmark trials are directly analyzable.
+- Retain every warmup and failed attempt. Report successful-only median/p95 along
+  with failure counts, and verified-paste counts under 500/1,000 ms divided by
+  all measured attempts. Exact handwritten quality agreement remains separate
+  from correct delivery of the pipeline's requested text. Avoid p99 on this sample.
+- Use the largest measured controllable cost to choose the next experiment.
+  Identify whether it is necessary before optimizing; investigate a large
+  unattributed residual before claiming complete attribution.
+- Use deliberate physical-hotkey runs in normal editors to investigate human
+  modifier-release time: the posted-message fixture does not reproduce it. Browser
+  formatting/undo acceptance and visible rendering remain separate live checks.
+- Keep models, transport, 50-ms settlement, protected literals, formatting,
+  clipboard recovery and active-target paste behavior unchanged at this checkpoint.
+- Do not call offline compute or historical/ordinary-use observations a new full
+  hotkey-to-editor baseline. That baseline remains pending until live approval.

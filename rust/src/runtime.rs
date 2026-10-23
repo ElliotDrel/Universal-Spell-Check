@@ -5,6 +5,7 @@ use crate::{
     logging::Logger,
     rich,
     store::{Store, new_id},
+    timing::{LocalTimings, measure},
 };
 use native_windows_gui as nwg;
 use serde_json::{Value, json};
@@ -226,6 +227,7 @@ impl Worker {
         })
     }
     pub fn trigger(&self, logger: &Logger) {
+        let started = Instant::now();
         if self
             .busy
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -234,7 +236,7 @@ impl Worker {
             logger.event("guard_rejected reason=already_running");
             return;
         }
-        if self.commands.send(Command::Run(Instant::now())).is_err() {
+        if self.commands.send(Command::Run(started)).is_err() {
             self.busy.store(false, Ordering::Release);
         }
         unsafe {
@@ -294,27 +296,38 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         bus,
         store,
     } = context;
-    let id = new_id();
-    let target = clipboard::foreground();
-    let evidence = if settings.developer_logging {
-        crate::evidence::Evidence::begin(target.clone())
-    } else {
-        None
+    let mut timings = LocalTimings {
+        dispatch_ms: Some(ms(started)),
+        ..Default::default()
     };
+    let (id, target, evidence) = measure(&mut timings.setup_ms, || {
+        let id = new_id();
+        let target = clipboard::foreground();
+        let evidence = if settings.developer_logging {
+            crate::evidence::Evidence::begin(target.clone())
+        } else {
+            None
+        };
+        (id, target, evidence)
+    });
+    let mut request_phases = None;
+    let mut recovery_ms = None;
     let mut backup = None;
     let mut detail = json!({"run_id":id,"status":"run_failed","model":settings.model,"developer_logging_enabled":settings.developer_logging,"input_text":"","output_text":"","paste_text":"","paste_html":"","events":["run_started"]});
     let mut corrected_on_clipboard = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let key = measure(&mut timings.setup_ms, || -> Result<_, String> {
         let key = key
             .filter(|s| !s.trim().is_empty())
             .ok_or("Enter an OpenAI API key in Settings.")?;
         let key = Zeroizing::new(key.to_owned());
         if client.is_none()&&replay.is_none(){return Err("Windows HTTP client unavailable; selection was left unchanged.".into());}
-        backup=Some(clipboard::Backup::capture(owner as _)?);
+        Ok(key)
+        })?;
+        backup=Some(measure(&mut timings.backup_ms, || clipboard::Backup::capture(owner as _))?);
         bus.send(UiEvent::Phase("Copying text..."));
-        let capture_start = Instant::now();
-        let captured = clipboard::capture(listener as _)?;
-        let capture_ms = ms(capture_start);
+        let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
+        measure(&mut timings.diagnostics_ms, || {
         detail["input_text"] = json!(captured.text);
         detail["input_chars"] = json!(captured.text.encode_utf16().count());
         detail["clipboard_html"] = json!(captured.html);
@@ -330,21 +343,29 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                 "disabled"
             }
         );
-        let history = clipboard::write(owner as _, &captured.text, "", None, true).is_ok();
+        });
+        let history = measure(&mut timings.history_exclude_ms, || clipboard::write(owner as _, &captured.text, "", None, true)).is_ok();
         detail["captured_text_history_excluded"] = json!(history);
+        let (protection, request_payload) = measure(&mut timings.prepare_ms, || -> Result<_, String> {
         let input = crate::terminal::normalize(&captured.text, &target.2);
         let protection = Protection::new(&input)?;
         let request_payload = payload(&protection.text, &settings.model);
+        Ok((protection, request_payload))
+        })?;
+        measure(&mut timings.diagnostics_ms, || {
         detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default());
+        });
         bus.send(UiEvent::Phase("Sending to AI..."));
-        let request_started=Instant::now();
-        let response=match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))}?;
-        let request_ms=ms(request_started);
+        let response=measure(&mut timings.request_ms, || match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))})?;
+        // Retain existing transport labels; these are not isolated upload/server phases.
+        if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
+        measure(&mut timings.diagnostics_ms, || {
         detail["status_code"] = json!(response.status);
         detail["request_attempts"] = json!(response.attempts);
         detail["raw_response"] = json!(response.raw);
         let usage=&response.body["usage"];
         detail["tokens"]=json!({"input":usage["input_tokens"],"output":usage["output_tokens"],"total":usage["total_tokens"],"cached":usage["input_tokens_details"]["cached_tokens"],"reasoning":usage["output_tokens_details"]["reasoning_tokens"]});
+        });
         if !(200..300).contains(&response.status) {
             detail["status"] = json!("request_failed");
             return Err(response.body["error"]["message"]
@@ -354,9 +375,8 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         }
         let raw = extract_output(&response.body)?;
         detail["raw_ai_output"] = json!(raw);
-        let post = Instant::now();
-        let (output, applied, leak, echo) = replacements.process(&raw, &protection)?;
-        let post_ms = ms(post);
+        let (output, applied, leak, echo) = measure(&mut timings.replacements_ms, || replacements.process(&raw, &protection))?;
+        measure(&mut timings.diagnostics_ms, || {
         detail["output_text"] = json!(output);
         detail["output_chars"] = json!(output.encode_utf16().count());
         detail["text_changed"] = json!(captured.text != output);
@@ -368,50 +388,81 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                 .unwrap()
                 .push(json!("echoed_original_removed"));
         }
-        let mapped = rich::rewrite(&captured.html, &captured.text, &output, &captured.native);
+        });
+        let mapped = measure(&mut timings.rich_mapping_ms, || rich::rewrite(&captured.html, &captured.text, &output, &captured.native));
+        measure(&mut timings.diagnostics_ms, || {
         detail["rich_text"] = serde_json::to_value(&mapped).unwrap_or_default();
         detail["paste_text"] = json!(mapped.text);
         if settings.developer_logging{use base64::Engine;detail["paste_chromium_mime_base64"]=json!(mapped.native.as_ref().map(|b|base64::engine::general_purpose::STANDARD.encode(b)).unwrap_or_default());}
         detail["paste_html"] = json!(mapped.html);
         detail["paste_text_chars"] = json!(mapped.text.encode_utf16().count());
         detail["paste_html_chars"] = json!(mapped.html.encode_utf16().count());
+        });
         bus.send(UiEvent::Phase("Pasting..."));
-        let paste = Instant::now();
-        let sequence = clipboard::write(
+        let sequence = measure(&mut timings.paste_ms, || -> Result<_, String> {
+        let sequence = measure(&mut timings.paste.write_ms, || clipboard::write(
             owner as _,
             &mapped.text,
             &mapped.html,
             mapped.native.as_deref(),
             false,
-        )?;
+        ))?;
         corrected_on_clipboard = true;
         if let Some(backup)=backup.as_mut(){backup.disarm();}
         if settings.developer_logging {
+            measure(&mut timings.paste.readback_ms, || {
             detail["clipboard_readback"] = crate::evidence::readback_before_input(owner, sequence);
+            });
         }
         // CloseClipboard publishes data, but live consumers still need the established handoff period.
-        clipboard::settle_publication();
-        clipboard::modifiers_released(Duration::from_millis(1200))?;
-        clipboard::chord(0x56)?;
-        let paste_ms = ms(paste);
+        measure(&mut timings.paste.settle_ms, clipboard::settle_publication);
+        measure(&mut timings.paste.modifiers_ms, || clipboard::modifiers_released(Duration::from_millis(1200)))?;
+        measure(&mut timings.paste.input_ms, || clipboard::chord(0x56))?;
+        Ok(sequence)
+        })?;
         detail["status"] = json!("success");
         detail["corrected_text_on_clipboard"] = json!(true);
         detail["clipboard_write_sequence"] = json!(sequence);
-        detail["timings"] = json!({"clipboard_ms":capture_ms,"request_ms":request_ms,"api_ms":request_ms,"request_send_ms":response.send_ms,"request_wait_ms":response.wait_ms,"response_download_ms":response.download_ms,"replacements_ms":post_ms,"paste_ms":paste_ms,"total_ms":ms(started)});
         Ok(())
     })).unwrap_or_else(|_|Err("The correction stopped safely after an internal error.".into()));
+    let total_ms = ms(started);
     if let Err(error) = &result {
         detail["error_message"] = json!(error);
         detail["corrected_text_on_clipboard"] = json!(corrected_on_clipboard);
         if !corrected_on_clipboard {
-            detail["original_clipboard_restored"] =
-                json!(backup.as_mut().is_some_and(|b| b.restore()));
+            detail["original_clipboard_restored"] = json!(measure(&mut recovery_ms, || backup
+                .as_mut()
+                .is_some_and(|b| b.restore())));
         }
         bus.send(UiEvent::Notify("Spell check failed".into(), error.clone()));
         if key.is_none() {
             bus.send(UiEvent::Settings);
         }
     }
+    let mut measured = serde_json::to_value(&timings).unwrap_or_default();
+    measured["total_ms"] = json!(total_ms);
+    measured["unattributed_ms"] = json!(total_ms - timings.accounted_ms());
+    measured["recovery_ms"] = json!(recovery_ms);
+    measured["api_ms"] = if replay.is_none() {
+        json!(timings.request_ms)
+    } else {
+        Value::Null
+    };
+    measured["request_send_ms"] = json!(request_phases.map(|p| p.0));
+    measured["request_wait_ms"] = json!(request_phases.map(|p| p.1));
+    measured["response_download_ms"] = json!(request_phases.map(|p| p.2));
+    detail["timings"] = measured;
+    detail["timing_schema_version"] = json!(1);
+    detail["timing_boundary"] = json!(if result.is_ok() {
+        "accepted_trigger_to_input_return"
+    } else {
+        "accepted_trigger_to_failure_before_recovery"
+    });
+    detail["request_mode"] = json!(if replay.is_some() {
+        "offline_replay"
+    } else {
+        "live"
+    });
     logger.event(format!(
         "run_completed run_id={id} status={} total_ms={:.3}",
         detail["status"].as_str().unwrap_or("run_failed"),

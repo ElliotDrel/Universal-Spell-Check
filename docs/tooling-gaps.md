@@ -42,3 +42,13 @@ plugin path; do not bypass the mandatory browser surface with another driver.
 
 - The shared `babysit-pr` watcher failed while decoding GitHub comments with the Windows cp1252 default (`UnicodeDecodeError`, then JSON parsing received `None`). This is a watcher issue, not an app failure.
 - Launching it with `PYTHONUTF8=1` restored `WATCH_READY`. The shared helper should explicitly decode GitHub CLI JSON as UTF-8; its source is outside this repository. The active PR follow-through records the required environment setting.
+
+
+## Null timing samples in the approved reader (2026-10-22, fixed)
+
+- The old `--stats` summed null request stages and treated missing stages as zero.
+  Partial failure timings now expose that incompatibility. The reader excludes
+  unavailable/nonfinite samples, preserves measured zero, reports sample counts,
+  and keeps every attempt in reliability counts. Plain output shows `unavailable`.
+- Stdlib regressions live in `tests/test_latency_log_stats.py`; run
+  `python -m unittest discover -s tests -p test_latency_log_stats.py`.

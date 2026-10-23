@@ -2,6 +2,18 @@
 
 Prepared October 22, 2026. Retain this file until the receiving thread has incorporated its context; remove it in a later explicit cleanup commit once superseded.
 
+## Scope update — October 22, receiving session
+
+- Supersede the mandatory three-PR batch below with Elliot's narrower checkpoint:
+  minimal local timing instrumentation, noninteractive verification, then this
+  machine's baseline and one evidence-backed optimization recommendation.
+- Keep the original batch below as historical proposals. Do not implement network
+  instrumentation or a new benchmark framework merely to complete that list.
+- Keep optimization/behavior changes, main pushes, merges and publication out of scope.
+- Require explicit idle-desktop authorization for clipboard/focus measurements.
+
+- Read the [receiving-machine checkpoint](research/2026-10-22-local-latency-checkpoint.md) for current evidence and pending tests.
+
 ## Objective and Scope
 
 - Optimize the full interval from physical hotkey activation to complete corrected text pasted into the target editor: first below 1 second, ideally below 500 ms.

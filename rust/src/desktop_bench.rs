@@ -265,7 +265,11 @@ impl Run {
         }
         let started = self.start.unwrap();
         let case = &self.cases[self.case];
-        let mut timings = serde_json::Map::new();
+        let mut timings = detail["timings"].as_object().cloned().unwrap_or_default();
+        timings.remove("capture");
+        timings.remove("paste");
+        // External total exists only when the editor actually acknowledges a paste.
+        timings.remove("total_ms");
         timings.insert("request_ms".into(), detail["timings"]["request_ms"].clone());
         timings.insert(
             "capture_ms".into(),
@@ -345,7 +349,7 @@ impl Run {
                 return;
             }
         }
-        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
+        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"coordinator_timings":detail["timings"],"timing_schema_version":detail["timing_schema_version"],"timing_boundary":detail["timing_boundary"],"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
         if let Err(error) = writeln!(self.raw, "{trial}").and_then(|_| self.raw.flush()) {
             self.abort(&format!("Cannot preserve benchmark trial: {error}"));
             return;
@@ -523,7 +527,15 @@ pub fn run(args: &[String]) -> Result<(), String> {
             return Err("Offline placeholder rejected before network access".into());
         }
     }
-    let manifest = json!({"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","notes":"Registered Ctrl+Alt+B; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .args(args)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+    };
+    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","notes":"Registered Ctrl+Alt+B; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),

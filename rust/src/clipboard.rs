@@ -1,4 +1,8 @@
-use crate::{docs_native, store::wide};
+use crate::{
+    docs_native,
+    store::wide,
+    timing::{CaptureTimings, ReadTimings, measure},
+};
 use std::{
     mem::{size_of, zeroed},
     ptr::{null, null_mut},
@@ -144,46 +148,63 @@ pub fn read_immediate(hwnd: HWND) -> Result<Clipboard, String> {
     read_with_budget(hwnd, Duration::ZERO)
 }
 fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
-    let _open = open(hwnd, budget)?;
+    read_measured(hwnd, budget, &mut ReadTimings::default())
+}
+fn read_measured(
+    hwnd: HWND,
+    budget: Duration,
+    timings: &mut ReadTimings,
+) -> Result<Clipboard, String> {
+    let _open = measure(&mut timings.open_ms, || open(hwnd, budget))?;
     let sequence = unsafe { GetClipboardSequenceNumber() };
-    let raw = bytes(13, 16 * 1024 * 1024)?;
-    let units: Vec<u16> = raw
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .take_while(|u| *u != 0)
-        .collect();
-    let text = String::from_utf16_lossy(&units);
+    let text = measure(&mut timings.unicode_ms, || -> Result<String, String> {
+        let raw = bytes(13, 16 * 1024 * 1024)?;
+        let units: Vec<u16> = raw
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .take_while(|u| *u != 0)
+            .collect();
+        Ok(String::from_utf16_lossy(&units))
+    })?;
     // Unicode is required; unavailable ancillary formats must not discard usable text.
-    let (html, html_status) = optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024));
-    let (rtf, rtf_status) = optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024));
-    let (native, native_status) = optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024));
-    let html = utf8(html);
-    let rtf = utf8(rtf);
-    let mut formats = Vec::new();
-    unsafe {
-        let mut f = 0;
-        loop {
-            f = EnumClipboardFormats(f);
-            if f == 0 {
-                break;
-            }
-            let mut name = [0u16; 256];
-            let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
-            formats.push(if len > 0 {
-                String::from_utf16_lossy(&name[..len as usize])
-            } else {
-                match f {
-                    13 => "UnicodeText".into(),
-                    1 => "Text".into(),
-                    7 => "OEMText".into(),
-                    16 => "Locale".into(),
-                    _ => format!("#{f}"),
+    let (html, html_status) = measure(&mut timings.html_ms, || {
+        optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024))
+    });
+    let (rtf, rtf_status) = measure(&mut timings.rtf_ms, || {
+        optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
+    });
+    let (native, native_status) = measure(&mut timings.native_ms, || {
+        optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024))
+    });
+    let (html, rtf) = measure(&mut timings.decode_ms, || (utf8(html), utf8(rtf)));
+    let formats = measure(&mut timings.enumerate_ms, || {
+        let mut formats = Vec::new();
+        unsafe {
+            let mut f = 0;
+            loop {
+                f = EnumClipboardFormats(f);
+                if f == 0 {
+                    break;
                 }
-            });
+                let mut name = [0u16; 256];
+                let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
+                formats.push(if len > 0 {
+                    String::from_utf16_lossy(&name[..len as usize])
+                } else {
+                    match f {
+                        13 => "UnicodeText".into(),
+                        1 => "Text".into(),
+                        7 => "OEMText".into(),
+                        16 => "Locale".into(),
+                        _ => format!("#{f}"),
+                    }
+                });
+            }
         }
-    }
+        formats
+    });
     if unsafe { GetClipboardSequenceNumber() } != sequence {
         return Err("Clipboard changed while capturing formats".into());
     }
@@ -306,20 +327,28 @@ pub fn chord(vk: u16) -> Result<(), String> {
         Ok(())
     }
 }
-pub fn capture(hwnd: HWND) -> Result<Clipboard, String> {
-    modifiers_released(Duration::from_millis(1200))?;
+pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, String> {
+    measure(&mut timings.modifiers_ms, || {
+        modifiers_released(Duration::from_millis(1200))
+    })?;
     for _ in 0..2 {
         let before = unsafe { GetClipboardSequenceNumber() };
-        chord(0x43)?;
+        timings.copy_attempts += 1;
+        measure(&mut timings.copy_input_ms, || chord(0x43))?;
         let start = Instant::now();
         while start.elapsed() < Duration::from_millis(700) {
             if unsafe { GetClipboardSequenceNumber() } != before
-                && let Ok(data) = read(hwnd)
+                && let Ok(data) = {
+                    timings.read_attempts += 1;
+                    measure(&mut timings.read_ms, || {
+                        read_measured(hwnd, Duration::from_millis(320), &mut timings.reads)
+                    })
+                }
                 && !data.text.trim().is_empty()
             {
                 return Ok(data);
             }
-            pump_wait(25);
+            measure(&mut timings.wait_ms, || pump_wait(25));
         }
     }
     Err("The selected app did not copy any text.".into())
