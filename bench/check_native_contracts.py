@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 
 
-def check_rows(folder, case_ids, must_succeed):
+def check_rows(folder, case_ids, must_succeed, negative_case=None):
     rows=[json.loads(line) for line in (folder/'trials.jsonl').read_text(encoding='utf-8-sig').splitlines()]
     if len(rows)!=len(case_ids) or sorted(r['case_id'] for r in rows)!=sorted(case_ids):
         raise ValueError('Missing, extra or duplicate workload cases')
@@ -21,6 +21,8 @@ def check_rows(folder, case_ids, must_succeed):
         raise ValueError('Frozen pipeline mismatch: '+str(failures))
     if not must_succeed and not failures:
         raise ValueError('Negative control passed: correctness gate is ineffective')
+    if not must_succeed and negative_case is not None and {r['case_id'] for r in failures} != {negative_case}:
+        raise ValueError('Negative control failed outside the deliberately mutated case')
 
 
 def main():
@@ -39,6 +41,9 @@ def main():
     bad.write_text(json.dumps(fixtures),encoding='utf-8')
     env=os.environ.copy()
     env['LOCALAPPDATA']=str(output/'isolated-data')
+    guard=subprocess.run([str(args.exe.resolve()),'--bench-request'],cwd=root,env=env,capture_output=True,timeout=10)
+    if guard.returncode == 0 or b'--allow-api required' not in guard.stderr:
+        raise ValueError('Live request probe did not enforce explicit API opt-in')
     for name,fixture,positive in [('positive',workload/'fixtures.json',True),('negative',bad,False)]:
         folder=output/name
         command=[str(args.exe.resolve()),'--bench-compute','--cases',str(workload/'cases.json'),
@@ -49,7 +54,7 @@ def main():
         (output/(name+'.stderr')).write_bytes(result.stderr)
         if (result.returncode==0)!=positive:
             raise ValueError(f'{name}: unexpected exit {result.returncode}')
-        check_rows(folder,[c['id'] for c in cases],positive)
+        check_rows(folder,[c['id'] for c in cases],positive,None if positive else fixtures[0]['id'])
     print('Frozen production pipeline passed all cases; mutated-output negative control rejected.')
 
 
