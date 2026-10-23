@@ -5,7 +5,7 @@ if($Rustfmt) {
     if(!(Test-Path -LiteralPath $Rustfmt -PathType Leaf)){throw 'Formatter executable missing'}
     $arguments=@('--edition','2024')
     if(!$Write){$arguments+='--check'}
-    $arguments+=Join-Path $root 'rust/src/main.rs'
+    $arguments+=@((Join-Path $root 'rust/src/main.rs'), (Join-Path $root 'rust/build.rs'), (Join-Path $root 'rust/tests/dpi_resources.rs'))
     & $Rustfmt @arguments
 } else {
     $cargo=Get-Command cargo -ErrorAction SilentlyContinue

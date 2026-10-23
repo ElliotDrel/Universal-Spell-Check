@@ -1,8 +1,26 @@
+import math
+
+def finite_timings(value, key=''):
+    if isinstance(value, dict):
+        for name, item in value.items():
+            finite_timings(item, name)
+    elif isinstance(value, list):
+        for item in value:
+            finite_timings(item, key)
+    elif key.endswith('_ms') and value is not None:
+        try:
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise ValueError('Non-finite or invalid latency: ' + key)
+
 import json, pathlib, statistics
 root = pathlib.Path(__file__).resolve().parent
 for mode in ('diagnostics-off', 'diagnostics-on'):
     rows = [json.loads(x) for x in (root / (mode + '.jsonl')).read_text().splitlines()]
-    manifest_path = root / (mode + '-manifest.json') if 'mode' in globals() else root / (label + '.manifest.json')
+    finite_timings(rows)
+    manifest_path = root / (mode + '-manifest.json')
     manifest = json.loads(manifest_path.read_text())
     for case in manifest['case_ids']:
         for warmup, expected in [(False, manifest['options']['runs']), (True, manifest['options']['warmup'])]:

@@ -1,3 +1,20 @@
+import math
+
+def finite_timings(value, key=''):
+    if isinstance(value, dict):
+        for name, item in value.items():
+            finite_timings(item, name)
+    elif isinstance(value, list):
+        for item in value:
+            finite_timings(item, key)
+    elif key.endswith('_ms') and value is not None:
+        try:
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise ValueError('Non-finite or invalid latency: ' + key)
+
 import json
 from pathlib import Path
 import statistics
@@ -10,7 +27,8 @@ def stats(v):
     return (statistics.median(v), v[i] + (v[min(i + 1, len(v) - 1)] - v[i]) * (p - i))
 for label in ['off-a1', 'on-a1', 'off-b1', 'on-b1', 'off-b2', 'on-b2', 'off-a2', 'on-a2']:
     rows = [json.loads(s) for s in (root / (label + '.jsonl')).read_text().splitlines()]
-    manifest_path = root / (mode + '-manifest.json') if 'mode' in globals() else root / (label + '.manifest.json')
+    finite_timings(rows)
+    manifest_path = root / (label + '.manifest.json')
     manifest = json.loads(manifest_path.read_text())
     for case in manifest['case_ids']:
         for warmup, expected in [(False, manifest['options']['runs']), (True, manifest['options']['warmup'])]:
@@ -33,10 +51,12 @@ for label in ['off-a1', 'on-a1', 'off-b1', 'on-b1', 'off-b2', 'on-b2', 'off-a2',
         raise ValueError("Evidence validation failed: {r['case_id'] for r in measured if not r['quality_match']} == {'rich-list'}")
     print(label, '50/50 delivery, 45/50 quality; completion median/p95', stats([r['timings']['total_ms'] for r in measured]), 'settlement median/p95', stats([r['coordinator_timings']['paste']['settle_ms'] for r in measured]))
 probe = json.loads((root / 'wait-probe.json').read_text())
+finite_timings(probe)
 if not (len(probe) == 260 and all((r['elapsed_ms'] >= 50 for r in probe))):
     raise ValueError("Evidence validation failed: len(probe) == 260 and all((r['elapsed_ms'] >= 50 for r in probe))")
 print('480 native-editor attempts and 260 native wait probes meet the 50-ms minimum.')
 live = json.loads((root / 'live-pipeline.json').read_text())
+finite_timings(live)
 if not len(live) == 7:
     raise ValueError('Evidence validation failed: len(live) == 7')
 if not all((r['status'] == 'success' and r['model'] == 'gpt-4.1' and (r['timings']['paste']['settle_ms'] >= 50) for r in live)):

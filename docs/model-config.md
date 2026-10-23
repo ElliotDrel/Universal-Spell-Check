@@ -104,9 +104,9 @@ Microsoft documents that WinHttpSendRequest may operate synchronously even on an
 asynchronous session. The native diagnostics now split the API call from waiting
 for its SENDREQUEST_COMPLETE callback without changing transport or payload.
 
-`spellcheck_detail.request_native` contains `successful_attempt`, `send_api_ms`,
-`send_completion_wait_ms` and `native`. These describe the final successful
-attempt; legacy aggregate request times still include retries/backoff. Replay
+`spellcheck_detail.request_native` contains `final_response_attempt`, `send_api_ms`,
+`send_completion_wait_ms` and `native`. These describe the final parsed HTTP response attempt (1-based), including
+terminal non-2xx responses; they do not indicate API success. Legacy aggregate request times still include retries/backoff. Replay
 has null native data. Optional native queries record request-times QPC values,
 their frequency, connection request index, request-stat flags and negotiated
 protocol flags. Unsupported queries remain null; zero raw timestamp entries are

@@ -44,6 +44,19 @@ def main():
     guard=subprocess.run([str(args.exe.resolve()),'--bench-request'],cwd=root,env=env,capture_output=True,timeout=10)
     if guard.returncode == 0 or b'--allow-api required' not in guard.stderr:
         raise ValueError('Live request probe did not enforce explicit API opt-in')
+    invalid_settings=output/'invalid-model-settings'
+    invalid_settings.mkdir()
+    saved=invalid_settings/'settings.json'
+    saved.write_text(json.dumps({'Model':'unsupported-benchmark-model'}),encoding='utf-8')
+    before=saved.read_bytes()
+    rejected_output=output/'invalid-model-output'
+    guard=subprocess.run([str(args.exe.resolve()),'--bench-request','--allow-api',
+        '--settings',str(invalid_settings),'--output',str(rejected_output)],
+        cwd=root,env=env,capture_output=True,timeout=10)
+    if guard.returncode == 0 or b'Unsupported saved model' not in guard.stderr:
+        raise ValueError('Live probe did not reject an unsupported saved model before loading keys')
+    if rejected_output.exists() or saved.read_bytes()!=before:
+        raise ValueError('Rejected model probe changed settings or created output')
     for name,fixture,positive in [('positive',workload/'fixtures.json',True),('negative',bad,False)]:
         folder=output/name
         command=[str(args.exe.resolve()),'--bench-compute','--cases',str(workload/'cases.json'),

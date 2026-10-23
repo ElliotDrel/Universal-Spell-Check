@@ -36,7 +36,9 @@ jobs:
       - name: Verify frozen desktop evidence under optimized Python
         run: |
           python -O bench/records/2026-10-desktop-latency/verify.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -O bench/records/2026-10-desktop-latency/settlement/verify.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -O bench/records/2026-10-desktop-latency/request-attribution/verify.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
