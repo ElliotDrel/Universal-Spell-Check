@@ -1,6 +1,6 @@
 # Code Conventions
 
-## C# / .NET (primary — everything under `src/`)
+## Retained C# / .NET reference (`src/`)
 
 **Namespace:** file-scoped `namespace UniversalSpellCheck;` in every file.
 

@@ -1,2 +1,3 @@
 rust/vendor/** -whitespace
 bench/records/** text eol=lf
+bench/records/2026-10-desktop-latency/settlement/workload/* -text

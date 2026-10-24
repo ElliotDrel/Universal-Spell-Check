@@ -1,0 +1,6 @@
+{
+  "variant": "candidate",
+  "case": "notepad-multiline-and-unchanged",
+  "text": "Please check the notes.\n\nThen send the documents. Keep https://example.com/reprot and C:\\sample\\notes.txt unchanged.",
+  "verified": true
+}

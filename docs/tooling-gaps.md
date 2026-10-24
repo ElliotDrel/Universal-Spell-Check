@@ -42,3 +42,29 @@ plugin path; do not bypass the mandatory browser surface with another driver.
 
 - The shared `babysit-pr` watcher failed while decoding GitHub comments with the Windows cp1252 default (`UnicodeDecodeError`, then JSON parsing received `None`). This is a watcher issue, not an app failure.
 - Launching it with `PYTHONUTF8=1` restored `WATCH_READY`. The shared helper should explicitly decode GitHub CLI JSON as UTF-8; its source is outside this repository. The active PR follow-through records the required environment setting.
+
+
+## Null timing samples in the approved reader (2026-10-22, fixed)
+
+- The old `--stats` summed null request stages and treated missing stages as zero.
+  Partial failure timings now expose that incompatibility. The reader excludes
+  unavailable/nonfinite samples, preserves measured zero, reports sample counts,
+  and keeps every attempt in reliability counts. Plain output shows `unavailable`.
+- Stdlib regressions live in `tests/test_latency_log_stats.py`; run
+  `python -m unittest discover -s tests -p test_latency_log_stats.py`.
+
+
+## Native baseline setup failure (2026-10-23, attribution pending)
+
+- Three authorized attempts on the receiving machine aborted before posting any
+  hotkey. No capture/paste trials ran. The generic foreground/selection error did
+  not say which precondition failed. External observation saw a verified selection
+  without foreground in one attempt; a later foreground request returned success
+  but the fixture still aborted. Do not identify a single cause from those facts.
+- The runner now logs `benchmark_setup_failed` with the same readiness snapshot:
+  foreground/focus comparisons, selection range, actual/expected UTF-16 counts,
+  exact text-match flag and relevant HWNDs. It records no text. `summary.json`
+  retains `block_error`, including failures before the first warmup.
+- Preserve the guard and failed setup artifacts. A setup abort with zero trials is
+  not a fast correction or a valid baseline. Require a new idle window before
+  retesting; the prior five-minute window ended with all fixture processes stopped.

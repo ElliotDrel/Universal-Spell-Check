@@ -17,12 +17,14 @@ mod evidence_storage;
 mod http;
 mod logging;
 mod platform;
+mod request_probe;
 mod rich;
 mod rich_links;
 mod runtime;
 mod store;
 mod style;
 mod terminal;
+mod timing;
 mod update;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -34,7 +36,11 @@ fn main() {
     let application_mode = !args.get(1).is_some_and(|arg| {
         matches!(
             arg.as_str(),
-            "--transform-json" | "--rich-json" | "--bench-desktop" | "--bench-compute"
+            "--transform-json"
+                | "--rich-json"
+                | "--bench-desktop"
+                | "--bench-compute"
+                | "--bench-request"
         )
     });
     let result = if args.get(1).is_some_and(|s| s == "--transform-json") {
@@ -43,6 +49,8 @@ fn main() {
         cli::rich_stdin()
     } else if args.get(1).is_some_and(|s| s == "--bench-desktop") {
         desktop_bench::run(&args)
+    } else if args.get(1).is_some_and(|s| s == "--bench-request") {
+        request_probe::run(&args)
     } else if args.get(1).is_some_and(|s| s == "--bench-compute") {
         benchmark::compute(&args)
     } else {

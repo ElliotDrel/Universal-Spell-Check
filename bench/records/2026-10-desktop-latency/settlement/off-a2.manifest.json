@@ -1,0 +1,42 @@
+{
+  "worktree_commit": "9b6033a7de96a1c55d6e51323e98a5d4a7bed6b9",
+  "dirty": "",
+  "created_utc": "2026-10-23T16:34:36.0372181Z",
+  "timing_schema_version": 1,
+  "schema_version": 2,
+  "implementation": "rust",
+  "options": {
+    "mode": "local",
+    "runs": 5,
+    "warmup": 1,
+    "developer_logging": false
+  },
+  "model": "gpt-4.1",
+  "prompt": "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.",
+  "developer_logging": false,
+  "saved_developer_logging": false,
+  "case_ids": [
+    "short",
+    "paragraph",
+    "long",
+    "unchanged",
+    "brands",
+    "literals",
+    "unicode",
+    "multiline",
+    "rich-link",
+    "rich-list"
+  ],
+  "cases_sha256": "57ec6a275cf8ad35dd4d09a1afa2c80adf6ba8a448a81041992bbd4125126be3",
+  "fixture_sha256": "eef16bc49d1f625ba5a01c6a21f29b2835a75c9aa91a7fedab4ec514dabc3b80",
+  "replacements_sha256": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+  "product_binary_sha256": "05bf8208e0342abdd6a7117b4d24c4558f993e40acf45cc210ff9eb6c7433f45",
+  "hotkey_trigger": "posted_registered_message",
+  "benchmark_vk": 121,
+  "setup_timeout_ms": 30000,
+  "notes": "Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard.",
+  "binary_source_commit": "f60aacd329d9e80325abe08f9ef5e397996acbd1",
+  "provenance_note": "worktree_commit is launch-time checkout state; binary_source_commit identifies downloaded CI artifact. Supported Computer Use activated the disposable editor before strict setup gates passed.",
+  "created_utc_original": "2026-10-23 16:34:36.0372181 +00:00:00",
+  "worktree_clean": true
+}

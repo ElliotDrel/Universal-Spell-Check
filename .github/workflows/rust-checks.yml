@@ -1,9 +1,9 @@
 name: Rust checks
 on:
   push:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
   pull_request:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'bench/*acceptance*.py', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -13,8 +13,33 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install pinned Rust tools
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - name: Cache pinned Cargo dependencies and build outputs
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-
       - name: Acceptance helper data guards
         run: python -m unittest discover -s bench -p test_rust_acceptance.py
+      - name: Partial latency log compatibility
+        run: python -m unittest discover -s tests -p test_latency_log_stats.py
+      - name: Benchmark phase report guards
+        run: python -m unittest discover -s bench -p test_phase_report.py
+      - name: Deterministic gate negative controls
+        run: python -m unittest discover -s bench -p test_native_contract_gate.py
+      - name: Evidence corruption negative controls
+        run: python -m unittest discover -s bench -p test_evidence_gate.py
+      - name: Verify frozen desktop evidence under optimized Python
+        run: |
+          python -O bench/records/2026-10-desktop-latency/verify.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -O bench/records/2026-10-desktop-latency/settlement/verify.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -O bench/records/2026-10-desktop-latency/request-attribution/verify.py
       - name: Format
         run: cargo fmt --manifest-path rust/Cargo.toml --check
       - name: Lint
@@ -25,6 +50,14 @@ jobs:
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
       - name: Optimized native build
         run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
+      - name: Frozen correction and formatting contracts
+        run: python bench/check_native_contracts.py --exe rust/target/release/universal-spell-check.exe --output benchmark_runs/ci-native-contracts
+      - name: Retain correctness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-contract-evidence
+          path: benchmark_runs/ci-native-contracts/
       - name: Native tray and resource startup smoke
         shell: pwsh
         run: |

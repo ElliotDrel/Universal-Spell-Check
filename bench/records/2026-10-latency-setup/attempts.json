@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "environment": "Windows laptop; explicitly authorized idle desktop",
+  "product_version": "0.13.2-dev",
+  "code_commit": "14befa6742a3afca0d3f472ed0c84d5475d9da26",
+  "binary_sha256": "c21eb0198f6d037c71521b6100c5dd6caa86836ee772f7c32e810f759607f80f",
+  "cases_sha256": "57ec6a275cf8ad35dd4d09a1afa2c80adf6ba8a448a81041992bbd4125126be3",
+  "fixtures_sha256": "eef16bc49d1f625ba5a01c6a21f29b2835a75c9aa91a7fedab4ec514dabc3b80",
+  "replacements_sha256": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+  "mode": "offline local replay; developer logging off",
+  "attempts": [
+    {
+      "kind": "initial",
+      "at": "2026-10-23T08:21:27.302482-04:00",
+      "exit_code": 1,
+      "stage": "setup_before_hotkey",
+      "reason": "Foreground/selection could not be verified; no hotkey posted.",
+      "measured_trials": 0,
+      "warmups": 0
+    },
+    {
+      "kind": "external-focus-observation",
+      "at": "2026-10-23T08:23:42.8330001-04:00",
+      "exit_code": 1,
+      "stage": "setup_before_hotkey",
+      "reason": "Foreground/selection could not be verified; no hotkey posted.",
+      "measured_trials": 0,
+      "warmups": 0
+    },
+    {
+      "kind": "controlled-activation",
+      "at": "2026-10-23T08:24:48.5012372-04:00",
+      "exit_code": 1,
+      "stage": "setup_before_hotkey",
+      "reason": "Foreground/selection could not be verified; no hotkey posted.",
+      "measured_trials": 0,
+      "warmups": 0
+    }
+  ],
+  "controlled_activation": {
+    "input_count": 2,
+    "foreground_request": 1,
+    "foreground_matches": true
+  },
+  "outcome": "No posted hotkey, capture, correction, or paste trial. Diagnostics-on not started. No latency baseline.",
+  "subsequent_source_commit": "3a258d2abb847c3a2ec30a7dd6498734c951c26b",
+  "subsequent_ci": "https://github.com/ElliotDrel/Universal-Spell-Check/actions/runs/39954171261",
+  "local_subsequent_verification": {
+    "lint": "passed",
+    "dev_tests": "43 unit plus one GDI test passed",
+    "release_build": "intentionally cancelled for desktop migration; no new candidate frozen"
+  }
+}

@@ -363,3 +363,131 @@ Installer argument sources: [Velopack Windows setup CLI](https://docs.velopack.i
 - The laptop's existing installed C# v0.12.3 accepted its built-in `--restart` request, restarted, downloaded/applied v0.13.0 and launched Rust PID33684. A second native Rust restart launched PID11784 and completed a successful public-feed `Up to date` check.
 - Verified installed executable and package manifest version 0.13.0, unchanged settings/encrypted keys/login startup, and removal of the old C# DLL from the active payload. No manual package apply, data deletion or app patch release was needed.
 - Retain primary `benchmark_runs/rust-port/production-release/` release/CI metadata, integrity snapshots, approved-reader upgrade events and completion report. This validates one current C# installation transition plus CI fresh install; it is not a new speed run or a guarantee about every older configuration.
+
+
+## Local latency measurement checkpoint
+
+Use the existing Rust desktop runner; a new harness is unnecessary. Build the
+instrumented branch in Release. Keep all output in a fresh ignored directory and
+record whether developer evidence is enabled. Do not execute desktop commands
+without Elliot's explicit idle-desktop window.
+
+The raw `trials.jsonl` now retains complete `coordinator_timings`, its schema and
+boundary, including partial timings for product failures. Its existing `timings`
+also retains new top-level fields, but `total_ms` remains the external
+posted-hotkey-to-native-editor-completion duration; `coordinator_total_ms` remains
+trigger-to-input-return. Nested capture/paste durations stay in
+`coordinator_timings`. Never sum both layers or infer editor time by subtracting
+percentiles from different trials. Native editor completion can occur before the
+input API returns, so their difference is not universally an editor-wait duration.
+The desktop manifest now records commit, dirty state and UTC creation time in
+addition to binary/workload/replacements hashes and machine identity.
+
+Prepare these commands from the instrumented worktree root. PowerShell should use
+`Start-Process -Wait -PassThru` or a waiting subprocess wrapper for the GUI binary.
+
+```powershell
+# Noninteractive: validate the portable historical record.
+python bench/records/2026-10-rust-port/verify.py
+
+# IDLE DESKTOP APPROVAL REQUIRED: 30 measured trials + ten retained warmups.
+# No API requests; both settings and credentials remain isolated by local mode.
+# Replace <candidate.exe> and <fresh-output> with absolute paths.
+<candidate.exe> --bench-desktop --mode local --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 3 --warmup 1 --allow-desktop --output <fresh-output>
+```
+
+- Run the first block without developer logging; use a second matched block with
+  `--developer-logging --evidence-log-dir <fresh-private-evidence-directory>` to
+  expose diagnostic cost. Keep the directory separate from ordinary production
+  evidence and record that its fresh-store condition differs from the historical
+  full-store benchmark. Keep both block results; do not pool logging modes.
+- Read runtime detail records through the approved log-reader CLI with explicit
+  `--log-dir <fresh-output>`; ordinary benchmark trials are directly analyzable.
+- Retain every warmup and failed attempt. Report successful-only median/p95 along
+  with failure counts, and verified-paste counts under 500/1,000 ms divided by
+  all measured attempts. Exact handwritten quality agreement remains separate
+  from correct delivery of the pipeline's requested text. Avoid p99 on this sample.
+- Use the largest measured controllable cost to choose the next experiment.
+  Identify whether it is necessary before optimizing; investigate a large
+  unattributed residual before claiming complete attribution.
+- Use deliberate physical-hotkey runs in normal editors to investigate human
+  modifier-release time: the posted-message fixture does not reproduce it. Browser
+  formatting/undo acceptance and visible rendering remain separate live checks.
+- Keep models, transport, 50-ms settlement, protected literals, formatting,
+  clipboard recovery and active-target paste behavior unchanged at this checkpoint.
+- Do not call offline compute or historical/ordinary-use observations a new full
+  hotkey-to-editor baseline. That baseline remains pending until live approval.
+
+
+Setup failures now emit `benchmark_setup_failed` with a single snapshot of the
+foreground/focus/selection/text-length and text-match prerequisites, excluding
+text contents. `summary.json.block_error` retains the abort reason even if setup
+failed before the first attempted warmup. Keep these zero-trial blocks as fixture
+diagnostics; they cannot establish app latency or a product failure rate.
+
+An occupied benchmark chord can be overridden explicitly with `--benchmark-vk N`
+(decimal Windows virtual-key code). The default remains `BuildChannel.BenchmarkHotkeyVk`.
+The manifest records `benchmark_vk`; this only changes the isolated registered
+benchmark chord, not product hotkeys, posted-message dispatch or correctness gates.
+Preserve registration failures as zero-trial preflight aborts.
+
+For desktop automation that cannot activate the window within the default three
+seconds, use `--setup-timeout-ms 30000` (bounded to 3,000–120,000). This only extends
+unmeasured setup; all foreground, focus, complete-selection and fixture-text gates
+still must pass before any hotkey is posted. The manifest records the setup limit.
+
+### Settlement wait follow-up, October 23, 2026
+
+The bounded [settlement comparison record](../bench/records/2026-10-desktop-latency/settlement/README.md) contains eight alternating blocks, 480 retained deliveries, a native wait-only probe and real-hotkey editor acceptance. The high-resolution wait preserves at least 50 ms and message pumping; native timer failures use the previous timeout path. Candidate local completion medians are about 70–71 ms versus baseline 81–83 ms on this desktop. Keep the unsupported-rich formatting limitation and frozen rich-list spacing discrepancy separate from delivery success.
+
+For ordered raw-block phase comparisons use python bench/phase_report.py --block NAME=DIRECTORY (repeat the block flag). Optional --output exclusively creates a fresh JSON report. It checks matching workloads within each diagnostic mode, reports nested phase distributions with sample counts, and retains failures and incomplete coverage. It does not launch desktop tests or award an automatic speed/reliability verdict. See the desktop-results follow-up for an ABBA example.
+
+### Deterministic correction and request investigation gates
+
+CI runs the actual optimized executable over the frozen ten-case compute workload
+and requires exact output, paste text and CF_HTML. It then mutates one expected
+output and requires a nonzero result plus an explicitly retained failed trial.
+Neither setup failure nor missing rows counts as a successful negative control.
+The gate is `bench/check_native_contracts.py`; evidence uploads even after failure.
+Existing Dev/Prod unit tests include protected literals/model parameters, native
+HTTP reads/deadlines/lifetime, and a gated loopback response proving the shared deadline expires even while
+the mock withholds response headers. Send completion ordering is not assumed. No provider key is in CI.
+These deterministic contracts prevent covered regressions; they cannot guarantee
+live service latency, all editor rendering, or every possible correction.
+
+Evidence checks use explicit failures, per-case warmup/measured coverage, frozen
+workload hashes and the recorded A/B claim. CI also corrupts case coverage under
+`python -O` and requires rejection. The saved-record speed check validates an
+existing observation, not a wall-clock threshold on shared CI hardware.
+
+For request attribution without clipboard/focus changes, the optimized binary
+supports `--bench-request --allow-api --settings <saved-data-directory> --output
+<fresh-directory> --runs 3`, optionally `--prewarm`. It reads saved settings and
+encrypted credentials without writing them, sends only `This is a tset.` to the
+saved model and fixed OpenAI endpoint, reuses one client, and retains every result in
+JSONL. It does not initialize the tray, updater, migration or startup registration.
+`--allow-api` explicitly opts into these bounded real API calls. Output creation
+fails if the directory exists. Compare cold first and subsequent same-client
+requests using native metadata, not labels alone. This is a diagnostic probe,
+not an end-to-end editor speed measurement.
+
+The completed [request attribution record](../bench/records/2026-10-desktop-latency/request-attribution/README.md)
+contains seven verified synthetic requests and the Opus 5.5 medium/auto assessment
+follow-up. Native timing shows a predominantly send-end-to-response-headers wait,
+not a one-second local upload. No request-speed change was justified or retained.
+
+Before pushing Rust edits, use `./bench/format-rust.ps1` (check by default), or
+`./bench/format-rust.ps1 -Rustfmt <verified-portable-rustfmt.exe>` when Cargo is
+unavailable. `-Write` opts into source formatting. The pinned official portable
+formatter/runtime on this desktop is retained under the primary checkout's
+ignored `benchmark_runs/tooling/rustfmt-1.99.1/`, with checksum/source provenance.
+CI uses a SHA-pinned official cache action for Cargo registry/git/build outputs;
+all correctness, mutation and safety gates still run after restoration.
+
+Request probe output distinguishes aggregate `send_ms`/`headers_ms`/`body_ms`
+across retries from the nested `final_response` attempt number, send-call split
+and native metadata. Do not subtract final-attempt fields from aggregate fields
+when retries occur. Release builds are required; unsupported saved models are
+rejected before output creation or network access. Earlier retained schema-1
+samples have top-level split/native fields; all seven have one attempt, so their
+timing scope is unambiguous.

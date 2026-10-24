@@ -106,6 +106,8 @@ unsafe extern "system" fn callback(
 struct Request {
     handle: Handle,
     state: Arc<State>,
+    send_api_ms: f64,
+    send_completion_wait_ms: f64,
 }
 impl Request {
     fn new(
@@ -174,7 +176,12 @@ impl Request {
                 drop(Arc::from_raw(context as *const State));
                 return Err(std::io::Error::last_os_error().to_string());
             }
-            let request = Self { handle, state };
+            let request = Self {
+                handle,
+                state,
+                send_api_ms: 0.,
+                send_completion_wait_ms: 0.,
+            };
             let redirect = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
             if WinHttpSetOption(
                 request.handle.0,
@@ -230,8 +237,51 @@ impl Request {
             }
         }
     }
-    fn send(&mut self, deadline: Instant) -> Result<(), Failure> {
+    fn diagnostics(&self) -> Value {
         unsafe {
+            let mut times: WINHTTP_REQUEST_TIMES = std::mem::zeroed();
+            times.cTimes = WinHttpRequestTimeLast as u32;
+            let mut size = std::mem::size_of_val(&times) as u32;
+            let times_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_REQUEST_TIMES,
+                (&mut times as *mut WINHTTP_REQUEST_TIMES).cast(),
+                &mut size,
+            ) != 0;
+            let mut stats: WINHTTP_REQUEST_STATS = std::mem::zeroed();
+            stats.cStats = WinHttpRequestStatLast as u32;
+            let mut size = std::mem::size_of_val(&stats) as u32;
+            let stats_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_REQUEST_STATS,
+                (&mut stats as *mut WINHTTP_REQUEST_STATS).cast(),
+                &mut size,
+            ) != 0;
+            let mut protocol = 0u32;
+            let mut size = 4;
+            let protocol_ok = WinHttpQueryOption(
+                self.handle.0,
+                WINHTTP_OPTION_HTTP_PROTOCOL_USED,
+                (&mut protocol as *mut u32).cast(),
+                &mut size,
+            ) != 0;
+            let mut frequency = 0i64;
+            let frequency_ok =
+                windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency)
+                    != 0
+                    && frequency > 0;
+            serde_json::json!({
+                "qpc_frequency":if frequency_ok {Some(frequency)} else {None},
+                "request_times_qpc":if times_ok {Some(&times.rgullTimes[..(times.cTimes as usize).min(times.rgullTimes.len())])} else {None},
+                "request_stats_flags":if stats_ok {Some(stats.ullFlags)} else {None},
+                "connection_request_index":if stats_ok {Some(stats.ulIndex)} else {None},
+                "protocol_flags":if protocol_ok {Some(protocol)} else {None}
+            })
+        }
+    }
+    fn send(&mut self, deadline: Instant) -> Result<(), Failure> {
+        let started = Instant::now();
+        let accepted = unsafe {
             Self::accepted(WinHttpSendRequest(
                 self.handle.0,
                 self.state.headers.as_ptr(),
@@ -240,9 +290,14 @@ impl Request {
                 self.state.body.len() as u32,
                 self.state.body.len() as u32,
                 Arc::as_ptr(&self.state) as usize,
-            ))?;
-        }
-        self.wait(deadline, WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE)?;
+            ))
+        };
+        self.send_api_ms = started.elapsed().as_secs_f64() * 1000.;
+        accepted?;
+        let started = Instant::now();
+        let completed = self.wait(deadline, WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE);
+        self.send_completion_wait_ms = started.elapsed().as_secs_f64() * 1000.;
+        completed?;
         Ok(())
     }
     fn receive(&mut self, deadline: Instant) -> Result<u32, Failure> {
@@ -318,6 +373,7 @@ impl Failure {
 pub struct Client {
     connection: Handle,
     session: Handle,
+    collect_native_diagnostics: bool,
 }
 // WinHTTP supports concurrent requests on an app-lifetime session/connection. Each Request owns its callback state.
 unsafe impl Send for Client {}
@@ -326,7 +382,10 @@ pub struct Response {
     pub body: Value,
     pub raw: String,
     pub status: u32,
+    pub native: Value,
     pub send_ms: f64,
+    pub send_api_ms: Option<f64>,
+    pub send_completion_wait_ms: Option<f64>,
     pub wait_ms: f64,
     pub download_ms: f64,
     pub total_ms: f64,
@@ -364,8 +423,14 @@ impl Client {
             Ok(Self {
                 connection,
                 session,
+                collect_native_diagnostics: false,
             })
         }
+    }
+    pub fn diagnostic() -> Result<Self, String> {
+        let mut client = Self::new()?;
+        client.collect_native_diagnostics = true;
+        Ok(client)
     }
     pub fn request(
         &self,
@@ -432,11 +497,19 @@ impl Client {
         let download_ms = download.elapsed().as_secs_f64() * 1000.;
         let raw = String::from_utf8_lossy(&body).into_owned();
         let body = parse_body(status, &body)?;
+        let native = if self.collect_native_diagnostics {
+            request.diagnostics()
+        } else {
+            Value::Null
+        };
         Ok(Response {
+            native,
             body,
             raw,
             status,
             send_ms,
+            send_api_ms: Some(request.send_api_ms),
+            send_completion_wait_ms: Some(request.send_completion_wait_ms),
             wait_ms,
             download_ms,
             total_ms: started.elapsed().as_secs_f64() * 1000.,
@@ -470,6 +543,7 @@ mod tests {
     fn local_request(
         delay: Duration,
         allow_disconnect: bool,
+        response_gate: Option<std::sync::mpsc::Receiver<()>>,
     ) -> (Request, Handle, Handle, std::thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -548,6 +622,10 @@ mod tests {
                 }
                 received.extend_from_slice(&b[..n]);
             }
+            assert_eq!(&received[header_end..header_end + length], b"{}");
+            if let Some(gate) = response_gate {
+                gate.recv_timeout(Duration::from_secs(10)).unwrap();
+            }
             std::thread::sleep(delay);
             let body = b"{\"output_text\":\"the test\"}";
             let header = format!(
@@ -580,7 +658,8 @@ mod tests {
     }
     #[test]
     fn native_async_reads_mock_http() {
-        let (mut request, _connection, _session, server) = local_request(Duration::ZERO, false);
+        let (mut request, _connection, _session, server) =
+            local_request(Duration::ZERO, false, None);
         let deadline = Instant::now() + Duration::from_secs(2);
         request.send(deadline).unwrap();
         assert_eq!(request.receive(deadline).unwrap(), 200);
@@ -593,9 +672,28 @@ mod tests {
         server.join().unwrap();
     }
     #[test]
+    fn request_deadline_does_not_require_response_release() {
+        let (release, gate) = std::sync::mpsc::channel();
+        let (mut request, _connection, _session, server) =
+            local_request(Duration::ZERO, false, Some(gate));
+        let deadline = Instant::now() + Duration::from_millis(100);
+        let outcome = request
+            .send(deadline)
+            .and_then(|_| request.receive(deadline));
+        // WinHTTP may complete send after headers arrive. Enforce the deadline,
+        // without assuming one platform-specific callback ordering or speed.
+        let _ = release.send(());
+        assert_eq!(
+            outcome.unwrap_err().message,
+            "The OpenAI request timed out."
+        );
+        drop(request);
+        server.join().unwrap();
+    }
+    #[test]
     fn native_timeout_keeps_state_alive_until_handle_closes() {
         let (mut request, _connection, _session, server) =
-            local_request(Duration::from_millis(200), true);
+            local_request(Duration::from_millis(200), true, None);
         let weak = Arc::downgrade(&request.state);
         let started = Instant::now();
         let deadline = started + Duration::from_millis(20);

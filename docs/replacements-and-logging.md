@@ -156,6 +156,49 @@ Each run emits a `spellcheck_detail` JSON blob containing: `status`, `error`, `m
 `target_formatting` may contain a parsed hostname for a site rule. It never contains a raw browser
 path, query, fragment, page title, selected text, or extension message.
 
+### Rust local latency timings (schema 1)
+
+Rust detail records now include `timing_schema_version=1`, `request_mode`
+(`live` or `offline_replay`), and an explicit `timing_boundary`. Existing timing
+names remain compatible; the C# reference retains its historical schema.
+
+- Start `total_ms` at accepted `Worker::trigger` entry, before the worker queue.
+  Finish at input-call return on success, or operation failure before recovery.
+  This excludes physical key delivery before app receipt and does not acknowledge
+  editor acceptance or visible rendering. Final status bookkeeping adds a small
+  residual before the sample is taken.
+- Retain partial timings on returned errors and caught panics. Report stages that
+  never ran as `null`; accumulate elapsed time across retries. Zero is a measured
+  value, never an unavailable-data placeholder.
+- Attribute nonoverlapping top-level work to `dispatch_ms` (queue and any client
+  reinitialization before run entry), `setup_ms` (target/evidence setup and key/client
+  validation), `backup_ms`, `clipboard_ms`, `history_exclude_ms`, `prepare_ms`
+  (normalization, protection and payload construction), `request_ms`,
+  `replacements_ms`, `rich_mapping_ms`, `diagnostics_ms` (existing hot-path metadata,
+  string/base64 copying and serialization), and `paste_ms`.
+- Report `unattributed_ms` as total minus those top-level fields. It includes UI
+  notices, response extraction, bookkeeping and timer overhead. Investigate a large
+  residual before adding deeper timers. Do not clamp it or add nested phases again.
+- Break `capture` into `modifiers_ms`, `copy_input_ms`, `wait_ms` (message-aware
+  waits, not an unconditional 25-ms sleep), `read_ms`, `copy_attempts` and
+  `read_attempts`. Break `capture.reads` into `open_ms`, `unicode_ms`, `html_ms`,
+  `rtf_ms`, `native_ms`, `decode_ms` and `enumerate_ms`. Optional-format checks
+  are timed even when a format is absent. Counts cover attempted calls including
+  failures; read counters/durations accumulate across both copy attempts.
+- Break `paste` into `write_ms` (allocation/open/publication wrapper), `readback_ms`
+  (developer-only readback and metadata), `settle_ms`, `modifiers_ms` and `input_ms`.
+  These nest inside `paste_ms`. Preserve the existing 50-ms settlement and all
+  clipboard, target-selection and recovery behavior.
+- Report failure `recovery_ms` separately, outside `total_ms`. The `run_completed`
+  event's elapsed time includes recovery/notification/timing finalization; use the
+  detail record's explicit boundary for latency analysis.
+- Preserve network phase labels without treating send/wait as proven upload/server
+  timings. Return `api_ms` and network subphases as `null` for offline replay; its
+  `request_ms` measures local replay lookup/response parsing. Failed requests retain
+  total request duration even when no phase breakdown is available.
+- Keep measurement itself to monotonic clock reads and fixed fields. Serialize new
+  timing metadata after the measured pipeline; no new I/O occurs before input.
+
 ### `clipboard_html`, `clipboard_rtf`, `clipboard_formats`
 
 Every capture reads all the flavors the source offered. `input_text` is `CF_UNICODETEXT`;

@@ -2,6 +2,25 @@
 
 Prepared October 22, 2026. Retain this file until the receiving thread has incorporated its context; remove it in a later explicit cleanup commit once superseded.
 
+## Desktop move — October 23, read this first
+
+- Continue from [the current desktop handoff](research/2026-10-23-desktop-latency-handoff.md).
+- Use PR #8's branch, not the old main-only research state. Its latest code measures
+  the local path and diagnoses fixture setup; no optimization or release has occurred.
+- Treat the three-PR batch below as superseded historical proposals.
+
+## Scope update — October 22, receiving session
+
+- Supersede the mandatory three-PR batch below with Elliot's narrower checkpoint:
+  minimal local timing instrumentation, noninteractive verification, then this
+  machine's baseline and one evidence-backed optimization recommendation.
+- Keep the original batch below as historical proposals. Do not implement network
+  instrumentation or a new benchmark framework merely to complete that list.
+- Keep optimization/behavior changes, main pushes, merges and publication out of scope.
+- Require explicit idle-desktop authorization for clipboard/focus measurements.
+
+- Read the [receiving-machine checkpoint](research/2026-10-22-local-latency-checkpoint.md) for current evidence and pending tests.
+
 ## Objective and Scope
 
 - Optimize the full interval from physical hotkey activation to complete corrected text pasted into the target editor: first below 1 second, ideally below 500 ms.
@@ -37,7 +56,7 @@ Prepared October 22, 2026. Retain this file until the receiving thread has incor
 - Never copy real credentials into fixtures, print keys, or use an old quarantined benchmark client.
 - Offline benchmarks must isolate settings AND key paths and cannot overwrite production data.
 
-## First Batch: Three Atomic PRs
+## Historical proposal: Three Atomic PRs (superseded)
 
 | PR | Scope | Acceptance |
 |---|---|---|
@@ -95,6 +114,6 @@ Prepared October 22, 2026. Retain this file until the receiving thread has incor
 - Inspect Git status and fetch upstream without discarding local changes.
 - Ensure this handoff and audit are present from `origin/main`; fast-forward only when safe.
 - Inspect existing PRs and branches before creating duplicates.
-- Implement PR 1, then PR 2, then PR 3 with separate reviewable changes and focused verification.
+- Continue existing PR #8 and its current measured checkpoint. The old three-PR sequence is superseded; do not implement it automatically.
 - Keep a current task list and clearly distinguish completed code, tested behavior, and pending live validation.
-- Return the three PR links, test results, measurement limitations, and evidence-ranked next step; stop before conditional optimization PRs.
+- Return the current PR link, test results, measurement limitations, and evidence-ranked next step; stop before conditional optimization PRs.

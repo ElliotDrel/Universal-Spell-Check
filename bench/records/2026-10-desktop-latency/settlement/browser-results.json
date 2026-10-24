@@ -1,0 +1,51 @@
+[
+  {
+    "variant": "installed-baseline",
+    "case": "plain",
+    "text": "This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "status": "Paste events: 1\nText: This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.\nHTML: <p>This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.</p>"
+  },
+  {
+    "variant": "installed-baseline",
+    "case": "rich",
+    "text": "This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.",
+    "status": "Paste events: 1\nText: This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.\nHTML: <p data-pm-slice=\"0 0 []\">This is a <strong>test</strong> with <em>italic text</em> and a <a href=\"https://example.com/acceptance?q=keep\">link</a>.</p><p><br></p><ul><li>Fix the first item.</li><li>Keep the second item.</li></ul>"
+  },
+  {
+    "variant": "candidate",
+    "case": "plain",
+    "text": "This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+    "status": "Paste events: 1\nText: This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.\nHTML: <p>This is a test. Please check https://example.com/reprot and C:\\sample\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.</p>"
+  },
+  {
+    "variant": "candidate",
+    "case": "rich",
+    "text": "This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.",
+    "status": "Paste events: 1\nText: This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.\nHTML: <p data-pm-slice=\"0 0 []\">This is a <strong>test</strong> with <em>italic text</em> and a <a href=\"https://example.com/acceptance?q=keep\">link</a>.</p><p><br></p><ul><li>Fix the first item.</li><li>Keep the second item.</li></ul>"
+  },
+  {
+    "variant": "candidate",
+    "case": "unchanged",
+    "text": "This sentence is already correct, with a link.",
+    "status": "Paste events: 1\nText: This sentence is already correct, with a link.\nHTML: <p data-pm-slice=\"0 0 []\">This sentence is already correct, with a link.</p>",
+    "formatting_match": false,
+    "expected_status": "Paste events: 1\nText: This sentence is already correct, with a link.\nHTML: <p data-pm-slice=\"0 0 []\">This sentence is <strong>already correct</strong>, with a <a href=\"https://example.com/acceptance?q=keep\">link</a>.</p>"
+  },
+  {
+    "variant": "candidate",
+    "case": "rich-repeat",
+    "status": "Paste events: 1\nText: This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.\nHTML: <p data-pm-slice=\"0 0 []\">This is a <strong>test</strong> with <em>italic text</em> and a <a href=\"https://example.com/acceptance?q=keep\">link</a>.</p><p><br></p><ul><li>Fix the first item.</li><li>Keep the second item.</li></ul>"
+  },
+  {
+    "variant": "candidate",
+    "case": "rich-unchanged",
+    "status": "Paste events: 2\nText: This is a test with italic text and a link.\n\n\n\n\nFix the first item.\nKeep the second item.\nHTML: <p data-pm-slice=\"0 0 []\">This is a <strong>test</strong> with <em>italic text</em> and a <a href=\"https://example.com/acceptance?q=keep\">link</a>.</p><p><br></p><ul><li>Fix the first item.</li><li>Keep the second item.</li></ul>"
+  },
+  {
+    "variant": "installed-baseline",
+    "case": "unchanged",
+    "text": "This sentence is already correct, with a link.",
+    "status": "Paste events: 1\nText: This sentence is already correct, with a link.\nHTML: <p data-pm-slice=\"0 0 []\">This sentence is already correct, with a link.</p>",
+    "formatting_match": false
+  }
+]

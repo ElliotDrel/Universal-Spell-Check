@@ -1,4 +1,8 @@
-use crate::{docs_native, store::wide};
+use crate::{
+    docs_native,
+    store::wide,
+    timing::{CaptureTimings, ReadTimings, measure},
+};
 use std::{
     mem::{size_of, zeroed},
     ptr::{null, null_mut},
@@ -35,6 +39,11 @@ impl Drop for Open {
 fn pump_wait(ms: u32) {
     unsafe {
         MsgWaitForMultipleObjectsEx(0, null(), ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        pump_messages();
+    }
+}
+fn pump_messages() {
+    unsafe {
         let mut msg = zeroed();
         while PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) != 0 {
             if msg.message == WM_QUIT {
@@ -144,46 +153,63 @@ pub fn read_immediate(hwnd: HWND) -> Result<Clipboard, String> {
     read_with_budget(hwnd, Duration::ZERO)
 }
 fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
-    let _open = open(hwnd, budget)?;
+    read_measured(hwnd, budget, &mut ReadTimings::default())
+}
+fn read_measured(
+    hwnd: HWND,
+    budget: Duration,
+    timings: &mut ReadTimings,
+) -> Result<Clipboard, String> {
+    let _open = measure(&mut timings.open_ms, || open(hwnd, budget))?;
     let sequence = unsafe { GetClipboardSequenceNumber() };
-    let raw = bytes(13, 16 * 1024 * 1024)?;
-    let units: Vec<u16> = raw
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .take_while(|u| *u != 0)
-        .collect();
-    let text = String::from_utf16_lossy(&units);
+    let text = measure(&mut timings.unicode_ms, || -> Result<String, String> {
+        let raw = bytes(13, 16 * 1024 * 1024)?;
+        let units: Vec<u16> = raw
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .take_while(|u| *u != 0)
+            .collect();
+        Ok(String::from_utf16_lossy(&units))
+    })?;
     // Unicode is required; unavailable ancillary formats must not discard usable text.
-    let (html, html_status) = optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024));
-    let (rtf, rtf_status) = optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024));
-    let (native, native_status) = optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024));
-    let html = utf8(html);
-    let rtf = utf8(rtf);
-    let mut formats = Vec::new();
-    unsafe {
-        let mut f = 0;
-        loop {
-            f = EnumClipboardFormats(f);
-            if f == 0 {
-                break;
-            }
-            let mut name = [0u16; 256];
-            let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
-            formats.push(if len > 0 {
-                String::from_utf16_lossy(&name[..len as usize])
-            } else {
-                match f {
-                    13 => "UnicodeText".into(),
-                    1 => "Text".into(),
-                    7 => "OEMText".into(),
-                    16 => "Locale".into(),
-                    _ => format!("#{f}"),
+    let (html, html_status) = measure(&mut timings.html_ms, || {
+        optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024))
+    });
+    let (rtf, rtf_status) = measure(&mut timings.rtf_ms, || {
+        optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
+    });
+    let (native, native_status) = measure(&mut timings.native_ms, || {
+        optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024))
+    });
+    let (html, rtf) = measure(&mut timings.decode_ms, || (utf8(html), utf8(rtf)));
+    let formats = measure(&mut timings.enumerate_ms, || {
+        let mut formats = Vec::new();
+        unsafe {
+            let mut f = 0;
+            loop {
+                f = EnumClipboardFormats(f);
+                if f == 0 {
+                    break;
                 }
-            });
+                let mut name = [0u16; 256];
+                let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
+                formats.push(if len > 0 {
+                    String::from_utf16_lossy(&name[..len as usize])
+                } else {
+                    match f {
+                        13 => "UnicodeText".into(),
+                        1 => "Text".into(),
+                        7 => "OEMText".into(),
+                        16 => "Locale".into(),
+                        _ => format!("#{f}"),
+                    }
+                });
+            }
         }
-    }
+        formats
+    });
     if unsafe { GetClipboardSequenceNumber() } != sequence {
         return Err("Clipboard changed while capturing formats".into());
     }
@@ -236,11 +262,52 @@ pub fn write(
     }
     Ok(unsafe { GetClipboardSequenceNumber() })
 }
+struct SettlementTimer(HANDLE);
+impl Drop for SettlementTimer {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe { CloseHandle(self.0) };
+        }
+    }
+}
 pub fn settle_publication() {
     // Zero-delay publication failed real editor checks with correct bytes and selection.
-    // Retain the C# 50 ms handoff period; pump only the worker's messages while waiting.
+    // Keep at least 50 ms, without the coarse message-wait timeout's extra timer tick.
     let until = Instant::now() + Duration::from_millis(50);
+    let timer = SettlementTimer(unsafe {
+        CreateWaitableTimerExW(
+            null(),
+            null(),
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+            TIMER_MODIFY_STATE | SYNCHRONIZATION_SYNCHRONIZE,
+        )
+    });
+    settle_until(until, timer.0);
+}
+fn settle_until(until: Instant, mut timer: HANDLE) {
     while let Some(remaining) = until.checked_duration_since(Instant::now()) {
+        if !timer.is_null() {
+            // Relative 100-ns units, rounded up. The monotonic deadline remains authoritative
+            // after early message wakes or timer signals; neither may shorten settlement.
+            let due = -(remaining.as_nanos().div_ceil(100).max(1) as i64);
+            unsafe {
+                if SetWaitableTimer(timer, &due, 0, None, null(), 0) != 0 {
+                    let result = MsgWaitForMultipleObjectsEx(
+                        1,
+                        &timer,
+                        INFINITE,
+                        QS_ALLINPUT,
+                        MWMO_INPUTAVAILABLE,
+                    );
+                    if result != WAIT_FAILED {
+                        pump_messages();
+                        continue;
+                    }
+                }
+            }
+            // Unavailable timers or a failed native wait retain the original safe path.
+            timer = null_mut();
+        }
         pump_wait(remaining.as_millis().clamp(1, 50) as u32);
     }
 }
@@ -306,20 +373,28 @@ pub fn chord(vk: u16) -> Result<(), String> {
         Ok(())
     }
 }
-pub fn capture(hwnd: HWND) -> Result<Clipboard, String> {
-    modifiers_released(Duration::from_millis(1200))?;
+pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, String> {
+    measure(&mut timings.modifiers_ms, || {
+        modifiers_released(Duration::from_millis(1200))
+    })?;
     for _ in 0..2 {
         let before = unsafe { GetClipboardSequenceNumber() };
-        chord(0x43)?;
+        timings.copy_attempts += 1;
+        measure(&mut timings.copy_input_ms, || chord(0x43))?;
         let start = Instant::now();
         while start.elapsed() < Duration::from_millis(700) {
             if unsafe { GetClipboardSequenceNumber() } != before
-                && let Ok(data) = read(hwnd)
+                && let Ok(data) = {
+                    timings.read_attempts += 1;
+                    measure(&mut timings.read_ms, || {
+                        read_measured(hwnd, Duration::from_millis(320), &mut timings.reads)
+                    })
+                }
                 && !data.text.trim().is_empty()
             {
                 return Ok(data);
             }
-            pump_wait(25);
+            measure(&mut timings.wait_ms, || pump_wait(25));
         }
     }
     Err("The selected app did not copy any text.".into())
@@ -547,5 +622,37 @@ mod ancillary_format_tests {
             optional_format(Ok(b"usable HTML".to_vec())),
             (b"usable HTML".to_vec(), "ok")
         );
+    }
+}
+
+#[cfg(test)]
+mod settlement_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static MESSAGES: AtomicU32 = AtomicU32::new(0);
+
+    unsafe extern "system" fn tick(_: HWND, _: u32, _: usize, _: u32) {
+        MESSAGES.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn settlement_preserves_minimum_and_pumps_messages() {
+        let id = unsafe { SetTimer(null_mut(), 0, 10, Some(tick)) };
+        assert_ne!(id, 0);
+        for _ in 0..3 {
+            let start = Instant::now();
+            settle_publication();
+            assert!(start.elapsed() >= Duration::from_millis(50));
+        }
+        unsafe { KillTimer(null_mut(), id) };
+        assert!(MESSAGES.load(Ordering::Relaxed) > 0);
+    }
+
+    #[test]
+    fn unavailable_timer_retains_minimum() {
+        let start = Instant::now();
+        settle_until(start + Duration::from_millis(50), null_mut());
+        assert!(start.elapsed() >= Duration::from_millis(50));
     }
 }

@@ -139,6 +139,7 @@ struct Run {
     output: PathBuf,
     error: Option<String>,
     prepare_started: Option<Instant>,
+    setup_timeout: Duration,
     deadline: Instant,
 }
 impl Run {
@@ -184,13 +185,30 @@ impl Run {
                 (&mut b as *mut u32) as isize,
             );
         }
-        let ready = unsafe { GetForegroundWindow() == parent.cast() && GetFocus() == child.cast() }
+        let foreground = unsafe { GetForegroundWindow() };
+        let focus = unsafe { GetFocus() };
+        let editor_text = self.editor.text();
+        let editor_chars = editor_text.encode_utf16().count();
+        let text_matches =
+            editor_text.replace("\r\n", "\n") == self.cases[self.case].text.replace("\r\n", "\n");
+        let ready = foreground == parent.cast()
+            && focus == child.cast()
             && a == 0
-            && b as usize == self.editor.text().encode_utf16().count()
-            && self.editor.text().replace("\r\n", "\n")
-                == self.cases[self.case].text.replace("\r\n", "\n");
+            && b as usize == editor_chars
+            && text_matches;
         if !ready {
-            if self.prepare_started.unwrap().elapsed() > Duration::from_secs(3) {
+            if self.prepare_started.unwrap().elapsed() > self.setup_timeout {
+                self.logger.data("benchmark_setup_failed", json!({
+                    "case_id": self.cases[self.case].id,
+                    "foreground_matches": foreground == parent.cast(),
+                    "focus_matches": focus == child.cast(),
+                    "selection_start": a, "selection_end": b,
+                    "editor_utf16_chars": editor_chars,
+                    "expected_utf16_chars": self.cases[self.case].text.encode_utf16().count(),
+                    "text_matches": text_matches,
+                    "expected_window": parent as usize, "foreground_window": foreground as usize,
+                    "expected_editor": child as usize, "focused_window": focus as usize
+                }));
                 self.abort("Foreground/selection could not be verified; no hotkey posted.");
             } else {
                 self.timer(40);
@@ -265,7 +283,11 @@ impl Run {
         }
         let started = self.start.unwrap();
         let case = &self.cases[self.case];
-        let mut timings = serde_json::Map::new();
+        let mut timings = detail["timings"].as_object().cloned().unwrap_or_default();
+        timings.remove("capture");
+        timings.remove("paste");
+        // External total exists only when the editor actually acknowledges a paste.
+        timings.remove("total_ms");
         timings.insert("request_ms".into(), detail["timings"]["request_ms"].clone());
         timings.insert(
             "capture_ms".into(),
@@ -345,7 +367,7 @@ impl Run {
                 return;
             }
         }
-        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
+        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"coordinator_timings":detail["timings"],"timing_schema_version":detail["timing_schema_version"],"timing_boundary":detail["timing_boundary"],"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
         if let Err(error) = writeln!(self.raw, "{trial}").and_then(|_| self.raw.flush()) {
             self.abort(&format!("Cannot preserve benchmark trial: {error}"));
             return;
@@ -397,8 +419,7 @@ impl Run {
                 )
             })
             .collect();
-        let summary =
-            json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups});
+        let summary = json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups,"block_error":self.error});
         fs::write(
             self.output.join("summary.json"),
             serde_json::to_vec_pretty(&summary).unwrap(),
@@ -418,6 +439,24 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let mode = option(args, "--mode").ok_or("--mode local or e2e required")?;
     if mode != "local" && mode != "e2e" {
         return Err("Invalid desktop mode".into());
+    }
+    let benchmark_vk = option(args, "--benchmark-vk")
+        .map(|value| value.parse::<u32>().map_err(|_| "Invalid --benchmark-vk"))
+        .transpose()?
+        .unwrap_or(channel::BENCH_VK);
+    if !(1..=254).contains(&benchmark_vk) {
+        return Err("--benchmark-vk must be a Windows virtual-key code from 1 to 254".into());
+    }
+    let setup_ms = option(args, "--setup-timeout-ms")
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .map_err(|_| "Invalid --setup-timeout-ms")
+        })
+        .transpose()?
+        .unwrap_or(3000);
+    if !(3000..=120000).contains(&setup_ms) {
+        return Err("--setup-timeout-ms must be between 3000 and 120000".into());
     }
     let live = mode == "e2e";
     let output = PathBuf::from(option(args, "--output").ok_or("--output required")?);
@@ -523,7 +562,15 @@ pub fn run(args: &[String]) -> Result<(), String> {
             return Err("Offline placeholder rejected before network access".into());
         }
     }
-    let manifest = json!({"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","notes":"Registered Ctrl+Alt+B; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .args(args)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+    };
+    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
@@ -592,7 +639,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             hwnd.cast(),
             1,
             MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
-            channel::BENCH_VK,
+            benchmark_vk,
         ) == 0
         {
             return Err(clipboard::error());
@@ -624,6 +671,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         output,
         error: None,
         prepare_started: None,
+        setup_timeout: Duration::from_millis(setup_ms),
         deadline: Instant::now(),
     }));
     let weak = Rc::downgrade(&state);
