@@ -1,0 +1,72 @@
+[
+  {
+    "case": "short",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0353,
+    "rich_median_ms": 0.00039999999999999996
+  },
+  {
+    "case": "paragraph",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0731,
+    "rich_median_ms": 0.00039999999999999996
+  },
+  {
+    "case": "long",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.5024,
+    "rich_median_ms": 0.0007999999999999999
+  },
+  {
+    "case": "unchanged",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0407,
+    "rich_median_ms": 0.00065
+  },
+  {
+    "case": "brands",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0499,
+    "rich_median_ms": 0.00045
+  },
+  {
+    "case": "literals",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.04705,
+    "rich_median_ms": 0.0006000000000000001
+  },
+  {
+    "case": "unicode",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.03545,
+    "rich_median_ms": 0.00025
+  },
+  {
+    "case": "multiline",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.04295,
+    "rich_median_ms": 0.00039999999999999996
+  },
+  {
+    "case": "rich-link",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0643,
+    "rich_median_ms": 0.02
+  },
+  {
+    "case": "rich-list",
+    "n": 10,
+    "success": 10,
+    "total_median_ms": 0.0474,
+    "rich_median_ms": 0.013149999999999998
+  }
+]
