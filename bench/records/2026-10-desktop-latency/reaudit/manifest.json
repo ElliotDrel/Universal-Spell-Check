@@ -1,0 +1,47 @@
+{
+  "source_commit": "711ff377b4915f2df3db37831c50d7144a36974a",
+  "installed_version": "0.13.3",
+  "binary_sha256": "6a7ce88bad34bc19ef2e2cd02fa4d9ece6801ee739456d33bed0c97694f35d09",
+  "date": "2026-10-24",
+  "machine": "same desktop as October 23 settlement comparison",
+  "scope": "pure compute and fixed synthetic request probes; no clipboard/focus or new editor-completion tests",
+  "compute": {
+    "frozen_measured": 100,
+    "frozen_warmups": 10,
+    "stress_measured": 200,
+    "stress_warmups": 10,
+    "all_exact": true,
+    "stress_input_characters": {
+      "rich-100-unchanged": 127,
+      "rich-100-edit": 124,
+      "rich-500-unchanged": 527,
+      "rich-500-edit": 524,
+      "rich-1000-unchanged": 1027,
+      "rich-1000-edit": 1024,
+      "rich-5000-unchanged": 5027,
+      "rich-5000-edit": 5024,
+      "rich-20000-unchanged": 20027,
+      "rich-20000-edit": 20024
+    }
+  },
+  "api": {
+    "requests": 6,
+    "all_exact": true,
+    "model": "gpt-4.1",
+    "fixture": "This is a tset.",
+    "attempts_each": 1,
+    "block_order": [
+      "request-sequential",
+      "request-prewarmed"
+    ],
+    "causal_warmup_comparison": false
+  },
+  "failed_setup": [
+    "Initial stress fixture duplicated request inputs and was rejected before trials.",
+    "Second stress reference used different CF_HTML wrapper bytes: all 210 attempts were retained as mismatches; corrected references passed without changing product code."
+  ],
+  "raw_evidence_location": "primary benchmark_runs/performance-reaudit-2026-10-24; private and ignored",
+  "saved_settings_and_encrypted_credentials_unchanged": true,
+  "stress-cases.json_sha256": "684532f0ae633c72f7726f1761fce4339305837ea3ff1a6394a7e6c7f4131e34",
+  "stress-fixtures.json_sha256": "dbcc76e5eabdeef1c2e832ad5f3ec2736fb54b08aac5b8facabd2f5aaeffafa7"
+}

@@ -1,5 +1,7 @@
 # Temporary Handoff: Latency Measurement PRs
 
+> Superseded October 24: PR #8 merged and v0.13.3 was published and installed on this desktop. Earlier pending/unreleased/branch instructions below are historical. Continue from [the re-audit](research/2026-10-24-performance-reaudit.md). Current user instructions govern permissions.
+
 Prepared October 22, 2026. Retain this file until the receiving thread has incorporated its context; remove it in a later explicit cleanup commit once superseded.
 
 ## Desktop move — October 23, read this first

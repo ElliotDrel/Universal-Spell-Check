@@ -1,5 +1,7 @@
 # Desktop installation and latency checkpoint — October 23, 2026
 
+> Superseded October 24: PR #8 merged and v0.13.3 was published and installed on this desktop. Earlier pending/unreleased/branch instructions below are historical. Continue from [the re-audit](2026-10-24-performance-reaudit.md). Current user instructions govern permissions.
+
 ## Installation repaired
 
 The October 3 Hermes setup published a local Release build and ran its startup smoke against real user data. That smoke registered the checkout executable for login startup. It displayed the default local version 1.0.0 and skipped updates as not_installed. See [incident #9](https://github.com/ElliotDrel/Universal-Spell-Check/issues/9).
