@@ -21,6 +21,8 @@ mod request_probe;
 mod rich;
 mod rich_links;
 mod runtime;
+#[cfg(feature = "settlement-experiments")]
+mod settlement;
 mod store;
 mod style;
 mod terminal;
