@@ -253,3 +253,15 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 - Generate the QA package/mutex/display identity from `BuildChannel.cs`. Disable correction-hotkey registration and startup-registry writes for QA; retain the same updater worker, download/apply/restart logic and native dashboard.
 - Validate canonical executable, data/log, feed and updater paths before bootstrap or restart forwarding. Validate the installed package ID before creating the private FileSource manager. Keep synthetic data outside the test install directory, and preserve production settings, credentials and startup registration.
 - Run installed acceptance only after explicit idle authorization. The complete preparation and authorized run sequence are in `docs/bench.md`; `bench/prepare-rust-acceptance.py` only builds/packages, while mutation helpers require `--allow-desktop`.
+
+### Benchmark-only Rust modifier release waiters
+
+With the `hotkey-experiments` feature, `hotkey_experiments.rs` supplies independent
+1 ms timer polling, passive low-level hook, and passive raw-input alternatives to
+`clipboard::modifiers_released`. Only `--bench-desktop --hotkey-release <arm>` or
+the bounded `--bench-hotkey-release` component probe can select them; an ordinary
+app launch retains baseline behavior. The same authoritative all-modifier state
+check and 1,200 ms timeout gate capture and paste. Scoped observers are removed
+before network work, and a reusable timer plus message-pumped watchdog preserves
+progress when notifications fail. Invocation, trade-offs, counters, test boundaries
+and pending interactive verification are in `docs/bench.md`.

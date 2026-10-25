@@ -14,6 +14,8 @@ mod diff;
 mod docs_native;
 mod evidence;
 mod evidence_storage;
+#[cfg(feature = "hotkey-experiments")]
+mod hotkey_experiments;
 mod http;
 mod logging;
 mod platform;
@@ -31,6 +33,22 @@ fn main() {
     #[cfg(feature = "acceptance")]
     if let Err(error) = acceptance::validate() {
         eprintln!("Acceptance isolation rejected: {error}");
+        std::process::exit(1);
+    }
+    #[cfg(feature = "hotkey-experiments")]
+    if args.get(1).is_some_and(|a| a == "--bench-hotkey-release") {
+        if let Err(error) = hotkey_experiments::probe(&args) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    if args
+        .iter()
+        .any(|a| a == "--bench-hotkey-release" || a == "--hotkey-release")
+        && !args.get(1).is_some_and(|a| a == "--bench-desktop")
+    {
+        eprintln!("Hotkey experiments require their build feature and a benchmark entrypoint");
         std::process::exit(1);
     }
     let application_mode = !args.get(1).is_some_and(|arg| {

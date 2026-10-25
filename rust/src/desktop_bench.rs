@@ -419,7 +419,12 @@ impl Run {
                 )
             })
             .collect();
-        let summary = json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups,"block_error":self.error});
+        #[allow(unused_mut)]
+        let mut summary = json!({"aggregate":summarize(&measured),"warmup":summarize(&warm),"cases":groups,"block_error":self.error});
+        #[cfg(feature = "hotkey-experiments")]
+        {
+            summary["hotkey_release_diagnostics"] = crate::hotkey_experiments::diagnostics();
+        }
         fs::write(
             self.output.join("summary.json"),
             serde_json::to_vec_pretty(&summary).unwrap(),
@@ -428,6 +433,15 @@ impl Run {
     }
 }
 pub fn run(args: &[String]) -> Result<(), String> {
+    #[cfg(feature = "hotkey-experiments")]
+    let hotkey_release = crate::hotkey_experiments::configure(args)?;
+    #[cfg(not(feature = "hotkey-experiments"))]
+    let hotkey_release = {
+        if args.iter().any(|a| a == "--hotkey-release") {
+            return Err("--hotkey-release requires the hotkey-experiments build feature".into());
+        }
+        "baseline"
+    };
     if cfg!(debug_assertions) {
         return Err("Desktop benchmarks require a Release build.".into());
     }
@@ -570,7 +584,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
-    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_release_variant":hotkey_release,"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
