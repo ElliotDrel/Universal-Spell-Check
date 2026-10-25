@@ -46,6 +46,21 @@ jobs:
         run: cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
       - name: Dev regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml
+      - name: Staged capture experimental coordinator regressions
+        run: cargo test --locked --manifest-path rust/Cargo.toml --features experimental-staged-capture
+      - name: Staged capture experimental lint
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets --features experimental-staged-capture -- -D warnings
+      - name: Staged capture executable and bounded helper IPC
+        run: |
+          cargo build --locked --manifest-path rust/Cargo.toml --features experimental-staged-capture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python bench/check_staged_capture.py --exe rust/target/debug/universal-spell-check.exe --output benchmark_runs/ci-staged-capture
+      - name: Retain staged capture component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staged-capture-component-evidence
+          path: benchmark_runs/ci-staged-capture/
       - name: Prod regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
       - name: Optimized native build

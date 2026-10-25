@@ -428,6 +428,15 @@ impl Run {
     }
 }
 pub fn run(args: &[String]) -> Result<(), String> {
+    if let Some(name) = option(args, "--staged-capture") {
+        #[cfg(feature = "experimental-staged-capture")]
+        crate::staged_capture::configure(&name)?;
+        #[cfg(not(feature = "experimental-staged-capture"))]
+        {
+            let _ = name;
+            return Err("Staged capture requires experimental-staged-capture build feature".into());
+        }
+    }
     if cfg!(debug_assertions) {
         return Err("Desktop benchmarks require a Release build.".into());
     }
@@ -571,6 +580,12 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
     let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    #[cfg(feature = "experimental-staged-capture")]
+    let manifest = {
+        let mut m = manifest;
+        m["staged_capture"] = json!(crate::staged_capture::active().map(|v| v.name()));
+        m
+    };
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),

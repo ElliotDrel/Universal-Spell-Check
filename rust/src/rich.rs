@@ -163,11 +163,48 @@ fn replace_paragraphs(fragment: &str, p: &[Paragraph], bodies: &[String]) -> Str
     rebuilt.push_str(&fragment[cursor..]);
     rebuilt
 }
+#[cfg(feature = "experimental-staged-capture")]
+pub struct PreparedSource {
+    html: String,
+    source: String,
+    paragraphs: Vec<Paragraph>,
+    rest_empty: bool,
+}
+#[cfg(feature = "experimental-staged-capture")]
+impl PreparedSource {
+    pub fn new(html: &str, source: &str) -> Self {
+        let fragment = fragment(html).unwrap_or("");
+        Self {
+            html: html.into(),
+            source: source.into(),
+            paragraphs: paragraphs(fragment, false),
+            rest_empty: re!(r"(?i)<p\b[^>]*>(?:[^<]*|<span\b[^>]*>[^<]*</span>)</p>")
+                .replace_all(fragment, "")
+                .trim()
+                .is_empty(),
+        }
+    }
+    pub fn rewrite(&self, corrected: &str, native: &[u8]) -> Rich {
+        rewrite_impl(&self.html, &self.source, corrected, native, Some(self))
+    }
+}
+// Ordinary builds never construct a prepared inventory.
+#[cfg(not(feature = "experimental-staged-capture"))]
+type PreparedSource = ();
 pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
+    rewrite_impl(html, source, corrected, native, None)
+}
+fn rewrite_impl(
+    html: &str,
+    source: &str,
+    corrected: &str,
+    native: &[u8],
+    prepared: Option<&PreparedSource>,
+) -> Rich {
     let Some(fragment) = fragment(html).filter(|f| {
         f.contains("data-pm-slice") && re!(r"(?i)\brich-link-source-app-id\b").is_match(f)
     }) else {
-        return rewrite_base(html, source, corrected, native);
+        return rewrite_base(html, source, corrected, native, prepared);
     };
     match crate::rich_links::project(fragment, source, corrected) {
         Ok(Some(projected)) => {
@@ -176,6 +213,7 @@ pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich
                 &projected.source,
                 &projected.corrected,
                 native,
+                None,
             );
             if result.applied {
                 result.link_status = "verified".into();
@@ -187,7 +225,7 @@ pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich
             result
         }
         outcome => {
-            let mut result = rewrite_base(html, source, corrected, native);
+            let mut result = rewrite_base(html, source, corrected, native, prepared);
             result.link_status = match outcome {
                 Err(reason) => reason,
                 _ => "not_applicable",
@@ -198,7 +236,13 @@ pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich
     }
 }
 
-fn rewrite_base(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
+fn rewrite_base(
+    html: &str,
+    source: &str,
+    corrected: &str,
+    native: &[u8],
+    _prepared: Option<&PreparedSource>,
+) -> Rich {
     if html.is_empty() {
         return Rich::plain("no_html", corrected);
     }
@@ -228,13 +272,26 @@ fn rewrite_base(html: &str, source: &str, corrected: &str, native: &[u8]) -> Ric
     } else {
         corrected.into()
     };
+    #[cfg(feature = "experimental-staged-capture")]
+    let p: std::borrow::Cow<'_, [Paragraph]> = _prepared
+        .map(|p| std::borrow::Cow::Borrowed(p.paragraphs.as_slice()))
+        .unwrap_or_else(|| std::borrow::Cow::Owned(paragraphs(fragment, false)));
+    #[cfg(not(feature = "experimental-staged-capture"))]
     let p = paragraphs(fragment, false);
     if let Some(result) = structured_list(fragment, source, &corrected, &p) {
         return result;
     }
-    let rest =
-        re!(r"(?i)<p\b[^>]*>(?:[^<]*|<span\b[^>]*>[^<]*</span>)</p>").replace_all(fragment, "");
-    if p.is_empty() || !rest.trim().is_empty() {
+    let rest_empty = || {
+        re!(r"(?i)<p\b[^>]*>(?:[^<]*|<span\b[^>]*>[^<]*</span>)</p>")
+            .replace_all(fragment, "")
+            .trim()
+            .is_empty()
+    };
+    #[cfg(feature = "experimental-staged-capture")]
+    let rest_empty = _prepared.map_or_else(rest_empty, |p| p.rest_empty);
+    #[cfg(not(feature = "experimental-staged-capture"))]
+    let rest_empty = rest_empty();
+    if p.is_empty() || !rest_empty {
         return align(fragment, source, &corrected, false);
     }
     let bodies: Vec<_> = p

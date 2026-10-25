@@ -21,6 +21,8 @@ mod request_probe;
 mod rich;
 mod rich_links;
 mod runtime;
+#[cfg(feature = "experimental-staged-capture")]
+mod staged_capture;
 mod store;
 mod style;
 mod terminal;
@@ -31,6 +33,32 @@ fn main() {
     #[cfg(feature = "acceptance")]
     if let Err(error) = acceptance::validate() {
         eprintln!("Acceptance isolation rejected: {error}");
+        std::process::exit(1);
+    }
+    #[cfg(feature = "experimental-staged-capture")]
+    if args
+        .get(1)
+        .is_some_and(|a| a == "--staged-capture-helper" || a == "--bench-staged-capture")
+    {
+        let result = if args[1] == "--staged-capture-helper" {
+            staged_capture::helper_main()
+        } else {
+            staged_capture::replay_cli(&args)
+        };
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    #[cfg(not(feature = "experimental-staged-capture"))]
+    if args.iter().any(|a| {
+        matches!(
+            a.as_str(),
+            "--bench-staged-capture" | "--staged-capture-helper"
+        )
+    }) {
+        eprintln!("Staged capture requires experimental-staged-capture build feature");
         std::process::exit(1);
     }
     let application_mode = !args.get(1).is_some_and(|arg| {
