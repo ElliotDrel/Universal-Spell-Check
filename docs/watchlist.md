@@ -234,3 +234,23 @@ Rust Restart previously invoked only `Update.exe start` even when a verified pac
 Require valid Unicode and one consistent clipboard sequence. Read HTML, RTF and native Docs MIME independently; an optional format exceeding its cap or failing to render must not abort otherwise usable text. Preserve `ok`, `absent`, `too_large` and `read_failed` statuses in diagnostics. A regression covers optional failure-to-fallback policy without touching the clipboard; original-editor tests still establish the visual result.
 
 The native HTTP timeout mock permits connection reset/abort only in its intentional cancellation scenario. A deadline can close the client before the server finishes reading headers; that expected cancellation must not panic the server thread or mask the actual deadline/lifetime assertions. The normal mock HTTP success path remains strict.
+
+
+## Experimental clipboard history exclusion
+
+`history-experiments` is an explicit desktop-benchmark feature (see `docs/bench.md`).
+All arms retain best-effort exclusion before the request; the source application's Ctrl+C
+may already have reached a monitor before this app can republish it. Do not promise to
+remove or retroactively exclude that source item. The final corrected publication stays
+untagged and retains the existing at-least-50ms publication settlement before paste.
+
+The fused arm owns every required capture flavor before emptying, opens with its actual
+worker HWND, and allocates every publication handle before `EmptyClipboard`. Generic
+diagnostic reads remain read-only. Never append metadata to a source-owned clipboard,
+publish only policy markers, defer exclusion until the network response, or reuse an
+HGLOBAL after transfer. Successful `SetClipboardData` transfers ownership; partial failures
+free only untransferred handles and preserve the existing backup/recovery behavior.
+Prepared policy handles are consumed once and replenished before worker readiness.
+
+References fetched October 25, 2026: [Windows history policy formats](https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats),
+[clipboard publication ownership](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setclipboarddata).

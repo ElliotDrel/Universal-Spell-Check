@@ -1,3 +1,5 @@
+#[cfg(feature = "history-experiments")]
+pub mod history_experiment;
 use crate::{
     docs_native,
     store::wide,
@@ -161,6 +163,9 @@ fn read_measured(
     timings: &mut ReadTimings,
 ) -> Result<Clipboard, String> {
     let _open = measure(&mut timings.open_ms, || open(hwnd, budget))?;
+    read_open(timings)
+}
+fn read_open(timings: &mut ReadTimings) -> Result<Clipboard, String> {
     let sequence = unsafe { GetClipboardSequenceNumber() };
     let text = measure(&mut timings.unicode_ms, || -> Result<String, String> {
         let raw = bytes(13, 16 * 1024 * 1024)?;
@@ -374,6 +379,15 @@ pub fn chord(vk: u16) -> Result<(), String> {
     }
 }
 pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, String> {
+    capture_using(hwnd, timings, |hwnd, timings| {
+        read_measured(hwnd, Duration::from_millis(320), timings)
+    })
+}
+fn capture_using(
+    hwnd: HWND,
+    timings: &mut CaptureTimings,
+    mut read: impl FnMut(HWND, &mut ReadTimings) -> Result<Clipboard, String>,
+) -> Result<Clipboard, String> {
     measure(&mut timings.modifiers_ms, || {
         modifiers_released(Duration::from_millis(1200))
     })?;
@@ -386,9 +400,7 @@ pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, St
             if unsafe { GetClipboardSequenceNumber() } != before
                 && let Ok(data) = {
                     timings.read_attempts += 1;
-                    measure(&mut timings.read_ms, || {
-                        read_measured(hwnd, Duration::from_millis(320), &mut timings.reads)
-                    })
+                    measure(&mut timings.read_ms, || read(hwnd, &mut timings.reads))
                 }
                 && !data.text.trim().is_empty()
             {

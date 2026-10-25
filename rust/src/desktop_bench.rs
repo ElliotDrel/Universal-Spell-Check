@@ -228,7 +228,7 @@ impl Run {
     }
     fn abort(&mut self, error: &str) {
         if self.start.take().is_some() && self.case < self.cases.len() {
-            let trial = json!({"case_id":self.cases[self.case].id,"index":self.index,"warmup":self.index<0,"success":false,"quality_match":false,"timings":{},"output":"","error":error});
+            let trial = json!({"history_variant":history_variant_name(),"case_id":self.cases[self.case].id,"index":self.index,"warmup":self.index<0,"success":false,"quality_match":false,"timings":{},"output":"","error":error});
             let _ = writeln!(self.raw, "{trial}");
             let _ = self.raw.flush();
             self.trials.push(trial);
@@ -367,7 +367,7 @@ impl Run {
                 return;
             }
         }
-        let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"coordinator_timings":detail["timings"],"timing_schema_version":detail["timing_schema_version"],"timing_boundary":detail["timing_boundary"],"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
+        let trial = json!({"history_variant":history_variant_name(),"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"coordinator_timings":detail["timings"],"timing_schema_version":detail["timing_schema_version"],"timing_boundary":detail["timing_boundary"],"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
         if let Err(error) = writeln!(self.raw, "{trial}").and_then(|_| self.raw.flush()) {
             self.abort(&format!("Cannot preserve benchmark trial: {error}"));
             return;
@@ -427,7 +427,25 @@ impl Run {
         .map_err(|e| e.to_string())
     }
 }
+fn history_variant_name() -> &'static str {
+    #[cfg(feature = "history-experiments")]
+    {
+        clipboard::history_experiment::selected().name()
+    }
+    #[cfg(not(feature = "history-experiments"))]
+    {
+        "baseline"
+    }
+}
 pub fn run(args: &[String]) -> Result<(), String> {
+    #[cfg(feature = "history-experiments")]
+    clipboard::history_experiment::select(
+        &option(args, "--history-variant").unwrap_or_else(|| "baseline".into()),
+    )?;
+    #[cfg(not(feature = "history-experiments"))]
+    if args.iter().any(|arg| arg == "--history-variant") {
+        return Err("--history-variant requires a history-experiments build".into());
+    }
     if cfg!(debug_assertions) {
         return Err("Desktop benchmarks require a Release build.".into());
     }
@@ -570,7 +588,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
-    let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    let manifest = json!({"history_variant":history_variant_name(),"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
