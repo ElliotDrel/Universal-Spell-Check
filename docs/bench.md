@@ -491,3 +491,64 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+
+## Experimental delivery alternatives (October 25, 2026)
+
+These are prototypes for later matched measurements. Ordinary builds do not contain
+an environment selector and retain the baseline behavior. An experimental build
+also defaults to baseline; selecting one arm never enables another.
+
+```powershell
+cargo build --locked --manifest-path rust/Cargo.toml --release --features delivery-experiments
+$env:USC_DELIVERY_VARIANT = 'lean' # baseline | lean | cached-ready | owned-worker
+# Launch this worktree's built Dev app only in an explicitly reserved desktop window.
+# No settings changes are required. Clear the session-only selector afterwards:
+Remove-Item Env:USC_DELIVERY_VARIANT
+```
+
+| Arm | Executed change | Trade-off |
+|---|---|---|
+| `baseline` | Existing diagnostic capture, finalization and post-run reload | Control, including its existing Finished-before-reload order. |
+| `lean` | When developer logging and trial observation are both off, skips capture RTF/format-name enumeration, diagnostic HTML/request/response copies and rich payload serialization. Builds bounded diagnostic paste text directly from the functional result and moves the owned detail into the logger. With full consumers, constructs bounded inline fields from references. | Diagnostic omissions are explicit; full input/output remain for dashboard/corpus use. Functional Unicode, HTML, native bytes, literal protection and recovery backup remain unchanged. Backup must still preserve RTF and other recovery formats. |
+| `cached-ready` | Reads replacements every refresh, reuses the parsed rules only for exactly equal successful bytes, then clears busy/emits Finished after the mandatory refresh | Still pays file-read and byte-comparison costs. A missing, unreadable or invalid file clears active rules and cache, reports unavailability and is retried at the next refresh. Same-size changed bytes reparse. |
+| `owned-worker` | Moves full detail into one diagnostic finalizer thread, retaining the baseline clone/clip algorithm to isolate offloading | At most one executing plus one queued job. Jobs with an estimated JSON allocation over 64 MiB, queue overflow, startup failure or disconnect fall back synchronously and log a reason. Exceptions log the run ID and status; later jobs continue. Graceful stop drains accepted jobs and joins before the app's logger flush, so shutdown can wait for correction/finalization. |
+
+All experimental arms refresh mandatory replacement state before releasing busy.
+The finalizer receives only owned values and prepared evidence completion; it never
+reads/writes the clipboard, injects input, resolves foreground context or performs
+COM/UIA calls. Existing evidence capture contexts are started and their targets
+frozen on the correction thread before submission; evidence storage retains its
+existing separate background lifetime and limits. Draining the finalizer does not
+wait for all existing evidence screenshots/storage tasks. The admission estimate
+bounds this finalizer queue, not the existing downstream logger queue or total
+process memory.
+
+`timings.total_ms` retains `accepted_trigger_to_input_return` on success and the
+existing failure-before-recovery boundary. `diagnostic_finalize_completed` reports
+finalization elapsed time (including queue wait for the worker); `delivery_worker_ready`
+reports accepted-trigger-to-ready elapsed time after refresh; both events carry
+the run ID for correlation. These are different
+boundaries. `run_completed` keeps its existing later elapsed field. No tail movement
+proves faster paste or editor rendering. No UIA completion observer is used.
+
+Developer logging **or trial observation** keeps complete diagnostic source detail,
+including HTML/native sidecars when developer logging is on. Thus `--bench-desktop`
+uses full trial diagnostics even with `lean`; its compact finalization can be
+compared, but it does not measure lean capture savings. Experimental desktop
+manifests and successful/failed coordinator trial rows include `delivery_variant`.
+Do not compare this full-trial path to unobserved lean Production as matched evidence.
+Original-editor acceptance, physical hotkeys, full runtime field assembly and
+matched end-to-end speed measurements remain pending; headless fixtures establish
+component contracts only.
+
+```powershell
+cargo test --locked --manifest-path rust/Cargo.toml --features delivery-experiments
+cargo test --locked --manifest-path rust/Cargo.toml --no-default-features --features delivery-experiments
+```
+
+Native headless fixtures cover baseline/compact exact fields, UTF-16 clipping,
+owned-string lifetime, developer/trial/evidence-admission combinations, exact-byte
+cache reuse and same-size changes, invalid UTF-8/JSON/schema, missing files, queue
+overflow/oversize/disconnect, panic survival, and drain-on-drop. They use synthetic
+values and do not touch the clipboard, installed application, settings or credentials.

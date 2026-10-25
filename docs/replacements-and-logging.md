@@ -201,7 +201,7 @@ names remain compatible; the C# reference retains its historical schema.
 
 ### `clipboard_html`, `clipboard_rtf`, `clipboard_formats`
 
-Every capture reads all the flavors the source offered. `input_text` is `CF_UNICODETEXT`;
+Ordinary builds read all the supported flavors the source offered; the experimental lean capture exception is documented below. `input_text` is `CF_UNICODETEXT`;
 `clipboard_html` is `CF_HTML` verbatim including its header; `clipboard_rtf` is the RTF flavor. Both
 rich fields are `""` when absent, carry `_chars` (true pre-truncation size) and `_truncated` siblings,
 and are capped at 512K chars so one pathological selection cannot produce a multi-megabyte log line.
@@ -417,3 +417,20 @@ The final rebuilt Dev native smoke passed again (PID 13196, run
 `7deef858b13a4cd3b05d77ba20abce96`, capture scheduling 3ms). The actual Dev dashboard then
 disabled the setting and a second normal Notepad correction succeeded without developer evidence
 (run `7ad4a5999ea54a93ab2bfee465f87bf6`). Dev settings were left disabled.
+
+
+### Experimental delivery diagnostics
+
+The opt-in `delivery-experiments` build feature and `USC_DELIVERY_VARIANT` selector
+are documented in `docs/bench.md`. They do not change ordinary builds or settings.
+The `lean` arm with developer logging and trial observation off records
+`diagnostics_mode=lean` and `diagnostics_omitted`, while preserving input/output,
+status, counters, mapping reasons, recovery and minimal request errors. Diagnostic
+paste text is bounded to 512 Ki UTF-16 units with original `_chars` and `_truncated`
+metadata; functional paste data is never clipped. Developer logging or trial
+observation preserves full detail. `owned-worker` may deliver `spellcheck_detail`
+after `Finished`; consumers must correlate by `run_id`, not delivery order.
+`diagnostic_finalize_completed` and `delivery_worker_ready` are separate from the
+unchanged input-return total. A queue failure logs `diagnostic_finalizer_fallback`
+and processes the owned record synchronously. See the benchmark runbook for
+queue limits, shutdown semantics and pending original-editor verification.

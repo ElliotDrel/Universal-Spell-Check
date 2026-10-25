@@ -368,6 +368,15 @@ impl Run {
             }
         }
         let trial = json!({"case_id":case.id,"index":self.index,"warmup":self.index<0,"success":success,"quality_match":output.replace("\r\n","\n")==case.expected.replace("\r\n","\n"),"timings":timings,"coordinator_timings":detail["timings"],"timing_schema_version":detail["timing_schema_version"],"timing_boundary":detail["timing_boundary"],"output":output,"error":error,"run_id":detail["run_id"],"observed_clipboard":observed_clipboard});
+        #[cfg(feature = "delivery-experiments")]
+        let trial = {
+            let mut trial = trial;
+            trial["delivery_variant"] = detail["delivery_variant"]
+                .as_str()
+                .unwrap_or("baseline")
+                .into();
+            trial
+        };
         if let Err(error) = writeln!(self.raw, "{trial}").and_then(|_| self.raw.flush()) {
             self.abort(&format!("Cannot preserve benchmark trial: {error}"));
             return;
@@ -571,6 +580,12 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
     };
     let manifest = json!({"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"created_utc":time::OffsetDateTime::now_utc().to_string(),"timing_schema_version":1,"schema_version":2,"implementation":"rust","options":{"mode":mode,"runs":runs,"warmup":warmup,"developer_logging":developer},"model":settings.model,"prompt":PROMPT,"developer_logging":developer,"saved_developer_logging":saved_developer,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":fixture_bytes.as_ref().map(|b|hash(b)),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"hotkey_trigger":"posted_registered_message","benchmark_vk":benchmark_vk,"setup_timeout_ms":setup_ms,"notes":"Registered Ctrl+Alt+benchmark_vk; real Rust coordinator/capture/rich mapper/native clipboard/SendInput; native edit procedure completion verifies exact text and requested CF_HTML. No physical-key delay, browser rendering, tray or dashboard."});
+    #[cfg(feature = "delivery-experiments")]
+    let manifest = {
+        let mut manifest = manifest;
+        manifest["delivery_variant"] = crate::delivery::Variant::from_environment()?.name().into();
+        manifest
+    };
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
