@@ -117,6 +117,8 @@ impl Worker {
                 if let Some(client) = client.clone() {
                     std::thread::spawn(move || client.warm());
                 }
+                #[cfg(feature = "history-experiments")]
+                clipboard::history_experiment::replenish();
                 let _ = ready_tx.send(Ok(()));
                 loop {
                     let mut stop = false;
@@ -179,6 +181,8 @@ impl Worker {
                                         "The correction stopped safely.".into(),
                                     ));
                                 }
+                                #[cfg(feature = "history-experiments")]
+                                clipboard::history_experiment::replenish();
                                 worker_busy.store(false, Ordering::Release);
                                 bus.send(UiEvent::Phase(""));
                                 bus.send(UiEvent::Finished);
@@ -326,7 +330,12 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         })?;
         backup=Some(measure(&mut timings.backup_ms, || clipboard::Backup::capture(owner as _))?);
         bus.send(UiEvent::Phase("Copying text..."));
+        #[cfg(not(feature = "history-experiments"))]
         let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
+        #[cfg(feature = "history-experiments")]
+        let (captured, fused_history) = measure(&mut timings.clipboard_ms, || clipboard::history_experiment::capture(listener as _, &mut timings.capture))?;
+        #[cfg(feature = "history-experiments")]
+        { detail["history_variant"] = json!(clipboard::history_experiment::selected().name()); }
         measure(&mut timings.diagnostics_ms, || {
         detail["input_text"] = json!(captured.text);
         detail["input_chars"] = json!(captured.text.encode_utf16().count());
@@ -344,7 +353,10 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
             }
         );
         });
+        #[cfg(not(feature = "history-experiments"))]
         let history = measure(&mut timings.history_exclude_ms, || clipboard::write(owner as _, &captured.text, "", None, true)).is_ok();
+        #[cfg(feature = "history-experiments")]
+        let history = fused_history.unwrap_or_else(|| measure(&mut timings.history_exclude_ms, || clipboard::history_experiment::exclude(owner as _, &captured.text)));
         detail["captured_text_history_excluded"] = json!(history);
         let (protection, request_payload) = measure(&mut timings.prepare_ms, || -> Result<_, String> {
         let input = crate::terminal::normalize(&captured.text, &target.2);

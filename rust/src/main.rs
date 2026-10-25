@@ -28,6 +28,13 @@ mod timing;
 mod update;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--history-variant")
+        && (!cfg!(feature = "history-experiments")
+            || args.get(1).is_none_or(|arg| arg != "--bench-desktop"))
+    {
+        eprintln!("--history-variant is available only in a history-experiments desktop benchmark");
+        std::process::exit(2);
+    }
     #[cfg(feature = "acceptance")]
     if let Err(error) = acceptance::validate() {
         eprintln!("Acceptance isolation rejected: {error}");
