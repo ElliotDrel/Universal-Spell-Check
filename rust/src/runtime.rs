@@ -326,6 +326,28 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         })?;
         backup=Some(measure(&mut timings.backup_ms, || clipboard::Backup::capture(owner as _))?);
         bus.send(UiEvent::Phase("Copying text..."));
+        #[cfg(feature = "experimental-staged-capture")]
+        let mut staged_history = false;
+        #[cfg(feature = "experimental-staged-capture")]
+        let mut staged = if let Some(variant) = crate::staged_capture::active() {
+            detail["staged_capture"] = json!({"variant":variant.name(),"status":"started"});
+            let completed = crate::staged_capture::native(
+                crate::staged_capture::NativeInput { variant, run_id:&id, model:&settings.model, target:&target.2, listener, owner, diagnostics:settings.developer_logging },
+                &mut timings, &mut staged_history,
+                |request_payload| match replay {
+                    Some(replay) => replay.request(request_payload),
+                    None => client.ok_or("HTTP client unavailable")?.request(request_payload, &key, || bus.send(UiEvent::Phase("Waiting for AI..."))),
+                },
+            )?;
+            detail["staged_capture"] = json!({"variant":variant.name(),"trace":completed.trace,"phase_note":"request overlaps capture or source preparation; phase durations are not additive"});
+            timings.request_ms = Some(completed.request_ms);
+            Some(completed)
+        } else { None };
+        #[cfg(feature = "experimental-staged-capture")]
+        let captured = if let Some(completed) = staged.as_mut() {
+            std::mem::take(&mut completed.captured)
+        } else { measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))? };
+        #[cfg(not(feature = "experimental-staged-capture"))]
         let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
         measure(&mut timings.diagnostics_ms, || {
         detail["input_text"] = json!(captured.text);
@@ -344,19 +366,30 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
             }
         );
         });
+        #[cfg(feature = "experimental-staged-capture")]
+        let history = if staged.is_some() { staged_history } else { measure(&mut timings.history_exclude_ms, || clipboard::write(owner as _, &captured.text, "", None, true)).is_ok() };
+        #[cfg(not(feature = "experimental-staged-capture"))]
         let history = measure(&mut timings.history_exclude_ms, || clipboard::write(owner as _, &captured.text, "", None, true)).is_ok();
         detail["captured_text_history_excluded"] = json!(history);
-        let (protection, request_payload) = measure(&mut timings.prepare_ms, || -> Result<_, String> {
+        #[cfg(feature = "experimental-staged-capture")]
+        let staged_preparation = staged.as_ref().map(|s| (s.protection.clone(), s.request_payload.clone()));
+        #[cfg(not(feature = "experimental-staged-capture"))]
+        let staged_preparation: Option<(Protection, Value)> = None;
+        let (protection, request_payload) = if let Some(prepared) = staged_preparation { prepared } else { measure(&mut timings.prepare_ms, || -> Result<_, String> {
         let input = crate::terminal::normalize(&captured.text, &target.2);
         let protection = Protection::new(&input)?;
         let request_payload = payload(&protection.text, &settings.model);
         Ok((protection, request_payload))
-        })?;
+        })? };
         measure(&mut timings.diagnostics_ms, || {
         detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default());
         });
         bus.send(UiEvent::Phase("Sending to AI..."));
-        let response=measure(&mut timings.request_ms, || match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))})?;
+        #[cfg(feature = "experimental-staged-capture")]
+        let (staged_response, prepared_source) = match staged.take() { Some(completed) => (Some(completed.response), completed.prepared), None => (None, None) };
+        #[cfg(not(feature = "experimental-staged-capture"))]
+        let staged_response: Option<crate::http::Response> = None;
+        let response = if let Some(response) = staged_response { response } else { measure(&mut timings.request_ms, || match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))})? };
         // Retain existing transport labels; these are not isolated upload/server phases.
         if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
         measure(&mut timings.diagnostics_ms, || {
@@ -390,6 +423,9 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                 .push(json!("echoed_original_removed"));
         }
         });
+        #[cfg(feature = "experimental-staged-capture")]
+        let mapped = measure(&mut timings.rich_mapping_ms, || match prepared_source { Some(prepared) => prepared.rewrite(&output, &captured.native), None => rich::rewrite(&captured.html, &captured.text, &output, &captured.native) });
+        #[cfg(not(feature = "experimental-staged-capture"))]
         let mapped = measure(&mut timings.rich_mapping_ms, || rich::rewrite(&captured.html, &captured.text, &output, &captured.native));
         measure(&mut timings.diagnostics_ms, || {
         detail["rich_text"] = serde_json::to_value(&mapped).unwrap_or_default();
@@ -443,6 +479,11 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     let mut measured = serde_json::to_value(&timings).unwrap_or_default();
     measured["total_ms"] = json!(total_ms);
     measured["unattributed_ms"] = json!(total_ms - timings.accounted_ms());
+    #[cfg(feature = "experimental-staged-capture")]
+    if crate::staged_capture::active().is_some() {
+        measured["unattributed_ms"] = Value::Null;
+        measured["phase_durations_overlap"] = json!(true);
+    }
     measured["recovery_ms"] = json!(recovery_ms);
     measured["api_ms"] = if replay.is_none() {
         json!(timings.request_ms)
