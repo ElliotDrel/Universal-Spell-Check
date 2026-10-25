@@ -36,6 +36,8 @@ pub struct CaptureTimings {
 }
 #[derive(Default, Serialize)]
 pub struct PasteTimings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diagnostics_ms: Option<f64>,
     pub write_ms: Option<f64>,
     pub readback_ms: Option<f64>,
     pub settle_ms: Option<f64>,
@@ -115,6 +117,7 @@ mod tests {
         timings.capture.read_ms = Some(20.);
         timings.capture.reads.html_ms = Some(10.);
         timings.paste.settle_ms = Some(50.);
+        timings.paste.diagnostics_ms = Some(5.);
         assert_eq!(timings.accounted_ms(), 92.);
     }
 }

@@ -69,7 +69,16 @@ pub struct Worker {
 }
 impl Worker {
     pub fn new(store: Store, logger: Logger, bus: Bus, owner: usize) -> Result<Self, String> {
-        Self::configured(store, logger, bus, owner, None, None)
+        Self::configured(
+            store,
+            logger,
+            bus,
+            owner,
+            None,
+            None,
+            #[cfg(feature = "settlement-experiments")]
+            crate::settlement::Variant::Baseline,
+        )
     }
     pub fn configured(
         store: Store,
@@ -78,6 +87,7 @@ impl Worker {
         owner: usize,
         replay: Option<Arc<Replay>>,
         override_settings: Option<crate::core::Settings>,
+        #[cfg(feature = "settlement-experiments")] settlement_variant: crate::settlement::Variant,
     ) -> Result<Self, String> {
         let handle = unsafe { CreateEventW(null(), 0, 0, null()) };
         if handle.is_null() {
@@ -117,6 +127,8 @@ impl Worker {
                 if let Some(client) = client.clone() {
                     std::thread::spawn(move || client.warm());
                 }
+                #[cfg(feature = "settlement-experiments")]
+                let mut settlement = crate::settlement::Settlement::new(settlement_variant);
                 let _ = ready_tx.send(Ok(()));
                 loop {
                     let mut stop = false;
@@ -169,6 +181,8 @@ impl Worker {
                                                 logger: &logger,
                                                 bus: &bus,
                                                 store: &store,
+                                                #[cfg(feature = "settlement-experiments")]
+                                                settlement: &mut settlement,
                                             },
                                         )
                                     }));
@@ -282,6 +296,8 @@ struct RunContext<'a> {
     logger: &'a Logger,
     bus: &'a Bus,
     store: &'a Store,
+    #[cfg(feature = "settlement-experiments")]
+    settlement: &'a mut crate::settlement::Settlement,
 }
 fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     let RunContext {
@@ -295,6 +311,8 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         logger,
         bus,
         store,
+        #[cfg(feature = "settlement-experiments")]
+        settlement,
     } = context;
     let mut timings = LocalTimings {
         dispatch_ms: Some(ms(started)),
@@ -314,6 +332,10 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     let mut recovery_ms = None;
     let mut backup = None;
     let mut detail = json!({"run_id":id,"status":"run_failed","model":settings.model,"developer_logging_enabled":settings.developer_logging,"input_text":"","output_text":"","paste_text":"","paste_html":"","events":["run_started"]});
+    #[cfg(feature = "settlement-experiments")]
+    {
+        detail["settlement_experiment"] = json!({"variant":settlement.variant().name()});
+    }
     let mut corrected_on_clipboard = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let key = measure(&mut timings.setup_ms, || -> Result<_, String> {
@@ -391,34 +413,54 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         }
         });
         let mapped = measure(&mut timings.rich_mapping_ms, || rich::rewrite(&captured.html, &captured.text, &output, &captured.native));
-        measure(&mut timings.diagnostics_ms, || {
-        detail["rich_text"] = serde_json::to_value(&mapped).unwrap_or_default();
-        detail["paste_text"] = json!(mapped.text);
-        if settings.developer_logging{use base64::Engine;detail["paste_chromium_mime_base64"]=json!(mapped.native.as_ref().map(|b|base64::engine::general_purpose::STANDARD.encode(b)).unwrap_or_default());}
-        detail["paste_html"] = json!(mapped.html);
-        detail["paste_text_chars"] = json!(mapped.text.encode_utf16().count());
-        detail["paste_html_chars"] = json!(mapped.html.encode_utf16().count());
-        });
+        #[cfg(feature = "settlement-experiments")]
+        let defer_diagnostics = settlement.variant().defers_diagnostics();
+        #[cfg(not(feature = "settlement-experiments"))]
+        let defer_diagnostics = false;
+        if !defer_diagnostics {
+            measure(&mut timings.diagnostics_ms, || record_paste_diagnostics(&mut detail, &mapped, settings.developer_logging));
+        }
         bus.send(UiEvent::Phase("Pasting..."));
         let sequence = measure(&mut timings.paste_ms, || -> Result<_, String> {
-        let sequence = measure(&mut timings.paste.write_ms, || clipboard::write(
+        let write_result = measure(&mut timings.paste.write_ms, || clipboard::write(
             owner as _,
             &mapped.text,
             &mapped.html,
             mapped.native.as_deref(),
             false,
-        ))?;
+        ));
+        if write_result.is_err() && defer_diagnostics {
+            measure(&mut timings.paste.diagnostics_ms, || record_paste_diagnostics(&mut detail, &mapped, settings.developer_logging));
+        }
+        let sequence = write_result?;
+        // write has returned: its Open guard has already called CloseClipboard.
+        #[cfg(feature = "settlement-experiments")]
+        let published = Instant::now();
         corrected_on_clipboard = true;
         if let Some(backup)=backup.as_mut(){backup.disarm();}
+        if defer_diagnostics {
+            // Nested under paste_ms, so do not add it to top-level diagnostics_ms.
+            measure(&mut timings.paste.diagnostics_ms, || record_paste_diagnostics(&mut detail, &mapped, settings.developer_logging));
+        }
         if settings.developer_logging {
             measure(&mut timings.paste.readback_ms, || {
             detail["clipboard_readback"] = crate::evidence::readback_before_input(owner, sequence);
             });
         }
         // CloseClipboard publishes data, but live consumers still need the established handoff period.
+        #[cfg(not(feature = "settlement-experiments"))]
         measure(&mut timings.paste.settle_ms, clipboard::settle_publication);
+        #[cfg(feature = "settlement-experiments")]
+        {
+            let report = measure(&mut timings.paste.settle_ms, || settlement.wait(published));
+            detail["settlement_experiment"] = json!({"variant":settlement.variant().name(),"wait":report});
+        }
         measure(&mut timings.paste.modifiers_ms, || clipboard::modifiers_released(Duration::from_millis(1200)))?;
+        #[cfg(feature = "settlement-experiments")]
+        let publication_to_input_ms = published.elapsed().as_secs_f64() * 1000.;
         measure(&mut timings.paste.input_ms, || clipboard::chord(0x56))?;
+        #[cfg(feature = "settlement-experiments")]
+        { detail["settlement_experiment"]["publication_to_input_ms"] = json!(publication_to_input_ms); }
         Ok(sequence)
         })?;
         detail["status"] = json!("success");
@@ -578,5 +620,47 @@ impl Replay {
             total_ms: ms(started),
             attempts: 1,
         })
+    }
+}
+
+fn record_paste_diagnostics(detail: &mut Value, mapped: &rich::Rich, developer_logging: bool) {
+    detail["rich_text"] = serde_json::to_value(mapped).unwrap_or_default();
+    detail["paste_text"] = json!(mapped.text);
+    if developer_logging {
+        use base64::Engine;
+        detail["paste_chromium_mime_base64"] = json!(
+            mapped
+                .native
+                .as_ref()
+                .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+                .unwrap_or_default()
+        );
+    }
+    detail["paste_html"] = json!(mapped.html);
+    detail["paste_text_chars"] = json!(mapped.text.encode_utf16().count());
+    detail["paste_html_chars"] = json!(mapped.html.encode_utf16().count());
+}
+
+#[cfg(test)]
+mod settlement_diagnostic_tests {
+    use super::*;
+    #[test]
+    fn paste_diagnostics_preserve_payload_and_developer_gate() {
+        let mut mapped = rich::rewrite("", "tset", "test 😀", &[]);
+        mapped.native = Some(vec![0, 1, 255]);
+        for developer in [false, true] {
+            let mut detail = json!({});
+            record_paste_diagnostics(&mut detail, &mapped, developer);
+            assert_eq!(detail["paste_text"], mapped.text);
+            assert_eq!(detail["paste_html"], mapped.html);
+            assert_eq!(detail["paste_text_chars"], 7);
+            assert_eq!(detail["rich_text"], serde_json::to_value(&mapped).unwrap());
+            if developer {
+                assert_eq!(detail["paste_chromium_mime_base64"], "AAH/");
+            } else {
+                assert!(detail.get("paste_chromium_mime_base64").is_none());
+            }
+            assert_eq!(mapped.native.as_deref(), Some([0u8, 1, 255].as_slice()));
+        }
     }
 }
