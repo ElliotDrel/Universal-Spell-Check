@@ -491,3 +491,84 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+## Experimental hotkey-release alternatives (October 25, 2026)
+
+The `hotkey-experiments` Cargo feature exposes three independent native waiters
+through benchmark entrypoints only. An ordinary app launch remains on the original
+5 ms message-wait loop, including in a feature-enabled binary. Builds without the
+feature reject the experiment arguments. No persistent setting selects an arm.
+
+```powershell
+cargo build --locked --manifest-path rust/Cargo.toml --release --features hotkey-experiments
+```
+
+| `--hotkey-release` | Implementation | Trade-off |
+|---|---|---|
+| `baseline` | Original 5 ms message-pumped polling | Unchanged reference |
+| `poll-1ms` | Reusable per-thread high-resolution timer; poll every nominal 1 ms | More state checks/wakeups; OS scheduling can exceed 1 ms |
+| `hook` | Passive `WH_KEYBOARD_LL` event wake with 5 ms high-resolution watchdog | Hook setup per held wait, callback delivery/OS timeout constraints |
+| `raw-input` | Message-only window and keyboard `RIDEV_INPUTSINK` wake with 5 ms high-resolution watchdog | Registration setup per held wait; device/remapping/remote coverage varies |
+
+Every candidate reads authoritative `GetAsyncKeyState` for Ctrl, Alt, Shift and
+both Windows keys, explicitly including left/right Ctrl/Alt/Shift, before returning.
+The 1,200 ms release deadline and existing capture/paste ordering remain intact.
+Observers exist only while waiting for a physically held modifier; request work
+cannot leave a hook installed without a message pump. Timers are reused on the
+worker thread and closed on thread exit. Timer creation/arming/wait failure falls
+back to bounded message-pumped polling. Observer setup failure keeps polling; the
+result counters disclose those fallbacks. An already-released wait installs no
+observer. A low-level hook callback is only a hint because it runs before async
+key state updates; it always calls `CallNextHookEx`. Raw input uses no
+`RIDEV_NOLEGACY`, refuses an existing keyboard registration rather than replacing
+it, and unregisters/destroys its own window on completion. No candidate synthesizes
+key-up or suppresses keyboard input. Product hotkeys and 50 ms paste settlement
+are unchanged.
+
+For the existing local replay, add `--hotkey-release <arm>` to the documented
+`--bench-desktop --mode local --fixtures ... --allow-desktop --output ...` command.
+The manifest records `hotkey_release_variant`; the summary retains cumulative
+wait-iteration, hook/raw-input notification, timer-failure and observer-failure counts. Posted `WM_HOTKEY`
+usually encounters already-released modifiers: it cannot establish human hold or
+physical-release latency, and zero wait iterations means an observer was not
+exercised.
+
+For a bounded physical-input component probe, obtain an exclusive idle desktop
+window first, launch one arm, then physically press/release the existing canonical
+benchmark chord (Ctrl+Alt+B). Each output path must be a fresh JSONL file whose
+parent directory exists:
+
+```powershell
+rust/target/release/universal-spell-check.exe --bench-hotkey-release --allow-desktop --hotkey-release poll-1ms --seconds 15 --output benchmark_runs/hotkey-poll-1ms.jsonl
+```
+
+Repeat separately with `baseline`, `hook` and `raw-input`. The probe registers only
+the benchmark chord, does not change focus, access clipboard/settings/keys, send
+input or call an API, and unregisters at exit. It fails if the chord is already
+owned. PowerShell must wait for the GUI-subsystem executable (use `Start-Process
+-Wait` with these arguments or Python `subprocess.run`). Duration is bounded to
+1–300 seconds, plus at most one in-progress 1,200 ms release wait. `ready`, each
+`release` success/failure, and `finished` retain the selected variant and cumulative
+fallback diagnostics. The measured boundary is registered-message dispatch to the
+authoritative released-state observation: it includes human hold and excludes
+physical delivery before dispatch, copy, API, paste and editor rendering. Alternate
+arms and retain failures; this is not an automatic speedup verdict.
+
+Noninteractive verification runs the actual shared release/wait drivers against
+scripted state/timing/native-failure outcomes, plus real high-resolution timer reuse
+and a real wrong-object arming failure. It covers already-released keys, stale early
+wakes, sampled repress/held state, missing observer wake, deadline exhaustion,
+left/right modifiers, disabled failed handles, and pumping order. CI compiles/lints
+the feature and runs these tests without installing hooks or registering raw input:
+
+```powershell
+cargo test --locked --manifest-path rust/Cargo.toml --features hotkey-experiments hotkey_experiments
+```
+
+Physical hook/raw-input delivery, registration cleanup on the interactive desktop,
+held-modifier end-to-end capture/paste and original-editor acceptance remain pending.
+No matched timing evidence or speedup claim accompanies this first implementation.
+Microsoft's [low-level hook contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc),
+[high-resolution timer API](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createwaitabletimerexw),
+and [single-owner raw input registration rules](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerrawinputdevices)
+were fetched for this implementation.
