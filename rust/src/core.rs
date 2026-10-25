@@ -64,6 +64,10 @@ impl Protection {
         })
     }
     pub fn restore(&self, mut text: String) -> Result<String, String> {
+        #[cfg(feature = "processing-experiments")]
+        if crate::processing_experiment::selected() == crate::processing_experiment::Arm::Restore {
+            return self.restore_spliced(&text);
+        }
         // Validate every token before replacing any: literal values may contain token-looking text.
         if self
             .entries
@@ -81,9 +85,46 @@ impl Protection {
     }
 }
 
+#[cfg(feature = "processing-experiments")]
+impl Protection {
+    fn restore_spliced(&self, text: &str) -> Result<String, String> {
+        let mut spans = Vec::with_capacity(self.entries.len());
+        let mut capacity = text.len();
+        for entry in &self.entries {
+            let mut matches = text.match_indices(&entry.placeholder);
+            let first = matches.next();
+            if first.is_none() || matches.next().is_some() {
+                return Err(
+                    "The model changed a protected literal; selection was left unchanged.".into(),
+                );
+            }
+            let start = first.unwrap().0;
+            spans.push((start, start + entry.placeholder.len(), &entry.value));
+            capacity = capacity - entry.placeholder.len() + entry.value.len();
+        }
+        spans.sort_unstable_by_key(|span| span.0);
+        let mut output = String::with_capacity(capacity);
+        let mut cursor = 0;
+        for (start, end, value) in spans {
+            if start < cursor {
+                return Err(
+                    "The model changed a protected literal; selection was left unchanged.".into(),
+                );
+            }
+            output.push_str(&text[cursor..start]);
+            output.push_str(value);
+            cursor = end;
+        }
+        output.push_str(&text[cursor..]);
+        Ok(output)
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Replacements {
     pairs: Vec<(String, String)>,
+    #[cfg(feature = "processing-experiments")]
+    matcher: Option<aho_corasick::AhoCorasick>,
 }
 impl Replacements {
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
@@ -104,9 +145,48 @@ impl Replacements {
             }
         }
         pairs.sort_by_key(|(v, _)| std::cmp::Reverse(v.encode_utf16().count()));
-        Ok(Self { pairs })
+        #[cfg(feature = "processing-experiments")]
+        let matcher = if crate::processing_experiment::selected()
+            == crate::processing_experiment::Arm::Replacements
+            && !pairs.is_empty()
+        {
+            Some(
+                aho_corasick::AhoCorasick::builder()
+                    .match_kind(aho_corasick::MatchKind::LeftmostLongest)
+                    .build(pairs.iter().map(|(variant, _)| variant))
+                    .map_err(|e| format!("Experimental replacement matcher: {e}"))?,
+            )
+        } else {
+            None
+        };
+        Ok(Self {
+            pairs,
+            #[cfg(feature = "processing-experiments")]
+            matcher,
+        })
     }
     pub fn apply(&self, text: &str) -> (String, Vec<String>) {
+        #[cfg(feature = "processing-experiments")]
+        if crate::processing_experiment::selected()
+            == crate::processing_experiment::Arm::Replacements
+            && let Some(matcher) = &self.matcher
+        {
+            let mut output = String::with_capacity(text.len());
+            let mut applied = Vec::new();
+            let mut cursor = 0;
+            for found in matcher.find_iter(text) {
+                let (variant, canonical) = &self.pairs[found.pattern().as_usize()];
+                output.push_str(&text[cursor..found.start()]);
+                output.push_str(canonical);
+                let label = format!("{variant} -> {canonical}");
+                if !applied.contains(&label) {
+                    applied.push(label);
+                }
+                cursor = found.end();
+            }
+            output.push_str(&text[cursor..]);
+            return (output, applied);
+        }
         let mut output = String::with_capacity(text.len());
         let mut applied = Vec::new();
         let mut pos = 0;

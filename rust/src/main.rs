@@ -17,6 +17,8 @@ mod evidence_storage;
 mod http;
 mod logging;
 mod platform;
+#[cfg(feature = "processing-experiments")]
+mod processing_experiment;
 mod request_probe;
 mod rich;
 mod rich_links;
@@ -31,6 +33,16 @@ fn main() {
     #[cfg(feature = "acceptance")]
     if let Err(error) = acceptance::validate() {
         eprintln!("Acceptance isolation rejected: {error}");
+        std::process::exit(1);
+    }
+    #[cfg(feature = "processing-experiments")]
+    if let Err(error) = processing_experiment::configure(&args) {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
+    #[cfg(not(feature = "processing-experiments"))]
+    if args.iter().any(|arg| arg == "--processing-arm") {
+        eprintln!("--processing-arm requires the processing-experiments feature");
         std::process::exit(1);
     }
     let application_mode = !args.get(1).is_some_and(|arg| {
