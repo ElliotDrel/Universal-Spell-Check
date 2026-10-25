@@ -440,6 +440,34 @@ fn insertion(nodes: &[Node], p: usize) -> Option<usize> {
             .rposition(|n| n.position.is_some_and(|s| p == s + n.text.len()))
     })
 }
+#[cfg(feature = "processing-experiments")]
+struct OwnershipIndex(Vec<(usize, usize, usize)>);
+#[cfg(feature = "processing-experiments")]
+impl OwnershipIndex {
+    fn new(nodes: &[Node]) -> Self {
+        // Source mapping advances its cursor, so mapped intervals are ordered and disjoint.
+        Self(
+            nodes
+                .iter()
+                .enumerate()
+                .filter_map(|(index, node)| {
+                    node.position
+                        .map(|start| (start, start + node.text.len(), index))
+                })
+                .collect(),
+        )
+    }
+    fn owner(&self, p: usize) -> Option<usize> {
+        let i = self.0.partition_point(|span| span.0 <= p).checked_sub(1)?;
+        (p < self.0[i].1).then_some(self.0[i].2)
+    }
+    fn insertion(&self, p: usize) -> Option<usize> {
+        self.owner(p).or_else(|| {
+            let i = self.0.partition_point(|span| span.1 <= p).checked_sub(1)?;
+            (self.0[i].1 == p).then_some(self.0[i].2)
+        })
+    }
+}
 fn map_offset(edits: &[crate::diff::Edit], position: usize) -> usize {
     let (mut from, mut to) = (0, 0);
     for edit in edits {
@@ -549,6 +577,24 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
         complete.splice(p..p, recovered);
     }
     result.text = String::from_utf16_lossy(&complete);
+    #[cfg(feature = "processing-experiments")]
+    let ownership = (crate::processing_experiment::selected()
+        == crate::processing_experiment::Arm::Rich)
+        .then(|| OwnershipIndex::new(&nodes));
+    let owner_at = |p| {
+        #[cfg(feature = "processing-experiments")]
+        if let Some(index) = &ownership {
+            return index.owner(p);
+        }
+        owner(&nodes, p)
+    };
+    let insertion_at = |p| {
+        #[cfg(feature = "processing-experiments")]
+        if let Some(index) = &ownership {
+            return index.insertion(p);
+        }
+        insertion(&nodes, p)
+    };
     let mut output = vec![Vec::<u16>::new(); nodes.len()];
     let mut position = 0;
     let mut removed_whitespace = None;
@@ -557,7 +603,7 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
             Kind::Equal => {
                 removed_whitespace = None;
                 for _ in edit.text {
-                    if let Some(n) = owner(&nodes, position) {
+                    if let Some(n) = owner_at(position) {
                         output[n].push(nodes[n].original[position - nodes[n].position.unwrap()]);
                     }
                     position += 1;
@@ -565,7 +611,7 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
             }
             Kind::Delete => {
                 for c in edit.text {
-                    if owner(&nodes, position).is_none() {
+                    if owner_at(position).is_none() {
                         if !char::from_u32(c as u32).is_some_and(char::is_whitespace) {
                             return result;
                         }
@@ -579,9 +625,9 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
                 }
             }
             Kind::Insert => {
-                let n = insertion(&nodes, position).or_else(|| {
+                let n = insertion_at(position).or_else(|| {
                     if position == source.len() {
-                        removed_whitespace.and_then(|p| insertion(&nodes, p))
+                        removed_whitespace.and_then(insertion_at)
                     } else {
                         None
                     }
@@ -864,6 +910,28 @@ mod golden_tests {
             assert_eq!(output, fixture.output, "{} text", case.id);
             assert_eq!(rich.text, fixture.paste_text, "{} paste text", case.id);
             assert_eq!(rich.html, fixture.paste_html, "{} HTML", case.id);
+        }
+    }
+}
+
+#[cfg(all(test, feature = "processing-experiments"))]
+mod ownership_index_tests {
+    use super::*;
+    #[test]
+    fn every_boundary_matches_linear_owner_including_unmapped_nodes() {
+        let nodes: Vec<_> = (0..2000)
+            .map(|i| Node {
+                start: 0,
+                end: 0,
+                position: (i % 7 != 0).then_some(i * 4),
+                text: vec![65, 66, 67],
+                original: vec![65, 66, 67],
+            })
+            .collect();
+        let index = OwnershipIndex::new(&nodes);
+        for p in 0..8002 {
+            assert_eq!(index.owner(p), owner(&nodes, p), "owner {p}");
+            assert_eq!(index.insertion(p), insertion(&nodes, p), "insertion {p}");
         }
     }
 }

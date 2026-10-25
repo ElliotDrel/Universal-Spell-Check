@@ -8,6 +8,7 @@ build = "build.rs"
 default = ["dev"]
 dev = []
 acceptance = []
+processing-experiments = ["dep:aho-corasick"]
 
 [dependencies]
 native-windows-gui = { version = "1.0.13", default-features = false, features = ["tray-notification", "message-window", "menu", "notice", "textbox", "combobox", "listbox", "rich-textbox", "high-dpi", "cursor", "frame", "embed-resource"] }
@@ -16,6 +17,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 fancy-regex = "0.16"
 regex = "1"
+aho-corasick = { version = "1", optional = true }
 html-escape = "0.2"
 time = { version = "0.3", features = ["formatting", "local-offset", "serde"] }
 sha2 = "0.10"
