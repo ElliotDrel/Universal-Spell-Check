@@ -33,6 +33,18 @@ fn main() {
         eprintln!("Acceptance isolation rejected: {error}");
         std::process::exit(1);
     }
+    #[cfg(feature = "clipboard-experiments")]
+    if args
+        .get(1)
+        .is_some_and(|arg| arg == "--clipboard-experiment")
+    {
+        if let Err(error) = clipboard::experiments::run(&args) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let application_mode = !args.get(1).is_some_and(|arg| {
         matches!(
             arg.as_str(),
