@@ -334,9 +334,12 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
             let completed = crate::staged_capture::native(
                 crate::staged_capture::NativeInput { variant, run_id:&id, model:&settings.model, target:&target.2, listener, owner, diagnostics:settings.developer_logging },
                 &mut timings, &mut staged_history,
-                |request_payload| match replay {
-                    Some(replay) => replay.request(request_payload),
-                    None => client.ok_or("HTTP client unavailable")?.request(request_payload, &key, || bus.send(UiEvent::Phase("Waiting for AI..."))),
+                |request_payload| {
+                    bus.send(UiEvent::Phase("Sending to AI..."));
+                    match replay {
+                        Some(replay) => replay.request(request_payload),
+                        None => client.ok_or("HTTP client unavailable")?.request(request_payload, &key, || bus.send(UiEvent::Phase("Waiting for AI..."))),
+                    }
                 },
             )?;
             detail["staged_capture"] = json!({"variant":variant.name(),"trace":completed.trace,"phase_note":"request overlaps capture or source preparation; phase durations are not additive"});
@@ -384,6 +387,9 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         measure(&mut timings.diagnostics_ms, || {
         detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default());
         });
+        #[cfg(feature = "experimental-staged-capture")]
+        if crate::staged_capture::active().is_none() { bus.send(UiEvent::Phase("Sending to AI...")); }
+        #[cfg(not(feature = "experimental-staged-capture"))]
         bus.send(UiEvent::Phase("Sending to AI..."));
         #[cfg(feature = "experimental-staged-capture")]
         let (staged_response, prepared_source) = match staged.take() { Some(completed) => (Some(completed.response), completed.prepared), None => (None, None) };

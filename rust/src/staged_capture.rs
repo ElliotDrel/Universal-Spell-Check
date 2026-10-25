@@ -904,6 +904,42 @@ mod tests {
         assert!(result.is_err());
     }
     #[test]
+    fn all_variants_keep_protected_terminal_payload_exact() {
+        for variant in [
+            Variant::UnicodeFirst,
+            Variant::OwnedPrepare,
+            Variant::Helper,
+        ] {
+            for model in ["gpt-4.1", "gpt-5.4-mini"] {
+                let mut fixture = fixture();
+                fixture.text =
+                    "A tset https://example.com/a?x=1 and C:\\USC\\draft.txt\r\n  wrapped".into();
+                let expected = payload(
+                    &Protection::new(&crate::terminal::normalize(
+                        &fixture.text,
+                        "WindowsTerminal",
+                    ))
+                    .unwrap()
+                    .text,
+                    model,
+                );
+                let completed = execute(
+                    variant,
+                    "run",
+                    model,
+                    "WindowsTerminal",
+                    |ready| fixture.capture("run", ready),
+                    |_| Ok(()),
+                    |p| Ok(p.clone()),
+                )
+                .unwrap();
+                assert_eq!(completed.request_payload, expected);
+                assert_eq!(completed.response, expected);
+                assert!(!completed.protection.entries.is_empty());
+            }
+        }
+    }
+    #[test]
     fn framed_ipc_rejects_oversize_partial_and_stale_data() {
         assert!(read_frame(&mut &((FRAME_LIMIT as u32 + 1).to_le_bytes())[..]).is_err());
         assert!(read_frame(&mut &[1u8, 0, 0, 0][..]).is_err());
@@ -938,6 +974,23 @@ mod tests {
                 serde_json::to_value(baseline).unwrap(),
                 "{}",
                 case.id
+            );
+        }
+        use base64::Engine;
+        for line in include_str!("../tests/fixtures/csharp-formatting.jsonl").lines() {
+            let case: Value = serde_json::from_str(line).unwrap();
+            let html = case["source_html"].as_str().unwrap();
+            let source = case["input"].as_str().unwrap();
+            let output = case["output"].as_str().unwrap();
+            let native = base64::engine::general_purpose::STANDARD
+                .decode(case["native_base64"].as_str().unwrap())
+                .unwrap();
+            let prepared = PreparedSource::new(html, source).rewrite(output, &native);
+            let baseline = crate::rich::rewrite(html, source, output, &native);
+            assert_eq!(prepared.native, baseline.native);
+            assert_eq!(
+                serde_json::to_value(prepared).unwrap(),
+                serde_json::to_value(baseline).unwrap()
             );
         }
         for html in ["invalid", "", "<p>unverified</p>"] {
