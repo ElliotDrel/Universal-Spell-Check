@@ -409,14 +409,38 @@ pub fn run(args: &[String]) -> Result<(), String> {
     initialize_sta()?;
     let window = notification_window()?;
     // Refuse any writes unless a complete original snapshot can be owned first.
+    let identity = Identity::current();
     let original = OwnedBackup::capture(window.0)?;
+    let prepared = original.prepare()?;
+    if Identity::current() != identity {
+        return Err("Clipboard changed before experiment; no mutation performed".into());
+    }
+    // Original recovery must not depend on allocating during an experiment failure.
+    let mut recovery = Backup {
+        formats: prepared,
+        owner: window.0,
+        sequence: identity.sequence,
+        armed: true,
+    };
     let mut attempts = Vec::new();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         roundtrip(variant, window.0, 20, &mut attempts)
     }))
     .map_err(|_| "Experiment panicked".to_string())
     .and_then(|result| result);
-    let restored = original.restore(window.0);
+    let restored = if recovery.restore() {
+        Ok(())
+    } else {
+        Err("Original clipboard restore failed".to_string())
+    };
+    let restored = restored.and_then(|_| {
+        let actual = OwnedBackup::capture(window.0)?;
+        if same_bytes(&original, &actual) {
+            Ok(())
+        } else {
+            Err("Original clipboard restore verification failed".to_string())
+        }
+    });
     let success = result.is_ok() && restored.is_ok();
     println!(
         "{}",

@@ -500,7 +500,8 @@ none of these alternatives is wired into app startup or persisted settings.
 
 The following commands require an explicitly reserved exclusive clipboard slot. They use no
 credentials, model/API request, focus changes, hotkey injection, or installed application. Each
-refuses mutations unless it can first own a complete original snapshot, then restores that snapshot
+refuses mutations unless it can first own a complete original snapshot and prepare every recovery
+handle, then restores and verifies that snapshot
 on success, error, or caught panic. Clipboard history may still observe these synthetic writes;
 Windows history policy is best effort. Do not run concurrently with other clipboard users.
 
