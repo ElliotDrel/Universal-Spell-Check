@@ -9,6 +9,8 @@ mod cli;
 mod clipboard;
 mod core;
 mod dashboard;
+#[cfg(feature = "delivery-experiments")]
+mod delivery;
 mod desktop_bench;
 mod diff;
 mod docs_native;

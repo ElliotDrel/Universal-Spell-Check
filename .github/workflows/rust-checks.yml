@@ -48,6 +48,8 @@ jobs:
         run: cargo test --locked --manifest-path rust/Cargo.toml
       - name: Prod regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
+      - name: Delivery experiment native fixtures
+        run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features --features delivery-experiments
       - name: Optimized native build
         run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
       - name: Frozen correction and formatting contracts
