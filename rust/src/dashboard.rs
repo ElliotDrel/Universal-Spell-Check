@@ -20,7 +20,7 @@ use std::{
     thread,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-const CREAM: [u8; 3] = [245, 241, 234];
+const CANVAS: [u8; 3] = [255, 255, 255];
 fn show(handle: &nwg::ControlHandle, visible: bool) {
     if let Some(h) = handle.hwnd() {
         unsafe {
@@ -60,7 +60,7 @@ fn label(
         .position((x, y))
         .size((width, height))
         .font(Some(font))
-        .background_color(Some(CREAM))
+        .background_color(Some(CANVAS))
         .build(&mut c)?;
     Ok(c)
 }
@@ -80,8 +80,8 @@ pub struct Dashboard {
     hwnd: Arc<std::sync::atomic::AtomicUsize>,
     open: Arc<AtomicBool>,
     store: Store,
-    worker: Worker,
-    updater: Updater,
+    worker: Option<Worker>,
+    updater: Option<Updater>,
     main_window: usize,
 }
 impl Dashboard {
@@ -90,8 +90,8 @@ impl Dashboard {
             hwnd: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             open: Arc::new(AtomicBool::new(false)),
             store,
-            worker,
-            updater,
+            worker: Some(worker),
+            updater: Some(updater),
             main_window,
         }
     }
@@ -166,6 +166,9 @@ struct Ui {
     _brand: nwg::Label,
     _version: nwg::Label,
     stats_label: nwg::Label,
+    subtitle: nwg::Label,
+    shortcut: nwg::Label,
+    empty: nwg::Label,
     refresh: nwg::Button,
     panel: nwg::Frame,
     feed_notice: nwg::Notice,
@@ -197,20 +200,35 @@ struct Ui {
     settings_page: bool,
     main_window: usize,
     _serif: nwg::Font,
+    _section_font: nwg::Font,
     body_font: nwg::Font,
     mono: nwg::Font,
     _icon: nwg::Icon,
     store: Store,
-    worker: Worker,
-    updater: Updater,
+    worker: Option<Worker>,
+    updater: Option<Updater>,
 }
 impl Ui {
     fn set_page(&mut self, settings: bool) {
         self.settings_page = settings;
-        self.title
-            .set_text(if settings { "Settings" } else { "Activity" });
+        self.title.set_text(if settings {
+            "Make it yours"
+        } else {
+            "Correction history"
+        });
+        self.subtitle.set_text(if settings {
+            "Set up once. Keep writing everywhere."
+        } else {
+            "A clear view of what changed. Select any correction to copy it."
+        });
+        self.home
+            .set_text(if settings { "History" } else { "History ✓" });
+        self.settings_button
+            .set_text(if settings { "Settings ✓" } else { "Settings" });
         for h in [
             &self.stats_label.handle,
+            &self.shortcut.handle,
+            &self.empty.handle,
             &self.refresh.handle,
             &self.panel.handle,
         ] {
@@ -223,6 +241,13 @@ impl Ui {
             self.reload_keys();
         }
         self.layout();
+        unsafe {
+            windows_sys::Win32::Graphics::Gdi::InvalidateRect(
+                self.window.handle.hwnd().unwrap().cast(),
+                std::ptr::null(),
+                1,
+            );
+        }
     }
     fn settings_handles(&self) -> Vec<nwg::ControlHandle> {
         let mut handles = vec![
@@ -290,14 +315,18 @@ impl Ui {
             settings.developer_logging =
                 self.developer.check_state() == nwg::CheckBoxState::Checked;
             let startup = self.startup.check_state() == nwg::CheckBoxState::Checked;
-            platform::startup(startup)?;
+            if self.worker.is_some() {
+                platform::startup(startup)?;
+            }
             settings.start_on_login = startup;
             self.store.save_settings(&settings)?;
             Ok::<_, String>(())
         })();
         match result {
             Ok(()) => {
-                self.worker.reload();
+                if let Some(worker) = &self.worker {
+                    worker.reload();
+                }
                 self.status
                     .set_text("Saved. Changes apply to the next correction.");
             }
@@ -332,7 +361,9 @@ impl Ui {
             Ok(()) => {
                 self.key_value.set_text("");
                 self.key_name.set_text("");
-                self.worker.reload();
+                if let Some(worker) = &self.worker {
+                    worker.reload();
+                }
                 self.reload_keys();
                 self.status.set_text("Encrypted key collection saved.");
             }
@@ -346,6 +377,7 @@ impl Ui {
         self.loading = true;
         self.exhausted = false;
         self.generation += 1;
+        self.empty.set_text("Loading your correction history…");
         let _ = self.feed_tx.send(FeedRequest::Refresh);
     }
     fn receive(&mut self) {
@@ -355,18 +387,8 @@ impl Ui {
             }
             if let Some(stats) = reply.stats {
                 self.stats_label.set_text(&format!(
-                    "{} CHECKS          {} CORRECTIONS          {} ACCURACY          {} DAY STREAK",
-                    stats.checks,
-                    stats.corrections,
-                    if stats.checks == 0 {
-                        "—".into()
-                    } else {
-                        format!(
-                            "{:.0}%",
-                            100. * stats.corrections as f64 / stats.checks as f64
-                        )
-                    },
-                    stats.streak
+                    "{} checks     /     {} corrections     /     {} day streak",
+                    stats.checks, stats.corrections, stats.streak
                 ));
             }
             if !reply.page {
@@ -382,6 +404,7 @@ impl Ui {
                     self.rows.push(row);
                 }
             }
+            self.empty.set_text(if self.rows.is_empty() { "Your next correction starts here.\nSelect text in any app, then press the shortcut above." } else { "" });
             self.layout();
         }
     }
@@ -389,14 +412,19 @@ impl Ui {
         let metadata = label(
             &self.panel,
             &format!(
-                "{}\n{}",
+                "{}\n{}\n{}",
                 entry.timestamp.get(11..16).unwrap_or(""),
-                entry.data["model"].as_str().unwrap_or("")
+                entry.data["model"].as_str().unwrap_or(""),
+                if entry.data["text_changed"] == true {
+                    "Corrected"
+                } else {
+                    "No changes"
+                }
             ),
             0,
             0,
             100,
-            45,
+            68,
             &self.mono,
         )?;
         let mut body = nwg::RichTextBox::default();
@@ -413,7 +441,7 @@ impl Ui {
                     | nwg::RichTextBoxFlags::AUTOVSCROLL,
             )
             .build(&mut body)?;
-        body.set_background_color(CREAM);
+        body.set_background_color(CANVAS);
         let date = entry.timestamp.get(..10).unwrap_or("");
         let previous = self.rows.last().and_then(|r| r.entry.timestamp.get(..10));
         let day = if previous != Some(date) {
@@ -427,7 +455,7 @@ impl Ui {
             .map(|l| 1 + l.chars().count() / 65)
             .sum::<usize>()
             .clamp(2, 100);
-        let height = (lines as i32 * 21 + 48).max(90) + if day.is_some() { 32 } else { 0 };
+        let height = (lines as i32 * 22 + 56).max(112) + if day.is_some() { 32 } else { 0 };
         let mut row = Row {
             entry,
             day,
@@ -472,55 +500,88 @@ impl Ui {
     }
     fn layout(&self) {
         let (w, h) = self.window.size();
-        let sx = ((w as f32 - 304.) / 790.).clamp(0.65, 1.);
-        let sy = ((h as f32 - 24.) / 682.).clamp(0.72, 1.);
-        let x = |value: i32| 272 + ((value - 272) as f32 * sx) as i32;
-        let y = |value: i32| (value as f32 * sy) as i32;
-        let width_of = |value: i32| (value as f32 * sx) as u32;
+        let width = w.saturating_sub(64);
+        let left = 32i32;
+        let gap = 48u32;
+        let col = width.saturating_sub(gap) / 2;
+        let right = left + col as i32 + gap as i32;
+        let sy = ((h as f32 - 276.) / 510.).clamp(0.65, 1.);
+        let y = |value: i32| 190 + ((value - 190) as f32 * sy) as i32;
         macro_rules! place {
             ($control:ident,$left:expr,$top:expr,$width:expr,$height:expr) => {
-                self.$control.set_position(x($left), y($top));
-                self.$control.set_size(width_of($width), $height);
+                self.$control.set_position($left, y($top));
+                self.$control.set_size($width, $height);
             };
         }
-        place!(model, 700, 160, 270, 100);
-        place!(keys, 272, 258, 500, 150);
-        place!(key_name, 460, 310, 500, 30);
-        place!(key_value, 460, 360, 500, 30);
-        place!(add_key, 820, 410, 140, 32);
-        place!(select_key, 790, 255, 90, 32);
-        place!(remove_key, 890, 255, 90, 32);
-        place!(developer, 272, 500, 245, 28);
-        place!(startup, 560, 500, 230, 28);
-        place!(edit_replacements, 272, 550, 165, 32);
-        place!(logs, 450, 550, 110, 32);
-        place!(check_updates, 575, 550, 165, 32);
-        place!(restart, 755, 550, 190, 32);
-        place!(update_label, 272, 596, 720, 25);
-        place!(status, 272, 632, 750, 45);
-        for (index, (left, top, width)) in [
-            (272, 100, 400),
-            (272, 165, 400),
-            (272, 225, 720),
-            (272, 315, 160),
-            (272, 365, 160),
-            (272, 465, 720),
-            (720, 100, 200),
+        self._brand.set_position(32, 27);
+        self._brand.set_size(350, 30);
+        self.home.set_position(w as i32 - 278, 24);
+        self.home.set_size(112, 36);
+        self.settings_button.set_position(w as i32 - 154, 24);
+        self.settings_button.set_size(122, 36);
+        self.title.set_position(32, 111);
+        self.title.set_size(width - 140, 42);
+        self.subtitle.set_position(32, 157);
+        self.subtitle.set_size(width, 25);
+        self.shortcut.set_position(32, 210);
+        self.shortcut.set_size(width, 36);
+        self.stats_label.set_position(32, 267);
+        self.stats_label.set_size(width, 28);
+        self.empty.set_position(32, 338);
+        self.empty.set_size(width, 90);
+        self.help.set_position(w as i32 - 130, h as i32 - 42);
+        self.help.set_size(98, 30);
+        self._version.set_position(32, h as i32 - 35);
+        self._version.set_size(width.saturating_sub(150), 24);
+        self.refresh.set_position(w as i32 - 140, 116);
+        self.refresh.set_size(108, 34);
+        self.panel.set_position(32, 310);
+        let height = h.saturating_sub(366);
+        self.panel.set_size(width, height);
+        place!(model, left + 138, 279, col.saturating_sub(138), 100);
+        place!(startup, left, 390, col, 28);
+        place!(developer, left, 432, col, 28);
+        place!(edit_replacements, left, 530, 182, 34);
+        place!(logs, left + 194, 530, col.saturating_sub(194), 34);
+        place!(update_label, left, 623, col, 38);
+        place!(check_updates, left, 672, col / 2 - 6, 34);
+        place!(restart, left + col as i32 / 2 + 6, 672, col / 2 - 6, 34);
+        place!(keys, right, 257, col, 150);
+        place!(select_key, right, 303, 116, 34);
+        place!(remove_key, right + 128, 303, 116, 34);
+        place!(key_name, right, 391, col, 32);
+        place!(key_value, right, 473, col, 32);
+        place!(add_key, right, 525, 154, 36);
+        place!(status, right, 584, col, 90);
+        for (index, (x, top, width, height)) in [
+            (left, 190, col, 30),
+            (left, 237, 138, 25),
+            (left, 285, 126, 25),
+            (left, 343, col, 30),
+            (left, 489, col, 30),
+            (left, 581, col, 30),
+            (right, 190, col, 30),
+            (right, 225, col, 25),
+            (right, 359, col, 25),
+            (right, 441, col, 25),
+            (left + 138, 237, col.saturating_sub(138), 25),
         ]
         .into_iter()
         .enumerate()
         {
             if let Some(label) = self.settings_labels.get(index) {
-                label.set_position(x(left), y(top));
-                label.set_size(width_of(width), 25);
+                label.set_position(x, y(top));
+                label.set_size(width, height);
             }
         }
-        self.help.set_position(24, h.saturating_sub(130) as i32);
-        self.refresh.set_position(w.saturating_sub(144) as i32, 36);
-        self._version.set_position(24, h.saturating_sub(85) as i32);
-        let width = w.saturating_sub(304);
-        let height = h.saturating_sub(210);
-        self.panel.set_size(width, height);
+        show(
+            &self.empty.handle,
+            !self.settings_page && self.rows.is_empty(),
+        );
+        show(
+            &self.panel.handle,
+            !self.settings_page && !self.rows.is_empty(),
+        );
         let info = SCROLLINFO {
             cbSize: std::mem::size_of::<SCROLLINFO>() as u32,
             fMask: SIF_RANGE | SIF_PAGE | SIF_POS,
@@ -564,8 +625,9 @@ impl Ui {
                 continue;
             }
             row.metadata.set_position(0, y + offset);
-            row.body.set_position(110, y + offset);
-            let full_width = width.saturating_sub(120);
+            row.metadata.set_size(130, 68);
+            row.body.set_position(152, y + offset);
+            let full_width = width.saturating_sub(178);
             let body_width = if split {
                 full_width.saturating_sub(12) / 2
             } else {
@@ -574,14 +636,21 @@ impl Ui {
             let body_height = row.height.saturating_sub(45 + offset) as u32;
             row.body.set_size(body_width, body_height);
             if let Some(second) = &row.secondary {
-                second.set_position(110 + body_width as i32 + 12, y + offset);
+                second.set_position(152 + body_width as i32 + 12, y + offset);
                 second.set_size(body_width, body_height);
             }
             let button_y = y + row.height - 39;
-            row.copy.set_position(110, button_y);
-            row.timing.set_position(180, button_y);
-            row.original.set_position(255, button_y);
-            row.side.set_position(365, button_y);
+            row.copy.set_position(152, button_y);
+            row.timing.set_position(224, button_y);
+            row.original.set_position(301, button_y);
+            row.side.set_position(413, button_y);
+            let changed = row.entry.data["text_changed"] == true;
+            show(&row.original.handle, changed && !self.settings_page);
+            show(&row.side.handle, changed && !self.settings_page);
+            show(
+                &row.timing.handle,
+                row.entry.data["timings"].is_object() && !self.settings_page,
+            );
         }
     }
     fn scroll_by(&mut self, delta: i32) {
@@ -665,7 +734,7 @@ fn render_row(row: &mut Row) {
                 .build(&mut second)
                 .is_ok()
             {
-                second.set_background_color(CREAM);
+                second.set_background_color(CANVAS);
                 if let Ok(handler) = body_handler(&second.handle, row.parent, row.copy.handle) {
                     row.body_handlers.push(handler);
                 }
@@ -717,36 +786,42 @@ fn run_dashboard(
     nwg::init()?;
     clipboard::initialize_sta()?;
     style::initialize_fonts();
-    nwg::Font::set_global_family("Instrument Sans")?;
-    let serif = style::font("Instrument Serif", 32)?;
-    let body_font = style::font("Instrument Sans", 15)?;
-    let mono = style::font("JetBrains Mono", 12)?;
+    nwg::Font::set_global_family("Segoe UI")?;
+    let serif = style::font("Segoe UI Semibold", 30)?;
+    let section_font = style::font("Segoe UI Semibold", 18)?;
+    let body_font = style::font("Segoe UI", 15)?;
+    let mono = style::font("Segoe UI", 13)?;
     let icon = style::icon()?;
     let mut window = nwg::Window::default();
     nwg::Window::builder()
-        .title(crate::channel::DISPLAY_NAME)
-        .size((1100, 720))
+        .title(&if state.worker.is_none() {
+            format!("{} — Synthetic preview", crate::channel::DISPLAY_NAME)
+        } else {
+            crate::channel::DISPLAY_NAME.into()
+        })
+        .size((1100, 780))
         .center(true)
         .flags(nwg::WindowFlags::MAIN_WINDOW | nwg::WindowFlags::VISIBLE)
         .icon(Some(&icon))
         .build(&mut window)?;
-    let home = button(&window, "Home", 24, 90, 190)?;
+    window.set_visible(true);
+    let home = button(&window, "History", 24, 90, 190)?;
     let settings_button = button(&window, "Settings", 24, 134, 190)?;
     let help = button(&window, "Help", 24, 560, 190)?;
-    let title = label(&window, "Activity", 272, 28, 430, 48, &serif)?;
+    let title = label(&window, "Correction history", 272, 28, 430, 48, &serif)?;
     let brand = label(
         &window,
-        "UNIVERSAL\nSPELL CHECK",
+        "Universal Spell Check",
         24,
         26,
         205,
         48,
-        &body_font,
+        &section_font,
     )?;
     let version = label(
         &window,
         &format!(
-            "Version {}\n{}",
+            "v{}   |   {}",
             crate::channel::VERSION,
             crate::channel::CHANNEL
         ),
@@ -758,12 +833,34 @@ fn run_dashboard(
     )?;
     let stats_label = label(
         &window,
-        "Loading activity...",
+        "Loading your history…",
         272,
         100,
         790,
         60,
         &body_font,
+    )?;
+    let subtitle = label(&window, "", 32, 157, 1000, 25, &body_font)?;
+    let shortcut = label(
+        &window,
+        &format!(
+            "Select text in any app     →     Ctrl + Alt + {}     →     Corrected in place",
+            char::from_u32(crate::channel::HOTKEY_VK).unwrap()
+        ),
+        32,
+        210,
+        1000,
+        36,
+        &section_font,
+    )?;
+    let empty = label(
+        &window,
+        "Loading your correction history…",
+        32,
+        338,
+        1000,
+        90,
+        &section_font,
     )?;
     let refresh = button(&window, "Refresh", 940, 36, 112)?;
     let mut panel = nwg::Frame::default();
@@ -850,23 +947,34 @@ fn run_dashboard(
                 }
             }
         })?;
-    let labels = [
-        ("Hotkey", 100),
-        ("Model", 165),
-        ("API keys — encrypted for this Windows user", 225),
-        ("New key name", 315),
-        ("New API key", 365),
-        ("Logs and startup", 465),
-    ];
     let mut settings_labels = Vec::new();
-    for (text, y) in labels {
-        settings_labels.push(label(&window, text, 272, y, 720, 25, &body_font)?);
+    for (text, heading) in [
+        ("Correction", true),
+        ("Shortcut", false),
+        ("AI model", false),
+        ("Preferences", true),
+        ("Local files", true),
+        ("App updates", true),
+        ("API keys", true),
+        ("Encrypted for your Windows user with DPAPI.", false),
+        ("Name for this key", false),
+        ("API key", false),
+    ] {
+        settings_labels.push(label(
+            &window,
+            text,
+            32,
+            190,
+            480,
+            30,
+            if heading { &section_font } else { &body_font },
+        )?);
     }
     let hotkey = format!(
         "Ctrl + Alt + {}",
         char::from_u32(crate::channel::HOTKEY_VK).unwrap()
     );
-    settings_labels.push(label(&window, &hotkey, 720, 100, 200, 25, &mono)?);
+    settings_labels.push(label(&window, &hotkey, 170, 237, 300, 25, &body_font)?);
     let saved = state.store.load_settings().unwrap_or_default();
     let mut model = nwg::ComboBox::default();
     nwg::ComboBox::builder()
@@ -918,7 +1026,7 @@ fn run_dashboard(
         .text("Start on login")
         .position((560, 500))
         .size((230, 28))
-        .enabled(!crate::channel::IS_DEV)
+        .enabled(!crate::channel::IS_DEV && state.worker.is_some())
         .check_state(if platform::startup_registered() {
             nwg::CheckBoxState::Checked
         } else {
@@ -931,7 +1039,11 @@ fn run_dashboard(
     let restart = button(&window, "Restart to update", 755, 550, 190)?;
     let update_label = label(
         &window,
-        &state.updater.state.lock().unwrap(),
+        &state
+            .updater
+            .as_ref()
+            .map(|u| u.state.lock().unwrap().clone())
+            .unwrap_or_else(|| "Preview: updates and startup changes are disabled".into()),
         272,
         596,
         720,
@@ -948,6 +1060,9 @@ fn run_dashboard(
         _brand: brand,
         _version: version,
         stats_label,
+        subtitle,
+        shortcut,
+        empty,
         refresh,
         panel,
         feed_notice,
@@ -979,6 +1094,7 @@ fn run_dashboard(
         settings_page: false,
         main_window: state.main_window,
         _serif: serif,
+        _section_font: section_font,
         body_font,
         mono,
         _icon: icon,
@@ -1037,15 +1153,17 @@ fn run_dashboard(
                         view.save_preferences();
                     } else if handle == view.edit_replacements.handle {
                         open_path = Some(view.store.replacements_path.clone());
-                    } else if handle == view.help.handle {
+                    } else if handle == view.help.handle && view.worker.is_some() {
                         open_path = Some(std::path::PathBuf::from(
                             "https://github.com/ElliotDrel/Universal-Spell-Check",
                         ));
                     } else if handle == view.logs.handle {
                         open_path = Some(view.store.log_directory.clone());
                     } else if handle == view.check_updates.handle {
-                        view.updater.check(Trigger::Manual);
-                    } else if handle == view.restart.handle {
+                        if let Some(updater) = &view.updater {
+                            updater.check(Trigger::Manual);
+                        }
+                    } else if handle == view.restart.handle && view.updater.is_some() {
                         unsafe {
                             PostMessageW(
                                 view.main_window as _,
@@ -1110,7 +1228,11 @@ fn run_dashboard(
                     }
                     if pending_update_handler.replace(false) {
                         view.update_label.set_text(
-                            &view.updater.state.lock().unwrap_or_else(|p| p.into_inner()),
+                            &view
+                                .updater
+                                .as_ref()
+                                .map(|u| u.state.lock().unwrap_or_else(|p| p.into_inner()).clone())
+                                .unwrap_or_default(),
                         );
                     }
                 }
@@ -1135,7 +1257,7 @@ fn run_dashboard(
                     let info = &mut *(l as *mut MINMAXINFO);
                     let scale = style::dpi_scale();
                     info.ptMinTrackSize.x = (900.0 * scale).round() as i32;
-                    info.ptMinTrackSize.y = (600.0 * scale).round() as i32;
+                    info.ptMinTrackSize.y = (640.0 * scale).round() as i32;
                 }
                 return Some(0);
             }
@@ -1320,7 +1442,7 @@ fn reset_text(body: &nwg::RichTextBox) {
     body.set_char_format(&nwg::CharFormat {
         effects: Some(nwg::CharEffects::empty()),
         text_color: Some([26, 26, 26]),
-        font_face_name: Some("Instrument Sans".into()),
+        font_face_name: Some("Segoe UI".into()),
         height: Some(225),
         ..Default::default()
     });
@@ -1336,6 +1458,8 @@ fn append_segment(body: &nwg::RichTextBox, text: &str, kind: Kind) {
         } else {
             nwg::CharEffects::empty()
         }),
+        font_face_name: Some("Segoe UI".into()),
+        height: Some(225),
         text_color: Some(match kind {
             Kind::Equal => [26, 26, 26],
             Kind::Delete => [184, 69, 59],
@@ -1355,4 +1479,55 @@ fn append_text(body: &nwg::RichTextBox, text: &str) {
         SendMessageW(hwnd, 0x00C2, 0, text.as_ptr() as isize); // EM_REPLACESEL preserves earlier formatting.
         SendMessageW(hwnd, 0x00CF, 1, 0);
     }
+}
+
+/// Runs the actual dashboard against newly created synthetic data, without a tray,
+/// correction worker, hotkey, network client, updater or installed-app data.
+#[cfg(all(feature = "ui-preview", feature = "dev"))]
+pub fn run_preview(args: &[String]) -> Result<(), String> {
+    let root = std::env::temp_dir().join(format!("usc-ui-preview-{}", std::process::id()));
+    std::fs::create_dir(&root).map_err(|e| e.to_string())?;
+    let store = Store::isolated(root);
+    std::fs::create_dir(&store.log_directory).map_err(|e| e.to_string())?;
+    std::fs::write(&store.replacements_path, "{}").map_err(|e| e.to_string())?;
+    if !args.iter().any(|a| a == "--empty") {
+        let samples = [
+            (
+                "Lets make this easier to read.",
+                "Let's make this easier to read.",
+            ),
+            (
+                "Thanks for you're help with the release. The changes looks good.",
+                "Thanks for your help with the release. The changes look good.",
+            ),
+            (
+                "Meet me at https://example.com/review at 10:30.",
+                "Meet me at https://example.com/review at 10:30.",
+            ),
+            (
+                "A good tool should gets out of your way.\nSelect some text, press the shortcut, and keep writting.",
+                "A good tool should get out of your way.\nSelect some text, press the shortcut, and keep writing.",
+            ),
+        ];
+        let mut lines = String::new();
+        for i in (0..65).rev() {
+            let (input, output) = samples[i % samples.len()];
+            let data = serde_json::json!({"status":"success", "input_text":input, "output_text":output, "text_changed":input != output, "model":"gpt-4.1", "timings":{"clipboard_ms":62,"request_ms":742,"post_process_ms":2,"paste_ms":52,"total_ms":858}});
+            lines.push_str(&format!("2026-10-25T{:02}:{:02}:00-04:00 channel=dev app_version=preview pid=0 spellcheck_detail {}\n", 12-i/60, 59-i%60, data));
+        }
+        std::fs::write(
+            store.log_directory.join("spellcheck-2026-10-25.jsonl"),
+            lines,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    let state = Dashboard {
+        hwnd: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        open: Arc::new(AtomicBool::new(false)),
+        store,
+        worker: None,
+        updater: None,
+        main_window: 0,
+    };
+    run_dashboard(&state, args.iter().any(|a| a == "--settings")).map_err(|e| e.to_string())
 }

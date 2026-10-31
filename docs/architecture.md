@@ -6,6 +6,8 @@ The product is the native Rust tray app and dashboard under `rust/`. `main.rs` b
 
 The sections below document the retained C#/.NET 10 reference under `src/`. It bootstraps via Velopack, registers a global hotkey, and runs a clipboard-capture → API-request → post-process → paste pipeline. AHK is archived at `.archive/ahk-legacy/` and is not part of the active system.
 
+The Rust dashboard uses top navigation for History and Settings, with asynchronous activity loading and a two-column settings layout. `DESIGN.md` describes the current first-pass proposal. The opt-in Dev `ui-preview` feature runs the actual dashboard against synthetic logs and isolated temporary settings, without tray, hotkey, correction worker, or updater; it bypasses normal app bootstrap before any installed-app access.
+
 ---
 
 ## Startup sequence (`src/Program.cs`)
