@@ -43,6 +43,14 @@ fn main() {
                 | "--bench-request"
         )
     });
+    #[cfg(all(feature = "ui-preview", feature = "dev"))]
+    if args.get(1).is_some_and(|s| s == "--ui-preview") {
+        if let Err(error) = dashboard::run_preview(&args) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let result = if args.get(1).is_some_and(|s| s == "--transform-json") {
         cli::transform_stdin(args.get(2).map_or("../replacements.json", String::as_str))
     } else if args.get(1).is_some_and(|s| s == "--rich-json") {
