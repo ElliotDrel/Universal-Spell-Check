@@ -2,93 +2,49 @@
 
 ## Status
 
-### T3 Code desktop Markdown and context transport (2026-10-31; list rendering under investigation)
+### T3 Code: narrowed to the proven citation fix (2026-10-31)
 
-Later manual Dev run `c40ea9238632ba1c1f64c09f893e24de` corrected a 1,729-character
-combined selection with an actual thread-context chip and nested numbered lists.
-All saved payload/image hashes validate. Native mapper replay exactly matches the
-requested Unicode/HTML; citations, context records, code/formula/link literals,
-Markdown list prefixes, style delimiters and paragraph breaks are unchanged.
-The before/after images nevertheless show numbered markers before and no markers
-after paste in the visible lower list. UIA also stops reporting those markers.
-The thread chip and corrected prose remain visible. The entire selection is not
-visible in the screenshots, so this is not full formatting acceptance.
+This supersedes the initial full-formatting implementation and its acceptance claims.
+Prod runs `e7e5033609d25bd9dacfcf10f892b259` and
+`a5a253bd81f3c211350a5fea088284f3` proved assistant citations were only partially
+protected, then omitted by the model. The existing restoration guard correctly
+refused to paste. Complete original evidence remains under ignored
+`formatting_replay_runs/` with validated payload/image hashes.
 
-Clipboard readback reported `source_changed` and the old diagnostic discarded the
-observed payload. A sequence mismatch alone cannot establish changed content or
-identify a clipboard writer. Do not attribute the missing markers to T3 parsing
-yet. The diagnostic now retains observed readback payloads on mismatch, preserving
-the warning and both expected/observed sequence numbers. This does not change paste
-behavior or add another clipboard read. A focused fresh manual list test is needed
-to separate clipboard publication/conversion from destination interpretation.
-Original source evidence and exact replay results remain ignored and intact.
+The retained change protects each complete assistant citation as one literal and
+adds explicit placeholder instructions only when a desktop T3 selection contains
+one. A live synthetic test reproduced omission with protection alone and passed
+with the instruction. Ordinary T3 selections keep the existing prompt and behavior.
+The speculative Markdown signature validator, atom-order validator, code/formula/
+mention/context protection, and context-HTML wrapper rewriting are removed.
 
-The 19:39–19:40 manual retest narrows this issue: Prod run
-`19f9a24706c5c7f6ea88b2ddce1e4dea` corrected the fresh nested numbered-list fixture
-and retained its visible numbering/indentation. Dev run
-`078239e4d4eb5dbea67b49efff191dd4` then received the already corrected selection;
-its unchanged-text paste has a byte-identical after-image to Prod. Dev run
-`621cb63856bc8df53451cb031ef80141` also retained added nested numbers and bullet
-levels while correcting prose. Both Dev readback payload hashes exactly match
-requested Unicode, despite sequence mismatches of three. All saved payload/image
-hashes validate and target identities agree. These selections offered no HTML;
-they establish plain-Markdown list acceptance in both channels, not acceptance of
-the earlier mixed-content selection with its context-record HTML wrapper.
+Production baseline run `19f9a24706c5c7f6ea88b2ddce1e4dea` already corrected nested
+numbered lists with visible numbering/indentation. Dev's unchanged-text retest
+`078239e4d4eb5dbea67b49efff191dd4` had a byte-identical after-image; changed-text run
+`621cb63856bc8df53451cb031ef80141` also retained nested numbers and bullets.
+Dev readback hashes matched requested Unicode despite a sequence mismatch of three.
+Those list tests are regression evidence, not justification for new formatting logic.
 
-Two Production 0.13.3 runs (`e7e5033609d25bd9dacfcf10f892b259` and
-`a5a253bd81f3c211350a5fea088284f3`) failed because the model omitted an assistant
-citation containing individually protected UUID/path fragments. Protection correctly
-refused the paste. Complete evidence sidecars were verified by SHA-256/byte/UTF-16
-counts; before/after image hashes were checked. Both were frozen under ignored
-`formatting_replay_runs/`.
-Both completion events report `ok`; source/paste target identities agree, no paste was
-issued and the UIA selection stayed unchanged. Empty HTML/RTF matches the offered
-format enumeration; it is not a missing screenshot inference. The normal mapper replay
-export correctly refuses these runs because no successful correction was produced.
+The initial broader implementation's mixed-context run
+`c40ea9238632ba1c1f64c09f893e24de` had missing visible list markers after paste despite
+preserved requested Markdown. Old diagnostics discarded readback on sequence mismatch,
+so the cause remains unproven. The unvalidated context-wrapper rewrite has been
+withdrawn, not declared a fix. Original captures/replay remain preserved.
 
-The independent causes were checked as follows:
+The independent causes examined were:
 
 ```text
-Source serialization ---- Unicode Markdown, no rich flavor offered ----\
-Literal protection ------ fragmented citation; model omitted it -------+--> refused correction
-Postprocessing ---------- restore guard detects missing atoms ---------+
-Clipboard transport ----- no write/readback; paste never issued -------+
-Destination/context ----- same editor, selection unchanged ------------/
+Source copy ----- T3 citation serialized as Unicode Markdown -------\
+Protection ------ fragments left citation exposed to the model -----+--> refusal before paste
+Model ----------- omitted citation/standalone token ----------------+
+Restoration ----- existing missing-token guard prevented data loss -/
 ```
 
-The source audit also found a separate context transport gap: context/attachment
-selections include encoded records in a `data-t3-context-fragment` HTML wrapper.
-The Rust mapper now retains that wrapper after verifying its body against Unicode.
-The desktop target protects full atoms and checks serialized Markdown structure
-without hiding ordinary prose or its styling from the model.
-
-A live synthetic request reproduced omission even after whole-citation protection.
-T3 requests now explicitly require every placeholder, including standalone tokens,
-exactly once in order. The target prompt and leak guard share that instruction.
-Three live synthetic `gpt-4.1` cases then passed: assistant citation plus prose;
-heading/bold/italic/strike/quote/task/nested-list/rule/code; and image/thread/file/skill
-chips plus prose. These exercise actual model responses and native processing without
-clipboard access or editor control, and do not establish destination rendering.
-The same three-case live block passed a second time. The copied upstream
-`parseInlineMarkdown` also verified the exact corrected text and retained bold,
-italic, strike and code marks. The final native unit/resource suite and all 76
-C# differential mapper cases pass. Failed initial model/probe attempts remain in
-the ignored evidence directory. The Dev candidate passes native startup smoke;
-Production remains unchanged.
-
-Upstream inspected at [15fe283](https://github.com/pingdotgg/t3code/tree/15fe2832727893cbdd2214383f9f971474849695):
-[copy/paste handler](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/apps/web/src/components/ComposerPromptEditorTiptap.tsx),
-[Markdown serialization](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/apps/web/src/composer-rich-text-doc.ts),
-[citation encoding](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/packages/shared/src/assistantCitations.ts),
-[context clipboard](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/packages/shared/src/composerContextClipboard.ts).
-
-Offline checks establish exact correction/transport behavior, not T3 rendering.
-T3's own paste handler disables block parsing when the selection starts inside a
-list/task/quote and pastes verbatim inside a code block. Partial selections and
-mixed-block replacement therefore still require original-editor acceptance.
-Elliot explicitly prohibited computer-use control of T3 during this investigation;
-do not run that acceptance through UI automation. No full-formatting acceptance or
-Production release is claimed. The web-hosted T3 path remains outside target matching.
+Retain the diagnostic fix that saves observed clipboard readback even on a sequence
+mismatch, with expected/observed sequence numbers and the warning intact. It adds no
+clipboard reads and changes no paste behavior. Original-editor citation acceptance
+remains separate; Elliot prohibits computer-use control of T3. No Production release
+or blanket full-formatting support is claimed.
 
 ### Partial-start indentation deferred (2026-10-11)
 

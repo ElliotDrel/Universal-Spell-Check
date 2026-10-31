@@ -222,20 +222,13 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 ## Rust implementation details
 
-- `t3.rs` handles the desktop T3 Code composer, which copies Markdown through its own
-  `serializeSelection` handler and consumes plain text on paste. `Protection::for_target`
-  protects whole citations, context/file/skill chips, code and formulas for the exact
-  `T3 Code` / `T3 Code (Beta)` process identities. Ordinary Markdown remains visible to
-  the model; ordered atoms and the serialized formatting signature are checked after
-  restoration. Changes to that signature fail before paste. Other applications retain
-  the existing protection path. `--transform-json` accepts optional `active_exe` to
-  exercise the same target path offline.
-- A verified T3 `<pre data-t3-context-fragment="...">` clipboard wrapper is rebuilt with
-  corrected Markdown and the original encoded context records (`mode=t3_context`).
-  Its decoded body must equal captured Unicode before it is accepted. T3 imports those
-  records from HTML while using Unicode as the editable Markdown. Rebuilding ordinary
-  HTML spans cannot replace this transport. Original-editor paste acceptance is separate
-  from these processing/transport checks.
+- `t3.rs` recognizes complete assistant-quote links copied by the desktop T3 Code
+  composer. `Protection::for_target` protects each citation as one literal for the
+  exact `T3 Code` / `T3 Code (Beta)` identities. Only selections containing those
+  citations receive the explicit placeholder-preservation instruction. Ordinary T3
+  text uses the existing protection/prompt; there is no new Markdown validator,
+  code/formula/chip handling, or context-HTML rewriting. `--transform-json` accepts
+  optional `active_exe` for deterministic target-path replay.
 
 - Formatting consumes `diff::try_diff`, which returns a precise edit map or an explicit refusal. Above the small LCS budget, unchanged line boundaries anchor per-line edits; larger sparse changes use a bounded Myers search. A wholesale display diff must never be consumed as a formatting map. This supersedes the temporary mixed-list paragraph fallback, which only bypassed the underlying size-limit failure for one markup family.
 - `rich_links.rs` reconciles Codex link chips with their HTTP(S) Markdown destinations in the copied Unicode before text alignment. HTML tags/attributes are tokenized independently of nesting, quoting, attribute order and inline styling. Repeated labels are matched by verified occurrence order; source/output destination sequences must agree. The same projection supplies HTML anchors and Unicode labels. Ambiguity retains original Unicode destinations and reports an unverified `link_status`; it never guesses a destination. Ordinary typed Markdown remains literal.

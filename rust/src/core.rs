@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use std::sync::LazyLock;
 
 pub const PROMPT: &str = "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.";
-const T3_INSTRUCTIONS: &str = "Every __USC_LITERAL_N_M__ token is immutable content, including standalone tokens. Copy every token exactly once in its original order. Preserve all Markdown delimiters and exact line breaks. Correct only prose; never add formatting, blank lines, or commentary.";
+const T3_INSTRUCTIONS: &str = "Every __USC_LITERAL_N_M__ token is immutable content, including standalone tokens. Copy every token exactly once in its original order.";
 static LITERALS: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(include_str!("literal_regex.txt")).expect("literal regex"));
 
@@ -19,11 +19,11 @@ pub struct Protection {
     pub text: String,
     pub entries: Vec<Literal>,
     #[serde(skip)]
-    t3_structure: Option<Vec<String>>,
+    t3_citations: bool,
 }
 impl Protection {
     fn prompt(&self) -> String {
-        if self.t3_structure.is_some() {
+        if self.t3_citations {
             format!("{PROMPT} {T3_INSTRUCTIONS}")
         } else {
             PROMPT.into()
@@ -31,7 +31,7 @@ impl Protection {
     }
     pub fn payload(&self, model: &str) -> Value {
         let mut result = payload(&self.text, model);
-        if self.t3_structure.is_some() {
+        if self.t3_citations {
             result["input"][0]["content"][0]["text"] = json!(format!(
                 "instructions: {}\ntext input: {}",
                 self.prompt(),
@@ -66,16 +66,13 @@ impl Protection {
                 .into_iter()
                 .map(|(start, end)| (start, end, "url")),
         );
-        let t3_structure = if crate::t3::matches(process) {
-            spans.extend(
-                crate::t3::literal_ranges(text)
-                    .into_iter()
-                    .map(|(a, b)| (a, b, "t3_format")),
-            );
-            Some(crate::t3::structure(text))
+        let citation_ranges = if crate::t3::matches(process) {
+            crate::t3::citation_ranges(text)
         } else {
-            None
+            Vec::new()
         };
+        let t3_citations = !citation_ranges.is_empty();
+        spans.extend(citation_ranges.into_iter().map(|(a, b)| (a, b, "url")));
         spans.sort_by_key(|(start, end, _)| (*start, std::cmp::Reverse(*end)));
         for (start, end, kind) in spans {
             if start < cursor {
@@ -95,7 +92,7 @@ impl Protection {
         Ok(Self {
             text: output,
             entries,
-            t3_structure,
+            t3_citations,
         })
     }
     pub fn restore(&self, mut text: String) -> Result<String, String> {
@@ -109,27 +106,8 @@ impl Protection {
                 "The model changed a protected literal; selection was left unchanged.".into(),
             );
         }
-        if self.t3_structure.is_some() {
-            let mut previous_end = 0;
-            for entry in &self.entries {
-                let position = text.find(&entry.placeholder).unwrap();
-                if position < previous_end {
-                    return Err(
-                        "The model reordered T3 content; selection was left unchanged.".into(),
-                    );
-                }
-                previous_end = position + entry.placeholder.len();
-            }
-        }
         for entry in &self.entries {
             text = text.replace(&entry.placeholder, &entry.value);
-        }
-        if self
-            .t3_structure
-            .as_ref()
-            .is_some_and(|expected| *expected != crate::t3::structure(&text))
-        {
-            return Err("The model changed T3 formatting; selection was left unchanged.".into());
         }
         Ok(text)
     }

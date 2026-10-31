@@ -102,8 +102,8 @@ and restoration. A failed historical run may have no corrected output and theref
 cannot be exported as a rich-mapper case: preserve the reader's JSON and validated
 sidecars, reproduce the historical processing refusal, and label any simulated
 corrected response explicitly. Never present that simulation as a new model result.
-`cargo test --manifest-path rust/Cargo.toml live_synthetic_corrections_preserve_t3_formatting -- --ignored --nocapture`
-runs three fixed public synthetic cases through the saved Dev model/key only when
+`cargo test --manifest-path rust/Cargo.toml live_synthetic_citation -- --ignored --nocapture`
+runs one fixed public synthetic citation case through the saved Dev model/key only when
 `USC_T3_ALLOW_API=1` is explicitly set. It reads settings/keys without saving them and
 uses no UI or clipboard. Normal tests never make these API calls. Original-editor
 acceptance remains separate; do not automate T3's UI against Elliot's standing prohibition.

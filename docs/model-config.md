@@ -5,13 +5,12 @@
 
 ## Current caller
 
-Desktop T3 Code requests append a target-scoped instruction to copy every protected
-placeholder exactly once in order, including standalone tokens, and retain Markdown
-delimiters/line breaks. The shared standard/reasoning parameter selection is unchanged.
-`Protection::payload` builds this request; the prompt-leak guard uses the same complete
-instruction. Whole-citation protection alone was insufficient in a live synthetic
-`gpt-4.1` test: the model omitted the standalone placeholder. The explicit instruction
-and atomic restoration/formatting checks are both required.
+Desktop T3 Code selections containing assistant citations append an instruction to
+copy each protected placeholder exactly once, including standalone tokens. Other
+T3 selections and other applications retain the existing prompt. Standard/reasoning
+parameter selection is unchanged. `Protection::payload` and the prompt-leak guard
+use the same instruction. A live synthetic test showed that whole-citation protection
+alone could still be omitted; the explicit instruction addressed that failure.
 
 `rust/src/http.rs` — persistent app-lifetime WinHTTP session/connection, sends directly to the Responses API. `src/OpenAiSpellcheckService.cs` is the retained C# reference with its own `HttpClient`. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
