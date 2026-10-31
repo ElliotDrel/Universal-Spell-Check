@@ -106,6 +106,15 @@ impl Protection {
                 "The model changed a protected literal; selection was left unchanged.".into(),
             );
         }
+        if self.t3_citations {
+            let mut cursor = 0;
+            for entry in &self.entries {
+                let position = text[cursor..].find(&entry.placeholder).ok_or(
+                    "The model reordered protected citation content; selection was left unchanged.",
+                )?;
+                cursor += position + entry.placeholder.len();
+            }
+        }
         for entry in &self.entries {
             text = text.replace(&entry.placeholder, &entry.value);
         }

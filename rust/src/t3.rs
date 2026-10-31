@@ -45,6 +45,23 @@ mod tests {
     }
 
     #[test]
+    fn multiple_citations_cannot_be_reordered() {
+        let second = QUOTE.replace("Keep+unchanged", "Second+quote");
+        let source = format!("{QUOTE}\nFirst tset.\n\n{second}\nSecond tset.");
+        let p = Protection::for_target(&source, "T3 Code").unwrap();
+        let corrected = p.text.replace("tset", "test");
+        assert_eq!(
+            p.restore(corrected.clone()).unwrap(),
+            source.replace("tset", "test")
+        );
+        let swapped = corrected
+            .replace(&p.entries[0].placeholder, "TEMP")
+            .replace(&p.entries[1].placeholder, &p.entries[0].placeholder)
+            .replace("TEMP", &p.entries[1].placeholder);
+        assert!(p.restore(swapped).unwrap_err().contains("reordered"));
+    }
+
+    #[test]
     fn ordinary_t3_text_uses_existing_protection_and_prompt() {
         for source in [
             "# Tset\n\n**Tset**\n1. Tset\n   1. Tset",

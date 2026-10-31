@@ -15,7 +15,7 @@ The retained change protects each complete assistant citation as one literal and
 adds explicit placeholder instructions only when a desktop T3 selection contains
 one. A live synthetic test reproduced omission with protection alone and passed
 with the instruction. Ordinary T3 selections keep the existing prompt and behavior.
-The speculative Markdown signature validator, atom-order validator, code/formula/
+The speculative Markdown signature validator, general T3 atom-order validator, code/formula/
 mention/context protection, and context-HTML wrapper rewriting are removed.
 
 Production baseline run `19f9a24706c5c7f6ea88b2ddce1e4dea` already corrected nested
@@ -40,7 +40,11 @@ Model ----------- omitted citation/standalone token ----------------+
 Restoration ----- existing missing-token guard prevented data loss -/
 ```
 
-Retain the diagnostic fix that saves observed clipboard readback even on a sequence
+Only citation-bearing selections check protected-token order before restoration,
+preventing two citations from exchanging their source metadata. Ordinary selections
+keep the existing restoration checks.
+
+Retain the diagnostic fix that, with developer logging enabled, saves observed clipboard readback even on a sequence
 mismatch, with expected/observed sequence numbers and the warning intact. It adds no
 clipboard reads and changes no paste behavior. Original-editor citation acceptance
 remains separate; Elliot prohibits computer-use control of T3. No Production release
