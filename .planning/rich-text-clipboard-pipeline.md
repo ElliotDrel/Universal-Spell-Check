@@ -23,6 +23,18 @@ behavior or add another clipboard read. A focused fresh manual list test is need
 to separate clipboard publication/conversion from destination interpretation.
 Original source evidence and exact replay results remain ignored and intact.
 
+The 19:39–19:40 manual retest narrows this issue: Prod run
+`19f9a24706c5c7f6ea88b2ddce1e4dea` corrected the fresh nested numbered-list fixture
+and retained its visible numbering/indentation. Dev run
+`078239e4d4eb5dbea67b49efff191dd4` then received the already corrected selection;
+its unchanged-text paste has a byte-identical after-image to Prod. Dev run
+`621cb63856bc8df53451cb031ef80141` also retained added nested numbers and bullet
+levels while correcting prose. Both Dev readback payload hashes exactly match
+requested Unicode, despite sequence mismatches of three. All saved payload/image
+hashes validate and target identities agree. These selections offered no HTML;
+they establish plain-Markdown list acceptance in both channels, not acceptance of
+the earlier mixed-content selection with its context-record HTML wrapper.
+
 Two Production 0.13.3 runs (`e7e5033609d25bd9dacfcf10f892b259` and
 `a5a253bd81f3c211350a5fea088284f3`) failed because the model omitted an assistant
 citation containing individually protected UUID/path fragments. Protection correctly
