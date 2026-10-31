@@ -516,7 +516,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         );
     }
     if let Some(readback) = detail.get("clipboard_readback") {
-        inline["clipboard_readback"] = json!({"status":readback["status"],"boundary":readback["boundary"],"sequence":readback["sequence"]});
+        inline["clipboard_readback"] = json!({"status":readback["status"],"boundary":readback["boundary"],"sequence":readback["sequence"],"expected_sequence":readback["expected_sequence"]});
     }
     logger.data("spellcheck_detail", inline);
     if bus.observe_trials {

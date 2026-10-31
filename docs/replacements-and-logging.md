@@ -277,6 +277,10 @@ logging records `clipboard_readback` immediately before input injection in eithe
 one non-waiting clipboard-open attempt. This supersedes the old Dev-only rule for the shipped app.
 Readback verifies publication, not the destination's rendered paste; full payloads remain in the
 opt-in evidence sidecars, with summary status and the capture boundary in ordinary records.
+On a sequence mismatch, `source_changed` retains the observed payloads and both
+`expected_sequence`/observed `sequence`. Sidecar `status=ok` means that payload was
+saved completely, not that it matched the requested paste. Older versions discarded
+the observed payload on mismatch. No readback is fabricated on a failed open/read.
 
 `output_text` is the corrected text before rich-text replacement. `paste_text` and `paste_html` are
 the final Unicode and CF_HTML strings requested in the clipboard write, including any text recovered

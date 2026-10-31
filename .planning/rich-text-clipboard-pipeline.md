@@ -2,7 +2,26 @@
 
 ## Status
 
-### T3 Code desktop Markdown and context transport (2026-10-31; editor retest pending)
+### T3 Code desktop Markdown and context transport (2026-10-31; list rendering under investigation)
+
+Later manual Dev run `c40ea9238632ba1c1f64c09f893e24de` corrected a 1,729-character
+combined selection with an actual thread-context chip and nested numbered lists.
+All saved payload/image hashes validate. Native mapper replay exactly matches the
+requested Unicode/HTML; citations, context records, code/formula/link literals,
+Markdown list prefixes, style delimiters and paragraph breaks are unchanged.
+The before/after images nevertheless show numbered markers before and no markers
+after paste in the visible lower list. UIA also stops reporting those markers.
+The thread chip and corrected prose remain visible. The entire selection is not
+visible in the screenshots, so this is not full formatting acceptance.
+
+Clipboard readback reported `source_changed` and the old diagnostic discarded the
+observed payload. A sequence mismatch alone cannot establish changed content or
+identify a clipboard writer. Do not attribute the missing markers to T3 parsing
+yet. The diagnostic now retains observed readback payloads on mismatch, preserving
+the warning and both expected/observed sequence numbers. This does not change paste
+behavior or add another clipboard read. A focused fresh manual list test is needed
+to separate clipboard publication/conversion from destination interpretation.
+Original source evidence and exact replay results remain ignored and intact.
 
 Two Production 0.13.3 runs (`e7e5033609d25bd9dacfcf10f892b259` and
 `a5a253bd81f3c211350a5fea088284f3`) failed because the model omitted an assistant

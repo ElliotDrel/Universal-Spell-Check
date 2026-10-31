@@ -90,6 +90,12 @@ Use full JSON parse when many nested fields are needed or structure varies. Keep
 
 ## Local formatting replay
 
+When developer clipboard readback reports `source_changed`, compare its retained
+payload hashes with the requested paste before inferring that the content changed.
+Both `expected_sequence` and observed `sequence` are logged; a mismatch retains
+that warning even when payloads agree. Older captures discarded the observed
+payload on mismatch and cannot resolve clipboard-content questions retroactively.
+
 For desktop T3 Code, `--transform-json <replacements.json>` accepts `active_exe`
 alongside `input`/`raw_ai_output`/`source_html` to exercise actual target protection
 and restoration. A failed historical run may have no corrected output and therefore
