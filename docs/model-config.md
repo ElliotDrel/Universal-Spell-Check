@@ -5,6 +5,14 @@
 
 ## Current caller
 
+Desktop T3 Code requests append a target-scoped instruction to copy every protected
+placeholder exactly once in order, including standalone tokens, and retain Markdown
+delimiters/line breaks. The shared standard/reasoning parameter selection is unchanged.
+`Protection::payload` builds this request; the prompt-leak guard uses the same complete
+instruction. Whole-citation protection alone was insufficient in a live synthetic
+`gpt-4.1` test: the model omitted the standalone placeholder. The explicit instruction
+and atomic restoration/formatting checks are both required.
+
 `rust/src/http.rs` — persistent app-lifetime WinHTTP session/connection, sends directly to the Responses API. `src/OpenAiSpellcheckService.cs` is the retained C# reference with its own `HttpClient`. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
 ## API key storage
@@ -55,7 +63,10 @@ instructions: <PromptInstruction>
 text input: <selected text>
 ```
 
-`PromptInstruction` is the constant string in `OpenAiSpellcheckService.PromptInstruction`. `TextPostProcessor` strips echoed `instructions:`/`text input:` text before paste.
+The Rust instruction is `core::PROMPT`; `Protection::payload` adds the T3-specific
+suffix when applicable. `Replacements::process` strips an echoed instruction and
+`text input:` before restoration. `OpenAiSpellcheckService.PromptInstruction` and
+`TextPostProcessor` remain the retained C# reference, superseded as runtime owners.
 
 ---
 

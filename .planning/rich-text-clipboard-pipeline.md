@@ -2,6 +2,63 @@
 
 ## Status
 
+### T3 Code desktop Markdown and context transport (2026-10-31; editor retest pending)
+
+Two Production 0.13.3 runs (`e7e5033609d25bd9dacfcf10f892b259` and
+`a5a253bd81f3c211350a5fea088284f3`) failed because the model omitted an assistant
+citation containing individually protected UUID/path fragments. Protection correctly
+refused the paste. Complete evidence sidecars were verified by SHA-256/byte/UTF-16
+counts; before/after image hashes were checked. Both were frozen under ignored
+`formatting_replay_runs/`.
+Both completion events report `ok`; source/paste target identities agree, no paste was
+issued and the UIA selection stayed unchanged. Empty HTML/RTF matches the offered
+format enumeration; it is not a missing screenshot inference. The normal mapper replay
+export correctly refuses these runs because no successful correction was produced.
+
+The independent causes were checked as follows:
+
+```text
+Source serialization ---- Unicode Markdown, no rich flavor offered ----\
+Literal protection ------ fragmented citation; model omitted it -------+--> refused correction
+Postprocessing ---------- restore guard detects missing atoms ---------+
+Clipboard transport ----- no write/readback; paste never issued -------+
+Destination/context ----- same editor, selection unchanged ------------/
+```
+
+The source audit also found a separate context transport gap: context/attachment
+selections include encoded records in a `data-t3-context-fragment` HTML wrapper.
+The Rust mapper now retains that wrapper after verifying its body against Unicode.
+The desktop target protects full atoms and checks serialized Markdown structure
+without hiding ordinary prose or its styling from the model.
+
+A live synthetic request reproduced omission even after whole-citation protection.
+T3 requests now explicitly require every placeholder, including standalone tokens,
+exactly once in order. The target prompt and leak guard share that instruction.
+Three live synthetic `gpt-4.1` cases then passed: assistant citation plus prose;
+heading/bold/italic/strike/quote/task/nested-list/rule/code; and image/thread/file/skill
+chips plus prose. These exercise actual model responses and native processing without
+clipboard access or editor control, and do not establish destination rendering.
+The same three-case live block passed a second time. The copied upstream
+`parseInlineMarkdown` also verified the exact corrected text and retained bold,
+italic, strike and code marks. The final native unit/resource suite and all 76
+C# differential mapper cases pass. Failed initial model/probe attempts remain in
+the ignored evidence directory. The Dev candidate passes native startup smoke;
+Production remains unchanged.
+
+Upstream inspected at [15fe283](https://github.com/pingdotgg/t3code/tree/15fe2832727893cbdd2214383f9f971474849695):
+[copy/paste handler](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/apps/web/src/components/ComposerPromptEditorTiptap.tsx),
+[Markdown serialization](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/apps/web/src/composer-rich-text-doc.ts),
+[citation encoding](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/packages/shared/src/assistantCitations.ts),
+[context clipboard](https://github.com/pingdotgg/t3code/blob/15fe2832727893cbdd2214383f9f971474849695/packages/shared/src/composerContextClipboard.ts).
+
+Offline checks establish exact correction/transport behavior, not T3 rendering.
+T3's own paste handler disables block parsing when the selection starts inside a
+list/task/quote and pastes verbatim inside a code block. Partial selections and
+mixed-block replacement therefore still require original-editor acceptance.
+Elliot explicitly prohibited computer-use control of T3 during this investigation;
+do not run that acceptance through UI automation. No full-formatting acceptance or
+Production release is claimed. The web-hosted T3 path remains outside target matching.
+
 ### Partial-start indentation deferred (2026-10-11)
 
 Later evidence from `a057dd031b044e549c306d7a70a9bcb7` showed native source,

@@ -23,6 +23,7 @@ mod rich_links;
 mod runtime;
 mod store;
 mod style;
+mod t3;
 mod terminal;
 mod timing;
 mod update;

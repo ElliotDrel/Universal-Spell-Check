@@ -164,6 +164,15 @@ fn replace_paragraphs(fragment: &str, p: &[Paragraph], bodies: &[String]) -> Str
     rebuilt
 }
 pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
+    if let Some(html) = crate::t3::context_html(html, source, corrected) {
+        let mut result = Rich::plain("", corrected);
+        result.html = html;
+        result.mode = "t3_context".into();
+        result.attempted = true;
+        result.applied = true;
+        result.paragraph_count = source.split('\n').count();
+        return result;
+    }
     let Some(fragment) = fragment(html).filter(|f| {
         f.contains("data-pm-slice") && re!(r"(?i)\brich-link-source-app-id\b").is_match(f)
     }) else {

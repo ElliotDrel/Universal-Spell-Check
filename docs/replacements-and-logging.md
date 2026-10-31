@@ -35,6 +35,16 @@ post-process (replacements + prompt-leak guard) → **restore literals** →
 
 ## Protected literals
 
+The Rust desktop T3 Code path additionally protects complete serialized assistant
+citations (`t3-citation://`), context/image references (`t3-context://`), file links,
+`@` mentions, currency-prefixed skill tokens, inline/fenced code and closed dollar
+formulas. It preserves encoded citation text/comments and chip labels exactly; prose
+outside these atoms remains editable. Its formatting signature checks line breaks,
+blank paragraphs, list/task/quote/heading prefixes, rules, style delimiters and escapes.
+Missing/duplicated/reordered atoms or changed formatting refuse the paste. This scope
+uses the desktop process identity, not a guessed browser title. Browser-hosted T3 has
+no target identity integration yet.
+
 Before the API call, `ProtectedText.Protect` replaces exact literals with collision-safe numbered
 placeholders. It protects:
 

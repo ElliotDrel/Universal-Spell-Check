@@ -1,6 +1,6 @@
 use crate::{
     clipboard,
-    core::{Protection, Replacements, extract_output, payload},
+    core::{Protection, Replacements, extract_output},
     http::Client,
     logging::Logger,
     rich,
@@ -348,8 +348,8 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         detail["captured_text_history_excluded"] = json!(history);
         let (protection, request_payload) = measure(&mut timings.prepare_ms, || -> Result<_, String> {
         let input = crate::terminal::normalize(&captured.text, &target.2);
-        let protection = Protection::new(&input)?;
-        let request_payload = payload(&protection.text, &settings.model);
+        let protection = Protection::for_target(&input, &target.2)?;
+        let request_payload = protection.payload(&settings.model);
         Ok((protection, request_payload))
         })?;
         measure(&mut timings.diagnostics_ms, || {
