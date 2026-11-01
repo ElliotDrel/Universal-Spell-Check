@@ -222,6 +222,14 @@ Triggered by `v*.*.*` tags. Steps: checkout â†’ dotnet publish Release win-x64 â
 
 ## Rust implementation details
 
+- `t3.rs` recognizes complete assistant-quote links copied by the desktop T3 Code
+  composer. `Protection::for_target` protects each citation as one literal for the
+  exact `T3 Code` / `T3 Code (Beta)` identities. Only selections containing those
+  citations receive the explicit placeholder-preservation instruction. Ordinary T3
+  text uses the existing protection/prompt; there is no new Markdown validator,
+  code/formula/chip handling, or context-HTML rewriting. `--transform-json` accepts
+  optional `active_exe` for deterministic target-path replay.
+
 - Formatting consumes `diff::try_diff`, which returns a precise edit map or an explicit refusal. Above the small LCS budget, unchanged line boundaries anchor per-line edits; larger sparse changes use a bounded Myers search. A wholesale display diff must never be consumed as a formatting map. This supersedes the temporary mixed-list paragraph fallback, which only bypassed the underlying size-limit failure for one markup family.
 - `rich_links.rs` reconciles Codex link chips with their HTTP(S) Markdown destinations in the copied Unicode before text alignment. HTML tags/attributes are tokenized independently of nesting, quoting, attribute order and inline styling. Repeated labels are matched by verified occurrence order; source/output destination sequences must agree. The same projection supplies HTML anchors and Unicode labels. Ambiguity retains original Unicode destinations and reports an unverified `link_status`; it never guesses a destination. Ordinary typed Markdown remains literal.
 

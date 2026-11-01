@@ -2,6 +2,54 @@
 
 ## Status
 
+### T3 Code: narrowed to the proven citation fix (2026-10-31)
+
+This supersedes the initial full-formatting implementation and its acceptance claims.
+Prod runs `e7e5033609d25bd9dacfcf10f892b259` and
+`a5a253bd81f3c211350a5fea088284f3` proved assistant citations were only partially
+protected, then omitted by the model. The existing restoration guard correctly
+refused to paste. Complete original evidence remains under ignored
+`formatting_replay_runs/` with validated payload/image hashes.
+
+The retained change protects each complete assistant citation as one literal and
+adds explicit placeholder instructions only when a desktop T3 selection contains
+one. A live synthetic test reproduced omission with protection alone and passed
+with the instruction. Ordinary T3 selections keep the existing prompt and behavior.
+The speculative Markdown signature validator, general T3 atom-order validator, code/formula/
+mention/context protection, and context-HTML wrapper rewriting are removed.
+
+Production baseline run `19f9a24706c5c7f6ea88b2ddce1e4dea` already corrected nested
+numbered lists with visible numbering/indentation. Dev's unchanged-text retest
+`078239e4d4eb5dbea67b49efff191dd4` had a byte-identical after-image; changed-text run
+`621cb63856bc8df53451cb031ef80141` also retained nested numbers and bullets.
+Dev readback hashes matched requested Unicode despite a sequence mismatch of three.
+Those list tests are regression evidence, not justification for new formatting logic.
+
+The initial broader implementation's mixed-context run
+`c40ea9238632ba1c1f64c09f893e24de` had missing visible list markers after paste despite
+preserved requested Markdown. Old diagnostics discarded readback on sequence mismatch,
+so the cause remains unproven. The unvalidated context-wrapper rewrite has been
+withdrawn, not declared a fix. Original captures/replay remain preserved.
+
+The independent causes examined were:
+
+```text
+Source copy ----- T3 citation serialized as Unicode Markdown -------\
+Protection ------ fragments left citation exposed to the model -----+--> refusal before paste
+Model ----------- omitted citation/standalone token ----------------+
+Restoration ----- existing missing-token guard prevented data loss -/
+```
+
+Only citation-bearing selections check protected-token order before restoration,
+preventing two citations from exchanging their source metadata. Ordinary selections
+keep the existing restoration checks.
+
+Retain the diagnostic fix that, with developer logging enabled, saves observed clipboard readback even on a sequence
+mismatch, with expected/observed sequence numbers and the warning intact. It adds no
+clipboard reads and changes no paste behavior. Original-editor citation acceptance
+remains separate; Elliot prohibits computer-use control of T3. No Production release
+or blanket full-formatting support is claimed.
+
 ### Partial-start indentation deferred (2026-10-11)
 
 Later evidence from `a057dd031b044e549c306d7a70a9bcb7` showed native source,
@@ -402,6 +450,11 @@ first time the flattening was visible enough to notice.
 ---
 
 ## Goal
+
+Scope note: the goal/non-goals below describe the original HTML-fidelity work.
+The later T3 citation fix above is a narrow, measured exception to the unchanged-prompt
+non-goal: citation-bearing desktop T3 selections add generic placeholder-preservation instructions.
+The model still sees placeholders, not citation markup. Ordinary requests are unchanged.
 
 Preserve the source formatting of the selection through a correction, without changing what the AI
 sees, what it costs, or how fast an ordinary plain-text run is.
