@@ -2,6 +2,15 @@
 
 ## Status
 
+Production release: [v0.13.4](https://github.com/ElliotDrel/Universal-Spell-Check/releases/tag/v0.13.4)
+was published on October 31, 2026 (America/Indianapolis), from `fd2fd97`, after
+[PR #32](https://github.com/ElliotDrel/Universal-Spell-Check/pull/32) merged and
+[release CI](https://github.com/ElliotDrel/Universal-Spell-Check/actions/runs/41256122478)
+passed Production checks, startup smoke and fresh-installer verification. The installed
+Prod app updated through its native restart flow to `0.13.4` (PID 19276), then reported
+`Up to date`. Settings and encrypted-key hashes remained unchanged. Dev was stopped;
+source evidence and replay records were retained locally.
+
 ### T3 Code: narrowed to the proven citation fix (2026-10-31)
 
 This supersedes the initial full-formatting implementation and its acceptance claims.
@@ -47,8 +56,7 @@ keep the existing restoration checks.
 Retain the diagnostic fix that, with developer logging enabled, saves observed clipboard readback even on a sequence
 mismatch, with expected/observed sequence numbers and the warning intact. It adds no
 clipboard reads and changes no paste behavior. Original-editor citation acceptance
-remains separate; Elliot prohibits computer-use control of T3. No Production release
-or blanket full-formatting support is claimed.
+remains separate; Elliot prohibits computer-use control of T3. Production publication is recorded above; blanket full-formatting support is not claimed.
 
 ### Partial-start indentation deferred (2026-10-11)
 
