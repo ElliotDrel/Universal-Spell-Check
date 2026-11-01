@@ -3,6 +3,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 pub fn matches(process: &str) -> bool {
+    let process = process.rsplit(['\\', '/']).next().unwrap_or(process);
     let process = process.strip_suffix(".exe").unwrap_or(process);
     ["T3 Code", "T3 Code (Beta)"]
         .iter()
@@ -78,6 +79,17 @@ mod tests {
         }
         assert!(!super::matches("Code"));
         assert!(super::matches("T3 Code (Beta).exe"));
+        for process in [r"C:\Apps\T3 Code (Beta).exe", "C:/Apps/T3 Code.exe"] {
+            let p = Protection::for_target(QUOTE, process).unwrap();
+            assert_eq!(p.entries.len(), 1);
+            assert_eq!(p.entries[0].value, QUOTE);
+            assert!(
+                p.payload("gpt-4.1")["input"][0]["content"][0]["text"]
+                    .as_str()
+                    .unwrap()
+                    .contains("including standalone tokens")
+            );
+        }
     }
 
     #[test]

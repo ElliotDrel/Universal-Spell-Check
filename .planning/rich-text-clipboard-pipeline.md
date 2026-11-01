@@ -451,6 +451,11 @@ first time the flattening was visible enough to notice.
 
 ## Goal
 
+Scope note: the goal/non-goals below describe the original HTML-fidelity work.
+The later T3 citation fix above is a narrow, measured exception to the unchanged-prompt
+non-goal: citation-bearing requests add generic placeholder-preservation instructions.
+The model still sees placeholders, not citation markup. Ordinary requests are unchanged.
+
 Preserve the source formatting of the selection through a correction, without changing what the AI
 sees, what it costs, or how fast an ordinary plain-text run is.
 
