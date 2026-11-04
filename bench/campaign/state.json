@@ -14,7 +14,7 @@
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
   "destination_observer": "Implemented; headless wrapped-paragraph regression passes; rich-list native mapper is flat but historical editor result nested; paste-time selection/clipboard evidence added, desktop retest required",
   "evaluator": "12 scorer/evidence/editor regressions passed; DOM adapter is serialization-only, never browser acceptance",
-  "next": "Obtain actual Chrome tool app grant, resolve rich-list fixture selection, rerun all-case pilot and wrong-output control with new provenance, then live baseline",
+  "next": "Actual Chrome app grant, then commands in resume.json; all 11 positive fixtures and wrong-output control must pass before live baseline",
   "blocker": "Required Chrome Computer Use app approval timed out; no further desktop runs until granted",
   "case_file": "cases-v1.json",
   "schedule_file": "schedule-v2.json",
@@ -48,5 +48,6 @@
       "source": "user-provided read-only findings",
       "hypothesis": "Earlier waiting phase could improve progress truthfulness; not a latency win"
     }
-  ]
+  ],
+  "scaling_candidate": "Bounded rich binding retained: 40000 predicate comparisons, 76/76 fresh C# cases, 9/9 matched full-result parity; no live score benefit established"
 }

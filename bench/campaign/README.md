@@ -124,3 +124,22 @@ paragraph serialization is covered, while rich-list nesting remains a downstream
 delivery/editor failure requiring the new paste-time selection/payload evidence.
 No source/expected workload was weakened. `records/sourcery-audit.json` preserves
 the actual failed security-check output and the bounded subprocess audit rationale.
+
+`records/rich-binding-scaling.json` records the bounded later-node search candidate.
+An earlier covering match is impossible at the current cursor or when its node is
+no longer than the current node. Otherwise searching only through
+`min(source.len(), candidate - 1 + later_len)` retains every possible earlier
+match and the original first-match semantics, including paragraph gaps. Native
+tests compare the original predicate on 40,000 deterministic UTF-16 cases; fresh
+C# differential tests pass 76/76 cases. Matched headless full-result parity passes
+on nine cases. Process-inclusive scaling timings are diagnostic, not a campaign
+score; the three frozen rich cases show no established practical benefit.
+
+The first generated 1000-span all-nodes correction was refused by both binaries
+with `alignment_budget_exceeded`, and remains a rejected diagnostic. A separate
+single sparse-edit stress case applies correctly; no frozen campaign input,
+expected output or correctness gate changed. Reproduce the diagnostic with
+`python bench/campaign/check_rich_scaling.py --control <saved-control.exe> --candidate <candidate.exe> --output <fresh-directory>`.
+`resume.json` contains commands and required gates. Do not run its desktop commands
+until the actual Chrome tool app grant exists; the CLI flag asserts that grant and
+cannot create it.

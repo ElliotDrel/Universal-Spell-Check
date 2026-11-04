@@ -1,0 +1,372 @@
+{
+  "scope": "scaling candidate only; not live latency, editor correctness or campaign acceptance",
+  "live_api_requests": 0,
+  "optimization_loops": 0,
+  "source_reference": "29de3a14251bf8debd4d8e7df1f558afdbac6216 plus bounded rich.rs search",
+  "source_sha256": "7cd48b5391d4274a1db427f75e1bb0713c31fa6f3786940a34d75e78d50f7926",
+  "predicate_parity": {
+    "comparisons": 40000,
+    "passed": true,
+    "seed": 20261104
+  },
+  "csharp_differential": {
+    "cases": 76,
+    "passed": 76,
+    "failed": 0
+  },
+  "failed_attempts": [
+    {
+      "kind": "fresh C# differential in restricted context",
+      "outcome": "NuGet restore NU1301 TLS credential context failure; no comparison executed",
+      "resolution": "Normal-context rerun passed all 76 cases"
+    },
+    {
+      "kind": "1000-span generated all-nodes correction",
+      "outcome": "Both binaries exact output parity, both refused alignment_budget_exceeded; correctness gate rejected the diagnostic",
+      "accepted": false,
+      "report": {
+        "scope": "headless process-inclusive mapper diagnostic; no clipboard/editor/API/live score",
+        "actual_http_requests": 0,
+        "executable_sha256": {
+          "control": "c0eb18997bfe31c3d3af04d389d8d4498c0c234ec8659fd13ef86ede819b5204",
+          "candidate": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+        },
+        "cases": [
+          {
+            "case_id": "rich-link",
+            "exact_output_parity": true,
+            "expected_text_and_applied": true,
+            "process_ms": {
+              "control": [
+                345.4520998056978,
+                159.354800125584,
+                142.59469998069108,
+                189.1044001094997
+              ],
+              "candidate": [
+                602.6749999728054,
+                163.78359985537827,
+                163.05470000952482,
+                185.8725999481976
+              ]
+            },
+            "median_process_ms": {
+              "control": 174.22960011754185,
+              "candidate": 174.82809990178794
+            }
+          },
+          {
+            "case_id": "rich-list",
+            "exact_output_parity": true,
+            "expected_text_and_applied": true,
+            "process_ms": {
+              "control": [
+                213.16859987564385,
+                227.50680008903146,
+                185.9546999912709,
+                182.588400086388
+              ],
+              "candidate": [
+                351.039299974218,
+                315.42890006676316,
+                180.17759989015758,
+                173.40820003300905
+              ]
+            },
+            "median_process_ms": {
+              "control": 199.56164993345737,
+              "candidate": 247.80324997846037
+            }
+          },
+          {
+            "case_id": "structured",
+            "exact_output_parity": true,
+            "expected_text_and_applied": true,
+            "process_ms": {
+              "control": [
+                164.18660013005137,
+                373.6395000014454,
+                113.78580005839467,
+                134.82490018941462
+              ],
+              "candidate": [
+                129.33539994992316,
+                135.60419995337725,
+                147.61310000903904,
+                115.67060020752251
+              ]
+            },
+            "median_process_ms": {
+              "control": 149.505750159733,
+              "candidate": 132.4697999516502
+            }
+          },
+          {
+            "case_id": "scaling-100-spans",
+            "exact_output_parity": true,
+            "expected_text_and_applied": true,
+            "process_ms": {
+              "control": [
+                253.70489992201328,
+                785.4271000251174,
+                379.3495998252183,
+                291.9811001047492
+              ],
+              "candidate": [
+                249.25170000642538,
+                372.9574999306351,
+                445.75270009227097,
+                271.34119998663664
+              ]
+            },
+            "median_process_ms": {
+              "control": 335.66534996498376,
+              "candidate": 322.14934995863587
+            }
+          },
+          {
+            "case_id": "scaling-1000-spans",
+            "exact_output_parity": true,
+            "expected_text_and_applied": false,
+            "process_ms": {
+              "control": [
+                8477.467100135982,
+                7278.960699914023,
+                7610.138599993661,
+                10969.01150001213
+              ],
+              "candidate": [
+                120.9082999266684,
+                110.37299991585314,
+                314.34680009260774,
+                226.60470008850098
+              ]
+            },
+            "median_process_ms": {
+              "control": 8043.8028500648215,
+              "candidate": 173.7565000075847
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "matched_sparse_diagnostic": {
+    "scope": "headless process-inclusive mapper diagnostic; no clipboard/editor/API/live score",
+    "actual_http_requests": 0,
+    "executable_sha256": {
+      "control": "c0eb18997bfe31c3d3af04d389d8d4498c0c234ec8659fd13ef86ede819b5204",
+      "candidate": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+    },
+    "cases": [
+      {
+        "case_id": "rich-link",
+        "exact_output_parity": true,
+        "expected_text_and_applied": true,
+        "process_ms": {
+          "control": [
+            284.8784998059273,
+            126.61379994824529,
+            115.83840008825064,
+            117.18179984018207
+          ],
+          "candidate": [
+            286.2909999676049,
+            118.72559995390475,
+            124.94809995405376,
+            123.8124999217689
+          ]
+        },
+        "median_process_ms": {
+          "control": 121.89779989421368,
+          "candidate": 124.38029993791133
+        }
+      },
+      {
+        "case_id": "rich-list",
+        "exact_output_parity": true,
+        "expected_text_and_applied": true,
+        "process_ms": {
+          "control": [
+            124.33709995821118,
+            118.5921998694539,
+            116.41269992105663,
+            147.25810009986162
+          ],
+          "candidate": [
+            125.3490000963211,
+            131.4062001183629,
+            121.52149993926287,
+            100.33530020155013
+          ]
+        },
+        "median_process_ms": {
+          "control": 121.46464991383255,
+          "candidate": 123.43525001779199
+        }
+      },
+      {
+        "case_id": "structured",
+        "exact_output_parity": true,
+        "expected_text_and_applied": true,
+        "process_ms": {
+          "control": [
+            126.80070009082556,
+            126.17300008423626,
+            117.35689989291131,
+            167.8832999896258
+          ],
+          "candidate": [
+            129.06139995902777,
+            112.65639984048903,
+            115.78339990228415,
+            138.8430001679808
+          ]
+        },
+        "median_process_ms": {
+          "control": 126.48685008753091,
+          "candidate": 122.42239993065596
+        }
+      },
+      {
+        "case_id": "scaling-100-spans",
+        "exact_output_parity": true,
+        "expected_text_and_applied": true,
+        "process_ms": {
+          "control": [
+            176.02170002646744,
+            168.7356000766158,
+            170.14480009675026,
+            170.7695999648422
+          ],
+          "candidate": [
+            151.24529995955527,
+            152.61660004034638,
+            164.652599953115,
+            162.65399986878037
+          ]
+        },
+        "median_process_ms": {
+          "control": 170.45720003079623,
+          "candidate": 157.63529995456338
+        }
+      },
+      {
+        "case_id": "scaling-1000-spans",
+        "exact_output_parity": true,
+        "expected_text_and_applied": true,
+        "process_ms": {
+          "control": [
+            7385.906399926171,
+            7159.288899973035,
+            7052.402399946004,
+            7158.407300012186
+          ],
+          "candidate": [
+            203.74209992587566,
+            140.2276000007987,
+            122.48859996907413,
+            127.36640009097755
+          ]
+        },
+        "median_process_ms": {
+          "control": 7158.8480999926105,
+          "candidate": 133.79700004588813
+        }
+      },
+      {
+        "case_id": "edge-0",
+        "exact_output_parity": true,
+        "expected_text_and_applied": null,
+        "process_ms": {
+          "control": [
+            115.90179987251759,
+            114.91270014084876,
+            114.93819998577237,
+            115.36049982532859
+          ],
+          "candidate": [
+            114.02889993041754,
+            114.52049994841218,
+            99.66660011559725,
+            97.17810014262795
+          ]
+        },
+        "median_process_ms": {
+          "control": 115.14934990555048,
+          "candidate": 106.84775002300739
+        }
+      },
+      {
+        "case_id": "edge-1",
+        "exact_output_parity": true,
+        "expected_text_and_applied": null,
+        "process_ms": {
+          "control": [
+            117.39630019292235,
+            117.79980012215674,
+            174.59459998644888,
+            103.18899992853403
+          ],
+          "candidate": [
+            134.9946998525411,
+            117.13259993121028,
+            214.62210011668503,
+            219.76779983378947
+          ]
+        },
+        "median_process_ms": {
+          "control": 117.59805015753955,
+          "candidate": 174.80839998461306
+        }
+      },
+      {
+        "case_id": "edge-2",
+        "exact_output_parity": true,
+        "expected_text_and_applied": null,
+        "process_ms": {
+          "control": [
+            128.32239991985261,
+            163.99109992198646,
+            131.58480008132756,
+            204.77530010975897
+          ],
+          "candidate": [
+            141.29870012402534,
+            126.77580001764,
+            123.14629997126758,
+            222.23019995726645
+          ]
+        },
+        "median_process_ms": {
+          "control": 147.787950001657,
+          "candidate": 134.03725007083267
+        }
+      },
+      {
+        "case_id": "edge-3",
+        "exact_output_parity": true,
+        "expected_text_and_applied": null,
+        "process_ms": {
+          "control": [
+            124.7044000774622,
+            128.0668000690639,
+            148.23310007341206,
+            126.3483997900039
+          ],
+          "candidate": [
+            295.44569994322956,
+            285.63840012066066,
+            135.59240009635687,
+            131.31819991394877
+          ]
+        },
+        "median_process_ms": {
+          "control": 127.2075999295339,
+          "candidate": 210.61540010850877
+        }
+      }
+    ]
+  },
+  "decision": "Retain bounded search as a headless-verified scaling candidate. Frozen three rich cases and sparse stress outputs apply and match expected text; four edge cases assert full result parity only. Live baseline/confirmation and rich-list desktop gate remain pending; no live improvement claim."
+}

@@ -1,7 +1,7 @@
 {
   "scope": "measurement foundation only; not live campaign acceptance",
   "rust_tests": {
-    "passed": 56,
+    "passed": 57,
     "failed": 0,
     "ignored": 1
   },
@@ -32,7 +32,7 @@
   "native_contracts": "Frozen production pipeline passed; mutated-output negative control rejected",
   "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2",
   "prod_rust_tests": {
-    "passed": 56,
+    "passed": 57,
     "failed": 0,
     "ignored": 0
   },
@@ -45,14 +45,38 @@
     "passed": 5,
     "failed": 0
   },
-  "verified_source_sha256": "dd627ff207295631d239b3cb5bbe0dadd776074c51e66cc4ff643bc793409c2f",
+  "verified_source_sha256": "7cd48b5391d4274a1db427f75e1bb0713c31fa6f3786940a34d75e78d50f7926",
   "release_binary_sha256": {
-    "dev": "c0eb18997bfe31c3d3af04d389d8d4498c0c234ec8659fd13ef86ede819b5204",
-    "prod": "e4530eeef868c72f1ac7971c8c932b8ebbced22b276319a5d0d108da485745f5"
+    "dev": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a",
+    "prod": "a217891a861420900b9450bbf2831b4e7d66aa725636e956ed9888080769e712"
   },
   "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
   "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
   "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup",
   "source_hash_algorithm": "SHA256 of concatenated UTF8 basename, NUL, file bytes for sorted rust/src/*.rs",
-  "verification_record": "Prepared local verification-05; all eight checks exited 0; source hash uses the campaign runner formula"
+  "verification_record": "Local verification-08 format/tests/Clippy/both Release builds/Prod contracts passed; restricted C# restore failed NU1301 before parity. Fresh normal-context parity-normal-09 passed 76/76. Separately 12 campaign tests and 3 native fixture replays passed; matched sparse diagnostic 9/9 full result parity.",
+  "editor_serialization_tests": {
+    "passed": 2,
+    "failed": 0,
+    "scope": "minimal DOM adapter, not Chrome acceptance"
+  },
+  "csharp_differential": {
+    "passed": 76,
+    "failed": 0,
+    "context": "normal Windows context; restricted first attempt failed during NuGet restore, preserved"
+  },
+  "fixture_mapper_replay": {
+    "passed": 3,
+    "failed": 0,
+    "scope": "native mapper only"
+  },
+  "rich_binding_predicate_comparisons": 40000,
+  "rich_full_result_parity": {
+    "passed": 9,
+    "failed": 0
+  },
+  "failed_diagnostics": [
+    "1000-span all-nodes edit: both exact outputs refused alignment_budget_exceeded; rejected and retained",
+    "Restricted-context C# differential: NuGet TLS credential context failure; normal-context retry passed"
+  ]
 }

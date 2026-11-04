@@ -428,6 +428,21 @@ fn find(hay: &[u16], needle: &[u16], from: usize) -> Option<usize> {
         .position(|s| s == needle)
         .map(|p| p + from)
 }
+fn earlier_cover(
+    source: &[u16],
+    later: &[u16],
+    cursor: usize,
+    candidate: usize,
+    len: usize,
+) -> bool {
+    if candidate == cursor || later.len() <= len {
+        return false;
+    }
+    // An earlier match must end by (candidate - 1) + its length. Keep first-find semantics.
+    let end = source.len().min(candidate.saturating_add(later.len() - 1));
+    find(&source[..end], later, cursor)
+        .is_some_and(|p| p < candidate && p + later.len() >= candidate + len)
+}
 fn owner(nodes: &[Node], p: usize) -> Option<usize> {
     nodes
         .iter()
@@ -516,11 +531,16 @@ fn align(fragment: &str, source: &str, corrected: &str, nbsp: bool) -> Rich {
     for index in 0..nodes.len() {
         let candidate = find(&source, &nodes[index].text, cursor);
         let later = candidate.is_some_and(|candidate| {
-            nodes[index + 1..].iter().any(|node| {
-                find(&source, &node.text, cursor).is_some_and(|p| {
-                    p < candidate && p + node.text.len() >= candidate + nodes[index].text.len()
+            candidate > cursor
+                && nodes[index + 1..].iter().any(|node| {
+                    earlier_cover(
+                        &source,
+                        &node.text,
+                        cursor,
+                        candidate,
+                        nodes[index].text.len(),
+                    )
                 })
-            })
         });
         if !later && let Some(p) = candidate {
             nodes[index].position = Some(p);
@@ -716,6 +736,51 @@ fn docs_rewrite(fragment: &str, copied: &str, corrected: &str, native: &[u8]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bounded_later_search_preserves_the_original_first_match() {
+        fn original(
+            source: &[u16],
+            later: &[u16],
+            cursor: usize,
+            candidate: usize,
+            len: usize,
+        ) -> bool {
+            find(source, later, cursor)
+                .is_some_and(|p| p < candidate && p + later.len() >= candidate + len)
+        }
+        // A later overlapping occurrence cannot replace the first, non-covering occurrence.
+        let repeated = units("abababX");
+        assert!(!earlier_cover(&repeated, &units("abab"), 0, 4, 2));
+        assert!(earlier_cover(
+            &units("\n\nlong node"),
+            &units("long node"),
+            0,
+            7,
+            2
+        ));
+        let alphabet = units("ab \n🙂é");
+        let mut seed = 20261104u64;
+        let mut next = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (seed >> 32) as usize
+        };
+        for _ in 0..40_000 {
+            let source: Vec<u16> = (0..next() % 80 + 1)
+                .map(|_| alphabet[next() % alphabet.len()])
+                .collect();
+            let cursor = next() % source.len();
+            let candidate = cursor + next() % (source.len() - cursor);
+            let len = 1 + next() % (source.len() - candidate);
+            let start = next() % source.len();
+            let end = start + next() % (source.len() - start + 1);
+            let later = &source[start..end];
+            assert_eq!(
+                earlier_cover(&source, later, cursor, candidate, len),
+                original(&source, later, cursor, candidate, len),
+                "cursor={cursor}, candidate={candidate}, len={len}, later={later:?}"
+            );
+        }
+    }
     #[test]
     fn precise_alignment_budget_exhaustion_is_explicit() {
         let source = "a".repeat(5000);
