@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 pub fn transform(value: &Value, replacements: &Replacements) -> Result<Value, String> {
     let source = value["input"].as_str().unwrap_or("");
-    let protection = Protection::new(source)?;
+    let protection = Protection::for_target(source, value["active_exe"].as_str().unwrap_or(""))?;
     let raw = value["raw_ai_output"].as_str().unwrap_or("");
     let (model_output, applied, leak, echo) = replacements.process(raw, &protection)?;
     let native = STANDARD

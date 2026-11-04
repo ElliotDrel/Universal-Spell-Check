@@ -90,6 +90,24 @@ Use full JSON parse when many nested fields are needed or structure varies. Keep
 
 ## Local formatting replay
 
+When developer clipboard readback reports `source_changed`, compare its retained
+payload hashes with the requested paste before inferring that the content changed.
+Both `expected_sequence` and observed `sequence` are logged; a mismatch retains
+that warning even when payloads agree. Older captures discarded the observed
+payload on mismatch and cannot resolve clipboard-content questions retroactively.
+
+For desktop T3 Code, `--transform-json <replacements.json>` accepts `active_exe`
+alongside `input`/`raw_ai_output`/`source_html` to exercise actual target protection
+and restoration. A failed historical run may have no corrected output and therefore
+cannot be exported as a rich-mapper case: preserve the reader's JSON and validated
+sidecars, reproduce the historical processing refusal, and label any simulated
+corrected response explicitly. Never present that simulation as a new model result.
+`cargo test --manifest-path rust/Cargo.toml live_synthetic_citation -- --ignored --nocapture`
+runs one fixed public synthetic citation case through the saved Dev model/key only when
+`USC_T3_ALLOW_API=1` is explicitly set. It reads settings/keys without saving them and
+uses no UI or clipboard. Normal tests never make these API calls. Original-editor
+acceptance remains separate; do not automate T3's UI against Elliot's standing prohibition.
+
 For Rust changes, use the built executable's `--rich-json` entry point with `source_html`, `input`,
 `output` and optional `native_base64` from the validated saved case. The C# replay below remains the
 reference oracle. Include varied structure and length checks, not only the reported selection:

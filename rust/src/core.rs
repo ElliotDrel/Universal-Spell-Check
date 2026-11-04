@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use std::sync::LazyLock;
 
 pub const PROMPT: &str = "Fix the grammar and spelling of the text below. Preserve all formatting, line breaks, and special characters. Do not add or remove any content. Return only the corrected text.";
+const T3_INSTRUCTIONS: &str = "Every __USC_LITERAL_N_M__ token is immutable content, including standalone tokens. Copy every token exactly once in its original order.";
 static LITERALS: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(include_str!("literal_regex.txt")).expect("literal regex"));
 
@@ -17,9 +18,32 @@ pub struct Literal {
 pub struct Protection {
     pub text: String,
     pub entries: Vec<Literal>,
+    #[serde(skip)]
+    t3_citations: bool,
 }
 impl Protection {
+    fn prompt(&self) -> String {
+        if self.t3_citations {
+            format!("{PROMPT} {T3_INSTRUCTIONS}")
+        } else {
+            PROMPT.into()
+        }
+    }
+    pub fn payload(&self, model: &str) -> Value {
+        let mut result = payload(&self.text, model);
+        if self.t3_citations {
+            result["input"][0]["content"][0]["text"] = json!(format!(
+                "instructions: {}\ntext input: {}",
+                self.prompt(),
+                self.text
+            ));
+        }
+        result
+    }
     pub fn new(text: &str) -> Result<Self, String> {
+        Self::for_target(text, "")
+    }
+    pub fn for_target(text: &str, process: &str) -> Result<Self, String> {
         let mut namespace = 0;
         while text.contains(&format!("__USC_LITERAL_{namespace}_")) {
             namespace += 1;
@@ -42,6 +66,13 @@ impl Protection {
                 .into_iter()
                 .map(|(start, end)| (start, end, "url")),
         );
+        let citation_ranges = if crate::t3::matches(process) {
+            crate::t3::citation_ranges(text)
+        } else {
+            Vec::new()
+        };
+        let t3_citations = !citation_ranges.is_empty();
+        spans.extend(citation_ranges.into_iter().map(|(a, b)| (a, b, "url")));
         spans.sort_by_key(|(start, end, _)| (*start, std::cmp::Reverse(*end)));
         for (start, end, kind) in spans {
             if start < cursor {
@@ -61,6 +92,7 @@ impl Protection {
         Ok(Self {
             text: output,
             entries,
+            t3_citations,
         })
     }
     pub fn restore(&self, mut text: String) -> Result<String, String> {
@@ -73,6 +105,15 @@ impl Protection {
             return Err(
                 "The model changed a protected literal; selection was left unchanged.".into(),
             );
+        }
+        if self.t3_citations {
+            let mut cursor = 0;
+            for entry in &self.entries {
+                let position = text[cursor..].find(&entry.placeholder).ok_or(
+                    "The model reordered protected citation content; selection was left unchanged.",
+                )?;
+                cursor += position + entry.placeholder.len();
+            }
         }
         for entry in &self.entries {
             text = text.replace(&entry.placeholder, &entry.value);
@@ -142,7 +183,7 @@ impl Replacements {
         let deecho = strip_echo(output, &protection.text);
         let echo_removed = deecho != output;
         let (mut text, applied) = self.apply(deecho);
-        let leak = format!("instructions: {PROMPT}");
+        let leak = format!("instructions: {}", protection.prompt());
         let triggered = text.contains(&leak);
         if triggered {
             text = text.replace(&leak, "").trim_start().to_owned();

@@ -438,17 +438,57 @@ fn save_inner(
 // Verify before injecting input: a reader after SendInput can lock out the target's paste.
 // Diagnostics never wait for clipboard access and never open it in a post-input worker.
 pub fn readback_before_input(owner: usize, sequence: u32) -> Value {
+    readback_result(crate::clipboard::read_immediate(owner as _), sequence)
+}
+fn readback_result(result: Result<crate::clipboard::Clipboard, String>, sequence: u32) -> Value {
     use base64::Engine;
-    let mut value = match crate::clipboard::read_immediate(owner as _) {
-        Ok(data) if data.sequence == sequence => json!({
-            "status":"ok", "captured_at":now(), "sequence":sequence,
+    let mut value = match result {
+        Ok(data) => json!({
+            "status":if data.sequence == sequence {"ok"} else {"source_changed"},
+            "captured_at":now(), "sequence":data.sequence, "expected_sequence":sequence,
             "readback_text":data.text, "readback_html":data.html, "readback_rtf":data.rtf,
             "readback_formats":data.formats,
             "readback_chromium_mime_base64":base64::engine::general_purpose::STANDARD.encode(data.native)
         }),
-        Ok(_) => json!({"status":"source_changed"}),
-        Err(_) => json!({"status":"busy_or_unavailable"}),
+        Err(_) => json!({"status":"busy_or_unavailable", "expected_sequence":sequence}),
     };
     value["boundary"] = json!("after_clipboard_write_before_input");
     value
+}
+
+#[cfg(test)]
+mod readback_tests {
+    use super::*;
+
+    #[test]
+    fn sequence_mismatch_keeps_observed_payload_without_claiming_verification() {
+        let data = crate::clipboard::Clipboard {
+            sequence: 42,
+            text: "1. Corrected item".into(),
+            html: "<pre>1. Corrected item</pre>".into(),
+            formats: "UnicodeText,HTML Format".into(),
+            native: vec![1, 2, 3],
+            ..Default::default()
+        };
+        for expected in [41, 42] {
+            let result = readback_result(Ok(data.clone()), expected);
+            assert_eq!(
+                result["status"],
+                if expected == 42 {
+                    "ok"
+                } else {
+                    "source_changed"
+                }
+            );
+            assert_eq!(result["sequence"], 42);
+            assert_eq!(result["expected_sequence"], expected);
+            assert_eq!(result["readback_text"], data.text);
+            assert_eq!(result["readback_html"], data.html);
+            assert_eq!(result["readback_chromium_mime_base64"], "AQID");
+        }
+        let failed = readback_result(Err("busy".into()), 41);
+        assert_eq!(failed["status"], "busy_or_unavailable");
+        assert_eq!(failed["expected_sequence"], 41);
+        assert!(failed.get("readback_text").is_none());
+    }
 }

@@ -5,6 +5,13 @@
 
 ## Current caller
 
+Desktop T3 Code selections containing assistant citations append an instruction to
+copy each protected placeholder exactly once, including standalone tokens. Other
+T3 selections and other applications retain the existing prompt. Standard/reasoning
+parameter selection is unchanged. `Protection::payload` and the prompt-leak guard
+use the same instruction. A live synthetic test showed that whole-citation protection
+alone could still be omitted; the explicit instruction addressed that failure.
+
 `rust/src/http.rs` — persistent app-lifetime WinHTTP session/connection, sends directly to the Responses API. `src/OpenAiSpellcheckService.cs` is the retained C# reference with its own `HttpClient`. Settings supports `gpt-4.1` (default) and `gpt-5.4-mini`; changes apply to the next request.
 
 ## API key storage
@@ -55,7 +62,10 @@ instructions: <PromptInstruction>
 text input: <selected text>
 ```
 
-`PromptInstruction` is the constant string in `OpenAiSpellcheckService.PromptInstruction`. `TextPostProcessor` strips echoed `instructions:`/`text input:` text before paste.
+The Rust instruction is `core::PROMPT`; `Protection::payload` adds the T3-specific
+suffix when applicable. `Replacements::process` strips an echoed instruction and
+`text input:` before restoration. `OpenAiSpellcheckService.PromptInstruction` and
+`TextPostProcessor` remain the retained C# reference, superseded as runtime owners.
 
 ---
 
