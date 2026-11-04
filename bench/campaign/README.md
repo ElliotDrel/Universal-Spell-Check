@@ -1,6 +1,8 @@
 # Live performance campaign
 
-Status: setup; no fresh baseline or optimization accepted.
+Status: setup; native per-benchmark HTTP cap implemented and two cap tests pass.
+No fresh baseline or optimization accepted. Current main has been incorporated;
+`711ff37` remains the historical starting source, not a fresh baseline.
 
 This campaign starts at `711ff37`. Historical experiments are evidence, not
 accepted improvements. Keep production and the primary checkout unchanged.
@@ -31,7 +33,8 @@ each arm's coverage rather than mixing arms into one score.
 
 Prerequisites before baseline:
 
-1. Enforce and test the native send-attempt cap including retries.
+1. Native per-process send cap is implemented. Aggregate campaign allocation and
+   runner integration remain pending; never launch more benchmarks manually.
 2. Validate out-of-process destination observation, including unchanged paste,
    nested messages, text and rich structure checks; reject injected wrong output.
 3. Freeze evaluator, cases, settings/prompt hashes and run schedule.
@@ -43,3 +46,16 @@ per-case results, failures, correctness verdict, decision and next hypothesis.
 Do not merge, release, or close independent UI/audit work.
 
 Resume state is `state.json`. No incomplete experiment counts as a completed loop.
+
+`cases-v1.json` and seeded `schedule-v1.json` propose 100 measured attempts:
+nine repetitions for each of eleven cases, plus a tenth short case. There are
+no excluded warmups. Retries consume request slots and can prevent completion;
+retain that incomplete benchmark rather than replenishing its budget. Fixtures
+must pass the independent observer pilot before this schedule is executed.
+
+`score.py` reports equal-weight per-case medians only on complete evidence.
+It refuses recorded API results, same-process observation, missing text/format
+verification and failed coverage. It does not independently attest supplied
+evidence fields, settings hashes, budget ledgers or fixture provenance. The
+runner must verify those before acceptance. `test_score.py` uses synthetic
+rows only to test the evaluator, never as performance evidence.

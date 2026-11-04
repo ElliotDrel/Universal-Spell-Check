@@ -10,5 +10,9 @@
   "goal_verified": false,
   "baseline": null,
   "iterations": [],
-  "next": "Implement and verify native HTTP attempt accounting and independent destination observer before live baseline"
+  "native_request_cap": "implemented; 2 focused tests passed",
+  "aggregate_campaign_guard": "pending",
+  "destination_observer": "pending independent process and rendered-format pilot",
+  "evaluator": "score.py; 3 regression tests passed; provenance gate pending",
+  "next": "Integrate aggregate allocation and independent destination observer; validate proposed cases/schedule before live baseline"
 }
