@@ -1,0 +1,1083 @@
+{
+  "scope": "offline fixture correctness only, never live latency acceptance",
+  "actual_live_requests": 0,
+  "app_permission": "Normal Chrome get_app_state succeeded after user allowed access",
+  "preflight_failure": "First resumed attempt found absent Prod settings.json; native default behavior now bound without creating Prod files",
+  "failed_pilot": {
+    "attempted": 10,
+    "passed": 9,
+    "attempts": [
+      {
+        "case_id": "short",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 232.7132,
+        "observed": {
+          "case_id": "short",
+          "repetition": 0,
+          "text": "This is a test.",
+          "selection_collapsed": true,
+          "html": "This is a test.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "This is a tset.",
+            "clipboard_text": "This is a test.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "paragraph",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 92.1798,
+        "observed": {
+          "case_id": "paragraph",
+          "repetition": 0,
+          "text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+          "selection_collapsed": true,
+          "html": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together.",
+            "clipboard_text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "long",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 93.8395,
+        "observed": {
+          "case_id": "long",
+          "repetition": 0,
+          "text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+          "selection_collapsed": true,
+          "html": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+            "clipboard_text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "unchanged",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 100.6886,
+        "observed": {
+          "case_id": "unchanged",
+          "repetition": 0,
+          "text": "The meeting starts at noon.",
+          "selection_collapsed": true,
+          "html": "The meeting starts at noon.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The meeting starts at noon.",
+            "clipboard_text": "The meeting starts at noon.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "brands",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 92.0372,
+        "observed": {
+          "case_id": "brands",
+          "repetition": 0,
+          "text": "We use OpenAI and GitHub for this project.",
+          "selection_collapsed": true,
+          "html": "We use OpenAI and GitHub for this project.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "We use open ai and github for this projcet.",
+            "clipboard_text": "We use OpenAI and GitHub for this project.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "literals",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 92.834,
+        "observed": {
+          "case_id": "literals",
+          "repetition": 0,
+          "text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+          "selection_collapsed": true,
+          "html": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+            "clipboard_text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "unicode",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 87.6218,
+        "observed": {
+          "case_id": "unicode",
+          "repetition": 0,
+          "text": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+          "selection_collapsed": true,
+          "html": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The caf\u00e9 opens tomorow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+            "clipboard_text": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "multiline",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 98.0308,
+        "observed": {
+          "case_id": "multiline",
+          "repetition": 0,
+          "text": "Please check the notes.\n\nThen send the documents.",
+          "selection_collapsed": true,
+          "html": "Please check the notes.\n\nThen send the documents.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "Please chek the notes.\n\nThen send the documants.",
+            "clipboard_text": "Please check the notes.\n\nThen send the documents.",
+            "clipboard_html": ""
+          }
+        }
+      },
+      {
+        "case_id": "rich-link",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 93.9456,
+        "observed": {
+          "case_id": "rich-link",
+          "repetition": 0,
+          "text": "Please check the guide.",
+          "selection_collapsed": true,
+          "html": "<p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p>",
+          "shape": {
+            "links": [
+              [
+                "guide",
+                "https://example.com/guide"
+              ]
+            ],
+            "bold": [
+              "check"
+            ],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "<p data-pm-slice=\"0 0 []\">Please <strong>chek</strong> the <a href=\"https://example.com/guide\">guide</a>.</p>",
+            "clipboard_text": "Please check the guide.",
+            "clipboard_html": "<html>\r\n<body>\r\n<!--StartFragment--><p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p><!--EndFragment-->\r\n</body>\r\n</html>"
+          }
+        }
+      },
+      {
+        "case_id": "rich-list",
+        "success": true,
+        "text_verified": false,
+        "format_verified": false,
+        "live_api": false,
+        "verified_insertion_ms": null,
+        "observed": {
+          "case_id": "rich-list",
+          "repetition": 0,
+          "text": "1. First item.\n\nSecond item.",
+          "selection_collapsed": true,
+          "html": "<ol data-pm-slice=\"0 0 []\"><li><ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol></li></ol>",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 2,
+            "items": 3,
+            "code": [],
+            "list_structure": [
+              [
+                "ol",
+                0,
+                1,
+                [
+                  1
+                ],
+                [
+                  "decimal"
+                ]
+              ],
+              [
+                "ol",
+                1,
+                2,
+                [
+                  1,
+                  2
+                ],
+                [
+                  "decimal",
+                  "decimal"
+                ]
+              ]
+            ]
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "<ol data-pm-slice=\"0 0 []\"><li><p>First itme.</p></li><li><p>Second itme.</p></li></ol>",
+            "clipboard_text": "1. First item.\n2. Second item.",
+            "clipboard_html": "<html>\r\n<body>\r\n<!--StartFragment--><ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol><!--EndFragment-->\r\n</body>\r\n</html>"
+          }
+        }
+      }
+    ],
+    "integrity": {
+      "production_unchanged": true,
+      "startup_unchanged": true,
+      "worker_stopped": true,
+      "clipboard_verified": true,
+      "restoration_error": null
+    }
+  },
+  "resolution": "Chrome received correct flat list HTML but retained outer list item during default full-selection paste. Disposable editor now deletes exactly the full root selection before native default paste; no preventDefault, output injection or expectations changed.",
+  "positive": {
+    "attempted": 11,
+    "passed": 11,
+    "attempts": [
+      {
+        "case_id": "short",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 271.5787,
+        "observed": {
+          "case_id": "short",
+          "repetition": 0,
+          "text": "This is a test.",
+          "selection_collapsed": true,
+          "html": "This is a test.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "This is a tset.",
+            "clipboard_text": "This is a test.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "paragraph",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 83.4834,
+        "observed": {
+          "case_id": "paragraph",
+          "repetition": 0,
+          "text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+          "selection_collapsed": true,
+          "html": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together.",
+            "clipboard_text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "long",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 93.301,
+        "observed": {
+          "case_id": "long",
+          "repetition": 0,
+          "text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+          "selection_collapsed": true,
+          "html": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+            "clipboard_text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "unchanged",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 97.0033,
+        "observed": {
+          "case_id": "unchanged",
+          "repetition": 0,
+          "text": "The meeting starts at noon.",
+          "selection_collapsed": true,
+          "html": "The meeting starts at noon.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The meeting starts at noon.",
+            "clipboard_text": "The meeting starts at noon.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "brands",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 94.4308,
+        "observed": {
+          "case_id": "brands",
+          "repetition": 0,
+          "text": "We use OpenAI and GitHub for this project.",
+          "selection_collapsed": true,
+          "html": "We use OpenAI and GitHub for this project.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "We use open ai and github for this projcet.",
+            "clipboard_text": "We use OpenAI and GitHub for this project.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "literals",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 88.4477,
+        "observed": {
+          "case_id": "literals",
+          "repetition": 0,
+          "text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+          "selection_collapsed": true,
+          "html": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+            "clipboard_text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "unicode",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 102.2902,
+        "observed": {
+          "case_id": "unicode",
+          "repetition": 0,
+          "text": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+          "selection_collapsed": true,
+          "html": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "The caf\u00e9 opens tomorow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+            "clipboard_text": "The caf\u00e9 opens tomorrow. Bring your r\u00e9sum\u00e9. \ud83d\ude42",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "multiline",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 95.3906,
+        "observed": {
+          "case_id": "multiline",
+          "repetition": 0,
+          "text": "Please check the notes.\n\nThen send the documents.",
+          "selection_collapsed": true,
+          "html": "Please check the notes.\n\nThen send the documents.",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "Please chek the notes.\n\nThen send the documants.",
+            "clipboard_text": "Please check the notes.\n\nThen send the documents.",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "rich-link",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 91.7353,
+        "observed": {
+          "case_id": "rich-link",
+          "repetition": 0,
+          "text": "Please check the guide.",
+          "selection_collapsed": true,
+          "html": "<p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p>",
+          "shape": {
+            "links": [
+              [
+                "guide",
+                "https://example.com/guide"
+              ]
+            ],
+            "bold": [
+              "check"
+            ],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "<p data-pm-slice=\"0 0 []\">Please <strong>chek</strong> the <a href=\"https://example.com/guide\">guide</a>.</p>",
+            "clipboard_text": "Please check the guide.",
+            "clipboard_html": "<html>\r\n<body>\r\n<!--StartFragment--><p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p><!--EndFragment-->\r\n</body>\r\n</html>",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "rich-list",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 98.7635,
+        "observed": {
+          "case_id": "rich-list",
+          "repetition": 0,
+          "text": "1. First item.\n2. Second item.",
+          "selection_collapsed": true,
+          "html": "<ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol>",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 1,
+            "items": 2,
+            "code": [],
+            "list_structure": [
+              [
+                "ol",
+                0,
+                2,
+                [
+                  1,
+                  2
+                ],
+                [
+                  "decimal",
+                  "decimal"
+                ]
+              ]
+            ]
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "<ol data-pm-slice=\"0 0 []\"><li><p>First itme.</p></li><li><p>Second itme.</p></li></ol>",
+            "clipboard_text": "1. First item.\n2. Second item.",
+            "clipboard_html": "<html>\r\n<body>\r\n<!--StartFragment--><ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol><!--EndFragment-->\r\n</body>\r\n</html>",
+            "full_document_selection_deleted": true
+          }
+        }
+      },
+      {
+        "case_id": "structured",
+        "success": true,
+        "text_verified": true,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": 96.6514,
+        "observed": {
+          "case_id": "structured",
+          "repetition": 0,
+          "text": "Please check these items:\n\n1. First document.\n2. Use C:\\sample\\notes.txt and the guide.",
+          "selection_collapsed": true,
+          "html": "<div data-pm-slice=\"1 1 []\"><p>Please <strong>check</strong> these items:</p><ol><li><p>First document.</p></li><li><p>Use <code>C:\\sample\\notes.txt</code> and the <a href=\"https://example.com/guide\">guide</a>.</p></li></ol></div>",
+          "shape": {
+            "links": [
+              [
+                "guide",
+                "https://example.com/guide"
+              ]
+            ],
+            "bold": [
+              "check"
+            ],
+            "lists": 1,
+            "items": 2,
+            "code": [
+              "C:\\sample\\notes.txt"
+            ],
+            "list_structure": [
+              [
+                "ol",
+                0,
+                2,
+                [
+                  1,
+                  2
+                ],
+                [
+                  "decimal",
+                  "decimal"
+                ]
+              ]
+            ]
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "<div data-pm-slice=\"1 1 []\"><p>Please <strong>chek</strong> these items:</p><ol><li><p>First documant.</p></li><li><p>Use <code>C:\\sample\\notes.txt</code> and the <a href=\"https://example.com/guide\">guide</a>.</p></li></ol></div>",
+            "clipboard_text": "Please check these items:\n\n1. First document.\n2. Use C:\\sample\\notes.txt and the guide.",
+            "clipboard_html": "<html>\r\n<body>\r\n<!--StartFragment--><div data-pm-slice=\"1 1 []\"><p>Please <strong>check</strong> these items:</p><ol><li><p>First document.</p></li><li><p>Use <code>C:\\sample\\notes.txt</code> and the <a href=\"https://example.com/guide\">guide</a>.</p></li></ol></div><!--EndFragment-->\r\n</body>\r\n</html>",
+            "full_document_selection_deleted": true
+          }
+        }
+      }
+    ],
+    "integrity": {
+      "production_unchanged": true,
+      "startup_unchanged": true,
+      "worker_stopped": true,
+      "clipboard_verified": true,
+      "restoration_error": null
+    }
+  },
+  "wrong_output": {
+    "attempts": [
+      {
+        "case_id": "short",
+        "success": true,
+        "text_verified": false,
+        "format_verified": true,
+        "live_api": false,
+        "verified_insertion_ms": null,
+        "observed": {
+          "case_id": "short",
+          "repetition": 0,
+          "text": "This is a test. WRONG",
+          "selection_collapsed": true,
+          "html": "This is a test. WRONG",
+          "shape": {
+            "links": [],
+            "bold": [],
+            "lists": 0,
+            "items": 0,
+            "code": [],
+            "list_structure": []
+          },
+          "inputType": "insertFromPaste",
+          "paste_received": true,
+          "paste_context": {
+            "selection": {
+              "anchor": {
+                "inside": true,
+                "path": []
+              },
+              "anchor_offset": 0,
+              "focus": {
+                "inside": true,
+                "path": []
+              },
+              "focus_offset": 1,
+              "collapsed": false
+            },
+            "html_before": "This is a tset.",
+            "clipboard_text": "This is a test. WRONG",
+            "clipboard_html": "",
+            "full_document_selection_deleted": true
+          }
+        }
+      }
+    ],
+    "result": {
+      "passed": true,
+      "live_api": false
+    },
+    "integrity": {
+      "production_unchanged": true,
+      "startup_unchanged": true,
+      "worker_stopped": true,
+      "clipboard_verified": true,
+      "restoration_error": null
+    }
+  },
+  "binary_sha256": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+}

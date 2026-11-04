@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_commit": "711ff37",
-  "phase": "blocked_desktop_permission",
+  "phase": "live_baseline_ready",
   "actual_http_attempts": 0,
   "completed_optimization_loops": 0,
   "maximum_http_attempts": 2100,
@@ -12,20 +12,20 @@
   "iterations": [],
   "native_request_cap": "implemented; 3 focused tests passed",
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
-  "destination_observer": "Implemented; headless wrapped-paragraph regression passes; rich-list native mapper is flat but historical editor result nested; paste-time selection/clipboard evidence added, desktop retest required",
+  "destination_observer": "Fresh 11/11 positive fixture pilot and wrong-output negative control passed after verified Chrome app access",
   "evaluator": "14 scorer/evidence/editor/replay guard regressions passed; markup-shape replay requires exact frozen rich coverage; DOM adapter is serialization-only, never browser acceptance",
-  "next": "Actual Chrome app grant, then commands in resume.json; all 11 positive fixtures and wrong-output control must pass before live baseline",
-  "blocker": "Required Chrome Computer Use app approval timed out; no further desktop runs until granted",
+  "next": "Run guarded baseline with pilot-after-grant-03 and negative-after-grant-01; max100 actual native HTTP sends including warmup/retries",
+  "blocker": null,
   "case_file": "cases-v1.json",
   "schedule_file": "schedule-v2.json",
   "frozen_file_hashes": {
     "cases-v1.json": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
     "schedule-v2.json": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
     "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
-    "editor.html": "060ade346c150c943efb87ea879c9ddfe62495418a84737a452ceffccde5ce89",
+    "editor.html": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
     "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
     "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
-    "run.py": "4bd449f9481de56d9a4f19af19550638c900bf21a65c5847e463faa0cb48174a"
+    "run.py": "8a1a02c6d03ee1b55d4c568191e6e9e6464c2d37a6678f8787959de234fca9a3"
   },
   "pilot_summary": {
     "kind": "recorded-response diagnosis only",

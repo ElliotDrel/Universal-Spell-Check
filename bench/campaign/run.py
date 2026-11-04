@@ -78,7 +78,10 @@ def main():
     settings_path=settings_directory/'settings.json'
     prompt=re.search(r'pub const PROMPT: &str = "(.*?)";', (ROOT/'rust/src/core.rs').read_text()).group(1)
     binding={name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in {
-        'runner':HERE/'run.py','cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','formats':HERE/'formats-v1.json','evidence':HERE/'evidence.py','settings':settings_path,'replacements':ROOT/'replacements.json','channel_constants':ROOT/'src/BuildChannel.cs'}.items()}
+        'runner':HERE/'run.py','cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','formats':HERE/'formats-v1.json','evidence':HERE/'evidence.py','replacements':ROOT/'replacements.json','channel_constants':ROOT/'src/BuildChannel.cs'}.items()}
+    # Absence is a valid native configuration: Store::load_settings uses Settings::default.
+    binding['settings_file_exists']=settings_path.exists()
+    binding['settings']=hashlib.sha256(settings_path.read_bytes() if settings_path.exists() else b'native Settings::default; settings.json absent').hexdigest()
     binding['prompt']=hashlib.sha256(prompt.encode()).hexdigest()
     binding['effective_developer_logging']=False
     binding['encrypted_credential_store']=before.get('apikey.dat')
