@@ -36,6 +36,12 @@ def main():
     workload=root/'bench/records/2026-10-rust-port'
     cases=json.loads((workload/'cases.json').read_text(encoding='utf-8-sig'))
     fixtures=json.loads((workload/'fixtures.json').read_text(encoding='utf-8-sig'))
+    # Preserve historical captures; explicit source-format correctness fixes have their own oracle.
+    overrides=json.loads((root/'bench/fixtures/correction-contract-overrides.json').read_text(encoding='utf-8'))
+    for fixture in fixtures:
+        fixture.update(overrides.get(fixture['id'], {}))
+    current=output/'current-fixtures.json'
+    current.write_text(json.dumps(fixtures),encoding='utf-8')
     bad=output/'mutated-fixtures.json'
     fixtures[0]['output']+=' NEGATIVE CONTROL MUST FAIL'
     bad.write_text(json.dumps(fixtures),encoding='utf-8')
@@ -57,7 +63,7 @@ def main():
         raise ValueError('Live probe did not reject an unsupported saved model before loading keys')
     if rejected_output.exists() or saved.read_bytes()!=before:
         raise ValueError('Rejected model probe changed settings or created output')
-    for name,fixture,positive in [('positive',workload/'fixtures.json',True),('negative',bad,False)]:
+    for name,fixture,positive in [('positive',current,True),('negative',bad,False)]:
         folder=output/name
         command=[str(args.exe.resolve()),'--bench-compute','--cases',str(workload/'cases.json'),
                  '--fixtures',str(fixture),'--replacements',str(root/'replacements.json'),

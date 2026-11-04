@@ -1,0 +1,55 @@
+{
+  "hypothesis": "Restore source line-end ASCII spacing to prevent observed model-added Markdown hard breaks; unchanged input/model/prompt/evaluator",
+  "source_sha256": "05744b17c6edd284d929ab8a8f7e0d34239f95ee37aefba55c3e71308c40d01b",
+  "binary_sha256": {
+    "dev": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657",
+    "prod": "60c1eeec8da1e78ba2761d811313fae246f19eeb69c02a57dd623f8b706dbbc7"
+  },
+  "checks": [
+    {
+      "name": "format",
+      "exit": 0
+    },
+    {
+      "name": "dev-tests",
+      "exit": 0
+    },
+    {
+      "name": "prod-tests",
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "exit": 0
+    },
+    {
+      "name": "dev-release",
+      "exit": 0
+    },
+    {
+      "name": "prod-release",
+      "exit": 0
+    },
+    {
+      "name": "prod-contracts",
+      "exit": 0
+    },
+    {
+      "name": "csharp-parity",
+      "exit": 0
+    },
+    {
+      "name": "fixture-replay",
+      "exit": 0
+    },
+    {
+      "name": "evidence-tests",
+      "exit": 0
+    }
+  ],
+  "historical_evidence_preserved": true,
+  "source_spacing_oracle": "bench/fixtures/correction-contract-overrides.json",
+  "pilot": "pilot-spacing-05",
+  "negative": "negative-spacing-04",
+  "status": "validated locally; awaiting live block"
+}

@@ -1,7 +1,7 @@
 {
   "scope": "measurement foundation only; not live campaign acceptance",
   "rust_tests": {
-    "passed": 57,
+    "passed": 59,
     "failed": 0,
     "ignored": 1
   },
@@ -17,9 +17,9 @@
   "cargo_fmt_check": "passed",
   "cargo_clippy_all_targets": "Warnings-denied Clippy passed after automatic fixes confined to new campaign worker/budget code; dependency warnings remain",
   "release_builds": "Latest-source Dev and Prod Release builds passed",
-  "live_api_requests": 0,
+  "live_api_requests": 88,
   "desktop_trials": "11 recorded-response trials; 9 passed text and format; no live benchmark",
-  "optimization_loops": 0,
+  "optimization_loops": 1,
   "production_settings_credentials_startup_clipboard": "Clipboard changed only in disposable pilots and restored byte-for-byte; production settings, encrypted credentials and startup remained unchanged; owned benchmark processes stopped",
   "unresolved": [
     "required Chrome tool app approval",
@@ -32,7 +32,7 @@
   "native_contracts": "Frozen production pipeline passed; mutated-output negative control rejected",
   "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2",
   "prod_rust_tests": {
-    "passed": 57,
+    "passed": 59,
     "failed": 0,
     "ignored": 0
   },
@@ -45,16 +45,16 @@
     "passed": 5,
     "failed": 0
   },
-  "verified_source_sha256": "7cd48b5391d4274a1db427f75e1bb0713c31fa6f3786940a34d75e78d50f7926",
+  "verified_source_sha256": "05744b17c6edd284d929ab8a8f7e0d34239f95ee37aefba55c3e71308c40d01b",
   "release_binary_sha256": {
-    "dev": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a",
-    "prod": "a217891a861420900b9450bbf2831b4e7d66aa725636e956ed9888080769e712"
+    "dev": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657",
+    "prod": "60c1eeec8da1e78ba2761d811313fae246f19eeb69c02a57dd623f8b706dbbc7"
   },
   "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
   "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
   "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup",
   "source_hash_algorithm": "SHA256 of concatenated UTF8 basename, NUL, file bytes for sorted rust/src/*.rs",
-  "verification_record": "Local verification-08 format/tests/Clippy/both Release builds/Prod contracts passed; restricted C# restore failed NU1301 before parity. Fresh normal-context parity-normal-09 passed 76/76. Separately 12 campaign tests and 3 native fixture replays passed; matched sparse diagnostic 9/9 full result parity. Latest 14 campaign tests passed; optimized-Python native fixture replay verifies exact frozen markup fields and exact three-case coverage.",
+  "verification_record": "verification-13: all10 groups passed, including both channel tests/builds, strict Clippy, current Prod contracts with independent source-spacing override, fresh C# parity76/76, fixture replay and14 campaign tests",
   "editor_serialization_tests": {
     "passed": 2,
     "failed": 0,
@@ -77,7 +77,8 @@
   },
   "failed_diagnostics": [
     "1000-span all-nodes edit: both exact outputs refused alignment_budget_exceeded; rejected and retained",
-    "Restricted-context C# differential: NuGet TLS credential context failure; normal-context retry passed"
+    "Restricted-context C# differential: NuGet TLS credential context failure; normal-context retry passed",
+    "verification-12 initially failed historical rich-list golden expecting model-added spaces; original capture retained, explicit current correctness override added, verification13 passed"
   ],
   "fixture_replay_guard_tests": {
     "passed": 2,

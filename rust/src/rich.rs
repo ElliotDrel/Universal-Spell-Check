@@ -913,6 +913,11 @@ mod golden_tests {
     }
     #[test]
     fn frozen_baseline_processing_matches() {
+        // Historical captures remain unchanged; explicit current correctness fixes are separate.
+        let overrides: Value = serde_json::from_str(include_str!(
+            "../../bench/fixtures/correction-contract-overrides.json"
+        ))
+        .unwrap();
         let cases: Vec<crate::benchmark::Case> =
             serde_json::from_str(include_str!("../../bench/baseline-cases.json")).unwrap();
         let fixtures: Vec<crate::benchmark::Fixture> =
@@ -926,9 +931,29 @@ mod golden_tests {
                 .process(&fixture.raw_ai_output, &protection)
                 .unwrap();
             let rich = rewrite(&case.html, &case.text, &output, &[]);
-            assert_eq!(output, fixture.output, "{} text", case.id);
-            assert_eq!(rich.text, fixture.paste_text, "{} paste text", case.id);
-            assert_eq!(rich.html, fixture.paste_html, "{} HTML", case.id);
+            let corrected = &overrides[&case.id];
+            assert_eq!(
+                output,
+                corrected["output"].as_str().unwrap_or(&fixture.output),
+                "{} text",
+                case.id
+            );
+            assert_eq!(
+                rich.text,
+                corrected["paste_text"]
+                    .as_str()
+                    .unwrap_or(&fixture.paste_text),
+                "{} paste text",
+                case.id
+            );
+            assert_eq!(
+                rich.html,
+                corrected["paste_html"]
+                    .as_str()
+                    .unwrap_or(&fixture.paste_html),
+                "{} HTML",
+                case.id
+            );
         }
     }
 }
