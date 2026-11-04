@@ -51,5 +51,6 @@
     "prod": "f61d137cd293153302cb3914762d37221e9e8d77a1255863ea12549be3ade400"
   },
   "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
-  "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant"
+  "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
+  "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup"
 }

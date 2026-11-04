@@ -22,7 +22,7 @@ class EvidenceTests(unittest.TestCase):
         self.row = dict(case_id='short', repetition=0, warmup=False, live_api=False,
                         observer_pid=101, coordinator_pid=102, collector_pid=103, editor_window_pid=101,
                         detail=dict(status='success', request_mode='offline_replay', input_text=self.case['text']),
-                        observed=dict(text=self.case['expected'], paste_received=True, selection_collapsed=True, shape=copy.deepcopy(EMPTY_SHAPE)))
+                        observed=dict(text=self.case['expected'], paste_received=True, inputType='insertFromPaste', selection_collapsed=True, shape=copy.deepcopy(EMPTY_SHAPE)))
 
     def save(self, name, value):
         (self.path / name).write_text(json.dumps(value), encoding='utf-8')
@@ -65,7 +65,7 @@ class EvidenceTests(unittest.TestCase):
         references = json.loads((Path(__file__).parent / 'formats-v1.json').read_text(encoding='utf-8'))
         cases = json.loads((Path(__file__).parent / 'cases-v1.json').read_text(encoding='utf-8'))
         case = next(case for case in cases if case['id'] == 'structured')
-        observed = dict(text=case['expected'], paste_received=True, selection_collapsed=True, shape=copy.deepcopy(references['structured']['expected']))
+        observed = dict(text=case['expected'], paste_received=True, inputType='insertFromPaste', selection_collapsed=True, shape=copy.deepcopy(references['structured']['expected']))
         self.assertTrue(destination_matches(observed, case, references))
         for key, bad in [('bold', ['wrong word']), ('links', [['wrong label', 'https://example.com/guide']]), ('list_structure', [['ol', 1, 2]])]:
             changed = copy.deepcopy(observed)

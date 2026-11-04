@@ -108,3 +108,8 @@ missing fixture or failed correctness gate; the block stops and remains incomple
 
 Historical rare native paste no-ops remain causally unresolved. This fixture pilot
 is not evidence of a product delivery fix or certification of every editor.
+
+The runner exits nonzero for an incomplete/incorrect pilot or an unmet live block
+latency goal. Its binding also freezes the runner itself and the encrypted-store
+fingerprint locally; it never exports plaintext credentials. A zero exit from one
+live block still requires separate independent confirmation for campaign acceptance.

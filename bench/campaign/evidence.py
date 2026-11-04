@@ -15,6 +15,7 @@ def shape_for(case_id, references, source=False):
 def destination_matches(observed, case, references):
     return (
         observed.get('paste_received') is True
+        and observed.get('inputType') == 'insertFromPaste'
         and observed.get('selection_collapsed') is True
         and observed.get('text', '').replace('\r\n', '\n') == case['expected'].replace('\r\n', '\n')
         and observed.get('shape') == shape_for(case['id'], references)
@@ -72,7 +73,7 @@ def verify_pilot(directory, cases, references, negative=False):
             return False
         observed = row.get('observed', {})
         if negative:
-            if observed.get('paste_received') is not True or observed.get('selection_collapsed') is not True or observed.get('text') != case['expected'] + ' WRONG':
+            if observed.get('paste_received') is not True or observed.get('inputType') != 'insertFromPaste' or observed.get('selection_collapsed') is not True or observed.get('text') != case['expected'] + ' WRONG':
                 return False
         elif not destination_matches(observed, case, references):
             return False

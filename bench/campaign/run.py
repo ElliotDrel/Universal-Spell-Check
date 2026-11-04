@@ -78,9 +78,10 @@ def main():
     settings_path=settings_directory/'settings.json'
     prompt=re.search(r'pub const PROMPT: &str = "(.*?)";', (ROOT/'rust/src/core.rs').read_text()).group(1)
     binding={name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in {
-        'cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','formats':HERE/'formats-v1.json','evidence':HERE/'evidence.py','settings':settings_path,'replacements':ROOT/'replacements.json','channel_constants':ROOT/'src/BuildChannel.cs'}.items()}
+        'runner':HERE/'run.py','cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','formats':HERE/'formats-v1.json','evidence':HERE/'evidence.py','settings':settings_path,'replacements':ROOT/'replacements.json','channel_constants':ROOT/'src/BuildChannel.cs'}.items()}
     binding['prompt']=hashlib.sha256(prompt.encode()).hexdigest()
     binding['effective_developer_logging']=False
+    binding['encrypted_credential_store']=before.get('apikey.dat')
     if not args.pilot:
         if not args.validated_pilot:raise RuntimeError('A validated independent fixture pilot is required before live API use')
         if not args.validated_negative:raise RuntimeError('A validated wrong-output control is required before live API use')
@@ -176,7 +177,7 @@ def main():
                 used_requests=reservation_count(out/'worker/http-reservations.jsonl')-before_requests
                 live_evidence=not args.pilot and has_live_evidence(detail,used_requests)
                 verified_ticks=qpc()
-                row=dict(trial,live_api=live_evidence,request_reservations=used_requests,success=detail.get('status')=='success' and bool(data.get('paste_received')) and data.get('selection_collapsed') is True and (args.pilot or live_evidence),text_verified=textok,format_verified=formatok,observer_pid=browser.pid,collector_pid=os.getpid(),editor_window_pid=browser.pid,coordinator_pid=worker.pid,verified_insertion_ms=(verified_ticks-trigger['ticks'])*1000/trigger['frequency'] if observation and textok and formatok else None,snapshot_receipt_ms=(observation[0]-trigger['ticks'])*1000/trigger['frequency'] if observation else None,observed=data,detail=detail)
+                row=dict(trial,live_api=live_evidence,request_reservations=used_requests,success=detail.get('status')=='success' and bool(data.get('paste_received')) and data.get('selection_collapsed') is True and data.get('inputType')=='insertFromPaste' and (args.pilot or live_evidence),text_verified=textok,format_verified=formatok,observer_pid=browser.pid,collector_pid=os.getpid(),editor_window_pid=browser.pid,coordinator_pid=worker.pid,verified_insertion_ms=(verified_ticks-trigger['ticks'])*1000/trigger['frequency'] if observation and textok and formatok else None,snapshot_receipt_ms=(observation[0]-trigger['ticks'])*1000/trigger['frequency'] if observation else None,observed=data,detail=detail)
                 rows.append(row)
                 with (out/'attempts.jsonl').open('a',encoding='utf-8') as f:f.write(json.dumps(row,ensure_ascii=False)+'\n');f.flush();os.fsync(f.fileno())
                 print(i+1,trial['case_id'],row['verified_insertion_ms'],textok,formatok,flush=True)
@@ -206,5 +207,8 @@ def main():
         if before!=after or reg!=regafter or restoration_error or not (guard_entered and getattr(clipboard_guard,'verified',False)):
             write(out/'pilot.json',{'passed':False,'reason':'Protected state or clipboard restoration failed','live_api':not args.pilot})
             raise RuntimeError('Protected production state changed or clipboard restoration failed')
+
+    accepted=verify_pilot(out,cases,references,negative=args.negative_control) if args.pilot else score(schedule,rows)['goal_verified']
+    raise SystemExit(0 if accepted else 1)
 
 if __name__=='__main__':main()

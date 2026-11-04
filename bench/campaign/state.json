@@ -24,7 +24,8 @@
     "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
     "editor.html": "d2e8027ff7af175ac8b35807f8ab3fee7e6ec25640e0698f92e5037b5c2fa077",
     "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
-    "evidence.py": "6366f47535ded7cfd784da24b97676fd13d1d657467e1f0bc30ebbd067ef3036"
+    "evidence.py": "4cdc7e6ccef09fe68539f4e4b71db0b8533fc83520e45af93f9083b88cd2db2c",
+    "run.py": "39034ffb5a6ff8c4f3a4f9c6a18394649f4bf84a17c9b78ab377a6cf0f3debca"
   },
   "pilot_summary": {
     "kind": "recorded-response diagnosis only",
