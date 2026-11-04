@@ -479,7 +479,7 @@ workload hashes and the recorded A/B claim. CI also corrupts case coverage under
 existing observation, not a wall-clock threshold on shared CI hardware.
 
 For request attribution without clipboard/focus changes, the optimized binary
-supports `--bench-request --allow-api --settings <saved-data-directory> --output
+supports `--bench-request --allow-api --campaign-ledger <shared-campaign-ledger> --settings <saved-data-directory> --output
 <fresh-directory> --runs 3`, optionally `--prewarm`. It reads saved settings and
 encrypted credentials without writing them, sends only `This is a tset.` to the
 saved model and fixed OpenAI endpoint, reuses one client, and retains every result in
@@ -509,3 +509,8 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+Live request probes must use the same persistent `http-campaign.ledger` as every
+other campaign benchmark, never a fresh ledger per probe. Its reservations count
+toward the 2100 ceiling including prewarm/retries. They diagnose transport only
+and cannot satisfy editor insertion acceptance.

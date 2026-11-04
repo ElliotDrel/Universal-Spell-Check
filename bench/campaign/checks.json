@@ -1,7 +1,7 @@
 {
   "scope": "measurement foundation only; not live campaign acceptance",
   "rust_tests": {
-    "passed": 55,
+    "passed": 56,
     "failed": 0,
     "ignored": 1
   },
@@ -15,19 +15,41 @@
   },
   "prod_cargo_check": "passed",
   "cargo_fmt_check": "passed",
-  "cargo_clippy_all_targets": "passed with vendor warnings; initial PowerShell redirection attempt retained separately",
-  "release_builds": "Dev and Prod passed; final post-lint rebuild running",
+  "cargo_clippy_all_targets": "Warnings-denied Clippy passed after automatic fixes confined to new campaign worker/budget code; dependency warnings remain",
+  "release_builds": "Latest-source Dev and Prod Release builds passed",
   "live_api_requests": 0,
   "desktop_trials": "11 recorded-response trials; 9 passed text and format; no live benchmark",
   "optimization_loops": 0,
-  "production_settings_credentials_startup_clipboard": "not modified by campaign; no desktop fixture was launched",
+  "production_settings_credentials_startup_clipboard": "Clipboard changed only in disposable pilots and restored byte-for-byte; production settings, encrypted credentials and startup remained unchanged; owned benchmark processes stopped",
   "unresolved": [
-    "aggregate campaign allocation",
-    "independent destination observer",
-    "rendered rich fixture pilot",
+    "required Chrome tool app approval",
+    "rich-list fixture nesting",
+    "desktop retest of structured observer and all-case pilot",
+    "wrong-output fixture negative control",
     "fresh live baseline",
     "optimization and independent confirmation"
   ],
   "native_contracts": "Frozen production pipeline passed; mutated-output negative control rejected",
-  "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2"
+  "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2",
+  "prod_rust_tests": {
+    "passed": 56,
+    "failed": 0,
+    "ignored": 0
+  },
+  "prod_integration_tests": {
+    "passed": 1,
+    "failed": 0
+  },
+  "interactive_media": "No hosted screenshot/recording; required Chrome app approval is pending. Synthetic DOM evidence is retained.",
+  "evidence_tests": {
+    "passed": 5,
+    "failed": 0
+  },
+  "verified_source_sha256": "ff460723d378391c7ed3fd31cc664ec182d02c08dda54efa475553bd78187b2f",
+  "release_binary_sha256": {
+    "dev": "1231e5531f241eab2c84575445510229ca0173d39380a7ce18bc2de15fb8cdbf",
+    "prod": "f61d137cd293153302cb3914762d37221e9e8d77a1255863ea12549be3ade400"
+  },
+  "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
+  "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant"
 }

@@ -25,8 +25,8 @@ jobs:
             ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-
       - name: Acceptance helper data guards
         run: python -m unittest discover -s bench -p test_rust_acceptance.py
-      - name: Live campaign scorer guards
-        run: python -m unittest discover -s bench/campaign -p test_score.py
+      - name: Live campaign scorer and evidence guards
+        run: python -m unittest discover -s bench/campaign -p "test_*.py"
       - name: Partial latency log compatibility
         run: python -m unittest discover -s tests -p test_latency_log_stats.py
       - name: Benchmark phase report guards

@@ -528,11 +528,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
     let developer = args.iter().any(|s| s == "--developer-logging");
     fs::create_dir_all(&output).map_err(|e| e.to_string())?;
-    let _claim = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(output.join("benchmark.claim"))
-        .map_err(|e| format!("Output already claimed: {e}"))?;
     let mut store = if live {
         let directory = PathBuf::from(
             option(args, "--settings").ok_or("Live mode requires explicit --settings directory")?,
@@ -571,6 +566,16 @@ pub fn run(args: &[String]) -> Result<(), String> {
             return Err("Offline placeholder rejected before network access".into());
         }
     }
+    let campaign_ledger = if live {
+        Some(option(args, "--campaign-ledger").ok_or("Live benchmarks require --campaign-ledger")?)
+    } else {
+        None
+    };
+    let _claim = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output.join("benchmark.claim"))
+        .map_err(|e| format!("Output already claimed: {e}"))?;
     let git = |args: &[&str]| {
         std::process::Command::new("git")
             .args(args)
@@ -617,8 +622,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let hwnd = window.handle.hwnd().unwrap();
     let replay = if live {
         crate::request_budget::campaign(std::path::Path::new(
-            &option(args, "--campaign-ledger")
-                .ok_or("Live benchmarks require --campaign-ledger")?,
+            campaign_ledger
+                .as_deref()
+                .ok_or("Campaign ledger missing")?,
         ))?;
         crate::request_budget::initialize(&output.join("http-reservations.jsonl"), 100)?;
         None

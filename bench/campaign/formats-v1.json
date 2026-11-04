@@ -1,0 +1,144 @@
+{
+  "rich-link": {
+    "source": {
+      "links": [
+        [
+          "guide",
+          "https://example.com/guide"
+        ]
+      ],
+      "bold": [
+        "chek"
+      ],
+      "lists": 0,
+      "items": 0,
+      "code": [],
+      "list_structure": []
+    },
+    "expected": {
+      "links": [
+        [
+          "guide",
+          "https://example.com/guide"
+        ]
+      ],
+      "bold": [
+        "check"
+      ],
+      "lists": 0,
+      "items": 0,
+      "code": [],
+      "list_structure": []
+    }
+  },
+  "rich-list": {
+    "source": {
+      "links": [],
+      "bold": [],
+      "lists": 1,
+      "items": 2,
+      "code": [],
+      "list_structure": [
+        [
+          "ol",
+          0,
+          2,
+          [
+            1,
+            2
+          ],
+          [
+            "decimal",
+            "decimal"
+          ]
+        ]
+      ]
+    },
+    "expected": {
+      "links": [],
+      "bold": [],
+      "lists": 1,
+      "items": 2,
+      "code": [],
+      "list_structure": [
+        [
+          "ol",
+          0,
+          2,
+          [
+            1,
+            2
+          ],
+          [
+            "decimal",
+            "decimal"
+          ]
+        ]
+      ]
+    }
+  },
+  "structured": {
+    "source": {
+      "links": [
+        [
+          "guide",
+          "https://example.com/guide"
+        ]
+      ],
+      "bold": [
+        "chek"
+      ],
+      "lists": 1,
+      "items": 2,
+      "code": [
+        "C:\\sample\\notes.txt"
+      ],
+      "list_structure": [
+        [
+          "ol",
+          0,
+          2,
+          [
+            1,
+            2
+          ],
+          [
+            "decimal",
+            "decimal"
+          ]
+        ]
+      ]
+    },
+    "expected": {
+      "links": [
+        [
+          "guide",
+          "https://example.com/guide"
+        ]
+      ],
+      "bold": [
+        "check"
+      ],
+      "lists": 1,
+      "items": 2,
+      "code": [
+        "C:\\sample\\notes.txt"
+      ],
+      "list_structure": [
+        [
+          "ol",
+          0,
+          2,
+          [
+            1,
+            2
+          ],
+          [
+            "decimal",
+            "decimal"
+          ]
+        ]
+      ]
+    }
+  }
+}

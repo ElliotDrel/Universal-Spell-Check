@@ -15,13 +15,32 @@ use std::{
     sync::mpsc,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-static EXPECTED: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+static EXPECTED: std::sync::OnceLock<std::sync::Mutex<String>> = std::sync::OnceLock::new();
+static DESTINATION: std::sync::OnceLock<std::sync::Mutex<(usize, u32)>> =
+    std::sync::OnceLock::new();
+pub fn verify_destination() -> Result<(), String> {
+    if let Some(destination) = DESTINATION.get() {
+        let expected = destination
+            .lock()
+            .map_err(|_| "Fixture destination guard poisoned")?;
+        let hwnd = unsafe { GetForegroundWindow() };
+        let mut pid = 0;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, &mut pid);
+        }
+        if hwnd as usize != expected.0 || pid != expected.1 {
+            return Err("Disposable editor lost native foreground identity; paste blocked".into());
+        }
+    }
+    Ok(())
+}
 pub fn verify_capture(text: &str) -> Result<(), String> {
-    if let Some(expected) = EXPECTED
-        .lock()
-        .map_err(|_| "Fixture guard poisoned")?
-        .as_ref()
-        && text.replace("\r\n", "\n") != expected.replace("\r\n", "\n")
+    if let Some(expected) = EXPECTED.get()
+        && text.replace("\r\n", "\n")
+            != expected
+                .lock()
+                .map_err(|_| "Fixture guard poisoned")?
+                .replace("\r\n", "\n")
     {
         return Err("Captured selection differs from authorized synthetic fixture; no API request permitted".into());
     }
@@ -48,6 +67,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
             .into(),
     };
     let mut settings = store.load_settings()?;
+    if !matches!(settings.model.as_str(), "gpt-4.1" | "gpt-5.4-mini") {
+        return Err("Unsupported saved model; campaign will not change models".into());
+    }
     settings.developer_logging = false;
     nwg::init().map_err(|e| e.to_string())?;
     crate::clipboard::initialize_sta()?;
@@ -120,7 +142,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             while let Ok(event) = rx.try_recv() {
                 if let UiEvent::Trial(detail) = event {
                     let id = state.borrow().0;
-                    let _ = fs::write(target.join(format!("detail-{id}.json")), detail.to_string());
+                    if crate::store::atomic_write(&target.join(format!("detail-{id}.json")), detail.to_string().as_bytes()).is_err() { nwg::stop_thread_dispatch(); return Some(0); }
                     state.borrow_mut().1 = false;
                 }
             }
@@ -135,12 +157,22 @@ pub fn run(args: &[String]) -> Result<(), String> {
                         if id > state.borrow().0 {
                         let mut title=[0u16;512];
                         let length=unsafe {GetWindowTextW(GetForegroundWindow(),title.as_mut_ptr(),512)};
-                        if !String::from_utf16_lossy(&title[..length as usize]).contains("USC disposable editor") {
+                        let hwnd=unsafe {GetForegroundWindow()};let mut pid=0;
+                        unsafe {GetWindowThreadProcessId(hwnd,&mut pid);}
+                        let title=String::from_utf16_lossy(&title[..length as usize]);
+                        if !matches!(title.as_str(),"USC disposable editor"|"USC disposable editor - Google Chrome") || command["expected_hwnd"].as_u64()!=Some(hwnd as usize as u64) || command["expected_pid"].as_u64()!=Some(pid as u64) || pid==0 {
                             let _=fs::write(target.join(format!("detail-{id}.json")),json!({"status":"run_failed","error_message":"Foreground is not disposable fixture"}).to_string());
                             *state.borrow_mut()=(id,false);
                             return Some(0);
                         }
-                        if let Ok(mut expected)=EXPECTED.lock() { *expected=command["expected_input"].as_str().map(str::to_owned); }
+                        let Some(input)=command["expected_input"].as_str().filter(|s|!s.is_empty()) else {
+                            let _=crate::store::atomic_write(&target.join(format!("detail-{id}.json")),b"{\"status\":\"run_failed\",\"error_message\":\"Missing authorized synthetic input\"}");
+                            *state.borrow_mut()=(id,false);return Some(0);
+                        };
+                        let Ok(mut expected)=EXPECTED.get_or_init(||std::sync::Mutex::new(String::new())).lock() else {nwg::stop_thread_dispatch();return Some(0);};
+                        *expected=input.to_owned();drop(expected);
+                        let Ok(mut destination)=DESTINATION.get_or_init(||std::sync::Mutex::new((0,0))).lock() else {nwg::stop_thread_dispatch();return Some(0);};
+                        *destination=(hwnd as usize,pid);drop(destination);
                             *state.borrow_mut() = (id, true);
                             let mut ticks = 0i64;
                             let mut frequency = 0i64;
@@ -171,4 +203,22 @@ pub fn run(args: &[String]) -> Result<(), String> {
     logger.flush();
     let _ = nwg::unbind_raw_event_handler(&handler);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn campaign_capture_guard_refuses_unexpected_text() {
+        assert!(verify_capture("ordinary non-campaign text").is_ok());
+        assert!(
+            EXPECTED
+                .set(std::sync::Mutex::new(
+                    "Synthetic fixture\r\nsecond line".into()
+                ))
+                .is_ok()
+        );
+        assert!(verify_capture("Synthetic fixture\nsecond line").is_ok());
+        assert!(verify_capture("Different selection").is_err());
+    }
 }

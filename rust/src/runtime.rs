@@ -327,7 +327,11 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         backup=Some(measure(&mut timings.backup_ms, || clipboard::Backup::capture(owner as _))?);
         bus.send(UiEvent::Phase("Copying text..."));
         let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
-        crate::campaign_worker::verify_capture(&captured.text)?;
+        if let Err(error)=crate::campaign_worker::verify_capture(&captured.text) {
+            detail["rejected_capture_sha256"]=json!(crate::benchmark::hash(captured.text.as_bytes()));
+            detail["rejected_capture_chars"]=json!(captured.text.chars().count());
+            return Err(error);
+        }
         measure(&mut timings.diagnostics_ms, || {
         detail["input_text"] = json!(captured.text);
         detail["input_chars"] = json!(captured.text.encode_utf16().count());
@@ -419,6 +423,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         // CloseClipboard publishes data, but live consumers still need the established handoff period.
         measure(&mut timings.paste.settle_ms, clipboard::settle_publication);
         measure(&mut timings.paste.modifiers_ms, || clipboard::modifiers_released(Duration::from_millis(1200)))?;
+        crate::campaign_worker::verify_destination()?;
         measure(&mut timings.paste.input_ms, || clipboard::chord(0x56))?;
         Ok(sequence)
         })?;

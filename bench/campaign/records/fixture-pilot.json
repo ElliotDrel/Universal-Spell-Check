@@ -23,7 +23,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "paragraph",
@@ -45,7 +48,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "long",
@@ -67,7 +73,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "unchanged",
@@ -89,7 +98,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "brands",
@@ -111,7 +123,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "literals",
@@ -133,7 +148,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "unicode",
@@ -155,7 +173,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "multiline",
@@ -177,7 +198,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "none",
+      "rich_applied": false,
+      "source_cf_html": false
     },
     {
       "case_id": "rich-link",
@@ -206,7 +230,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "aligned_html",
+      "rich_applied": true,
+      "source_cf_html": true
     },
     {
       "case_id": "rich-list",
@@ -228,7 +255,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "structured_list_html",
+      "rich_applied": true,
+      "source_cf_html": true
     },
     {
       "case_id": "structured",
@@ -259,7 +289,10 @@
         },
         "inputType": "insertFromPaste",
         "paste_received": true
-      }
+      },
+      "rich_mode": "aligned_html",
+      "rich_applied": true,
+      "source_cf_html": true
     }
   ],
   "integrity": {
@@ -285,5 +318,15 @@
       "pilot": 4,
       "reason": "Native Chrome source did not copy text"
     }
-  ]
+  ],
+  "provenance": {
+    "binary_sha256": "777542a8d7493f6eb6921507f3c6e75a94cb11e9e737c3e7359508ece525f2d5",
+    "cases_sha256": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+    "source_head": "35630bea9e4f9263e45cb4f16a6cecd6cfd1ea54",
+    "source_was_dirty": true,
+    "model": "gpt-4.1",
+    "prompt_sha256": "a583472584222294aa451e7bd34e828cd745187ab9374421fbb805e64f72cab1",
+    "effective_developer_logging": false,
+    "limitation": "Pilot predates wrapper-serialization and two-animation-frame observer corrections; its executable was not separately frozen. No acceptance claim; fresh pilot required."
+  }
 }

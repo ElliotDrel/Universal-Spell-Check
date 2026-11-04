@@ -52,11 +52,19 @@ captured selection differing from the authorized fixture before creating a paylo
 Only a native window titled USC disposable editor may be triggered.
 
 The editor observes actual paste/input and snapshots destination text/HTML/structure
-in a separate process. QPC ties the coordinator trigger to receipt of the editor's
-snapshot, including the loopback delivery overhead. That is a conservative boundary;
+in a separate process after two animation frames, matching the historical browser
+observer's stable-state boundary. QPC ties the coordinator trigger to completion
+of independent text/format verification, including snapshot delivery, native
+coordinator receipt and polling overhead. Snapshot receipt is recorded separately. That is a conservative boundary;
 never substitute SendInput success or requested clipboard HTML for destination proof.
 The owner stops its processes before restoring the complete clipboard and checking
 production settings, encrypted credential and startup hashes/registration unchanged.
+
+The benchmark-only coordinator uses the actual Release correction worker. Tray,
+dashboard, loading overlay and physical hardware hotkey delivery are excluded;
+the boundary begins at an accepted synthetic coordinator trigger. Bare single-block
+span HTML retains the known `unsupported_editor` limitation for changed and unchanged
+text. No allowlist expansion or unsupported-editor pass is introduced.
 
 Chrome app approval through Computer Use timed out. Idle-desktop authorization does
 not substitute for that gate. No more desktop runs are allowed until it is granted;
@@ -71,7 +79,8 @@ not live performance evidence. Preserve all failed pilots, including private
 unmatched-capture artifacts locally; never publish those raw artifacts.
 
 After approval, run a fresh `--pilot`; require all eleven cases and negative controls.
-Live mode additionally requires `--validated-pilot <directory>`, a matching binary,
+Live mode additionally requires `--validated-pilot <directory>` and
+`--validated-negative <directory>`, a matching frozen binary snapshot,
 and frozen cases/schedule/evaluator/editor/settings/prompt hashes. Those hashes bind
 the persistent campaign before live API use. Output paths and benchmark allocations
 are exclusive. A fixture failure stops the block and remains explicit.
@@ -80,3 +89,22 @@ After each completed loop: preserve attempts, commit/push, and post attributed
 progress on PR #33 with source/binary hashes, request counts, per-case before/after
 scores, failures, correctness, decision and next hypothesis. Incorporate the parent's
 read-only findings only after a valid baseline. No merge, release or PR watch.
+
+The prepared primary checkout must retain its historical
+`benchmark_runs/experiment-evaluation-2026-10-31/desktop.py` clipboard guard. The
+runner locates it through the shared Git directory and checks it before creating
+output or starting a run. A clean clone without that artifact is not sufficient.
+Pilot gates recompute observations, process identities and restoration checks;
+caller-supplied passed flags are insufficient. Formatting references in
+`formats-v1.json` require exact link labels/destinations, bold content, code
+literals and ordered list depth/item structure. Session-bound fixture posts and
+matching native HWND/browser PID checks reject stale or unrelated observers.
+
+Live evidence additionally requires native send timing, positive API token usage,
+live request mode and matching request-reservation exposure. Offline responses
+cannot satisfy that gate. An actual insertFromPaste event and collapsed selection
+are required even for unchanged text. No extra live calls are authorized by a
+missing fixture or failed correctness gate; the block stops and remains incomplete.
+
+Historical rare native paste no-ops remain causally unresolved. This fixture pilot
+is not evidence of a product delivery fix or certification of every editor.

@@ -1,13 +1,16 @@
 """Serial disposable editor campaign owner. Native worker alone can access API credentials."""
 import argparse, ctypes, ctypes.wintypes as W, hashlib, importlib.util, json, os
-import pathlib, subprocess, sys, threading, time, urllib.parse, winreg, re, msvcrt
+import pathlib, subprocess, sys, threading, time, urllib.parse, winreg, re, msvcrt, shutil, tempfile, secrets
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from score import score
+from evidence import shape_for, verify_pilot, reservation_count, has_live_evidence
 
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 HERE=pathlib.Path(__file__).resolve().parent
 def write(path,value):
-    path.write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    with tempfile.NamedTemporaryFile(mode='w',dir=path.parent,delete=False,encoding='utf-8',newline='\n') as f:
+        json.dump(value,f,ensure_ascii=False,indent=2);f.write('\n');f.flush();os.fsync(f.fileno());temporary=f.name
+    os.replace(temporary,path)
 def norm(text):return text.replace('\r\n','\n')
 def qpc():
     value=ctypes.c_longlong();ctypes.windll.kernel32.QueryPerformanceCounter(ctypes.byref(value));return value.value
@@ -18,19 +21,22 @@ def startup():
             try:n,v,t=winreg.EnumValue(key,i);i+=1;rows[n]=(v,t)
             except OSError:return rows
 
-def focus_fixture(guard):
+def focus_fixture(guard, expected_pid):
     matches=[]
     callback=ctypes.WINFUNCTYPE(W.BOOL,W.HWND,W.LPARAM)
     def visit(hwnd,param):
         text=ctypes.create_unicode_buffer(512)
-        ctypes.windll.user32.GetWindowTextW(hwnd,text,512)
-        if 'USC disposable editor' in text.value:matches.append(hwnd)
+        guard.u.GetWindowTextW(hwnd,text,512)
+        pid=W.DWORD();guard.u.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
+        if text.value in ['USC disposable editor','USC disposable editor - Google Chrome'] and pid.value==expected_pid:matches.append(hwnd)
         return True
     visit=callback(visit)
+    guard.u.EnumWindows.argtypes=[callback,W.LPARAM];guard.u.EnumWindows.restype=W.BOOL
+    guard.u.GetWindowTextW.argtypes=[W.HWND,W.LPWSTR,ctypes.c_int];guard.u.GetWindowTextW.restype=ctypes.c_int
     guard.u.EnumWindows(visit,0)
     if len(matches)!=1:return False
     guard.u.SetForegroundWindow(matches[0])
-    return guard.u.GetForegroundWindow()==matches[0]
+    return matches[0] if guard.u.GetForegroundWindow()==matches[0] else None
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -45,19 +51,23 @@ def main():
     args=parser.parse_args()
     if not args.desktop_app_approved:parser.error('Required Chrome tool app approval is pending; idle-desktop authorization alone does not satisfy it')
     if args.negative_control and not args.pilot:parser.error('Negative controls are offline pilot diagnostics only')
-    out=args.output;out.mkdir(parents=True,exist_ok=False)
+    primary=pathlib.Path(subprocess.check_output(['git','rev-parse','--path-format=absolute','--git-common-dir'],cwd=ROOT,text=True).strip()).parent
+    historical=primary/'benchmark_runs/experiment-evaluation-2026-10-31/desktop.py'
+    if not historical.is_file():raise RuntimeError('Prepared historical clipboard guard prerequisite is missing; see campaign README')
+    spec=importlib.util.spec_from_file_location('historical_guard',historical);guard=importlib.util.module_from_spec(spec);spec.loader.exec_module(guard)
+    out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     owner_path=ROOT/'benchmark_runs/campaign-2026-11-04/desktop-owner.lock'
     owner_path.parent.mkdir(parents=True,exist_ok=True)
     owner=owner_path.open('a+b')
     if owner.tell()==0:owner.write(b'0');owner.flush()
     owner.seek(0);msvcrt.locking(owner.fileno(),msvcrt.LK_NBLCK,1)
-    primary=pathlib.Path(subprocess.check_output(['git','rev-parse','--path-format=absolute','--git-common-dir'],cwd=ROOT,text=True).strip()).parent
-    historical=primary/'benchmark_runs/experiment-evaluation-2026-10-31/desktop.py'
-    spec=importlib.util.spec_from_file_location('historical_guard',historical);guard=importlib.util.module_from_spec(spec);spec.loader.exec_module(guard)
     cases={c['id']:c for c in json.loads((HERE/'cases-v1.json').read_text(encoding='utf-8'))}
     schedule=json.loads((HERE/'schedule-v2.json').read_text(encoding='utf-8'))['trials']
     if args.pilot:schedule=[dict(case_id=c,repetition=0,warmup=False) for c in cases]
     if args.negative_control:schedule=schedule[:1]
+    references=json.loads((HERE/'formats-v1.json').read_text(encoding='utf-8'))
+    guard.u.GetWindowThreadProcessId.argtypes=[W.HWND,ctypes.POINTER(W.DWORD)];guard.u.GetWindowThreadProcessId.restype=W.DWORD
+    session_token=secrets.token_hex(16)
     browser=None;clipboard_guard=None;guard_entered=False
     rows=[];state={'index':0,'active':None,'ready':False,'observed':None,'stop':False};lock=threading.Lock();worker=None
     before=guard.integrity();reg=startup()
@@ -68,18 +78,19 @@ def main():
     settings_path=settings_directory/'settings.json'
     prompt=re.search(r'pub const PROMPT: &str = "(.*?)";', (ROOT/'rust/src/core.rs').read_text()).group(1)
     binding={name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in {
-        'cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','settings':settings_path}.items()}
+        'cases':HERE/'cases-v1.json','schedule':HERE/'schedule-v2.json','evaluator':HERE/'score.py','editor':HERE/'editor.html','formats':HERE/'formats-v1.json','evidence':HERE/'evidence.py','settings':settings_path,'replacements':ROOT/'replacements.json','channel_constants':ROOT/'src/BuildChannel.cs'}.items()}
     binding['prompt']=hashlib.sha256(prompt.encode()).hexdigest()
+    binding['effective_developer_logging']=False
     if not args.pilot:
         if not args.validated_pilot:raise RuntimeError('A validated independent fixture pilot is required before live API use')
         if not args.validated_negative:raise RuntimeError('A validated wrong-output control is required before live API use')
         pilot=json.loads((args.validated_pilot/'pilot.json').read_text())
-        if pilot.get('passed') is not True or pilot.get('live_api') is not False:raise RuntimeError('Fixture pilot did not pass')
+        if not verify_pilot(args.validated_pilot,cases,references):raise RuntimeError('Fixture pilot observations or restoration checks did not pass')
         manifest=json.loads((args.validated_pilot/'manifest.json').read_text())
         if manifest.get('binding')!=binding or manifest.get('binary_sha256')!=hashlib.sha256(exe.read_bytes()).hexdigest():raise RuntimeError('Pilot binary or frozen provenance differs')
         negative=json.loads((args.validated_negative/'negative.json').read_text())
         negative_manifest=json.loads((args.validated_negative/'manifest.json').read_text())
-        if negative.get('passed') is not True or negative_manifest.get('binding')!=binding or negative_manifest.get('binary_sha256')!=manifest['binary_sha256']:raise RuntimeError('Wrong-output control did not pass with this provenance')
+        if not verify_pilot(args.validated_negative,cases,references,negative=True) or negative_manifest.get('binding')!=binding or negative_manifest.get('binary_sha256')!=manifest['binary_sha256']:raise RuntimeError('Wrong-output control did not pass with this provenance')
         campaign=ledger.parent/'binding.json'
         if campaign.exists():
             if json.loads(campaign.read_text())!=binding:raise RuntimeError('Frozen campaign provenance changed')
@@ -90,12 +101,17 @@ def main():
         if args.phase=='iteration' and (args.iteration is None or not 1<=args.iteration<=19):raise RuntimeError('Candidate iteration must be 1..19; reserve final allocation for independent confirmation')
         name=args.phase+(f'-{args.iteration}' if args.phase=='iteration' else '')
         with (allocations/(name+'.json')).open('x') as f:json.dump({'output':str(out.resolve()),'binding':binding},f);f.flush();os.fsync(f.fileno())
+    snapshot=out/'candidate.exe';shutil.copy2(exe,snapshot);exe=snapshot.resolve()
+    source_snapshot=out/'source';source_snapshot.mkdir()
+    for source in (ROOT/'rust/src').glob('*.rs'):shutil.copy2(source,source_snapshot/source.name)
+    for name in ['cases-v1.json','schedule-v2.json','score.py','editor.html','formats-v1.json','evidence.py']:shutil.copy2(HERE/name,out/name)
     write(out/'manifest.json',{'source_sha256':hashlib.sha256(b''.join(p.name.encode()+b'\0'+p.read_bytes() for p in sorted((ROOT/'rust/src').glob('*.rs')))).hexdigest(),'binding':binding,'binary_sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'cases_sha256':hashlib.sha256((HERE/'cases-v1.json').read_bytes()).hexdigest(),'schedule':schedule,'pilot':args.pilot,'observer_pid':os.getpid(),'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()})
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_GET(self):
-            if self.path=='/':body=(HERE/'editor.html').read_bytes();mime='text/html'
-            elif self.path=='/next':
+            if self.path=='/':body=(out/'editor.html').read_text(encoding='utf-8').replace('__USC_SESSION__',session_token).encode();mime='text/html'
+            elif self.path.startswith('/next?'):
+                if urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('session')!=[session_token]:self.send_error(403);return
                 with lock:
                     if state['active'] is None and state['index']<len(schedule):
                         trial=schedule[state['index']];state['active']=dict(cases[trial['case_id']],**{k:v for k,v in trial.items() if k!='case_id'});state['ready']=False;state['started']=time.monotonic();body=json.dumps(state['active']).encode()
@@ -105,7 +121,11 @@ def main():
             self.send_response(200);self.send_header('Content-Type',mime);self.end_headers();self.wfile.write(body)
         def do_POST(self):
             data=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            if data.pop('session',None)!=session_token:self.send_error(403);return
             with lock:
+                active=state['active']
+                if not active or data.get('case_id')!=active['id'] or data.get('repetition')!=active['repetition']:self.send_error(409);return
+                if self.path=='/ready' and data.get('shape')!=shape_for(active['id'],references,source=True):state['fixture_error']='Source formatting differs from frozen fixture';self.send_error(409);return
                 if self.path=='/ready':state['ready']=True;state['source_shape']=data['shape'];write(out/f"source-{state['index']}.json",data)
                 elif self.path=='/observed':state['observed']=(qpc(),data)
             self.send_response(200);self.end_headers();self.wfile.write(b'{}')
@@ -129,14 +149,17 @@ def main():
             print('FIXTURE READY http://127.0.0.1:8767',flush=True)
             deadline=time.monotonic()+180
             while state['index']<len(schedule):
+                if state.get('fixture_error'):raise RuntimeError(state['fixture_error'])
                 if worker.poll() is not None:raise RuntimeError('Native worker exited')
                 if (out/'cancel').exists():raise RuntimeError('Pilot cancelled')
                 if time.monotonic()>deadline:raise RuntimeError('Fixture browser did not connect or trial timed out')
                 with lock:active=state['active'];ready=state['ready']
                 if not active or not ready:time.sleep(.02);continue
-                if not focus_fixture(guard):time.sleep(.05);continue
+                editor_hwnd=focus_fixture(guard,browser.pid)
+                if not editor_hwnd:time.sleep(.05);continue
                 i=state['index'];trial=schedule[i];state['ready']=False
-                write(out/'worker/command.json',{'id':i+1,'expected_input':active['text']})
+                before_requests=reservation_count(out/'worker/http-reservations.jsonl')
+                write(out/'worker/command.json',{'id':i+1,'expected_input':active['text'],'expected_hwnd':editor_hwnd,'expected_pid':browser.pid})
                 started=time.monotonic();detail_path=out/f'worker/detail-{i+1}.json'
                 while time.monotonic()-started<65:
                     if detail_path.exists():
@@ -149,17 +172,24 @@ def main():
                 triggerpath=out/f'worker/trigger-{i+1}.json'
                 trigger=json.loads(triggerpath.read_text()) if triggerpath.exists() else {'ticks':0,'frequency':1}
                 textok=norm(data.get('text',''))==norm(active['expected'])
-                shape=data.get('shape',{});source=state['source_shape'];formatok=(shape.get('lists')==source['lists'] and shape.get('items')==source['items'] and [x[1] for x in shape.get('links',[])]==[x[1] for x in source['links']] and len(shape.get('bold',[]))==len(source['bold']) and shape.get('code')==source['code'])
-                row=dict(trial,live_api=not args.pilot,success=detail.get('status')=='success' and bool(data.get('paste_received')),text_verified=textok,format_verified=formatok,observer_pid=os.getpid(),coordinator_pid=worker.pid,verified_insertion_ms=(observation[0]-trigger['ticks'])*1000/trigger['frequency'] if observation else None,observed=data,detail=detail)
+                formatok=data.get('shape')==shape_for(active['id'],references)
+                used_requests=reservation_count(out/'worker/http-reservations.jsonl')-before_requests
+                live_evidence=not args.pilot and has_live_evidence(detail,used_requests)
+                verified_ticks=qpc()
+                row=dict(trial,live_api=live_evidence,request_reservations=used_requests,success=detail.get('status')=='success' and bool(data.get('paste_received')) and data.get('selection_collapsed') is True and (args.pilot or live_evidence),text_verified=textok,format_verified=formatok,observer_pid=browser.pid,collector_pid=os.getpid(),editor_window_pid=browser.pid,coordinator_pid=worker.pid,verified_insertion_ms=(verified_ticks-trigger['ticks'])*1000/trigger['frequency'] if observation and textok and formatok else None,snapshot_receipt_ms=(observation[0]-trigger['ticks'])*1000/trigger['frequency'] if observation else None,observed=data,detail=detail)
                 rows.append(row)
                 with (out/'attempts.jsonl').open('a',encoding='utf-8') as f:f.write(json.dumps(row,ensure_ascii=False)+'\n');f.flush();os.fsync(f.fileno())
                 print(i+1,trial['case_id'],row['verified_insertion_ms'],textok,formatok,flush=True)
                 with lock:state['index']+=1;state['active']=None;state['observed']=None
                 deadline=time.monotonic()+90
-                if not row['success']:break
+                if not row['success'] or not row['text_verified'] or not row['format_verified']:break
             write(out/'summary.json',score(schedule,rows))
             write(out/'pilot.json',{'passed':not args.negative_control and len(rows)==len(schedule) and all(r['success'] and r['text_verified'] and r['format_verified'] for r in rows),'live_api':not args.pilot})
             if args.negative_control:write(out/'negative.json',{'passed':len(rows)==1 and rows[0]['success'] and not rows[0]['text_verified'],'live_api':False})
+    except BaseException as error:
+        write(out/'failure.json',{'error_type':type(error).__name__,'error':str(error),'attempted':len(rows),'expected':len(schedule),'live_api':not args.pilot})
+        write(out/'summary.json',score(schedule,rows))
+        raise
     finally:
         if worker and worker.poll() is None:
             (out/'worker/stop').touch()
@@ -168,8 +198,13 @@ def main():
         if browser and browser.poll() is None:
             browser.terminate();browser.wait(timeout=10)
         server.shutdown()
-        if guard_entered:clipboard_guard.__exit__(None,None,None)
-        after=guard.integrity();regafter=startup();write(out/'integrity.json',{'production_unchanged':before==after,'startup_unchanged':reg==regafter,'worker_stopped':worker is None or worker.poll() is not None,'clipboard_verified':guard_entered and clipboard_guard.verified})
-        if before!=after or reg!=regafter:raise RuntimeError('Protected production state changed')
+        restoration_error=None
+        if guard_entered:
+            try:clipboard_guard.__exit__(None,None,None)
+            except Exception as error:restoration_error=str(error)
+        after=guard.integrity();regafter=startup();write(out/'integrity.json',{'production_unchanged':before==after,'startup_unchanged':reg==regafter,'worker_stopped':worker is None or worker.poll() is not None,'clipboard_verified':guard_entered and getattr(clipboard_guard,'verified',False),'restoration_error':restoration_error})
+        if before!=after or reg!=regafter or restoration_error or not (guard_entered and getattr(clipboard_guard,'verified',False)):
+            write(out/'pilot.json',{'passed':False,'reason':'Protected state or clipboard restoration failed','live_api':not args.pilot})
+            raise RuntimeError('Protected production state changed or clipboard restoration failed')
 
 if __name__=='__main__':main()
