@@ -24,7 +24,7 @@
     "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
     "editor.html": "d2e8027ff7af175ac8b35807f8ab3fee7e6ec25640e0698f92e5037b5c2fa077",
     "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
-    "evidence.py": "4cdc7e6ccef09fe68539f4e4b71db0b8533fc83520e45af93f9083b88cd2db2c",
+    "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
     "run.py": "39034ffb5a6ff8c4f3a4f9c6a18394649f4bf84a17c9b78ab377a6cf0f3debca"
   },
   "pilot_summary": {
@@ -34,7 +34,7 @@
     "live_requests": 0
   },
   "settings_prompt_binding": "Local binding records and validates settings, prompt, replacements and channel constants before any live worker launch",
-  "configuration_binding": "Live runner validates settings/prompt/replacements/channel constants and effective logging hashes before startup; no live binding created yet",
+  "configuration_binding": "Live runner validates settings/prompt/replacements/channel constants and binds developer logging off before startup; no live binding created yet",
   "deferred_hypotheses": [
     {
       "source": "user-provided read-only findings",

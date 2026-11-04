@@ -329,7 +329,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
         if let Err(error)=crate::campaign_worker::verify_capture(&captured.text) {
             detail["rejected_capture_sha256"]=json!(crate::benchmark::hash(captured.text.as_bytes()));
-            detail["rejected_capture_chars"]=json!(captured.text.chars().count());
+            detail["rejected_capture_chars"]=json!(captured.text.encode_utf16().count());
             return Err(error);
         }
         measure(&mut timings.diagnostics_ms, || {
@@ -406,6 +406,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         });
         bus.send(UiEvent::Phase("Pasting..."));
         let sequence = measure(&mut timings.paste_ms, || -> Result<_, String> {
+        crate::campaign_worker::verify_destination()?;
         let sequence = measure(&mut timings.paste.write_ms, || clipboard::write(
             owner as _,
             &mapped.text,

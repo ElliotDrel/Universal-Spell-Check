@@ -48,6 +48,7 @@ class EvidenceTests(unittest.TestCase):
         self.integrity['clipboard_verified'] = True
         self.save('integrity.json', self.integrity)
         self.row['observer_pid'] = self.row['coordinator_pid']
+        self.row['editor_window_pid'] = self.row['observer_pid']
         self.samples([self.row])
         self.assertFalse(verify_pilot(self.path, self.cases, {}))
         self.samples([])
@@ -67,7 +68,7 @@ class EvidenceTests(unittest.TestCase):
         case = next(case for case in cases if case['id'] == 'structured')
         observed = dict(text=case['expected'], paste_received=True, inputType='insertFromPaste', selection_collapsed=True, shape=copy.deepcopy(references['structured']['expected']))
         self.assertTrue(destination_matches(observed, case, references))
-        for key, bad in [('bold', ['wrong word']), ('links', [['wrong label', 'https://example.com/guide']]), ('list_structure', [['ol', 1, 2]])]:
+        for key, bad in [('bold', ['wrong word']), ('links', [['wrong label', 'https://example.com/guide']]), ('list_structure', [['ol', 1, 2]]), ('code', ['wrong path']), ('lists', 0), ('items', 1)]:
             changed = copy.deepcopy(observed)
             changed['shape'][key] = bad
             self.assertFalse(destination_matches(changed, case, references))
@@ -77,6 +78,8 @@ class EvidenceTests(unittest.TestCase):
                       request_attempts=1, request_native=dict(send_api_ms=0.0))
         self.assertTrue(has_live_evidence(detail, 1))
         self.assertFalse(has_live_evidence(detail, 0))
+        self.assertFalse(has_live_evidence(detail, 2))
+        self.assertFalse(has_live_evidence(detail, True))
         self.assertFalse(has_live_evidence(dict(detail, request_mode='offline_replay'), 1))
         self.assertFalse(has_live_evidence(dict(detail, tokens=dict(input=None, output=None)), 1))
         path = self.path / 'reservations.jsonl'

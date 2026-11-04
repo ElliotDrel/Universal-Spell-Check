@@ -43,7 +43,7 @@ def has_live_evidence(detail, reservations):
     return (
         detail.get('request_mode') == 'live' and detail.get('status_code') == 200
         and all(type(tokens.get(k)) is int and tokens[k] > 0 for k in ['input', 'output'])
-        and type(attempts) is int and 1 <= attempts <= 2 and reservations >= attempts
+        and type(attempts) is int and 1 <= attempts <= 2 and type(reservations) is int and reservations == attempts
         and type(send) in [int, float] and math.isfinite(send) and send >= 0
     )
 

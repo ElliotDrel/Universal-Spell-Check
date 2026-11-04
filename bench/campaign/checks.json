@@ -45,12 +45,14 @@
     "passed": 5,
     "failed": 0
   },
-  "verified_source_sha256": "ff460723d378391c7ed3fd31cc664ec182d02c08dda54efa475553bd78187b2f",
+  "verified_source_sha256": "dd627ff207295631d239b3cb5bbe0dadd776074c51e66cc4ff643bc793409c2f",
   "release_binary_sha256": {
-    "dev": "1231e5531f241eab2c84575445510229ca0173d39380a7ce18bc2de15fb8cdbf",
-    "prod": "f61d137cd293153302cb3914762d37221e9e8d77a1255863ea12549be3ade400"
+    "dev": "c0eb18997bfe31c3d3af04d389d8d4498c0c234ec8659fd13ef86ede819b5204",
+    "prod": "e4530eeef868c72f1ac7971c8c932b8ebbced22b276319a5d0d108da485745f5"
   },
   "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
   "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
-  "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup"
+  "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup",
+  "source_hash_algorithm": "SHA256 of concatenated UTF8 basename, NUL, file bytes for sorted rust/src/*.rs",
+  "verification_record": "Prepared local verification-05; all eight checks exited 0; source hash uses the campaign runner formula"
 }
