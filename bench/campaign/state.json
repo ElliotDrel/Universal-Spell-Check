@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "source_commit": "711ff37",
+  "phase": "setup",
+  "actual_http_attempts": 0,
+  "completed_optimization_loops": 0,
+  "maximum_http_attempts": 2100,
+  "maximum_attempts_per_benchmark": 100,
+  "maximum_optimization_loops": 20,
+  "goal_verified": false,
+  "baseline": null,
+  "iterations": [],
+  "next": "Implement and verify native HTTP attempt accounting and independent destination observer before live baseline"
+}
