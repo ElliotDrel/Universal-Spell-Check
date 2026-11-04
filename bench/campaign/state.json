@@ -1,20 +1,125 @@
 {
   "schema_version": 1,
   "source_commit": "711ff37",
-  "phase": "live_baseline_ready",
-  "actual_http_attempts": 0,
+  "phase": "iteration_1_fixture_focus_validation",
+  "actual_http_attempts": 55,
   "completed_optimization_loops": 0,
   "maximum_http_attempts": 2100,
   "maximum_attempts_per_benchmark": 100,
   "maximum_optimization_loops": 20,
   "goal_verified": false,
-  "baseline": null,
+  "baseline": {
+    "phase": "baseline",
+    "complete": false,
+    "attempted_corrections": 54,
+    "verified_corrections": 53,
+    "actual_native_http_sends": 55,
+    "expected_corrections": 99,
+    "summary": {
+      "complete": false,
+      "goal_verified": false,
+      "mean_of_case_medians_ms": null,
+      "per_case": {
+        "rich-link": {
+          "expected": 9,
+          "attempted": 6,
+          "verified": 6,
+          "median_ms": 817.088
+        },
+        "long": {
+          "expected": 9,
+          "attempted": 3,
+          "verified": 3,
+          "median_ms": 1787.5657
+        },
+        "multiline": {
+          "expected": 9,
+          "attempted": 5,
+          "verified": 5,
+          "median_ms": 1108.1234
+        },
+        "short": {
+          "expected": 9,
+          "attempted": 7,
+          "verified": 7,
+          "median_ms": 870.3917
+        },
+        "structured": {
+          "expected": 9,
+          "attempted": 7,
+          "verified": 7,
+          "median_ms": 1114.0281
+        },
+        "paragraph": {
+          "expected": 9,
+          "attempted": 7,
+          "verified": 7,
+          "median_ms": 1208.6469
+        },
+        "unicode": {
+          "expected": 9,
+          "attempted": 6,
+          "verified": 6,
+          "median_ms": 761.47855
+        },
+        "unchanged": {
+          "expected": 9,
+          "attempted": 2,
+          "verified": 2,
+          "median_ms": 788.40835
+        },
+        "literals": {
+          "expected": 9,
+          "attempted": 3,
+          "verified": 3,
+          "median_ms": 952.226
+        },
+        "brands": {
+          "expected": 9,
+          "attempted": 5,
+          "verified": 4,
+          "median_ms": 762.7517
+        },
+        "rich-list": {
+          "expected": 9,
+          "attempted": 3,
+          "verified": 3,
+          "median_ms": 719.3563
+        }
+      },
+      "attempted": 54,
+      "failures": [
+        {
+          "index": 53,
+          "case_id": "brands",
+          "reason": "failed or incomplete evidence"
+        }
+      ],
+      "note": "Evidence fields require independent fixture validation; this scorer cannot attest provenance."
+    },
+    "failure": {
+      "case_id": "brands",
+      "reason": "Disposable editor lost native foreground identity; paste blocked",
+      "api_response_received": true,
+      "api_status": 200,
+      "output_correct": true,
+      "clipboard_publication_blocked": true
+    },
+    "integrity": {
+      "production_unchanged": true,
+      "startup_unchanged": true,
+      "worker_stopped": true,
+      "clipboard_verified": true,
+      "restoration_error": null
+    },
+    "decision": "Reject incomplete baseline; no aggregate score. Next bounded block tests disposable focus ownership during request latency; native pre-publication/pre-paste guards remain intact. No failed sample removed or replenished."
+  },
   "iterations": [],
   "native_request_cap": "implemented; 3 focused tests passed",
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
   "destination_observer": "Fresh 11/11 positive fixture pilot and wrong-output negative control passed after verified Chrome app access",
   "evaluator": "14 scorer/evidence/editor/replay guard regressions passed; markup-shape replay requires exact frozen rich coverage; DOM adapter is serialization-only, never browser acceptance",
-  "next": "Run guarded baseline with pilot-after-grant-03 and negative-after-grant-01; max100 actual native HTTP sends including warmup/retries",
+  "next": "Validate new owner during API-wait focus control with offline positive/negative pilots, then allocation iteration-1; no valid baseline comparison or speed claim",
   "blocker": null,
   "case_file": "cases-v1.json",
   "schedule_file": "schedule-v2.json",
@@ -25,7 +130,7 @@
     "editor.html": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
     "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
     "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
-    "run.py": "8a1a02c6d03ee1b55d4c568191e6e9e6464c2d37a6678f8787959de234fca9a3"
+    "run.py": "38c614c6381c3e5419380c86337926ee3af90934e9f35df340de5605180a922a"
   },
   "pilot_summary": {
     "kind": "recorded-response diagnosis only",

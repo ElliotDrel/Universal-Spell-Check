@@ -1,6 +1,6 @@
 {
-  "phase": "live_baseline_ready",
-  "actual_http_requests": 0,
+  "phase": "iteration_1_fixture_focus_validation",
+  "actual_http_requests": 55,
   "completed_optimization_loops": 0,
   "goal_verified": false,
   "required_external_action": null,
@@ -13,5 +13,6 @@
   "after_actual_grant_only": [
     "python bench/campaign/run.py --phase baseline --desktop-app-approved --validated-pilot benchmark_runs/campaign-2026-11-04/pilot-after-grant-03 --validated-negative benchmark_runs/campaign-2026-11-04/negative-after-grant-01 --output benchmark_runs/campaign-2026-11-04/baseline-live-01"
   ],
-  "stop_conditions": "Never run the next command after a failed gate; preserve the fresh output and use a new directory on the next authorized attempt. Baseline is at most 100 native sends including startup/retries; campaign at most 2100. Independent confirmation mandatory. No merge/release/watch."
+  "stop_conditions": "Never run the next command after a failed gate; preserve the fresh output and use a new directory on the next authorized attempt. Baseline is at most 100 native sends including startup/retries; campaign at most 2100. Independent confirmation mandatory. No merge/release/watch.",
+  "production_build_command": "cargo build --manifest-path rust/Cargo.toml --release --no-default-features --target-dir rust/target/prod-channel"
 }

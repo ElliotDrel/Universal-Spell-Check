@@ -2,7 +2,7 @@
   "scope": "scaling candidate only; not live latency, editor correctness or campaign acceptance",
   "live_api_requests": 0,
   "optimization_loops": 0,
-  "source_reference": "29de3a14251bf8debd4d8e7df1f558afdbac6216 plus bounded rich.rs search",
+  "source_reference": "200d79a0f4da220b88854ac9049965b855d97053",
   "source_sha256": "7cd48b5391d4274a1db427f75e1bb0713c31fa6f3786940a34d75e78d50f7926",
   "predicate_parity": {
     "comparisons": 40000,
@@ -368,5 +368,7 @@
       }
     ]
   },
-  "decision": "Retain bounded search as a headless-verified scaling candidate. Frozen three rich cases and sparse stress outputs apply and match expected text; four edge cases assert full result parity only. Live baseline/confirmation and rich-list desktop gate remain pending; no live improvement claim."
+  "decision": "Retain bounded search as a headless-verified scaling candidate. Frozen three rich cases and sparse stress outputs apply and match expected text; four edge cases assert full result parity only. Live baseline/confirmation and rich-list desktop gate remain pending; no live improvement claim.",
+  "git_blob_source_sha256": "4ce24552cc797dc7f4ef3b2126aef1a0ac3fc33a13b7462aae5bc765937472d6",
+  "source_hash_note": "source_sha256 is the exact raw Windows build-tree byte hash, verified matching current checkout; git_blob_source_sha256 uses same basename/NUL formula on LF Git blobs. Difference is CRLF normalization, not source changes."
 }

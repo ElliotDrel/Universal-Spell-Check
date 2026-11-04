@@ -1,0 +1,11 @@
+{
+  "reason": "Incomplete initial baseline rejected after native foreground guard refused paste; idle fixture owner now maintains focus while API is pending",
+  "changed_binding": [
+    "runner"
+  ],
+  "unchanged_evaluator_cases_schedule_editor": true,
+  "prior_runner_sha256": "8a1a02c6d03ee1b55d4c568191e6e9e6464c2d37a6678f8787959de234fca9a3",
+  "new_runner_sha256": "38c614c6381c3e5419380c86337926ee3af90934e9f35df340de5605180a922a",
+  "prior_live_score": null,
+  "requests_spent": 55
+}

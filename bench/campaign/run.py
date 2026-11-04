@@ -35,7 +35,7 @@ def focus_fixture(guard, expected_pid):
     guard.u.GetWindowTextW.argtypes=[W.HWND,W.LPWSTR,ctypes.c_int];guard.u.GetWindowTextW.restype=ctypes.c_int
     guard.u.EnumWindows(visit,0)
     if len(matches)!=1:return False
-    guard.u.SetForegroundWindow(matches[0])
+    if guard.u.GetForegroundWindow()!=matches[0]:guard.u.SetForegroundWindow(matches[0])
     return matches[0] if guard.u.GetForegroundWindow()==matches[0] else None
 
 def main():
@@ -166,8 +166,10 @@ def main():
                 i=state['index'];trial=schedule[i];state['ready']=False
                 before_requests=reservation_count(out/'worker/http-reservations.jsonl')
                 write(out/'worker/command.json',{'id':i+1,'expected_input':active['text'],'expected_hwnd':editor_hwnd,'expected_pid':browser.pid})
-                started=time.monotonic();detail_path=out/f'worker/detail-{i+1}.json'
+                started=time.monotonic();detail_path=out/f'worker/detail-{i+1}.json';focus_reacquisitions=0
                 while time.monotonic()-started<65:
+                    # The explicitly idle disposable desktop stays owned during API latency too.
+                    if guard.u.GetForegroundWindow()!=editor_hwnd and focus_fixture(guard,browser.pid):focus_reacquisitions+=1
                     if detail_path.exists():
                         interim=json.loads(detail_path.read_text())
                         if state['observed'] or interim.get('status')!='success':break
@@ -183,6 +185,7 @@ def main():
                 live_evidence=not args.pilot and has_live_evidence(detail,used_requests)
                 verified_ticks=qpc()
                 row=dict(trial,live_api=live_evidence,request_reservations=used_requests,success=detail.get('status')=='success' and bool(data.get('paste_received')) and data.get('selection_collapsed') is True and data.get('inputType')=='insertFromPaste' and (args.pilot or live_evidence),text_verified=textok,format_verified=formatok,observer_pid=browser.pid,collector_pid=os.getpid(),editor_window_pid=browser.pid,coordinator_pid=worker.pid,verified_insertion_ms=(verified_ticks-trigger['ticks'])*1000/trigger['frequency'] if observation and textok and formatok else None,snapshot_receipt_ms=(observation[0]-trigger['ticks'])*1000/trigger['frequency'] if observation else None,observed=data,detail=detail)
+                row['fixture_focus_reacquisitions']=focus_reacquisitions
                 rows.append(row)
                 with (out/'attempts.jsonl').open('a',encoding='utf-8') as f:f.write(json.dumps(row,ensure_ascii=False)+'\n');f.flush();os.fsync(f.fileno())
                 print(i+1,trial['case_id'],row['verified_insertion_ms'],textok,formatok,flush=True)
