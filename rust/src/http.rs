@@ -280,7 +280,8 @@ impl Request {
         }
     }
     fn send(&mut self, deadline: Instant) -> Result<(), Failure> {
-        crate::request_budget::reserve().map_err(Failure::permanent)?;
+        crate::request_budget::reserve()
+            .map_err(|e| Failure::permanent(format!("[http_budget] {e}")))?;
         let started = Instant::now();
         let accepted = unsafe {
             Self::accepted(WinHttpSendRequest(

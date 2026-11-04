@@ -1,9 +1,9 @@
 name: Rust checks
 on:
   push:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/campaign/**', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
   pull_request:
-    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
+    paths: ['.cargo/**', 'rust/**', 'rust-toolchain.toml', 'src/BuildChannel.cs', 'replacements.json', 'bench/baseline-cases.json', 'tests/test_latency_log_stats.py', '.agents/skills/read-logs/scripts/logs.py', 'bench/*.py', 'bench/campaign/**', 'bench/records/**', 'bench/fixtures/editor-acceptance.json', '.github/workflows/rust-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -25,6 +25,8 @@ jobs:
             ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-
       - name: Acceptance helper data guards
         run: python -m unittest discover -s bench -p test_rust_acceptance.py
+      - name: Live campaign scorer guards
+        run: python -m unittest discover -s bench/campaign -p test_score.py
       - name: Partial latency log compatibility
         run: python -m unittest discover -s tests -p test_latency_log_stats.py
       - name: Benchmark phase report guards

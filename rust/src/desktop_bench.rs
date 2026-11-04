@@ -272,6 +272,9 @@ impl Run {
             return;
         }
         let failed = detail["status"] != "success";
+        let budget_failed = detail["error_message"]
+            .as_str()
+            .is_some_and(|e| e.contains("[http_budget]"));
         let completion = self
             .shared
             .completion
@@ -379,7 +382,8 @@ impl Run {
             return;
         }
         if !success
-            && (!failed
+            && (budget_failed
+                || !failed
                 || unsafe { GetForegroundWindow() } != self.window.handle.hwnd().unwrap().cast())
         {
             self.abort("Unsafe fixture, mapping, or foreground failure; block stopped.");
@@ -524,6 +528,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
     let developer = args.iter().any(|s| s == "--developer-logging");
     fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+    let _claim = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output.join("benchmark.claim"))
+        .map_err(|e| format!("Output already claimed: {e}"))?;
     let mut store = if live {
         let directory = PathBuf::from(
             option(args, "--settings").ok_or("Live mode requires explicit --settings directory")?,
@@ -607,6 +616,10 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let logger = Logger::observed(output.clone(), Some(bus.clone()));
     let hwnd = window.handle.hwnd().unwrap();
     let replay = if live {
+        crate::request_budget::campaign(std::path::Path::new(
+            &option(args, "--campaign-ledger")
+                .ok_or("Live benchmarks require --campaign-ledger")?,
+        ))?;
         crate::request_budget::initialize(&output.join("http-reservations.jsonl"), 100)?;
         None
     } else {

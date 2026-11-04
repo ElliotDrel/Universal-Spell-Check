@@ -4,6 +4,7 @@ mod acceptance;
 mod activity;
 mod app;
 mod benchmark;
+mod campaign_worker;
 mod channel;
 mod cli;
 mod clipboard;
@@ -43,12 +44,15 @@ fn main() {
                 | "--bench-desktop"
                 | "--bench-compute"
                 | "--bench-request"
+                | "--campaign-worker"
         )
     });
     let result = if args.get(1).is_some_and(|s| s == "--transform-json") {
         cli::transform_stdin(args.get(2).map_or("../replacements.json", String::as_str))
     } else if args.get(1).is_some_and(|s| s == "--rich-json") {
         cli::rich_stdin()
+    } else if args.get(1).is_some_and(|s| s == "--campaign-worker") {
+        campaign_worker::run(&args)
     } else if args.get(1).is_some_and(|s| s == "--bench-desktop") {
         desktop_bench::run(&args)
     } else if args.get(1).is_some_and(|s| s == "--bench-request") {

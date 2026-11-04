@@ -8,11 +8,21 @@ from pathlib import Path
 
 
 def score(schedule, attempts):
+    def identity(row):
+        return (row.get('case_id'), row.get('repetition'), row.get('warmup'))
+    identities = {identity(row) for row in schedule}
+    visited = set()
     expected = collections.Counter(row['case_id'] for row in schedule if not row['warmup'])
     seen = collections.Counter()
     accepted = collections.defaultdict(list)
     failures = []
     for index, row in enumerate(attempts):
+        key = identity(row)
+        if (type(row.get('repetition')) is not int or type(row.get('warmup')) is not bool
+                or key not in identities or key in visited or index >= len(schedule) or key != identity(schedule[index])):
+            failures.append({'index': index, 'reason': 'unknown or duplicate trial identity'})
+            continue
+        visited.add(key)
         if row.get('warmup') is True:
             if row.get('success') is not True:
                 failures.append({'index': index, 'reason': 'failed warmup'})
@@ -25,8 +35,8 @@ def score(schedule, attempts):
             and row.get('success') is True
             and row.get('text_verified') is True
             and row.get('format_verified') is True
-            and isinstance(row.get('observer_pid'), int)
-            and isinstance(row.get('coordinator_pid'), int)
+            and type(row.get('observer_pid')) is int
+            and type(row.get('coordinator_pid')) is int
             and row['observer_pid'] > 0
             and row['coordinator_pid'] > 0
             and row['observer_pid'] != row['coordinator_pid']
@@ -45,7 +55,7 @@ def score(schedule, attempts):
                'median_ms': statistics.median(accepted[case]) if accepted[case] else None}
         for case, count in expected.items()
     }
-    complete = bool(expected) and not failures and seen == expected and all(
+    complete = bool(expected) and not failures and len(identities) == len(schedule) and visited == identities and seen == expected and all(
         len(accepted[case]) == count for case, count in expected.items())
     mean = statistics.mean(row['median_ms'] for row in per_case.values()) if complete else None
     return {'complete': complete, 'goal_verified': complete and mean < 1000,
@@ -62,4 +72,4 @@ if __name__ == '__main__':
     result = score(json.loads(args.schedule.read_text(encoding='utf-8'))['trials'],
                    [json.loads(line) for line in args.attempts.read_text(encoding='utf-8').splitlines()])
     print(json.dumps(result, indent=2))
-    raise SystemExit(0 if result['complete'] else 1)
+    raise SystemExit(0 if result['goal_verified'] else 1)

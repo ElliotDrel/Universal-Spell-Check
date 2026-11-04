@@ -1,4 +1,6 @@
 rust/vendor/** -whitespace
 bench/campaign/** text eol=lf
+# Preserve the superseded proposal exactly as originally committed.
+bench/campaign/schedule-v1.json -text
 bench/records/** text eol=lf
 bench/records/2026-10-desktop-latency/settlement/workload/* -text

@@ -35,6 +35,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let key = keys.active().ok_or("No active saved key")?;
     let client = Client::diagnostic()?;
     fs::create_dir(&output).map_err(|e| e.to_string())?;
+    crate::request_budget::campaign(std::path::Path::new(
+        &option(args, "--campaign-ledger")
+            .ok_or("Live request probes require --campaign-ledger")?,
+    ))?;
+    crate::request_budget::initialize(&output.join("http-reservations.jsonl"), 100)?;
     let prewarm = args.iter().any(|s| s == "--prewarm");
     let manifest = json!({"schema_version":2,"model":model,"fixture":"This is a tset.","runs":runs,"prewarm":prewarm,"binary_sha256":crate::benchmark::hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"boundary":"Client::request; no clipboard, mapper, GUI or physical hotkey"});
     fs::write(

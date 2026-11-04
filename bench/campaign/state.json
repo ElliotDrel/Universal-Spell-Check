@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_commit": "711ff37",
-  "phase": "setup",
+  "phase": "blocked_desktop_permission",
   "actual_http_attempts": 0,
   "completed_optimization_loops": 0,
   "maximum_http_attempts": 2100,
@@ -10,9 +10,24 @@
   "goal_verified": false,
   "baseline": null,
   "iterations": [],
-  "native_request_cap": "implemented; 2 focused tests passed",
-  "aggregate_campaign_guard": "pending",
-  "destination_observer": "pending independent process and rendered-format pilot",
-  "evaluator": "score.py; 3 regression tests passed; provenance gate pending",
-  "next": "Integrate aggregate allocation and independent destination observer; validate proposed cases/schedule before live baseline"
+  "native_request_cap": "implemented; 3 focused tests passed",
+  "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
+  "destination_observer": "implemented; recorded-response pilot 9/11 passed; rich-list target and structured observer require retest",
+  "evaluator": "5 regression tests passed; exact identities/order, explicit markers and integer PIDs required",
+  "next": "Obtain actual Chrome tool app grant, resolve rich-list fixture selection, rerun all-case pilot and negative control, then live baseline",
+  "blocker": "Required Chrome Computer Use app approval timed out; no further desktop runs until granted",
+  "case_file": "cases-v1.json",
+  "schedule_file": "schedule-v2.json",
+  "frozen_file_hashes": {
+    "cases-v1.json": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+    "schedule-v2.json": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+    "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+    "editor.html": "d98ea413bb6829f52af3c7e33c2ce9dbb492cb5ec50e12c25d9b0ce29a832eda"
+  },
+  "pilot_summary": {
+    "kind": "recorded-response diagnosis only",
+    "attempted": 11,
+    "text_and_format_passed": 9,
+    "live_requests": 0
+  }
 }

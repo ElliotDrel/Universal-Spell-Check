@@ -1,0 +1,289 @@
+{
+  "acceptance": false,
+  "kind": "offline fixture diagnosis, never live latency evidence",
+  "actual_http_requests": 0,
+  "pilot_attempts": [
+    {
+      "case_id": "short",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "This is a test.",
+        "html": "This is a test.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+        "html": "The meeting starts tomorrow. Please bring the documents and check the address before you leave. We will review the results together.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "long",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+        "html": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidence and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "The meeting starts at noon.",
+        "html": "The meeting starts at noon.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "brands",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "We use OpenAI and GitHub for this project.",
+        "html": "We use OpenAI and GitHub for this project.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "literals",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+        "html": "Please check https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "The café opens tomorrow. Bring your résumé. 🙂",
+        "html": "The café opens tomorrow. Bring your résumé. 🙂",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "Please check the notes.\n\nThen send the documents.",
+        "html": "Please check the notes.\n\nThen send the documents.",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": true,
+      "format_verified": true,
+      "observed": {
+        "text": "Please check the guide.",
+        "html": "<p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p>",
+        "shape": {
+          "links": [
+            [
+              "guide",
+              "https://example.com/guide"
+            ]
+          ],
+          "bold": [
+            "check"
+          ],
+          "lists": 0,
+          "items": 0,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": false,
+      "format_verified": false,
+      "observed": {
+        "text": "1. First item.\n\nSecond item.",
+        "html": "<ol data-pm-slice=\"0 0 []\"><li><ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol></li></ol>",
+        "shape": {
+          "links": [],
+          "bold": [],
+          "lists": 2,
+          "items": 3,
+          "code": []
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    },
+    {
+      "case_id": "structured",
+      "repetition": 0,
+      "warmup": false,
+      "live_api": false,
+      "success": true,
+      "text_verified": false,
+      "format_verified": true,
+      "observed": {
+        "text": "1. First document.\n2. Use C:\\sample\\notes.txt and the guide.",
+        "html": "<div data-pm-slice=\"1 1 []\"><div data-pm-slice=\"1 1 []\"><p>Please <strong>check</strong> these items:</p><ol><li><p>First document.</p></li><li><p>Use <code>C:\\sample\\notes.txt</code> and the <a href=\"https://example.com/guide\">guide</a>.</p></li></ol></div></div>",
+        "shape": {
+          "links": [
+            [
+              "guide",
+              "https://example.com/guide"
+            ]
+          ],
+          "bold": [
+            "check"
+          ],
+          "lists": 1,
+          "items": 2,
+          "code": [
+            "C:\\sample\\notes.txt"
+          ]
+        },
+        "inputType": "insertFromPaste",
+        "paste_received": true
+      }
+    }
+  ],
+  "integrity": {
+    "production_unchanged": true,
+    "startup_unchanged": true,
+    "worker_stopped": true,
+    "clipboard_verified": true
+  },
+  "prior_failed_pilots": [
+    {
+      "pilot": 1,
+      "reason": "Native SendInput denied in restricted context; no insertion"
+    },
+    {
+      "pilot": 2,
+      "reason": "Captured selection did not match replay fixture; no API permitted; raw artifact remains private"
+    },
+    {
+      "pilot": 3,
+      "reason": "Native fixture focus unavailable; cancelled and restored"
+    },
+    {
+      "pilot": 4,
+      "reason": "Native Chrome source did not copy text"
+    }
+  ]
+}

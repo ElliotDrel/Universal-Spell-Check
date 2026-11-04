@@ -1,61 +1,82 @@
 # Live performance campaign
 
-Status: setup; native per-benchmark HTTP cap implemented and two cap tests pass.
-No fresh baseline or optimization accepted. Current main has been incorporated;
-`711ff37` remains the historical starting source, not a fresh baseline.
+Status: aggregate send cap and independent editor owner implemented. Live baseline
+is blocked on required Chrome tool app approval and a passing rich-fixture pilot.
+Zero live API requests and zero optimization loops have run. No speed win is claimed.
 
-This campaign starts at `711ff37`. Historical experiments are evidence, not
-accepted improvements. Keep production and the primary checkout unchanged.
+## Acceptance and frozen inputs
 
-Acceptance is the equal-weight arithmetic mean of each frozen case's median
-trigger-to-verified destination insertion latency, below 1000 ms. Every case
-must have complete coverage, correct destination text and required formatting.
-Failed, missing, timed-out, and unsupported coverage prevents acceptance;
-successful-only timings may be reported only with their denominator.
+Score the equal-weight arithmetic mean of each case's median trigger-to-verified
+destination insertion latency, below 1000 ms. Every scheduled repetition must have
+correct text, required rendered formatting, a real live response and independent
+observation. Failed/missing/unsupported coverage prevents acceptance. The scorer
+requires the exact seeded order, repetition identity, explicit warmup marker and
+integer process identities. Its CLI exits zero only when the goal is verified.
 
-Use disposable plain/native and Chrome synthetic rich editors only. Never open
-real LinkedIn, Codex, or documents. Preserve and restore clipboard in a finally
-guard and verify production settings, encrypted credentials and startup unchanged.
-The current prompt/model and 50 ms minimum settle remain fixed.
+Keep all eleven case IDs in `cases-v1.json`: short, paragraph, long, unchanged,
+brands, literals, unicode, multiline, rich-link, rich-list and structured. The HTML
+is browser source (fragment or CF_HTML); Chrome's copy event generates Windows
+CF_HTML. Do not pass this campaign file to the generic native clipboard producer.
+Never trim text, weaken expected output, skip unchanged paste or reduce 50 ms settle.
+Keep model/prompt fixed initially. No actual LinkedIn, Codex or real documents.
 
-Budget: baseline at most 100 actual HTTP send attempts, then at most 20 candidate
-benchmarks of at most 100 each, including warmups and retries (2100 total).
-If baseline passes, use a separate 100-request confirmation and stop. Winners
-also need independent confirmation within the campaign ceiling. Reserve budget
-before each native HTTP send; counting successful coordinator messages is unsafe.
-No live requests may run before this boundary and its durable ledger are verified.
+`schedule-v2.json` supersedes v1 before any optimization: one real startup HEAD
+request plus 99 corrections, nine repetitions per case, in frozen seeded order.
+This fixes the initial 100-correction proposal's missing warmup allocation without
+changing any text, expected output, formatting requirement or score weighting.
+Retries and periodic warmups consume remaining slots and can make a block incomplete.
+Do not replenish an incomplete block or erase its failures.
 
-Freeze versioned cases before optimization: short, paragraph, long, unchanged,
-protected literals, Unicode, rich paragraph/link and structured list/bold/link/path.
-Use a seeded balanced order and retain the exact schedule and hashes. Interleave
-candidate/control within the same 100-request allocation where practical; report
-each arm's coverage rather than mixing arms into one score.
+## Native and aggregate caps
 
-Prerequisites before baseline:
+`request_budget.rs` durably reserves immediately before every native send. Each
+benchmark permits at most 100 sends including retries/warmups. The shared campaign
+ledger uses an exclusive Windows file handle for each reservation, validates all
+prior records and caps the entire campaign at 2100. A partial/corrupt ledger or
+budget error fails closed. Reservations conservatively consume a crash gap before
+send and are not billing receipts. Native desktop and request-probe entry points
+require the aggregate ledger; normal installed application requests are unaffected.
 
-1. Native per-process send cap is implemented. Aggregate campaign allocation and
-   runner integration remain pending; never launch more benchmarks manually.
-2. Validate out-of-process destination observation, including unchanged paste,
-   nested messages, text and rich structure checks; reject injected wrong output.
-3. Freeze evaluator, cases, settings/prompt hashes and run schedule.
-4. Read saved credentials only through the native protected store. Never export keys.
+Baseline and at most 20 post-baseline benchmark allocations fit the 2100 ceiling.
+Reserve the final allocation for independent confirmation (normally at most 19
+candidate screens plus confirmation). If baseline passes, run independent confirmation
+immediately and stop. No unconfirmed winner satisfies the goal.
 
-After every completed loop, preserve failed attempts, commit and push, then comment
-on the same campaign PR with model attribution, hashes, request counts, before/after
-per-case results, failures, correctness verdict, decision and next hypothesis.
-Do not merge, release, or close independent UI/audit work.
+## Desktop owner and current blockers
 
-Resume state is `state.json`. No incomplete experiment counts as a completed loop.
+Build the Release binary with `cargo build --release --manifest-path rust/Cargo.toml`.
+`run.py` owns one disposable Chrome profile/editor and the native `--campaign-worker`
+process. It uses only synthetic fixtures. Saved credentials are loaded read-only by
+the native protected store; no plaintext key is exported. The runtime rejects a
+captured selection differing from the authorized fixture before creating a payload.
+Only a native window titled USC disposable editor may be triggered.
 
-`cases-v1.json` and seeded `schedule-v1.json` propose 100 measured attempts:
-nine repetitions for each of eleven cases, plus a tenth short case. There are
-no excluded warmups. Retries consume request slots and can prevent completion;
-retain that incomplete benchmark rather than replenishing its budget. Fixtures
-must pass the independent observer pilot before this schedule is executed.
+The editor observes actual paste/input and snapshots destination text/HTML/structure
+in a separate process. QPC ties the coordinator trigger to receipt of the editor's
+snapshot, including the loopback delivery overhead. That is a conservative boundary;
+never substitute SendInput success or requested clipboard HTML for destination proof.
+The owner stops its processes before restoring the complete clipboard and checking
+production settings, encrypted credential and startup hashes/registration unchanged.
 
-`score.py` reports equal-weight per-case medians only on complete evidence.
-It refuses recorded API results, same-process observation, missing text/format
-verification and failed coverage. It does not independently attest supplied
-evidence fields, settings hashes, budget ledgers or fixture provenance. The
-runner must verify those before acceptance. `test_score.py` uses synthetic
-rows only to test the evaluator, never as performance evidence.
+Chrome app approval through Computer Use timed out. Idle-desktop authorization does
+not substitute for that gate. No more desktop runs are allowed until it is granted;
+`--desktop-app-approved` asserts an actual external grant, never grants it itself.
+A benchmark-owned Chrome launch is not a workaround for the outstanding gate.
+
+The retained recorded-response pilot verified 9/11 fixtures. Rich-list nested another
+list on native paste; structured preserved the DOM but its observer omitted text
+inside a wrapper. The observer serialization is corrected in source, unvalidated
+on desktop. Rich-list remains unresolved. These offline timings are diagnostics,
+not live performance evidence. Preserve all failed pilots, including private
+unmatched-capture artifacts locally; never publish those raw artifacts.
+
+After approval, run a fresh `--pilot`; require all eleven cases and negative controls.
+Live mode additionally requires `--validated-pilot <directory>`, a matching binary,
+and frozen cases/schedule/evaluator/editor/settings/prompt hashes. Those hashes bind
+the persistent campaign before live API use. Output paths and benchmark allocations
+are exclusive. A fixture failure stops the block and remains explicit.
+
+After each completed loop: preserve attempts, commit/push, and post attributed
+progress on PR #33 with source/binary hashes, request counts, per-case before/after
+scores, failures, correctness, decision and next hypothesis. Incorporate the parent's
+read-only findings only after a valid baseline. No merge, release or PR watch.

@@ -9,10 +9,11 @@ including warmups and retries, in `http-reservations.jsonl`. Reservations are
 flushed to disk before `WinHttpSendRequest`; exhausted budgets or ledger errors
 fail closed. They conservatively count a crash between reservation and send as
 spent, and are not a billing receipt. Normal application runs are unaffected.
-The campaign runner must additionally enforce the aggregate 2100 ceiling across
-processes before live measurements are authorized by its evaluator. Existing
-example commands with 120 nominal trials below exceed the new live desktop cap;
-use a total at most 100 including retries, and report incomplete coverage.
+The guarded campaign runner also enforces a shared durable 2100-send ceiling.
+All C# live commands below are historical, non-campaign examples and MUST NOT run
+as part of this campaign: their 120 nominal trials and unbounded retries lack the
+required cap. Campaign work goes only through `bench/campaign/run.py` after its
+app-permission and independent fixture-pilot gates pass.
 
 Fresh baseline acceptance remains pending independent destination observation;
 the existing in-process native editor does not establish rendered rich fidelity.

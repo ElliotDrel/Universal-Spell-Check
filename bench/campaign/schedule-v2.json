@@ -1,0 +1,503 @@
+{
+  "seed": 20261104,
+  "cases_sha256": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+  "trials": [
+    {
+      "case_id": "rich-link",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "structured",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "paragraph",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 1,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 8,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "short",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "literals",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "multiline",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "long",
+      "repetition": 0,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-list",
+      "repetition": 6,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 5,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 4,
+      "warmup": false
+    },
+    {
+      "case_id": "rich-link",
+      "repetition": 3,
+      "warmup": false
+    },
+    {
+      "case_id": "brands",
+      "repetition": 2,
+      "warmup": false
+    },
+    {
+      "case_id": "unchanged",
+      "repetition": 7,
+      "warmup": false
+    },
+    {
+      "case_id": "unicode",
+      "repetition": 8,
+      "warmup": false
+    }
+  ],
+  "startup_http_reservations": 1,
+  "reason": "One actual native startup HEAD warmup plus 99 balanced corrections; workload and score unchanged"
+}

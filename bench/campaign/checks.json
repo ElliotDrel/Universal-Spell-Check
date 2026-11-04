@@ -1,15 +1,33 @@
 {
   "scope": "measurement foundation only; not live campaign acceptance",
-  "rust_tests": {"passed": 54, "failed": 0, "ignored": 1},
-  "rust_integration_tests": {"passed": 1, "failed": 0},
-  "scorer_tests": {"passed": 3, "failed": 0},
+  "rust_tests": {
+    "passed": 55,
+    "failed": 0,
+    "ignored": 1
+  },
+  "rust_integration_tests": {
+    "passed": 1,
+    "failed": 0
+  },
+  "scorer_tests": {
+    "passed": 5,
+    "failed": 0
+  },
   "prod_cargo_check": "passed",
   "cargo_fmt_check": "passed",
   "cargo_clippy_all_targets": "passed with vendor warnings; initial PowerShell redirection attempt retained separately",
-  "release_builds": "not run",
+  "release_builds": "Dev and Prod passed; final post-lint rebuild running",
   "live_api_requests": 0,
-  "desktop_trials": 0,
+  "desktop_trials": "11 recorded-response trials; 9 passed text and format; no live benchmark",
   "optimization_loops": 0,
   "production_settings_credentials_startup_clipboard": "not modified by campaign; no desktop fixture was launched",
-  "unresolved": ["aggregate campaign allocation", "independent destination observer", "rendered rich fixture pilot", "fresh live baseline", "optimization and independent confirmation"]
+  "unresolved": [
+    "aggregate campaign allocation",
+    "independent destination observer",
+    "rendered rich fixture pilot",
+    "fresh live baseline",
+    "optimization and independent confirmation"
+  ],
+  "native_contracts": "Frozen production pipeline passed; mutated-output negative control rejected",
+  "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2"
 }
