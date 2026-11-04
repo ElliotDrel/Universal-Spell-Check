@@ -54,7 +54,7 @@
   "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
   "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup",
   "source_hash_algorithm": "SHA256 of concatenated UTF8 basename, NUL, file bytes for sorted rust/src/*.rs",
-  "verification_record": "Local verification-08 format/tests/Clippy/both Release builds/Prod contracts passed; restricted C# restore failed NU1301 before parity. Fresh normal-context parity-normal-09 passed 76/76. Separately 12 campaign tests and 3 native fixture replays passed; matched sparse diagnostic 9/9 full result parity.",
+  "verification_record": "Local verification-08 format/tests/Clippy/both Release builds/Prod contracts passed; restricted C# restore failed NU1301 before parity. Fresh normal-context parity-normal-09 passed 76/76. Separately 12 campaign tests and 3 native fixture replays passed; matched sparse diagnostic 9/9 full result parity. Latest 14 campaign tests passed; optimized-Python native fixture replay verifies exact frozen markup fields and exact three-case coverage.",
   "editor_serialization_tests": {
     "passed": 2,
     "failed": 0,
@@ -78,5 +78,10 @@
   "failed_diagnostics": [
     "1000-span all-nodes edit: both exact outputs refused alignment_budget_exceeded; rejected and retained",
     "Restricted-context C# differential: NuGet TLS credential context failure; normal-context retry passed"
-  ]
+  ],
+  "fixture_replay_guard_tests": {
+    "passed": 2,
+    "failed": 0
+  },
+  "javascript_prerequisite": "Node.js 22+ on PATH; CI explicitly provisions Node 22"
 }

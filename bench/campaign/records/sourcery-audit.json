@@ -2,8 +2,19 @@
   "head": "da6854c93fc5f78db89521e15be65a76a27b25ef",
   "check_url": "https://github.com/ElliotDrel/Universal-Spell-Check/runs/126678562766",
   "conclusion": "failure",
-  "title": "❌ Found 2 blocking security issues",
-  "summary": "Sourcery found 2 blocking security issues:\n\n- [`bench/campaign/run.py:123`](https://github.com/ElliotDrel/Universal-Spell-Check/pull/33/files#diff-d169cf721e7be615007967cd6eb36675c58b92565884c02adc93b09807d8ae6cR123) - https://github.com/ElliotDrel/Universal-Spell-Check/pull/33#discussion_r4468140597\n- [`bench/campaign/run.py:123`](https://github.com/ElliotDrel/Universal-Spell-Check/pull/33/files#diff-d169cf721e7be615007967cd6eb36675c58b92565884c02adc93b09807d8ae6cR123) - https://github.com/ElliotDrel/Universal-Spell-Check/pull/33#discussion_r4468140606",
+  "title": "\u274c Found 2 blocking security issues",
   "classification": "Two subprocess security audit findings, not a service outage",
-  "assessment": "Trusted local worker snapshot and fixed Chrome executable; operator-controlled paths passed as argument lists, no shell, no browser/API-controlled argv. Explicit shell=False and narrowly scoped nosemgrep audit annotations added with rationale. No claim that hosted check has rerun green."
+  "assessment": "Trusted local worker snapshot and fixed Chrome executable; operator-controlled paths passed as argument lists, no shell, no browser/API-controlled argv. Explicit shell=False and narrowly scoped nosemgrep audit annotations added with rationale. No claim that hosted check has rerun green.",
+  "raw_summary": "Sourcery found 2 blocking security issues:\n\n- [`bench/campaign/run.py:123`](https://github.com/ElliotDrel/Universal-Spell-Check/pull/33/files#diff-d169cf721e7be615007967cd6eb36675c58b92565884c02adc93b09807d8ae6cR123) - https://github.com/ElliotDrel/Universal-Spell-Check/pull/33#discussion_r4468140597\n- [`bench/campaign/run.py:123`](https://github.com/ElliotDrel/Universal-Spell-Check/pull/33/files#diff-d169cf721e7be615007967cd6eb36675c58b92565884c02adc93b09807d8ae6cR123) - https://github.com/ElliotDrel/Universal-Spell-Check/pull/33#discussion_r4468140606",
+  "raw_summary_limitation": "Service-reported run.py:123 locations are stale; retained verbatim as actual check output, not authoritative source locations",
+  "audited_launch_locations": [
+    {
+      "line": 144,
+      "url": "https://github.com/ElliotDrel/Universal-Spell-Check/blob/da6854c93fc5f78db89521e15be65a76a27b25ef/bench/campaign/run.py#L144"
+    },
+    {
+      "line": 149,
+      "url": "https://github.com/ElliotDrel/Universal-Spell-Check/blob/da6854c93fc5f78db89521e15be65a76a27b25ef/bench/campaign/run.py#L149"
+    }
+  ]
 }

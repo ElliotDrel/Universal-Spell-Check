@@ -115,6 +115,7 @@ fingerprint locally; it never exports plaintext credentials. A zero exit from on
 live block still requires separate independent confirmation for campaign acceptance.
 
 Headless diagnosis: `python -m unittest discover -s bench/campaign -p "test_*.py"`
+requires Python and Node.js 22 or newer on PATH; CI explicitly provisions Node 22.
 also exercises the actual observer text function against retained synthetic DOM
 trees through a minimal adapter; this does not simulate browser editing or layout.
 `python bench/campaign/check_fixture_replay.py --exe rust/target/release/universal-spell-check.exe --output <fresh-directory>`

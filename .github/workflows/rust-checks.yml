@@ -11,6 +11,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install pinned Rust tools
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - name: Cache pinned Cargo dependencies and build outputs

@@ -13,7 +13,7 @@
   "native_request_cap": "implemented; 3 focused tests passed",
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
   "destination_observer": "Implemented; headless wrapped-paragraph regression passes; rich-list native mapper is flat but historical editor result nested; paste-time selection/clipboard evidence added, desktop retest required",
-  "evaluator": "12 scorer/evidence/editor regressions passed; DOM adapter is serialization-only, never browser acceptance",
+  "evaluator": "14 scorer/evidence/editor/replay guard regressions passed; markup-shape replay requires exact frozen rich coverage; DOM adapter is serialization-only, never browser acceptance",
   "next": "Actual Chrome app grant, then commands in resume.json; all 11 positive fixtures and wrong-output control must pass before live baseline",
   "blocker": "Required Chrome Computer Use app approval timed out; no further desktop runs until granted",
   "case_file": "cases-v1.json",
