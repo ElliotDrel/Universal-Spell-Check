@@ -607,6 +607,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let logger = Logger::observed(output.clone(), Some(bus.clone()));
     let hwnd = window.handle.hwnd().unwrap();
     let replay = if live {
+        crate::request_budget::initialize(&output.join("http-reservations.jsonl"), 100)?;
         None
     } else {
         Some(Arc::new(Replay::new(&fixtures)?))

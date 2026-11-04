@@ -1,5 +1,22 @@
 # C# / Rust Baseline
 
+## November live campaign request ceiling
+
+The resumable live campaign contract is in
+[`bench/campaign/README.md`](../bench/campaign/README.md). Rust desktop `e2e`
+benchmarks now reserve at most 100 native HTTP send attempts per process,
+including warmups and retries, in `http-reservations.jsonl`. Reservations are
+flushed to disk before `WinHttpSendRequest`; exhausted budgets or ledger errors
+fail closed. They conservatively count a crash between reservation and send as
+spent, and are not a billing receipt. Normal application runs are unaffected.
+The campaign runner must additionally enforce the aggregate 2100 ceiling across
+processes before live measurements are authorized by its evaluator. Existing
+example commands with 120 nominal trials below exceed the new live desktop cap;
+use a total at most 100 including retries, and report incomplete coverage.
+
+Fresh baseline acceptance remains pending independent destination observation;
+the existing in-process native editor does not establish rendered rich fidelity.
+
 The portable historical measurement record is committed at
 [`bench/records/2026-10-rust-port/`](../bench/records/2026-10-rust-port/README.md).
 It includes synthetic cases/responses, canonical per-attempt samples, sanitized

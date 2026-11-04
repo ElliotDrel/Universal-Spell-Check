@@ -17,6 +17,7 @@ mod evidence_storage;
 mod http;
 mod logging;
 mod platform;
+mod request_budget;
 mod request_probe;
 mod rich;
 mod rich_links;
