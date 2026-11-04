@@ -15,8 +15,12 @@ as part of this campaign: their 120 nominal trials and unbounded retries lack th
 required cap. Campaign work goes only through `bench/campaign/run.py` after its
 app-permission and independent fixture-pilot gates pass.
 
-Fresh baseline acceptance remains pending independent destination observation;
-the existing in-process native editor does not establish rendered rich fidelity.
+The November campaign confirms complete live Release Worker benchmark blocks at
+956.29 ms and independently 936.59 ms (equal mean of eleven per-case medians,
+99/99 verified insertions each), using 288 total native HTTP sends including
+rejected blocks and warmups. See [campaign results](../bench/campaign/records/README.md).
+This is independently observed synthetic editor insertion, not physical hotkey/tray
+latency or general editor certification; no speedup over the incomplete baseline is claimed.
 
 The portable historical measurement record is committed at
 [`bench/records/2026-10-rust-port/`](../bench/records/2026-10-rust-port/README.md).

@@ -1,8 +1,8 @@
 {
-  "phase": "independent_confirmation",
-  "actual_http_requests": 188,
+  "phase": "goal_confirmed_stopped",
+  "actual_http_requests": 288,
   "completed_optimization_loops": 2,
-  "goal_verified": false,
+  "goal_verified": true,
   "required_external_action": null,
   "remaining_fixture_blocker": null,
   "release_app_paths": {
@@ -10,9 +10,8 @@
     "prod": "rust/target/prod-channel/release/universal-spell-check.exe"
   },
   "safe_headless_command": "python -m unittest discover -s bench/campaign -p \"test_*.py\"",
-  "after_actual_grant_only": [
-    "python bench/campaign/run.py --phase confirmation --desktop-app-approved --validated-pilot benchmark_runs/campaign-2026-11-04/pilot-spacing-05 --validated-negative benchmark_runs/campaign-2026-11-04/negative-spacing-04 --output benchmark_runs/campaign-2026-11-04/confirmation-live-01"
-  ],
+  "after_actual_grant_only": [],
   "stop_conditions": "Never run the next command after a failed gate; preserve the fresh output and use a new directory on the next authorized attempt. Baseline is at most 100 native sends including startup/retries; campaign at most 2100. Independent confirmation mandatory. No merge/release/watch.",
-  "production_build_command": "cargo build --manifest-path rust/Cargo.toml --release --no-default-features --target-dir rust/target/prod-channel"
+  "production_build_command": "cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features --target-dir rust/target/prod-channel",
+  "next_action": "Campaign stopped after independent confirmation; review PR33, do not run more live blocks"
 }

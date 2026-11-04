@@ -1079,5 +1079,473 @@
       "restoration_error": null
     }
   },
-  "binary_sha256": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+  "binary_sha256": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a",
+  "provenance_supplement": {
+    "initial_positive": {
+      "artifact_hashes": {
+        "manifest.json": "b8913f76be4c8da9488d62256e2923e3b8cf47b1569172987126f515a588a587",
+        "attempts.jsonl": "5c4527e644eb4701ca6bdfbb14ed0f761dd88c1b843d80b1fb0cd78a8471a32e",
+        "integrity.json": "07a03497dabca184fba08dce0721b9e4781f6dac09aab7727f9ea2c23d43e115",
+        "candidate.exe": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+      },
+      "public_binding": {
+        "runner": "8a1a02c6d03ee1b55d4c568191e6e9e6464c2d37a6678f8787959de234fca9a3",
+        "cases": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+        "schedule": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+        "evaluator": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+        "editor": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+        "formats": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+        "evidence": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+        "replacements": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+        "channel_constants": "b68c6d761d183081b0773f175efaa5a3749c044344601a8d846fee23c89ad819",
+        "settings_file_exists": false,
+        "prompt": "a583472584222294aa451e7bd34e828cd745187ab9374421fbb805e64f72cab1",
+        "effective_developer_logging": false
+      },
+      "binding_redactions": "Saved settings/encrypted-store fingerprints remain only in the retained local manifests",
+      "rows": [
+        {
+          "case_id": "short",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "This is a tset."
+          }
+        },
+        {
+          "case_id": "paragraph",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together."
+          }
+        },
+        {
+          "case_id": "long",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions."
+          }
+        },
+        {
+          "case_id": "unchanged",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The meeting starts at noon."
+          }
+        },
+        {
+          "case_id": "brands",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "We use open ai and github for this projcet."
+          }
+        },
+        {
+          "case_id": "literals",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000."
+          }
+        },
+        {
+          "case_id": "unicode",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The caf\u00e9 opens tomorow. Bring your r\u00e9sum\u00e9. \ud83d\ude42"
+          }
+        },
+        {
+          "case_id": "multiline",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek the notes.\n\nThen send the documants."
+          }
+        },
+        {
+          "case_id": "rich-link",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek the guide."
+          }
+        },
+        {
+          "case_id": "rich-list",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "1. First itme.\n2. Second itme."
+          }
+        },
+        {
+          "case_id": "structured",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 10760,
+          "coordinator_pid": 65888,
+          "collector_pid": 60128,
+          "editor_window_pid": 10760,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek these items:\n\n1. First documant.\n2. Use C:\\sample\\notes.txt and the guide."
+          }
+        }
+      ],
+      "generated_directory_retained": true
+    },
+    "initial_negative": {
+      "artifact_hashes": {
+        "manifest.json": "1e4842526a344c2674b5858e1a92173b576df06a0dbeadd20842196f5f456c2f",
+        "attempts.jsonl": "860e6934b1d8d10f0d8599bb1848a13dd243bcc2081cc169b87d75d7919605ff",
+        "integrity.json": "07a03497dabca184fba08dce0721b9e4781f6dac09aab7727f9ea2c23d43e115",
+        "candidate.exe": "3a19e1339b6b9d9c4b98026692a45f67597538665ca07e1188e77eb9be3c825a"
+      },
+      "public_binding": {
+        "runner": "8a1a02c6d03ee1b55d4c568191e6e9e6464c2d37a6678f8787959de234fca9a3",
+        "cases": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+        "schedule": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+        "evaluator": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+        "editor": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+        "formats": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+        "evidence": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+        "replacements": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+        "channel_constants": "b68c6d761d183081b0773f175efaa5a3749c044344601a8d846fee23c89ad819",
+        "settings_file_exists": false,
+        "prompt": "a583472584222294aa451e7bd34e828cd745187ab9374421fbb805e64f72cab1",
+        "effective_developer_logging": false
+      },
+      "binding_redactions": "Saved settings/encrypted-store fingerprints remain only in the retained local manifests",
+      "rows": [
+        {
+          "case_id": "short",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 23756,
+          "coordinator_pid": 38284,
+          "collector_pid": 49400,
+          "editor_window_pid": 23756,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "This is a tset."
+          }
+        }
+      ],
+      "generated_directory_retained": true
+    },
+    "spacing_positive": {
+      "artifact_hashes": {
+        "manifest.json": "8f102532cdb1e0978338a63e8633c8db4372ac3cef1d35b98fdd4cd1d2fbd640",
+        "attempts.jsonl": "4d09a0fa3ac3b6002adfa1ac45f85fa578081fb379d497d0a29e43a90dc5d14a",
+        "integrity.json": "07a03497dabca184fba08dce0721b9e4781f6dac09aab7727f9ea2c23d43e115",
+        "candidate.exe": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657"
+      },
+      "public_binding": {
+        "runner": "38c614c6381c3e5419380c86337926ee3af90934e9f35df340de5605180a922a",
+        "cases": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+        "schedule": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+        "evaluator": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+        "editor": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+        "formats": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+        "evidence": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+        "replacements": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+        "channel_constants": "b68c6d761d183081b0773f175efaa5a3749c044344601a8d846fee23c89ad819",
+        "settings_file_exists": false,
+        "prompt": "a583472584222294aa451e7bd34e828cd745187ab9374421fbb805e64f72cab1",
+        "effective_developer_logging": false
+      },
+      "binding_redactions": "Saved settings/encrypted-store fingerprints remain only in the retained local manifests",
+      "rows": [
+        {
+          "case_id": "short",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "This is a tset."
+          }
+        },
+        {
+          "case_id": "paragraph",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The meeting starts tomorow. Please bring the documants and check the adress before you leave. We will review the results together."
+          }
+        },
+        {
+          "case_id": "long",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The team reviewed the project on Monday and agreed to keep the next version simple. Each change should solve a specific problem, preserve the existing behavior, and be easy to verify. We want the application to feel responsive without adding more steps for the person using it. The first milestone is a reliable baseline that we can repeat after the implementation changes.\n\nThe report should include typical delays, slower runs, and failures. A fast result is useful only when the corrected words actually reach the editor and the formatting remains intact. We will keep the original inputs, the recorded responses, and the exact settings used during the comparison. That makes it possible to investigate a regression without guessing what changed between runs.\n\nAfter the measurements are complete, the team will review the evidance and decide which changes improved the experience. Any remaining limitations should be stated clearly so the next comparison uses the same assumptions."
+          }
+        },
+        {
+          "case_id": "unchanged",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The meeting starts at noon."
+          }
+        },
+        {
+          "case_id": "brands",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "We use open ai and github for this projcet."
+          }
+        },
+        {
+          "case_id": "literals",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek https://example.com/Github?q=OpenAI and C:\\sample\\Github\\notes.txt for session 550e8400-e29b-41d4-a716-446655440000."
+          }
+        },
+        {
+          "case_id": "unicode",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "The caf\u00e9 opens tomorow. Bring your r\u00e9sum\u00e9. \ud83d\ude42"
+          }
+        },
+        {
+          "case_id": "multiline",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek the notes.\n\nThen send the documants."
+          }
+        },
+        {
+          "case_id": "rich-link",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek the guide."
+          }
+        },
+        {
+          "case_id": "rich-list",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "1. First itme.\n2. Second itme."
+          }
+        },
+        {
+          "case_id": "structured",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 68044,
+          "coordinator_pid": 49712,
+          "collector_pid": 53804,
+          "editor_window_pid": 68044,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "Please chek these items:\n\n1. First documant.\n2. Use C:\\sample\\notes.txt and the guide."
+          }
+        }
+      ],
+      "generated_directory_retained": true
+    },
+    "spacing_negative": {
+      "artifact_hashes": {
+        "manifest.json": "d667c67c65de615fae986177fceaa69da5773fbd64d4844319e0d5d1a9db88a9",
+        "attempts.jsonl": "d0252b0fecffab756463306e7e28b3e7ebff6fe5e4eee1ccf7c94fb390ce6bde",
+        "integrity.json": "07a03497dabca184fba08dce0721b9e4781f6dac09aab7727f9ea2c23d43e115",
+        "candidate.exe": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657"
+      },
+      "public_binding": {
+        "runner": "38c614c6381c3e5419380c86337926ee3af90934e9f35df340de5605180a922a",
+        "cases": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+        "schedule": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+        "evaluator": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+        "editor": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+        "formats": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+        "evidence": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+        "replacements": "dc9a99a506191a4c0857fbd3d5dee329415ca182f014308d135c938ed51fac7e",
+        "channel_constants": "b68c6d761d183081b0773f175efaa5a3749c044344601a8d846fee23c89ad819",
+        "settings_file_exists": false,
+        "prompt": "a583472584222294aa451e7bd34e828cd745187ab9374421fbb805e64f72cab1",
+        "effective_developer_logging": false
+      },
+      "binding_redactions": "Saved settings/encrypted-store fingerprints remain only in the retained local manifests",
+      "rows": [
+        {
+          "case_id": "short",
+          "repetition": 0,
+          "warmup": false,
+          "live_api": false,
+          "observer_pid": 69100,
+          "coordinator_pid": 65064,
+          "collector_pid": 68708,
+          "editor_window_pid": 69100,
+          "worker": {
+            "status": "success",
+            "request_mode": "offline_replay",
+            "input_text": "This is a tset."
+          }
+        }
+      ],
+      "generated_directory_retained": true
+    }
+  },
+  "verification_limit": "Curated public proof and artifact hashes supplement retained complete generated directories; binary snapshots/private configuration fingerprints remain local. The native live runner re-read and verified full raw pilot evidence before API launch.",
+  "manifest_pid_note": "Historical top-level manifest observer_pid denoted the collector, not Chrome; native validation always used per-attempt observer_pid/editor_window_pid and distinct coordinator/collector identities. Future manifests name that top-level field collector_pid. Generated historical manifests remain unchanged."
 }

@@ -1,7 +1,7 @@
 {
-  "scope": "measurement foundation only; not live campaign acceptance",
+  "scope": "Confirmed frozen live Release Worker benchmark; exact scope and failures in records/README.md",
   "rust_tests": {
-    "passed": 59,
+    "passed": 60,
     "failed": 0,
     "ignored": 1
   },
@@ -17,22 +17,20 @@
   "cargo_fmt_check": "passed",
   "cargo_clippy_all_targets": "Warnings-denied Clippy passed after automatic fixes confined to new campaign worker/budget code; dependency warnings remain",
   "release_builds": "Latest-source Dev and Prod Release builds passed",
-  "live_api_requests": 188,
-  "desktop_trials": "Loop2 live99/99 exact text/format verified; score956.29ms, independent confirmation pending",
+  "live_api_requests": 288,
+  "desktop_trials": "Accepted candidate198/198 live exact text/format verified across iteration2 and independent confirmation; scores956.29/936.59ms. Earlier rejected baseline53/54 and loop1 31/32 retained.",
   "optimization_loops": 2,
   "production_settings_credentials_startup_clipboard": "Clipboard changed only in disposable pilots and restored byte-for-byte; production settings, encrypted credentials and startup remained unchanged; owned benchmark processes stopped",
   "unresolved": [
-    "required Chrome tool app approval",
-    "rich-list fixture nesting",
-    "desktop retest of structured observer and all-case pilot",
-    "wrong-output fixture negative control",
-    "fresh live baseline",
-    "optimization and independent confirmation"
+    "Historical rare native paste no-ops remain causally unresolved",
+    "Offline stray-c negative control retained, not accepted",
+    "Bare single-block span unsupported_editor unchanged",
+    "No generalized original-editor certification or measured speedup over incomplete baseline"
   ],
   "native_contracts": "Frozen production pipeline passed; mutated-output negative control rejected",
   "permission_refusal": "Runner rejected missing actual Chrome tool app grant before creating output; exit 2",
   "prod_rust_tests": {
-    "passed": 59,
+    "passed": 60,
     "failed": 0,
     "ignored": 0
   },
@@ -40,21 +38,21 @@
     "passed": 1,
     "failed": 0
   },
-  "interactive_media": "No hosted screenshot/recording; required Chrome app approval is pending. Synthetic DOM evidence is retained.",
+  "interactive_media": "Hosted native GitHub synthetic fixture source screenshot verified byte-identical; caption explicitly excludes destination/latency acceptance",
   "evidence_tests": {
     "passed": 5,
     "failed": 0
   },
-  "verified_source_sha256": "05744b17c6edd284d929ab8a8f7e0d34239f95ee37aefba55c3e71308c40d01b",
+  "verified_source_sha256": "2cdac26d7a203e23e3a140332db2a68a3b09b0de3127fe18de4d92573a513998",
   "release_binary_sha256": {
-    "dev": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657",
-    "prod": "60c1eeec8da1e78ba2761d811313fae246f19eeb69c02a57dd623f8b706dbbc7"
+    "dev": "87477c3aa0f6b37d901828a5cf5c220942bc6c0823a75ecf1e07280a79eaaab8",
+    "prod": "195a38418f62fd6275e13ccde325a248a4f3ede105dde8cca67f9da7ea503e66"
   },
-  "owned_process_inventory": "Normal-context CIM verification found zero remaining campaign executable processes",
-  "editor_static_syntax": "Node syntax check passed; DOM/layout retest remains blocked on Chrome app grant",
+  "owned_process_inventory": "Final normal-context CIM found zero campaign Chrome/worker processes",
+  "editor_static_syntax": "Node syntax check and real desktop11-case pilots passed",
   "runner_exit_contract": "Incorrect/incomplete pilots and live blocks missing the latency goal exit nonzero after cleanup",
   "source_hash_algorithm": "SHA256 of concatenated UTF8 basename, NUL, file bytes for sorted rust/src/*.rs",
-  "verification_record": "verification-13: all10 groups passed, including both channel tests/builds, strict Clippy, current Prod contracts with independent source-spacing override, fresh C# parity76/76, fixture replay and14 campaign tests",
+  "verification_record": "verification-14 all10 groups passed: Dev60/1ignored + integration1, Prod60 + integration1, fmt, strict Clippy, both locked Release builds, current Prod contracts/negative, C#76, native rich replay3 and14 campaign tests. Final schema guard is cfg(test)-only; exact Release code/data equivalence apart from parsed linker identity fields recorded separately.",
   "editor_serialization_tests": {
     "passed": 2,
     "failed": 0,
@@ -84,5 +82,17 @@
     "passed": 2,
     "failed": 0
   },
-  "javascript_prerequisite": "Node.js 22+ on PATH; CI explicitly provisions Node 22"
+  "javascript_prerequisite": "Node.js 22+ on PATH; CI explicitly provisions Node 22",
+  "build_input_hashes": {
+    "rust\\Cargo.lock": "12c12ef04226a0b90464e77b586af0a64c2eee5e305a3e61682803e67a50108e",
+    "rust\\Cargo.toml": "43390b83745ee2cca4fe37493921662cfa741a7bd2e3b2930e636abb2cfb25cf",
+    "rust\\build.rs": "1dd02a1275c999ecaaa18a35408ce97eb1cd0993822375c293538410d2fc029b",
+    "rust-toolchain.toml": "d8c420f9c9a2fc00c09cf07b7bb570c92a09137ef1559cb9ef5b12c76f7557cc",
+    "bench\\fixtures\\correction-contract-overrides.json": "708758a7f4a256f8da14c653e56643b4a3db3292d751ea7bf7a978bbdac9ac55"
+  },
+  "goal_verified": true,
+  "locked_release_builds": "Final Dev and Prod --locked cached builds passed; Dev binary hash identical to measured snapshot",
+  "measured_source_sha256": "05744b17c6edd284d929ab8a8f7e0d34239f95ee37aefba55c3e71308c40d01b",
+  "measured_dev_binary_sha256": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657",
+  "post_measurement_changes": "cfg(test)-only override schema guard; future manifest observer_pid field renamed collector_pid (per-trial actual browser PID was already correct and used by all gates); no metric/workload/runtime change"
 }

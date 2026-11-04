@@ -891,6 +891,18 @@ mod golden_tests {
     use super::*;
     use base64::Engine;
     use serde_json::{Value, json};
+    fn expected_field<'a>(record: &'a Value, name: &str, fallback: &'a str) -> &'a str {
+        record.get(name).map_or(fallback, |value| {
+            value
+                .as_str()
+                .expect("Correction override field must be a string")
+        })
+    }
+    #[test]
+    #[should_panic(expected = "Correction override field must be a string")]
+    fn malformed_correction_override_never_uses_historical_fallback() {
+        expected_field(&json!({"output": 42}), "output", "historical");
+    }
     #[test]
     fn original_csharp_formatting_contracts() {
         for (index, line) in include_str!("../tests/fixtures/csharp-formatting.jsonl")
@@ -934,23 +946,19 @@ mod golden_tests {
             let corrected = &overrides[&case.id];
             assert_eq!(
                 output,
-                corrected["output"].as_str().unwrap_or(&fixture.output),
+                expected_field(corrected, "output", &fixture.output),
                 "{} text",
                 case.id
             );
             assert_eq!(
                 rich.text,
-                corrected["paste_text"]
-                    .as_str()
-                    .unwrap_or(&fixture.paste_text),
+                expected_field(corrected, "paste_text", &fixture.paste_text),
                 "{} paste text",
                 case.id
             );
             assert_eq!(
                 rich.html,
-                corrected["paste_html"]
-                    .as_str()
-                    .unwrap_or(&fixture.paste_html),
+                expected_field(corrected, "paste_html", &fixture.paste_html),
                 "{} HTML",
                 case.id
             );

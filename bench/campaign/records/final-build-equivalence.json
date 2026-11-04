@@ -1,0 +1,46 @@
+{
+  "scope": "Post-measurement cfg(test)-only schema guard; no product-path change or extra API run",
+  "measured_binary_sha256": "267a7109bcf0bbf683da877cff81d626cdff11c8f813a4f21da2407e89ef2657",
+  "final_dev_binary_sha256": "87477c3aa0f6b37d901828a5cf5c220942bc6c0823a75ecf1e07280a79eaaab8",
+  "same_size": true,
+  "differing_bytes": 24,
+  "normalized_binary_sha256": "387166a6ed23f15cf10d48c3fb5659abec704e62340ea7d44ec208dc6c429327",
+  "normalized_binary_identical": true,
+  "normalized_fields": [
+    {
+      "offset": 272,
+      "size": 4,
+      "field": "COFF timestamp"
+    },
+    {
+      "offset": 4788148,
+      "size": 4,
+      "field": "debug directory timestamp"
+    },
+    {
+      "offset": 4789228,
+      "size": 16,
+      "field": "CodeView GUID"
+    },
+    {
+      "offset": 4788176,
+      "size": 4,
+      "field": "debug directory timestamp"
+    },
+    {
+      "offset": 4788204,
+      "size": 4,
+      "field": "debug directory timestamp"
+    }
+  ],
+  "section_hashes_match": {
+    ".text": true,
+    ".rdata": false,
+    ".data": true,
+    ".pdata": true,
+    ".fptable": true,
+    ".rsrc": true,
+    ".reloc": true
+  },
+  "conclusion": "All executable bytes except parsed linker/debug identity fields are identical; .text/.data and all other sections except debug-containing .rdata match exactly. Original measured executable remains immutable in generated directory."
+}

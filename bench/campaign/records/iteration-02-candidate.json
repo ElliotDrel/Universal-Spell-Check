@@ -51,5 +51,6 @@
   "source_spacing_oracle": "bench/fixtures/correction-contract-overrides.json",
   "pilot": "pilot-spacing-05",
   "negative": "negative-spacing-04",
-  "status": "validated locally; awaiting live block"
+  "status": "Live loop2 complete956.29ms; independent same-binary confirmation936.59ms, all198 accepted corrections verified",
+  "source_spacing_oracle_sha256": "708758a7f4a256f8da14c653e56643b4a3db3292d751ea7bf7a978bbdac9ac55"
 }

@@ -1,13 +1,12 @@
 {
   "schema_version": 1,
-  "source_commit": "711ff37",
-  "phase": "independent_confirmation",
-  "actual_http_attempts": 188,
+  "phase": "goal_confirmed_stopped",
+  "actual_http_attempts": 288,
   "completed_optimization_loops": 2,
   "maximum_http_attempts": 2100,
   "maximum_attempts_per_benchmark": 100,
   "maximum_optimization_loops": 20,
-  "goal_verified": false,
+  "goal_verified": true,
   "baseline": {
     "record": "records/baseline-live-01.json",
     "complete": false,
@@ -34,7 +33,7 @@
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
   "destination_observer": "Fresh 11/11 positive fixture pilot and wrong-output negative control passed after verified Chrome app access",
   "evaluator": "14 scorer/evidence/editor/replay guard regressions passed; markup-shape replay requires exact frozen rich coverage; DOM adapter is serialization-only, never browser acceptance",
-  "next": "Independent same-binary confirmation, max100 actual HTTP sends including startup and retries",
+  "next": "No more API experiments. Review PR33; never merge/release automatically.",
   "blocker": null,
   "case_file": "cases-v1.json",
   "schedule_file": "schedule-v2.json",
@@ -70,5 +69,39 @@
     }
   ],
   "scaling_candidate": "Bounded rich binding retained: 40000 predicate comparisons, 76/76 fresh C# cases, 9/9 matched full-result parity; no live score benefit established",
-  "first_complete_live_score_ms": 956.2945545454545
+  "first_complete_live_score_ms": 956.2945545454545,
+  "confirmation": {
+    "record": "records/confirmation-live-01.json",
+    "complete": true,
+    "http_sends": 100,
+    "score_ms": 936.586790909091
+  },
+  "scope": "Frozen Release correction Worker trigger to independently verified synthetic editor insertion, including live API and observer overhead; physical hardware hotkey/tray/dashboard excluded",
+  "remaining_limits": [
+    "Historical rare native paste no-ops remain causally unresolved",
+    "Offline stray-c negative control retained, not accepted",
+    "Bare single-block span unsupported_editor unchanged",
+    "No generalized original-editor certification or measured speedup over incomplete baseline"
+  ],
+  "initial_source_commit": "711ff37",
+  "measured_source_commit": "63656c8a5ab28f1d15fd0e5e8fffaf2556fafb3f",
+  "measured_frozen_file_hashes": {
+    "cases-v1.json": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+    "schedule-v2.json": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+    "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+    "editor.html": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+    "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+    "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+    "run.py": "38c614c6381c3e5419380c86337926ee3af90934e9f35df340de5605180a922a"
+  },
+  "current_file_hashes": {
+    "cases-v1.json": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
+    "schedule-v2.json": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
+    "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
+    "editor.html": "1b9221fc1c448c5f3a156c31ae97021d880117106639f6467f699cc24447e349",
+    "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
+    "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
+    "run.py": "c9bf2ae019e21cacf6165e18d52a5e9e52682a8c22d4cd9548154a336f913476"
+  },
+  "final_build_equivalence": "records/final-build-equivalence.json"
 }

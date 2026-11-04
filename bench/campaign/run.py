@@ -109,7 +109,7 @@ def main():
     source_snapshot=out/'source';source_snapshot.mkdir()
     for source in (ROOT/'rust/src').glob('*.rs'):shutil.copy2(source,source_snapshot/source.name)
     for name in ['cases-v1.json','schedule-v2.json','score.py','editor.html','formats-v1.json','evidence.py']:shutil.copy2(HERE/name,out/name)
-    write(out/'manifest.json',{'source_sha256':hashlib.sha256(b''.join(p.name.encode()+b'\0'+p.read_bytes() for p in sorted((ROOT/'rust/src').glob('*.rs')))).hexdigest(),'binding':binding,'binary_sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'cases_sha256':hashlib.sha256((HERE/'cases-v1.json').read_bytes()).hexdigest(),'schedule':schedule,'pilot':args.pilot,'observer_pid':os.getpid(),'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()})
+    write(out/'manifest.json',{'source_sha256':hashlib.sha256(b''.join(p.name.encode()+b'\0'+p.read_bytes() for p in sorted((ROOT/'rust/src').glob('*.rs')))).hexdigest(),'binding':binding,'binary_sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'cases_sha256':hashlib.sha256((HERE/'cases-v1.json').read_bytes()).hexdigest(),'schedule':schedule,'pilot':args.pilot,'collector_pid':os.getpid(),'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()})
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_GET(self):

@@ -1,8 +1,11 @@
 # Live performance campaign
 
-Status: aggregate send cap and independent editor owner implemented. Live baseline
-is blocked on required Chrome tool app approval and a passing rich-fixture pilot.
-Zero live API requests and zero optimization loops have run. No speed win is claimed.
+Status: frozen Release correction benchmark goal independently confirmed and stopped.
+Loop 2 scored 956.29 ms; separate same-binary confirmation scored 936.59 ms,
+each with 99/99 verified corrections (nine/case) and 100 actual HTTP sends.
+Campaign total 288 sends, two optimization loops and one confirmation. Earlier
+baseline/loop failures remain rejected and retained. No speedup over the incomplete
+baseline is claimed. See [final results](records/README.md) for per-case data and scope.
 
 ## Acceptance and frozen inputs
 
@@ -42,7 +45,7 @@ Reserve the final allocation for independent confirmation (normally at most 19
 candidate screens plus confirmation). If baseline passes, run independent confirmation
 immediately and stop. No unconfirmed winner satisfies the goal.
 
-## Desktop owner and current blockers
+## Desktop owner and verification
 
 Build the Release binary with `cargo build --release --manifest-path rust/Cargo.toml`.
 `run.py` owns one disposable Chrome profile/editor and the native `--campaign-worker`
@@ -66,15 +69,20 @@ the boundary begins at an accepted synthetic coordinator trigger. Bare single-bl
 span HTML retains the known `unsupported_editor` limitation for changed and unchanged
 text. No allowlist expansion or unsupported-editor pass is introduced.
 
-Chrome app approval through Computer Use timed out. Idle-desktop authorization does
-not substitute for that gate. No more desktop runs are allowed until it is granted;
+Chrome app approval initially timed out, then normal app access succeeded after the
+user granted it. Idle-desktop authorization does not substitute for that gate;
 `--desktop-app-approved` asserts an actual external grant, never grants it itself.
-A benchmark-owned Chrome launch is not a workaround for the outstanding gate.
+A benchmark-owned Chrome launch is never a workaround for a missing gate.
 
-The retained recorded-response pilot verified 9/11 fixtures. Rich-list nested another
+The earlier retained recorded-response pilot verified 9/11 fixtures. Rich-list nested another
 list on native paste; structured preserved the DOM but its observer omitted text
-inside a wrapper. The observer serialization is corrected in source, unvalidated
-on desktop. Rich-list remains unresolved. These offline timings are diagnostics,
+inside a wrapper. Fresh granted desktop pilots verified the corrected serializer.
+Paste-time evidence showed flat clipboard HTML reaching Chrome but default paste
+retaining an outer list item. The disposable rich editor now deletes exactly a
+whole-root selection before Chrome performs its normal default paste; it neither
+injects expected output nor cancels paste. All eleven unchanged expectations pass.
+The fixture owner maintains the authorized idle focus during API latency. These
+fixture semantics do not certify arbitrary bare contenteditable editors. Offline timings are diagnostics,
 not live performance evidence. Preserve all failed pilots, including private
 unmatched-capture artifacts locally; never publish those raw artifacts.
 
@@ -121,8 +129,8 @@ trees through a minimal adapter; this does not simulate browser editing or layou
 `python bench/campaign/check_fixture_replay.py --exe rust/target/release/universal-spell-check.exe --output <fresh-directory>`
 replays all three frozen rich cases through the actual mapper, without clipboard,
 credentials or API access. See `records/fixture-diagnosis.json`: the structured
-paragraph serialization is covered, while rich-list nesting remains a downstream
-delivery/editor failure requiring the new paste-time selection/payload evidence.
+paragraph serialization is covered; the later granted desktop diagnosis and fixed
+whole-document fixture semantics are recorded in `records/fixture-after-grant.json`.
 No source/expected workload was weakened. `records/sourcery-audit.json` preserves
 the actual failed security-check output and the bounded subprocess audit rationale.
 
