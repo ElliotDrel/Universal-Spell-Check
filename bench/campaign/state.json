@@ -12,8 +12,8 @@
   "iterations": [],
   "native_request_cap": "implemented; 3 focused tests passed",
   "aggregate_campaign_guard": "implemented with exclusive Windows file handle; ceiling and partial-record test passed",
-  "destination_observer": "implemented; recorded-response pilot 9/11 passed; rich-list target and structured observer require retest",
-  "evaluator": "10 scorer/evidence regression tests passed; raw observations, exact formatting content/list ordinals, native request evidence and process identity required",
+  "destination_observer": "Implemented; headless wrapped-paragraph regression passes; rich-list native mapper is flat but historical editor result nested; paste-time selection/clipboard evidence added, desktop retest required",
+  "evaluator": "12 scorer/evidence/editor regressions passed; DOM adapter is serialization-only, never browser acceptance",
   "next": "Obtain actual Chrome tool app grant, resolve rich-list fixture selection, rerun all-case pilot and wrong-output control with new provenance, then live baseline",
   "blocker": "Required Chrome Computer Use app approval timed out; no further desktop runs until granted",
   "case_file": "cases-v1.json",
@@ -22,10 +22,10 @@
     "cases-v1.json": "4dc3393543b023affc877504896036f22bb54b9ba75161fce77d13b5981c30d7",
     "schedule-v2.json": "1b361f02405f0bd67c3c418e3f190832e8dcaf65fb87e616b85af540a8ac2030",
     "score.py": "66629d4d8030a6c975fbad2c9741629fc0c91e96f41385089931f2d6d557f0b7",
-    "editor.html": "d2e8027ff7af175ac8b35807f8ab3fee7e6ec25640e0698f92e5037b5c2fa077",
+    "editor.html": "060ade346c150c943efb87ea879c9ddfe62495418a84737a452ceffccde5ce89",
     "formats-v1.json": "1f84092ed5dcef3e23534292d86acb2e94a7c6207c1fca3589d754fbdcdc62d3",
     "evidence.py": "febc5ee9676d71f98fd4556ab220e3608f880fc1b1f68d975645dcc987aeef3d",
-    "run.py": "39034ffb5a6ff8c4f3a4f9c6a18394649f4bf84a17c9b78ab377a6cf0f3debca"
+    "run.py": "4bd449f9481de56d9a4f19af19550638c900bf21a65c5847e463faa0cb48174a"
   },
   "pilot_summary": {
     "kind": "recorded-response diagnosis only",

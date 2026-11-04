@@ -141,12 +141,14 @@ def main():
                 if args.negative_control:
                     replay_cases=out/'negative-cases.json';bad=[dict(c) for c in cases.values()];bad[0]['expected']+=' WRONG';write(replay_cases,bad)
                 command+=['--replay-cases',str(replay_cases)]
-            worker=subprocess.Popen(command,cwd=ROOT,stdout=(out/'worker.stdout').open('wb'),stderr=(out/'worker.stderr').open('wb'))
+            # Trusted local executable/argv only; browser/API data never enters this no-shell launch.
+            worker=subprocess.Popen(command,shell=False,cwd=ROOT,stdout=(out/'worker.stdout').open('wb'),stderr=(out/'worker.stderr').open('wb'))  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
             deadline=time.monotonic()+20
             while not(out/'worker/ready.json').exists():
                 if worker.poll() is not None or time.monotonic()>deadline:raise RuntimeError('Native campaign worker readiness failed')
                 time.sleep(.05)
-            browser=subprocess.Popen([r'C:\Program Files\Google\Chrome\Application\chrome.exe','--new-window','--no-first-run','--no-default-browser-check','--disable-sync','--disable-extensions','--user-data-dir='+str((out/'chrome-profile').resolve()),'http://127.0.0.1:8767'],stdout=(out/'chrome.stdout').open('wb'),stderr=(out/'chrome.stderr').open('wb'))
+            # Fixed installed executable and operator-owned profile path; no external command input.
+            browser=subprocess.Popen([r'C:\Program Files\Google\Chrome\Application\chrome.exe','--new-window','--no-first-run','--no-default-browser-check','--disable-sync','--disable-extensions','--user-data-dir='+str((out/'chrome-profile').resolve()),'http://127.0.0.1:8767'],shell=False,stdout=(out/'chrome.stdout').open('wb'),stderr=(out/'chrome.stderr').open('wb'))  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args
             print('FIXTURE READY http://127.0.0.1:8767',flush=True)
             deadline=time.monotonic()+180
             while state['index']<len(schedule):

@@ -113,3 +113,14 @@ The runner exits nonzero for an incomplete/incorrect pilot or an unmet live bloc
 latency goal. Its binding also freezes the runner itself and the encrypted-store
 fingerprint locally; it never exports plaintext credentials. A zero exit from one
 live block still requires separate independent confirmation for campaign acceptance.
+
+Headless diagnosis: `python -m unittest discover -s bench/campaign -p "test_*.py"`
+also exercises the actual observer text function against retained synthetic DOM
+trees through a minimal adapter; this does not simulate browser editing or layout.
+`python bench/campaign/check_fixture_replay.py --exe rust/target/release/universal-spell-check.exe --output <fresh-directory>`
+replays all three frozen rich cases through the actual mapper, without clipboard,
+credentials or API access. See `records/fixture-diagnosis.json`: the structured
+paragraph serialization is covered, while rich-list nesting remains a downstream
+delivery/editor failure requiring the new paste-time selection/payload evidence.
+No source/expected workload was weakened. `records/sourcery-audit.json` preserves
+the actual failed security-check output and the bounded subprocess audit rationale.

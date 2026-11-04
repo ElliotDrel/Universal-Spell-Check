@@ -1,0 +1,20 @@
+{
+  "scope": "headless synthetic replay only; not browser paste or live acceptance",
+  "source_head": "da6854c93fc5f78db89521e15be65a76a27b25ef",
+  "live_api_requests": 0,
+  "frozen_rich_mapper_cases_passed": 3,
+  "structured": {
+    "cause": "Historical text observer omitted a paragraph inside a div wrapper although the saved destination DOM retained it",
+    "resolution": "Current descendant paragraph/list traversal reproduces the full frozen expected text from the retained DOM; regression exercises the actual JavaScript function with a minimal DOM adapter",
+    "limitation": "Adapter checks serialization, not Chrome layout, selection or delivery; fresh desktop pilot still required"
+  },
+  "rich_list": {
+    "mapper_output": "One ol with two li elements and exact frozen corrected text",
+    "historical_destination": "Two ol with three li elements; list inserted inside a surviving list item",
+    "conclusion": "Nesting is downstream of mapper reconstruction; no mapper workaround is justified",
+    "missing_evidence": "Historical paste-time selection endpoints and exact clipboard payload received by Chrome were not retained; native clipboard handoff versus editor contextual insertion cannot be conclusively distinguished headlessly",
+    "next": "New observer records selection endpoints, pre-paste DOM and received synthetic clipboard HTML/text before default paste. After actual app grant, run unchanged source/expected fixture and inspect those records if nesting recurs",
+    "expectations_unchanged": true,
+    "fixed": false
+  }
+}
