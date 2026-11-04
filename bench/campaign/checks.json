@@ -17,9 +17,9 @@
   "cargo_fmt_check": "passed",
   "cargo_clippy_all_targets": "Warnings-denied Clippy passed after automatic fixes confined to new campaign worker/budget code; dependency warnings remain",
   "release_builds": "Latest-source Dev and Prod Release builds passed",
-  "live_api_requests": 88,
-  "desktop_trials": "11 recorded-response trials; 9 passed text and format; no live benchmark",
-  "optimization_loops": 1,
+  "live_api_requests": 188,
+  "desktop_trials": "Loop2 live99/99 exact text/format verified; score956.29ms, independent confirmation pending",
+  "optimization_loops": 2,
   "production_settings_credentials_startup_clipboard": "Clipboard changed only in disposable pilots and restored byte-for-byte; production settings, encrypted credentials and startup remained unchanged; owned benchmark processes stopped",
   "unresolved": [
     "required Chrome tool app approval",
