@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--dotnet", required=True)
     parser.add_argument("--rust", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--processing-arm", choices=["baseline", "replacements-ac", "restore-splice", "rich-index"])
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     output = Path(args.output).resolve()
@@ -65,7 +66,10 @@ def main():
         print(completed.stdout[-12000:])
         return completed.returncode
     cases = [json.loads(line) for line in capture.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
-    rust = subprocess.run([args.rust, "--rich-json"], input="".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cases), text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    rust_args = [args.rust, "--rich-json"]
+    if args.processing_arm:
+        rust_args += ["--processing-arm", args.processing_arm]
+    rust = subprocess.run(rust_args, input="".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cases), text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (output / "rust-results.jsonl").write_text(rust.stdout, encoding="utf-8")
     if rust.returncode:
         print(rust.stderr)

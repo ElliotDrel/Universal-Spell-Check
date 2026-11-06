@@ -491,3 +491,55 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+
+## Experimental local processing arms
+
+These three independent prototypes are compiled only with `processing-experiments`.
+Ordinary builds retain the existing processing code. The selector accepts only
+`--transform-json`, `--rich-json` and `--bench-compute`; it rejects app, desktop and
+request modes. No saved settings or production instance are involved.
+
+| `--processing-arm` | Runnable change | Hypothesis and cost |
+|---|---|---|
+| `baseline` | Existing implementation | Control in the same feature-built binary |
+| `replacements-ac` | Compile a case-sensitive Aho-Corasick leftmost-longest matcher once per parsed replacement set | Avoid repeated variant scans; adds matcher construction and memory. Byte-length wins and duplicate precedence must match baseline, including applied-label order and noncascading output. |
+| `restore-splice` | Validate each token exactly once in immutable output, sort ranges, allocate one restored output | Avoid one full string allocation per literal; validation still scans for each token and sorting adds overhead. Missing/duplicate token failure remains atomic. |
+| `rich-index` | Index mapped UTF-16 node intervals; binary-search ownership and insertion boundaries | Avoid scanning every node per diff unit; builds an interval vector. The existing diff, mapping, omitted-node recovery, native path and refusal rules stay in use. |
+
+Build and run the reusable frozen check from the repository root:
+
+```powershell
+cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features --features processing-experiments
+python bench/check_processing_experiments.py --exe rust/target/release/universal-spell-check.exe --output benchmark_runs/processing-v1 --runs 10
+```
+
+The check runs each arm through real frozen compute and C# rich/native fixtures,
+compares exact text/HTML/native bytes/refusal reasons, and retains each arm's
+manifest, raw trials, summaries and rich outputs. Existing compute stage timings
+remain unchanged; the manifest records `processing_arm`. A feature build with no
+selector records `baseline` in compute manifests. For individual arms use:
+
+```powershell
+rust/target/release/universal-spell-check.exe --bench-compute --processing-arm replacements-ac --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 10 --warmup 2 --output benchmark_runs/processing-ac
+rust/target/release/universal-spell-check.exe --bench-compute --processing-arm restore-splice --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 10 --warmup 2 --output benchmark_runs/processing-restore
+rust/target/release/universal-spell-check.exe --bench-compute --processing-arm rich-index --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 10 --warmup 2 --output benchmark_runs/processing-rich
+```
+
+Use a fresh output directory per invocation. Run
+`cargo test --locked --manifest-path rust/Cargo.toml --no-default-features --features processing-experiments`
+for differential Unicode/overlap/duplicate replacements, 20k/100k sparse/dense
+text, protected-token errors/reordering/namespace collisions, large mixed rich
+spans, and every owner/insertion boundary across 2,000 nodes. Rich golden fixtures
+also retain exact native bytes in comparisons. These are correctness and component
+timing probes, not live editor acceptance or a speedup claim. Original-editor
+formatting and end-to-end timing remain pending before selecting any arm.
+
+To regenerate the current C# differential and compare the indexed arm, run
+`python rust/tests/parity.py --dotnet "C:/Program Files/dotnet/dotnet.exe" --rust rust/target/release/universal-spell-check.exe --processing-arm rich-index --output benchmark_runs/processing-csharp`.
+Matcher construction occurs before the measured compute loop, as does baseline
+replacement parsing; report startup/construction separately if evaluating short-lived use.
+
+The matcher semantics and reuse guidance follow the fetched upstream documentation:
+[Aho-Corasick match kinds](https://docs.rs/aho-corasick/latest/aho_corasick/enum.MatchKind.html)
+and [AhoCorasick construction and reuse](https://docs.rs/aho-corasick/latest/aho_corasick/struct.AhoCorasick.html).

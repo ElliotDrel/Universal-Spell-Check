@@ -119,7 +119,12 @@ pub fn compute(args: &[String]) -> Result<(), String> {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
             .unwrap_or_default()
     };
-    let manifest = json!({"schema_version":2,"created_utc":time::OffsetDateTime::now_utc().to_string(),"implementation":"rust","options":{"mode":"compute","runs":runs,"warmup":warmup,"cases":cases_path,"fixtures":fixture_path,"developer_logging":false},"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"model":"gpt-4.1","prompt":PROMPT,"developer_logging":false,"saved_developer_logging":false,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":hash(&fixture_bytes),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"configuration":"Release","runtime":"Rust native Win32","notes":"Same compute boundaries: protection, real payload serialization/parser, exact frozen replay lookup, response parser, postprocessing and rich mapping. No clipboard/UI/network/key storage."});
+    #[allow(unused_mut)]
+    let mut manifest = json!({"schema_version":2,"created_utc":time::OffsetDateTime::now_utc().to_string(),"implementation":"rust","options":{"mode":"compute","runs":runs,"warmup":warmup,"cases":cases_path,"fixtures":fixture_path,"developer_logging":false},"worktree_commit":git(&["rev-parse","HEAD"]),"dirty":git(&["status","--porcelain"]),"model":"gpt-4.1","prompt":PROMPT,"developer_logging":false,"saved_developer_logging":false,"machine_name":std::env::var("COMPUTERNAME").unwrap_or_default(),"case_ids":cases.iter().map(|c|&c.id).collect::<Vec<_>>(),"cases_sha256":hash(&case_bytes),"fixture_sha256":hash(&fixture_bytes),"replacements_sha256":hash(&replacements_bytes),"product_binary_sha256":hash(&fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"configuration":"Release","runtime":"Rust native Win32","notes":"Same compute boundaries: protection, real payload serialization/parser, exact frozen replay lookup, response parser, postprocessing and rich mapping. No clipboard/UI/network/key storage."});
+    #[cfg(feature = "processing-experiments")]
+    {
+        manifest["processing_arm"] = json!(crate::processing_experiment::selected().name());
+    }
     fs::write(
         output.join("manifest.json"),
         serde_json::to_vec_pretty(&manifest).unwrap(),
