@@ -491,3 +491,50 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+
+## Experimental settlement candidates (October 25, 2026)
+
+Build with `cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features --features settlement-experiments`.
+Only `--bench-desktop` accepts `--settlement-variant`; normal application workers always select
+`baseline`, including in a feature-enabled build. Ordinary builds reject the selector. No setting
+is saved, and no API, model, clipboard payload, recovery rule or input chord changes.
+
+| Selector | Actual candidate | Trade-off |
+|---|---|---|
+| `baseline` | Existing readback followed by a fresh per-run timer and full 50 ms wait | Control; remains the default |
+| `publication-deadline` | Start the 50 ms deadline after `clipboard::write` returns, overlapping existing developer readback | Readback time can consume the handoff interval; needs original-editor acceptance |
+| `overlap-diagnostics` | Publish earlier; move existing immutable rich-result JSON, UTF-16 counts and developer native base64 into that publication-relative interval | Moves diagnostic allocation after publication; retains payload diagnostics when writing fails |
+| `reuse-timer` | Keep one high-resolution timer on the correction worker; rearm for each correction | Isolates handle reuse: retains baseline diagnostics/readback ordering and a fresh 50 ms wait |
+
+After obtaining an exclusive idle desktop, use one selector per fresh output directory:
+
+```powershell
+rust/target/release/universal-spell-check.exe --bench-desktop --mode local --cases bench/baseline-cases.json --fixtures rust/tests/fixtures/baseline-api.json --replacements replacements.json --runs 3 --warmup 1 --settlement-variant publication-deadline --allow-desktop --output benchmark_runs/settlement-deadline
+```
+
+Repeat with `baseline`, `overlap-diagnostics`, and `reuse-timer`, matching all other flags.
+For developer evidence, match `--developer-logging --evidence-log-dir <isolated-evidence-directory>`
+on every arm. All three candidates retain at least 50 ms from returned publication to input,
+message pumping, pre-input readback and the authoritative final modifier gate. Timer creation,
+arming or native wait failures fall back to pumping deadline waits; early wakes recheck elapsed time.
+No blind repeat paste is introduced. The corrected-clipboard flag and backup disarm immediately
+follow publication, before deferred diagnostics; failures after publication retain the correction.
+
+The manifest records `options.settlement_variant`; each completed trial retains
+`settlement_experiment` with the variant, native wait/fallback counters (`wait` is null for the uninstrumented baseline) and
+`publication_to_input_ms` (measured immediately before input, not editor-visible completion).
+Variant identity also survives failures before settlement. `paste.settle_ms` is residual wait,
+not the full publication interval. Moved diagnostics use nested `paste.diagnostics_ms` inside
+`paste_ms`, avoiding double counting in top-level `diagnostics_ms`/`accounted_ms`.
+
+Focus-free checks: `cargo test --locked --manifest-path rust/Cargo.toml --features settlement-experiments -- --test-threads=1`.
+They exercise the actual deadline backend with 0/1/20/49/60 ms preceding work and early wakes,
+native missing/invalid/access-restricted timer fallback, message callback pumping, all selectors'
+minimum intervals, repeated timer reuse and handle cleanup. These are correctness checks, not
+matched performance measurements. Live clipboard/editor acceptance and speed comparisons remain
+pending; the 50 ms interval is retained because earlier zero-delay delivery failed editor checks.
+
+Publication is anchored after the write function's clipboard guard closes, because
+[CloseClipboard enables other windows to access the clipboard](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-closeclipboard).
+The reusable timer is explicitly rearmed per wait; [SetWaitableTimer resets an active timer](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setwaitabletimer).

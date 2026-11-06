@@ -48,6 +48,10 @@ jobs:
         run: cargo test --locked --manifest-path rust/Cargo.toml
       - name: Prod regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
+      - name: Settlement experiment lint
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets --features settlement-experiments -- -D warnings
+      - name: Settlement experimental deadline and native timer checks
+        run: cargo test --locked --manifest-path rust/Cargo.toml --features settlement-experiments -- --test-threads=1
       - name: Optimized native build
         run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
       - name: Frozen correction and formatting contracts

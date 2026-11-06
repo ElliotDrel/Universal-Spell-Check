@@ -42,7 +42,7 @@ fn pump_wait(ms: u32) {
         pump_messages();
     }
 }
-fn pump_messages() {
+pub(crate) fn pump_messages() {
     unsafe {
         let mut msg = zeroed();
         while PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) != 0 {
