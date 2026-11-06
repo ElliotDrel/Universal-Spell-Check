@@ -1,0 +1,72 @@
+[
+  {
+    "case": "rich-100-unchanged",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.11245,
+    "rich_median_ms": 0.0119
+  },
+  {
+    "case": "rich-100-edit",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.12855,
+    "rich_median_ms": 0.04435
+  },
+  {
+    "case": "rich-500-unchanged",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.24119999999999997,
+    "rich_median_ms": 0.018500000000000003
+  },
+  {
+    "case": "rich-500-edit",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.9049,
+    "rich_median_ms": 0.6363000000000001
+  },
+  {
+    "case": "rich-1000-unchanged",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.44305000000000005,
+    "rich_median_ms": 0.027500000000000004
+  },
+  {
+    "case": "rich-1000-edit",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 0.3923,
+    "rich_median_ms": 0.0209
+  },
+  {
+    "case": "rich-5000-unchanged",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 1.7847,
+    "rich_median_ms": 0.07039999999999999
+  },
+  {
+    "case": "rich-5000-edit",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 1.7998,
+    "rich_median_ms": 0.0713
+  },
+  {
+    "case": "rich-20000-unchanged",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 7.36735,
+    "rich_median_ms": 0.37929999999999997
+  },
+  {
+    "case": "rich-20000-edit",
+    "n": 20,
+    "success": 20,
+    "total_median_ms": 7.9622,
+    "rich_median_ms": 0.4333
+  }
+]

@@ -1,5 +1,7 @@
 # Universal Spell Check latency — desktop handoff
 
+> Superseded October 24: PR #8 merged and v0.13.3 was published and installed on this desktop. Earlier pending/unreleased/branch instructions below are historical. Continue from [the re-audit](2026-10-24-performance-reaudit.md). Current user instructions govern permissions.
+
 Prepared October 23, 2026. Resume the current measurement checkpoint; do not start
 the old three-PR program or later optimization experiments automatically.
 
