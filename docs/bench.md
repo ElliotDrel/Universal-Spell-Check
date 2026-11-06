@@ -491,3 +491,42 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+
+## History exclusion experiments (October 25, 2026)
+
+Build `cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features --features history-experiments`.
+The optional `--history-variant` selector is accepted only by `--bench-desktop` in that build.
+Omitting it selects `baseline`. Ordinary app launches always use baseline, including an
+experiment-enabled binary; no saved settings, model, transport or final paste behavior changes.
+
+| Variant | Actual candidate behavior | Tradeoff |
+|---|---|---|
+| `baseline` | Existing separate Unicode publication plus two DWORD policy markers | Control |
+| `combined` | Separate Unicode publication with one `ExcludeClipboardContentFromMonitorProcessing` payload | One allocation/registration/transfer rather than two; policy behavior still needs live verification |
+| `fused` | Capture every existing Unicode/HTML/native/RTF/status/format field, validate sequence and nonempty text, then allocate and publish Unicode plus the original two markers under the same open | Avoids reopen; holds the clipboard while preparing publication |
+| `prepared` | Separate publication with cached policy format IDs and two fresh policy HGLOBALs prepared on the worker while idle | Moves two policy allocations before readiness; Unicode still allocated on the run |
+
+Run each arm in a separate process after obtaining an exclusive idle desktop window:
+
+```powershell
+rust/target/release/universal-spell-check.exe --bench-desktop --mode local --history-variant baseline --replacements replacements.json --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --runs 10 --warmup 2 --allow-desktop --output benchmark_runs/history-baseline
+```
+
+Replace `baseline` in both selector and output directory with `combined`, `fused`, then
+`prepared`; retain matched developer logging and ABBA order. Do not combine arms. Existing
+native editor fixtures run the real capture, correction and paste pipeline with offline responses.
+Manifest and per-trial records carry `history_variant`, including failed setup trials.
+The coordinator detail also carries the selector. In `fused`, publication time belongs to
+`clipboard_ms`/nested capture `read_ms`, and `history_exclude_ms` stays null. Compare the entire
+capture-through-request-start interval and accepted-trigger-to-input total; a smaller exclusion
+field by itself is not a speedup. Idle replenishment finishes before worker readiness but is
+outside the existing input-return timing boundary.
+
+Noninteractive gates are `cargo test --locked --manifest-path rust/Cargo.toml` and
+`cargo test --locked --manifest-path rust/Cargo.toml --no-default-features --features history-experiments`.
+The latter exercises the actual policy builder, fused ordering, native policy allocation,
+publication failure/ownership cleanup, and consume-once idle replenishment without opening
+or changing the clipboard. CI also compiles/lints the experimental configuration.
+Live editor, Win+V/cloud policy behavior, failure recovery on actual clipboard contention,
+and matched speed measurements remain pending. No speedup is claimed.
