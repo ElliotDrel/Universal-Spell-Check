@@ -617,6 +617,42 @@ fn report(summary: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Request size drives API latency, the bulk of every correction. CI fails a PR that grows
+    /// any value above main's. Regenerate with `USC_UPDATE_BUDGET=1 cargo test perf_budget`.
+    #[test]
+    fn perf_budget_matches_request_bytes() {
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../../bench/cases.json")).unwrap();
+        let model = Settings::default().model;
+        let measured: BTreeMap<_, _> = cases
+            .iter()
+            .map(|c| {
+                let payload = crate::core::Protection::new(&c.text)
+                    .unwrap()
+                    .payload(&model);
+                (
+                    format!("request_bytes.{}", c.id),
+                    serde_json::to_vec(&payload).unwrap().len(),
+                )
+            })
+            .collect();
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../bench/perf-budget.json");
+        let expected = serde_json::to_string_pretty(&measured).unwrap()
+            + "
+";
+        if std::env::var_os("USC_UPDATE_BUDGET").is_some() {
+            fs::write(path, &expected).unwrap();
+        }
+        let committed = fs::read_to_string(path).unwrap_or_default().replace(
+            "
+", "
+",
+        );
+        assert_eq!(
+            committed, expected,
+            "Run USC_UPDATE_BUDGET=1 cargo test perf_budget"
+        );
+    }
     #[test]
     fn median_handles_even_odd_and_empty() {
         assert_eq!(median(vec![3., 1., 2.]), json!(2.));

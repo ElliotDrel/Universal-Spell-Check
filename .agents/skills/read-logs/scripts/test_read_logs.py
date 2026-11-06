@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).parents[1] / ".agents/skills/read-logs/scripts/logs.py"
+SCRIPT = Path(__file__).resolve().parent / "logs.py"
 
 
 def test_last_spellchecks_cross_midnight(tmp_path):

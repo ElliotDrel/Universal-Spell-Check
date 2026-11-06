@@ -1,0 +1,12 @@
+{
+  "request_bytes.brands": 396,
+  "request_bytes.literals": 441,
+  "request_bytes.long": 1342,
+  "request_bytes.multiline": 403,
+  "request_bytes.paragraph": 483,
+  "request_bytes.rich-link": 375,
+  "request_bytes.rich-list": 384,
+  "request_bytes.short": 368,
+  "request_bytes.unchanged": 380,
+  "request_bytes.unicode": 403
+}

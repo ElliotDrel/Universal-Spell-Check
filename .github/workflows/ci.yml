@@ -1,0 +1,168 @@
+name: CI
+
+# check: format, lint, tests and a packaged Prod candidate.
+# perf-budget: fails when a PR grows any value in bench/perf-budget.json above main's.
+#   The Rust test perf_budget_matches_request_bytes keeps that file equal to the real request size.
+# perf: runs bench/perf.py on main's build and the PR's build on the same runner and fails on a
+#   keypress-to-paste latency regression.
+# To accept a regression on purpose, add the perf-regression-accepted label.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ALLOW_REGRESSION: ${{ contains(github.event.pull_request.labels.*.name, 'perf-regression-accepted') }}
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust tools
+        run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-rust-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-
+      - name: Format
+        run: cargo fmt --manifest-path rust/Cargo.toml --check
+      - name: Lint
+        run: |
+          cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets --no-default-features -- -D warnings
+      - name: Test Dev and Prod
+        run: |
+          cargo test --locked --manifest-path rust/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
+      - name: Test log reader
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest -q .agents/skills/read-logs/scripts
+      - name: Build Prod release
+        run: cargo build --locked --manifest-path rust/Cargo.toml --release --no-default-features
+      - name: Tray startup smoke
+        shell: pwsh
+        run: |
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'usc-startup-smoke'
+          python -c "import subprocess; subprocess.run([r'rust\target\release\universal-spell-check.exe','--startup-smoke'],check=True,timeout=15)"
+      - name: Package candidate
+        run: ./rust/package.ps1 -SkipBuild -Output rust/dist/prod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prod-candidate
+          path: rust/dist/prod/
+
+  perf-budget:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BUDGET: bench/perf-budget.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: bench/perf-budget.json
+          sparse-checkout-cone-mode: false
+      - name: Compare with main
+        run: |
+          git fetch --quiet --depth=1 origin "${{ github.base_ref }}"
+          if ! git cat-file -e "FETCH_HEAD:$BUDGET" 2>/dev/null; then
+            echo "Base has no perf budget yet."
+            exit 0
+          fi
+          git show "FETCH_HEAD:$BUDGET" > "$RUNNER_TEMP/base.json"
+          grown=$(jq -r --slurpfile base "$RUNNER_TEMP/base.json" '
+            to_entries[]
+            | select($base[0][.key] != null and .value > $base[0][.key])
+            | "\(.key): \($base[0][.key]) -> \(.value) (+\(.value - $base[0][.key]))"
+          ' "$BUDGET")
+          if [ -z "$grown" ]; then
+            echo "Requests are not larger than main."
+            exit 0
+          fi
+          printf 'Request size grew compared to main:\n%s\n' "$grown"
+          if [ "$ALLOW_REGRESSION" = "true" ]; then
+            echo "Accepted by the perf-regression-accepted label."
+            exit 0
+          fi
+          echo "::error file=$BUDGET::Requests grew compared to main, which slows every API call. Cut the added prompt or payload text, or add the perf-regression-accepted label."
+          exit 1
+
+  perf:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned Rust tools
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+            base/rust/target
+          key: ${{ runner.os }}-perf-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-perf-1.99.1-
+      - name: Check out base
+        id: base
+        shell: bash
+        run: |
+          git worktree add base "origin/${{ github.base_ref }}"
+          if [ -f base/bench/perf.py ]; then
+            echo "exe=base/rust/target/release/universal-spell-check.exe" >> "$GITHUB_OUTPUT"
+          else
+            echo "Base has no bench yet; comparing the PR build with itself."
+            echo "exe=rust/target/release/universal-spell-check.exe" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build base and PR
+        run: |
+          if (Test-Path base/bench/perf.py) {
+            cargo build --locked --release --no-default-features --manifest-path base/rust/Cargo.toml
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          cargo build --locked --release --no-default-features --manifest-path rust/Cargo.toml
+      - name: Compare latency
+        id: compare
+        continue-on-error: true
+        run: |
+          python bench/perf.py --base ${{ steps.base.outputs.exe }} --candidate rust/target/release/universal-spell-check.exe --markdown perf.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Report
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f perf.md ] || echo "perf.py did not finish; see the Compare latency step log." > perf.md
+          { echo "### Performance"; echo; cat perf.md; } > comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md --edit-last --create-if-none || true
+      - name: Enforce
+        if: steps.compare.outcome == 'failure'
+        shell: bash
+        run: |
+          if [ "$ALLOW_REGRESSION" = "true" ]; then echo "Accepted by the perf-regression-accepted label."; exit 0; fi
+          echo "::error::Latency regressed or the bench failed. Fix it, or add the perf-regression-accepted label."
+          exit 1

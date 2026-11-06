@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / ".agents/skills/read-logs/scripts/logs.py"
+SCRIPT = Path(__file__).resolve().parent / "logs.py"
 spec = importlib.util.spec_from_file_location("latency_reader", SCRIPT)
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)

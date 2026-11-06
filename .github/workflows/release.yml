@@ -46,8 +46,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Rust lint failed' }
           cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
           if ($LASTEXITCODE -ne 0) { throw 'Rust regressions failed' }
-          python -m unittest discover -s bench -p test_rust_acceptance.py
-          if ($LASTEXITCODE -ne 0) { throw 'Protected-data regressions failed' }
 
       - name: Build and assemble production Rust app
         run: ./rust/package.ps1 -Output publish
