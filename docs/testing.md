@@ -43,7 +43,7 @@ Real-use latency is about 95% API time; check it with `logs.py --stats`.
 `.github/workflows/ci.yml` copies T3 Code's budget pattern. Every PR runs:
 
 - **`perf-budget`**: fails if any value in `bench/perf-budget.json` is larger than on the base branch. `perf_budget_matches_request_bytes` keeps that file equal to the real payload size, so it can't be edited down. Request size drives API time, which the replay bench can't see. After an intended payload change, regenerate it with `USC_UPDATE_BUDGET=1 cargo test perf_budget`.
-- **`perf`**: builds the base branch and the PR in Prod mode on the same Windows runner and runs `python bench/perf.py --base <base.exe> --candidate <pr.exe>`. It alternates the two builds over four rounds so machine noise hits both, posts the per-case table as a PR comment, and fails when the overall median is slower by more than both 3 ms and 5%. Identical builds differ by under 1 ms.
+- **`perf`**: builds the base branch (in its own checkout) and the PR in Prod mode on the same Windows runner and runs `python bench/perf.py --base <base.exe> --base-root base --candidate <pr.exe>`, so each build is checked against its own `bench/replay.json`. It alternates the two builds over four rounds so machine noise hits both, posts the per-case table as a PR comment, and fails when the geometric mean of the per-case ratios is slower by more than both 3 ms and 5% (one case doubling moves it about 7%; noise in one case averages out). Identical builds differ by under 1 ms.
 
 Either gate can be overridden only by Elliot adding the `perf-regression-accepted` label. Run
 `perf.py` locally before pushing a hot-path change.
@@ -52,5 +52,6 @@ Either gate can be overridden only by Elliot adding the `perf-regression-accepte
 
 After changes to capture, paste or a specific app's formatting, use the Dev build (Ctrl+Alt+D)
 in the real target app (Notepad, Chrome textareas, ChatGPT, Google Docs, T3 Code, a terminal),
-then read the run with `read-logs`. After a release, the `deploy` skill installs the update and
-verifies the running version, which exercises the real update path.
+then read the run with `read-logs`. The update flow has no automated test: the `deploy` skill's
+post-release install and version check is its only coverage, so test update changes by hand,
+including a restart with the feed unreachable after a download.

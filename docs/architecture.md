@@ -36,6 +36,7 @@ path returns, before any slow clipboard restore, so it never sticks after a fail
 
 - NWG reserves raw event-handler IDs through `0xFFFF`. Use `style::raw_handler_id`; a low literal panics at window setup.
 - `SendInput` returning means input is queued, not consumed. Never open the clipboard right after injecting Ctrl+V: a reader can hold it while the target pastes, leaving the selection unchanged. Developer readback runs before injection with one non-waiting open.
+- Rarely (about 1 in 500 bench trials), the target receives Ctrl+V but its text stays unchanged even though the corrected text was published. Cause unproven. The bench catches it as `Pasted text or HTML differs from the correction` with the original text in `output`, and `perf.py` retries a failed run once so it can't fail a latency comparison. Investigate this before claiming paste is fully reliable.
 - NWG's high-DPI helper leaked a screen DC per query; the vendored patch releases it (`rust/tests/dpi_resources.rs`). Keep the vendor override until upstream ships the fix.
 - Use embedded PE icon resources. NWG `source_bin` needs its optional image decoder and panics without it.
 - Capture failures (`Clipboard did not change after Ctrl+C`) come in session bursts in some apps (historically Notepad and outlook.com). Each carries per-attempt forensics in `spellcheck_detail.events[]` (sequence numbers, modifier state, foreground elevation). Read those before theorizing; elevated targets silently drop injected keys (UIPI).

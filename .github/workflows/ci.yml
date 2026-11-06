@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   ALLOW_REGRESSION: ${{ contains(github.event.pull_request.labels.*.name, 'perf-regression-accepted') }}
@@ -126,28 +126,20 @@ jobs:
           key: ${{ runner.os }}-perf-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}-perf-1.99.1-
       - name: Check out base
-        id: base
-        shell: bash
-        run: |
-          git worktree add base "origin/${{ github.base_ref }}"
-          if [ -f base/bench/perf.py ]; then
-            echo "exe=base/rust/target/release/universal-spell-check.exe" >> "$GITHUB_OUTPUT"
-          else
-            echo "Base has no bench yet; comparing the PR build with itself."
-            echo "exe=rust/target/release/universal-spell-check.exe" >> "$GITHUB_OUTPUT"
-          fi
+        run: git worktree add base "origin/${{ github.base_ref }}"
       - name: Build base and PR
+        # Each build runs in its own checkout so it uses its own toolchain and cargo config.
         run: |
-          if (Test-Path base/bench/perf.py) {
-            cargo build --locked --release --no-default-features --manifest-path base/rust/Cargo.toml
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          Push-Location base
+          cargo build --locked --release --no-default-features --manifest-path rust/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
           cargo build --locked --release --no-default-features --manifest-path rust/Cargo.toml
       - name: Compare latency
         id: compare
         continue-on-error: true
         run: |
-          python bench/perf.py --base ${{ steps.base.outputs.exe }} --candidate rust/target/release/universal-spell-check.exe --markdown perf.md
+          python bench/perf.py --base base/rust/target/release/universal-spell-check.exe --base-root base --candidate rust/target/release/universal-spell-check.exe --markdown perf.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Report
         if: always()

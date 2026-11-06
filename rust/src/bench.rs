@@ -159,6 +159,9 @@ struct Run {
     pressed: Option<Instant>,
     hotkey: Option<Instant>,
     detail: Option<Value>,
+    /// Set by `UiEvent::Finished`, which the worker sends after clearing its busy flag, so the
+    /// next trial's hotkey is never rejected as `already_running`.
+    finished: bool,
     trials: Vec<Value>,
     /// Live answers in `bench/replay.json` format, one per case.
     recorded: Vec<Fixture>,
@@ -200,6 +203,7 @@ impl Run {
             ));
         }
         self.detail = None;
+        self.finished = false;
         self.hotkey = None;
         self.pressed = Some(Instant::now());
         if let Err(error) = press_hotkey(channel::BENCH_VK as u16) {
@@ -209,8 +213,10 @@ impl Run {
     }
     fn poll(&mut self) {
         while let Ok(event) = self.events.try_recv() {
-            if let UiEvent::Trial(detail) = event {
-                self.detail = Some(detail);
+            match event {
+                UiEvent::Trial(detail) => self.detail = Some(detail),
+                UiEvent::Finished => self.finished = true,
+                _ => {}
             }
         }
         let pressed = self.pressed.unwrap();
@@ -225,7 +231,13 @@ impl Run {
             .as_ref()
             .is_some_and(|d| d["status"] != "success");
         let pasted = lock(&self.shared.paste).is_some();
-        if self.detail.is_some() && (pasted || failed) {
+        if self.finished && self.detail.is_none() {
+            // A worker panic or dropped run ends without a detail record.
+            self.detail = Some(
+                json!({"status": "failed", "error_message": "The worker finished without a result"}),
+            );
+            self.finish_trial();
+        } else if self.finished && self.detail.is_some() && (pasted || failed) {
             self.finish_trial();
         } else {
             self.timer(20);
@@ -450,6 +462,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         pressed: None,
         hotkey: None,
         detail: None,
+        finished: false,
         trials: Vec::new(),
         recorded: Vec::new(),
         error: None,
