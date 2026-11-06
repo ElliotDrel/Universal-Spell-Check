@@ -1,6 +1,20 @@
 # Design System — Universal Spell Check (Native Dashboard)
 
-> **Scope:** This spec covers the WPF dashboard window for the native C#/.NET tray app under `src/`. The AHK production script (Universal Spell Checker.ahk) is archived and unaffected. The dashboard opens from the tray icon and provides an activity feed, settings, and (later) deeper analytics.
+> **Scope:** The product is the native Rust tray app and dashboard under `rust/`. The Rust proposal below supersedes the WPF layout and typography specification. The remaining WPF sections preserve guidance for the C# reference under `src/`; they do not describe the current product. AHK is archived.
+
+## Native Rust dashboard proposal (2026-10-31)
+
+The first-pass direction is a compact proofreading desk: white canvas, dark forest text, Segoe UI typography, and two top-level destinations, History and Settings. Native Windows controls retain familiar keyboard focus and interaction. The existing embedded channel icon remains the window identity.
+
+- **Shell:** 1100×780 default, 900×640 minimum; 32px side margins, top navigation, footer with channel/version and Help. No sidebar or web renderer.
+- **History:** clear heading and Refresh action, shortcut instructions derived from channel constants, compact all-time checks/corrections/streak, and a day-grouped feed. Correction text has a separate metadata column and visible Copy, Timing, See original, and Side by side actions. Original mode remains explicitly marked. Empty history explains how to make the first correction.
+- **Settings:** two columns group correction model, shortcut, preferences, local files and updates on the left; encrypted API-key selection and entry on the right. Existing settings and updater services retain ownership of persistence and actions.
+- **Performance:** feed I/O and statistics remain on workers; initial feed loading remains 30 rows. No hot-path behavior changes.
+- **Preview:** build with `cargo build --locked --manifest-path rust/Cargo.toml --release --features ui-preview`, then run `rust/target/release/universal-spell-check.exe --ui-preview` (`--empty` or `--settings` optional). This Dev-only feature creates synthetic logs and isolated temporary settings, with no correction worker, updater, startup registration, or tray. Close the preview to exit; no live API key is required.
+
+Recovered research read the installed Claude `frontend-design` skill and Microsoft's Windows navigation and UX guidance. It informed the explicit visual direction, shallow navigation, standard controls and visible actions. This is a first-pass proposal, not a claim of complete accessibility or display-scaling acceptance.
+
+## Retained C# / WPF reference (superseded for product UI)
 
 ## Product Context
 

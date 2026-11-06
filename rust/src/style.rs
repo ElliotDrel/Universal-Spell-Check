@@ -41,7 +41,7 @@ pub fn paint_background(
     use windows_sys::Win32::{Graphics::Gdi::*, UI::WindowsAndMessaging::GetClientRect};
     static BRUSH: OnceLock<usize> = OnceLock::new();
     let brush =
-        *BRUSH.get_or_init(|| unsafe { CreateSolidBrush(245 | (241 << 8) | (234 << 16)) as usize });
+        *BRUSH.get_or_init(|| unsafe { CreateSolidBrush(255 | (255 << 8) | (255 << 16)) as usize });
     unsafe {
         let mut rect = std::mem::zeroed();
         GetClientRect(hwnd, &mut rect);
@@ -57,11 +57,11 @@ pub const fn raw_handler_id(local: usize) -> usize {
 }
 pub fn text_background(dc: HDC) -> isize {
     static BRUSH: OnceLock<usize> = OnceLock::new();
-    let color = 245 | (241 << 8) | (234 << 16);
+    let color = 255 | (255 << 8) | (255 << 16);
     let brush = *BRUSH.get_or_init(|| unsafe { CreateSolidBrush(color) as usize });
     unsafe {
         SetBkColor(dc, color);
-        SetTextColor(dc, 26 | (26 << 8) | (26 << 16));
+        SetTextColor(dc, 31 | (42 << 8) | (38 << 16));
     }
     brush as isize
 }
