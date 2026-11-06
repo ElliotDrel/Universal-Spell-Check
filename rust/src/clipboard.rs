@@ -153,12 +153,13 @@ pub fn read_immediate(hwnd: HWND) -> Result<Clipboard, String> {
     read_with_budget(hwnd, Duration::ZERO)
 }
 fn read_with_budget(hwnd: HWND, budget: Duration) -> Result<Clipboard, String> {
-    read_measured(hwnd, budget, &mut ReadTimings::default())
+    read_measured(hwnd, budget, &mut ReadTimings::default(), true)
 }
 fn read_measured(
     hwnd: HWND,
     budget: Duration,
     timings: &mut ReadTimings,
+    diagnostics: bool,
 ) -> Result<Clipboard, String> {
     let _open = measure(&mut timings.open_ms, || open(hwnd, budget))?;
     let sequence = unsafe { GetClipboardSequenceNumber() };
@@ -178,7 +179,11 @@ fn read_measured(
         optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024))
     });
     let (rtf, rtf_status) = measure(&mut timings.rtf_ms, || {
-        optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
+        if diagnostics {
+            optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
+        } else {
+            (Vec::new(), "disabled")
+        }
     });
     let (native, native_status) = measure(&mut timings.native_ms, || {
         optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024))
@@ -186,6 +191,9 @@ fn read_measured(
     let (html, rtf) = measure(&mut timings.decode_ms, || (utf8(html), utf8(rtf)));
     let formats = measure(&mut timings.enumerate_ms, || {
         let mut formats = Vec::new();
+        if !diagnostics {
+            return formats;
+        }
         unsafe {
             let mut f = 0;
             loop {
@@ -374,6 +382,17 @@ pub fn chord(vk: u16) -> Result<(), String> {
     }
 }
 pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, String> {
+    capture_with_diagnostics(hwnd, timings, true)
+}
+#[cfg(feature = "delivery-experiments")]
+pub fn capture_lean(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, String> {
+    capture_with_diagnostics(hwnd, timings, false)
+}
+fn capture_with_diagnostics(
+    hwnd: HWND,
+    timings: &mut CaptureTimings,
+    diagnostics: bool,
+) -> Result<Clipboard, String> {
     measure(&mut timings.modifiers_ms, || {
         modifiers_released(Duration::from_millis(1200))
     })?;
@@ -387,7 +406,12 @@ pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, St
                 && let Ok(data) = {
                     timings.read_attempts += 1;
                     measure(&mut timings.read_ms, || {
-                        read_measured(hwnd, Duration::from_millis(320), &mut timings.reads)
+                        read_measured(
+                            hwnd,
+                            Duration::from_millis(320),
+                            &mut timings.reads,
+                            diagnostics,
+                        )
                     })
                 }
                 && !data.text.trim().is_empty()

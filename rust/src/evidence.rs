@@ -56,32 +56,37 @@ impl Evidence {
             source: target,
         })
     }
-    pub fn finish(
+    pub fn finish(self, store: Store, logger: Logger, detail: Value, paste: (usize, u32, String)) {
+        self.prepare_finish(store, logger, paste)(detail);
+    }
+    pub fn prepare_finish(
         mut self,
         store: Store,
         logger: Logger,
-        detail: Value,
         paste: (usize, u32, String),
-    ) {
+    ) -> impl FnOnce(Value) + Send + 'static {
+        // Freeze target and launch after-capture on the correction thread, before offloading JSON.
         let after = context("after-paste", paste.clone(), true);
         let before = self.before.take().unwrap();
-        let _ = thread::Builder::new()
-            .name("evidence-save".into())
-            .spawn(move || {
-                let result = save_inner(
-                    &store,
-                    &logger,
-                    &detail,
-                    &self.source,
-                    &paste,
-                    vec![before, after],
-                );
-                logger.data(
-                    "developer_evidence_completed",
-                    json!({"run_id":detail["run_id"],"reference":result}),
-                );
-                drop(self);
-            });
+        move |detail| {
+            let _ = thread::Builder::new()
+                .name("evidence-save".into())
+                .spawn(move || {
+                    let result = save_inner(
+                        &store,
+                        &logger,
+                        &detail,
+                        &self.source,
+                        &paste,
+                        vec![before, after],
+                    );
+                    logger.data(
+                        "developer_evidence_completed",
+                        json!({"run_id":detail["run_id"],"reference":result}),
+                    );
+                    drop(self);
+                });
+        }
     }
 }
 fn context(phase: &'static str, target: (usize, u32, String), after: bool) -> Context {

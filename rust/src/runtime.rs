@@ -63,6 +63,8 @@ enum Command {
 }
 #[derive(Clone)]
 pub struct Worker {
+    #[cfg(feature = "delivery-experiments")]
+    completion: Option<Arc<std::sync::Mutex<Option<thread::JoinHandle<()>>>>>,
     commands: Sender<Command>,
     event: Arc<Event>,
     pub busy: Arc<AtomicBool>,
@@ -79,6 +81,8 @@ impl Worker {
         replay: Option<Arc<Replay>>,
         override_settings: Option<crate::core::Settings>,
     ) -> Result<Self, String> {
+        #[cfg(feature = "delivery-experiments")]
+        let delivery_variant = crate::delivery::Variant::from_environment()?;
         let handle = unsafe { CreateEventW(null(), 0, 0, null()) };
         if handle.is_null() {
             return Err(clipboard::error());
@@ -89,7 +93,7 @@ impl Worker {
         let busy = Arc::new(AtomicBool::new(false));
         let worker_event = event.clone();
         let worker_busy = busy.clone();
-        thread::Builder::new()
+        let _correction = thread::Builder::new()
             .name("correction".into())
             .spawn(move || {
                 if let Err(error) = clipboard::initialize_sta() {
@@ -108,7 +112,37 @@ impl Worker {
                 let mut settings =
                     override_settings.unwrap_or_else(|| store.load_settings().unwrap_or_default());
                 let mut keys = store.load_keys().unwrap_or_default();
-                let mut replacements = load_replacements(&store, &logger);
+                let mut replacements = {
+                    #[cfg(feature = "delivery-experiments")]
+                    if delivery_variant == crate::delivery::Variant::CachedReady {
+                        Replacements::default()
+                    } else {
+                        load_replacements(&store, &logger)
+                    }
+                    #[cfg(not(feature = "delivery-experiments"))]
+                    {
+                        load_replacements(&store, &logger)
+                    }
+                };
+                #[cfg(feature = "delivery-experiments")]
+                let mut replacement_cache = crate::delivery::ReplacementCache::default();
+                #[cfg(feature = "delivery-experiments")]
+                if delivery_variant == crate::delivery::Variant::CachedReady {
+                    refresh_cached(&mut replacement_cache, &store, &logger);
+                }
+                #[cfg(feature = "delivery-experiments")]
+                let finalizer = if delivery_variant == crate::delivery::Variant::OwnedWorker {
+                    match crate::delivery::Finalizer::new() {
+                        Ok(worker) => Some(worker),
+                        Err(error) => {
+                            logger
+                                .event(format!("diagnostic_finalizer_unavailable error={error:?}"));
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
                 let mut client = if replay.is_none() {
                     Client::new().ok().map(Arc::new)
                 } else {
@@ -137,9 +171,22 @@ impl Worker {
                                         logger.event("apikey_load_failed");
                                     }
                                 }
-                                replacements = load_replacements(&store, &logger);
+                                #[cfg(feature = "delivery-experiments")]
+                                if delivery_variant == crate::delivery::Variant::CachedReady {
+                                    refresh_cached(&mut replacement_cache, &store, &logger);
+                                }
+                                #[cfg(feature = "delivery-experiments")]
+                                if delivery_variant != crate::delivery::Variant::CachedReady {
+                                    replacements = load_replacements(&store, &logger);
+                                }
+                                #[cfg(not(feature = "delivery-experiments"))]
+                                {
+                                    replacements = load_replacements(&store, &logger);
+                                }
                             }
                             Command::Run(started) => {
+                                #[cfg(feature = "delivery-experiments")]
+                                let mut delivery_run_id = None;
                                 let result =
                                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                         if client.is_none() && replay.is_none() {
@@ -163,7 +210,26 @@ impl Worker {
                                                 } else {
                                                     keys.active()
                                                 },
-                                                replacements: &replacements,
+                                                replacements: {
+                                                    #[cfg(feature = "delivery-experiments")]
+                                                    if delivery_variant
+                                                        == crate::delivery::Variant::CachedReady
+                                                    {
+                                                        &replacement_cache.parsed
+                                                    } else {
+                                                        &replacements
+                                                    }
+                                                    #[cfg(not(feature = "delivery-experiments"))]
+                                                    {
+                                                        &replacements
+                                                    }
+                                                },
+                                                #[cfg(feature = "delivery-experiments")]
+                                                delivery_variant,
+                                                #[cfg(feature = "delivery-experiments")]
+                                                delivery_run_id: &mut delivery_run_id,
+                                                #[cfg(feature = "delivery-experiments")]
+                                                finalizer: finalizer.as_ref(),
                                                 client: client.as_deref(),
                                                 replay: replay.as_deref(),
                                                 logger: &logger,
@@ -179,10 +245,34 @@ impl Worker {
                                         "The correction stopped safely.".into(),
                                     ));
                                 }
+                                #[cfg(feature = "delivery-experiments")]
+                                if delivery_variant != crate::delivery::Variant::Baseline {
+                                    if delivery_variant == crate::delivery::Variant::CachedReady {
+                                        refresh_cached(&mut replacement_cache, &store, &logger);
+                                    } else {
+                                        replacements = load_replacements(&store, &logger);
+                                    }
+                                }
                                 worker_busy.store(false, Ordering::Release);
+                                #[cfg(feature = "delivery-experiments")]
+                                if delivery_variant != crate::delivery::Variant::Baseline {
+                                    logger.event(format!(
+                                        "delivery_worker_ready run_id={} variant={} elapsed_ms={:.3}",
+                                        delivery_run_id.as_deref().unwrap_or("unavailable"),
+                                        delivery_variant.name(),
+                                        ms(started)
+                                    ));
+                                }
                                 bus.send(UiEvent::Phase(""));
                                 bus.send(UiEvent::Finished);
-                                replacements = load_replacements(&store, &logger);
+                                #[cfg(feature = "delivery-experiments")]
+                                if delivery_variant == crate::delivery::Variant::Baseline {
+                                    replacements = load_replacements(&store, &logger);
+                                }
+                                #[cfg(not(feature = "delivery-experiments"))]
+                                {
+                                    replacements = load_replacements(&store, &logger);
+                                }
                             }
                         }
                     }
@@ -215,12 +305,23 @@ impl Worker {
                         }
                     }
                 }
+                #[cfg(feature = "delivery-experiments")]
+                if delivery_variant == crate::delivery::Variant::OwnedWorker {
+                    drop(finalizer);
+                    logger.event("diagnostic_finalizer_shutdown status=drained");
+                }
             })
             .map_err(|e| e.to_string())?;
         ready_rx
             .recv_timeout(Duration::from_secs(5))
             .map_err(|_| "Correction worker did not become ready within five seconds")??;
         Ok(Self {
+            #[cfg(feature = "delivery-experiments")]
+            completion: if delivery_variant == crate::delivery::Variant::OwnedWorker {
+                Some(Arc::new(std::sync::Mutex::new(Some(_correction))))
+            } else {
+                None
+            },
             commands: tx,
             event,
             busy,
@@ -254,6 +355,13 @@ impl Worker {
         unsafe {
             SetEvent(self.event.0);
         }
+        #[cfg(feature = "delivery-experiments")]
+        if let Some(completion) = &self.completion {
+            let join = completion.lock().unwrap_or_else(|e| e.into_inner()).take();
+            if let Some(join) = join {
+                let _ = join.join();
+            }
+        }
     }
 }
 fn load_replacements(store: &Store, logger: &Logger) -> Replacements {
@@ -268,10 +376,25 @@ fn load_replacements(store: &Store, logger: &Logger) -> Replacements {
         }
     }
 }
+#[cfg(feature = "delivery-experiments")]
+fn refresh_cached(cache: &mut crate::delivery::ReplacementCache, store: &Store, logger: &Logger) {
+    if cache
+        .refresh(std::fs::read(&store.replacements_path))
+        .is_err()
+    {
+        logger.event("replacements_unavailable");
+    }
+}
 fn ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.
 }
 struct RunContext<'a> {
+    #[cfg(feature = "delivery-experiments")]
+    delivery_run_id: &'a mut Option<String>,
+    #[cfg(feature = "delivery-experiments")]
+    delivery_variant: crate::delivery::Variant,
+    #[cfg(feature = "delivery-experiments")]
+    finalizer: Option<&'a crate::delivery::Finalizer>,
     owner: usize,
     listener: usize,
     settings: &'a crate::core::Settings,
@@ -285,6 +408,12 @@ struct RunContext<'a> {
 }
 fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     let RunContext {
+        #[cfg(feature = "delivery-experiments")]
+        delivery_run_id,
+        #[cfg(feature = "delivery-experiments")]
+        delivery_variant,
+        #[cfg(feature = "delivery-experiments")]
+        finalizer,
         owner,
         listener,
         settings,
@@ -296,6 +425,10 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         bus,
         store,
     } = context;
+    #[cfg(feature = "delivery-experiments")]
+    let lean = delivery_variant.lean(settings.developer_logging, bus.observe_trials);
+    #[cfg(not(feature = "delivery-experiments"))]
+    let lean = false;
     let mut timings = LocalTimings {
         dispatch_ms: Some(ms(started)),
         ..Default::default()
@@ -310,10 +443,29 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         };
         (id, target, evidence)
     });
+    #[cfg(feature = "delivery-experiments")]
+    if delivery_variant != crate::delivery::Variant::Baseline {
+        *delivery_run_id = Some(id.clone());
+    }
     let mut request_phases = None;
     let mut recovery_ms = None;
     let mut backup = None;
     let mut detail = json!({"run_id":id,"status":"run_failed","model":settings.model,"developer_logging_enabled":settings.developer_logging,"input_text":"","output_text":"","paste_text":"","paste_html":"","events":["run_started"]});
+    if lean {
+        detail["diagnostics_mode"] = json!("lean");
+        detail["diagnostics_omitted"] = json!([
+            "clipboard_html",
+            "clipboard_rtf",
+            "clipboard_formats",
+            "request_payload",
+            "request_native",
+            "raw_response",
+            "raw_ai_output",
+            "rich_text.text",
+            "rich_text.html",
+            "paste_html"
+        ]);
+    }
     let mut corrected_on_clipboard = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let key = measure(&mut timings.setup_ms, || -> Result<_, String> {
@@ -326,11 +478,17 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         })?;
         backup=Some(measure(&mut timings.backup_ms, || clipboard::Backup::capture(owner as _))?);
         bus.send(UiEvent::Phase("Copying text..."));
-        let captured = measure(&mut timings.clipboard_ms, || clipboard::capture(listener as _, &mut timings.capture))?;
+        let captured = measure(&mut timings.clipboard_ms, || {
+            #[cfg(feature = "delivery-experiments")]
+            if lean { clipboard::capture_lean(listener as _, &mut timings.capture) } else { clipboard::capture(listener as _, &mut timings.capture) }
+            #[cfg(not(feature = "delivery-experiments"))]
+            { clipboard::capture(listener as _, &mut timings.capture) }
+        })?;
         measure(&mut timings.diagnostics_ms, || {
         detail["input_text"] = json!(captured.text);
         detail["input_chars"] = json!(captured.text.encode_utf16().count());
-        detail["clipboard_html"] = json!(captured.html);
+        if !lean { detail["clipboard_html"] = json!(captured.html); }
+        else { detail["diagnostics_mode"] = json!("lean"); detail["source_html_present"] = json!(!captured.html.is_empty()); }
         if settings.developer_logging{use base64::Engine;detail["clipboard_chromium_mime_base64"]=json!(base64::engine::general_purpose::STANDARD.encode(&captured.native));}
         detail["clipboard_rtf"] = json!(captured.rtf);
         detail["clipboard_formats"] = json!(captured.formats);
@@ -353,17 +511,17 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         Ok((protection, request_payload))
         })?;
         measure(&mut timings.diagnostics_ms, || {
-        detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default());
+        if !lean { detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default()); }
         });
         bus.send(UiEvent::Phase("Sending to AI..."));
         let response=measure(&mut timings.request_ms, || match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))})?;
         // Retain existing transport labels; these are not isolated upload/server phases.
         if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
         measure(&mut timings.diagnostics_ms, || {
-        detail["request_native"] = json!({"final_response_attempt":response.attempts,"native":response.native,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms});
+        if !lean { detail["request_native"] = json!({"final_response_attempt":response.attempts,"native":response.native,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms}); }
         detail["status_code"] = json!(response.status);
         detail["request_attempts"] = json!(response.attempts);
-        detail["raw_response"] = json!(response.raw);
+        if !lean { detail["raw_response"] = json!(response.raw); }
         let usage=&response.body["usage"];
         detail["tokens"]=json!({"input":usage["input_tokens"],"output":usage["output_tokens"],"total":usage["total_tokens"],"cached":usage["input_tokens_details"]["cached_tokens"],"reasoning":usage["output_tokens_details"]["reasoning_tokens"]});
         });
@@ -375,7 +533,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                 .to_owned());
         }
         let raw = extract_output(&response.body)?;
-        detail["raw_ai_output"] = json!(raw);
+        if !lean { detail["raw_ai_output"] = json!(raw); }
         let (output, applied, leak, echo) = measure(&mut timings.replacements_ms, || replacements.process(&raw, &protection))?;
         measure(&mut timings.diagnostics_ms, || {
         detail["output_text"] = json!(output);
@@ -392,12 +550,20 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         });
         let mapped = measure(&mut timings.rich_mapping_ms, || rich::rewrite(&captured.html, &captured.text, &output, &captured.native));
         measure(&mut timings.diagnostics_ms, || {
-        detail["rich_text"] = serde_json::to_value(&mapped).unwrap_or_default();
-        detail["paste_text"] = json!(mapped.text);
+        if lean {
+            detail["rich_text"] = json!({"mode":mapped.mode,"attempted":mapped.attempted,"applied":mapped.applied,"reason":mapped.reason,"paragraph_count":mapped.paragraph_count,"link_status":mapped.link_status,"native_docs_status":mapped.native_docs_status,"source_html_present":!captured.html.is_empty()});
+        } else { detail["rich_text"] = serde_json::to_value(&mapped).unwrap_or_default(); }
+        #[cfg(feature = "delivery-experiments")]
+        if lean { crate::delivery::record_bounded(&mut detail, "paste_text", &mapped.text); }
+        else { detail["paste_text"] = json!(mapped.text); }
+        #[cfg(not(feature = "delivery-experiments"))]
+        { detail["paste_text"] = json!(mapped.text); }
         if settings.developer_logging{use base64::Engine;detail["paste_chromium_mime_base64"]=json!(mapped.native.as_ref().map(|b|base64::engine::general_purpose::STANDARD.encode(b)).unwrap_or_default());}
-        detail["paste_html"] = json!(mapped.html);
-        detail["paste_text_chars"] = json!(mapped.text.encode_utf16().count());
-        detail["paste_html_chars"] = json!(mapped.html.encode_utf16().count());
+        if !lean { detail["paste_html"] = json!(mapped.html); } else { detail.as_object_mut().unwrap().remove("paste_html"); }
+        if !lean {
+            detail["paste_text_chars"] = json!(mapped.text.encode_utf16().count());
+            detail["paste_html_chars"] = json!(mapped.html.encode_utf16().count());
+        }
         });
         bus.send(UiEvent::Phase("Pasting..."));
         let sequence = measure(&mut timings.paste_ms, || -> Result<_, String> {
@@ -440,6 +606,8 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
             bus.send(UiEvent::Settings);
         }
     }
+    #[cfg(feature = "delivery-experiments")]
+    let finalize_started = Instant::now();
     let mut measured = serde_json::to_value(&timings).unwrap_or_default();
     measured["total_ms"] = json!(total_ms);
     measured["unattributed_ms"] = json!(total_ms - timings.accounted_ms());
@@ -478,6 +646,78 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     }
     detail["active_exe"] = json!(target.2);
     detail["paste_method"] = json!("SendInput");
+    #[cfg(feature = "delivery-experiments")]
+    if delivery_variant != crate::delivery::Variant::Baseline {
+        detail["delivery_variant"] = json!(delivery_variant.name());
+    }
+    #[cfg(feature = "delivery-experiments")]
+    if matches!(
+        delivery_variant,
+        crate::delivery::Variant::Lean | crate::delivery::Variant::OwnedWorker
+    ) {
+        if lean {
+            // No evidence or trial consumer exists: transfer the detail rather than clone it.
+            logger.data("spellcheck_detail", crate::delivery::compact_owned(detail));
+            logger.event(format!(
+                "diagnostic_finalize_completed run_id={id} status=ok elapsed_ms={:.3}",
+                ms(finalize_started)
+            ));
+            return result;
+        }
+        detail["delivery_variant"] = json!(delivery_variant.name());
+        let prepared = evidence
+            .map(|e| e.prepare_finish(store.clone(), logger.clone(), clipboard::foreground()));
+        let bytes = crate::delivery::owned_bytes(&detail);
+        let logger = logger.clone();
+        let bus = bus.clone();
+        let fallback_logger = logger.clone();
+        let failure_logger = logger.clone();
+        let failure_id = id.clone();
+        let job: crate::delivery::Job = Box::new(move || {
+            let completed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                logger.data(
+                    "spellcheck_detail",
+                    if delivery_variant == crate::delivery::Variant::Lean {
+                        crate::delivery::compact(&detail)
+                    } else {
+                        crate::delivery::baseline_inline(&detail)
+                    },
+                );
+                match (bus.observe_trials, prepared) {
+                    (true, Some(finish)) => {
+                        bus.send(UiEvent::Trial(detail.clone()));
+                        finish(detail);
+                    }
+                    (true, None) => bus.send(UiEvent::Trial(detail)),
+                    (false, Some(finish)) => finish(detail),
+                    (false, None) => {}
+                }
+            }));
+            failure_logger.event(format!(
+                "diagnostic_finalize_completed run_id={failure_id} status={} elapsed_ms={:.3}",
+                if completed.is_ok() { "ok" } else { "panic" },
+                ms(finalize_started)
+            ));
+        });
+        if delivery_variant == crate::delivery::Variant::OwnedWorker {
+            match finalizer {
+                Some(worker) => {
+                    if let Err((reason, job)) = worker.submit(bytes, job) {
+                        fallback_logger
+                            .event(format!("diagnostic_finalizer_fallback reason={reason}"));
+                        job();
+                    }
+                }
+                None => {
+                    fallback_logger.event("diagnostic_finalizer_fallback reason=unavailable");
+                    job();
+                }
+            }
+        } else {
+            job();
+        }
+        return result;
+    }
     let mut inline = detail.clone();
     for name in [
         "clipboard_html",
@@ -529,6 +769,13 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
             detail,
             clipboard::foreground(),
         );
+    }
+    #[cfg(feature = "delivery-experiments")]
+    if delivery_variant == crate::delivery::Variant::CachedReady {
+        logger.event(format!(
+            "diagnostic_finalize_completed run_id={id} status=ok elapsed_ms={:.3}",
+            ms(finalize_started)
+        ));
     }
     result
 }
