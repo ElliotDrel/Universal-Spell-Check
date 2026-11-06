@@ -46,6 +46,11 @@ jobs:
         run: cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
       - name: Dev regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml
+      - name: Experimental hotkey lint and deterministic native timer guards
+        run: |
+          cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets --features hotkey-experiments -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --manifest-path rust/Cargo.toml --features hotkey-experiments hotkey_experiments
       - name: Prod regressions
         run: cargo test --locked --manifest-path rust/Cargo.toml --no-default-features
       - name: Optimized native build

@@ -36,13 +36,13 @@ impl Drop for Open {
         }
     }
 }
-fn pump_wait(ms: u32) {
+pub(crate) fn pump_wait(ms: u32) {
     unsafe {
         MsgWaitForMultipleObjectsEx(0, null(), ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         pump_messages();
     }
 }
-fn pump_messages() {
+pub(crate) fn pump_messages() {
     unsafe {
         let mut msg = zeroed();
         while PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) != 0 {
@@ -312,6 +312,10 @@ fn settle_until(until: Instant, mut timer: HANDLE) {
     }
 }
 pub fn modifiers_released(timeout: Duration) -> Result<(), String> {
+    #[cfg(feature = "hotkey-experiments")]
+    if crate::hotkey_experiments::selected() != crate::hotkey_experiments::Variant::Baseline {
+        return crate::hotkey_experiments::modifiers_released(timeout);
+    }
     let start = Instant::now();
     loop {
         let held = unsafe {
