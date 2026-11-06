@@ -427,6 +427,7 @@ impl Client {
             })
         }
     }
+    #[cfg(all(test, feature = "dev"))]
     pub fn diagnostic() -> Result<Self, String> {
         let mut client = Self::new()?;
         client.collect_native_diagnostics = true;

@@ -17,9 +17,6 @@ pub struct Logger {
 }
 impl Logger {
     pub fn new(directory: PathBuf) -> Self {
-        Self::observed(directory, None)
-    }
-    pub fn observed(directory: PathBuf, observer: Option<crate::runtime::Bus>) -> Self {
         let (tx, rx) = mpsc::channel::<Message>();
         thread::Builder::new()
             .name("log-writer".into())
@@ -32,11 +29,6 @@ impl Logger {
                             continue;
                         }
                     };
-                    if let Some(bus) = &observer
-                        && let Some(data) = &data
-                    {
-                        bus.send(crate::runtime::UiEvent::Log(event.clone(), data.clone()));
-                    }
                     let date = now.date().to_string();
                     let stamp = now.format(&Rfc3339).unwrap_or_default();
                     let tail = data.map(|d| format!(" {d}")).unwrap_or_default();

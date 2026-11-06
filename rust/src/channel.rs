@@ -21,8 +21,9 @@ pub const MUTEX: &str = if IS_DEV {
 pub const HOTKEY_VK: u32 = if IS_DEV { 0x44 } else { 0x55 };
 pub const EVIDENCE_MUTEX: &str = "Local\\UniversalSpellCheck.DeveloperEvidence";
 pub const MIGRATION_MUTEX: &str = "UniversalSpellCheck.DataMigration.v1";
-/// Ctrl+Alt+B, isolated from both product hotkeys so harness runs never fire a real channel.
-pub const BENCH_VK: u32 = 0x42;
+/// Ctrl+Alt+F24: SendInput can press it but no physical keyboard has it, so bench runs never
+/// collide with a product channel or another app.
+pub const BENCH_VK: u32 = 0x87;
 pub const BENCH_TITLE: &str = "UniversalSpellCheck.Bench.Rust";
 
 pub fn hotkey_title() -> String {

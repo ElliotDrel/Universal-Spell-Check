@@ -31,7 +31,6 @@ pub enum UiEvent {
     ReadyToExit,
     StartupChecked,
     Trial(Value),
-    Log(String, Value),
 }
 #[derive(Clone)]
 pub struct Bus {
@@ -537,7 +536,7 @@ pub struct Replay {
     responses: std::collections::HashMap<String, Vec<u8>>,
 }
 impl Replay {
-    pub fn new(fixtures: &[crate::benchmark::Fixture]) -> Result<Self, String> {
+    pub fn new(fixtures: &[crate::bench::Fixture]) -> Result<Self, String> {
         let mut responses = std::collections::HashMap::new();
         for f in fixtures {
             let protected = Protection::new(&f.input)?;

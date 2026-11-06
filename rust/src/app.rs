@@ -261,7 +261,7 @@ pub fn run(
                         UiEvent::StartupChecked => {
                             event_checking.store(false, Ordering::Release);
                         }
-                        UiEvent::Trial(_) | UiEvent::Log(_, _) => {}
+                        UiEvent::Trial(_) => {}
                         UiEvent::Update(text) => {
                             ui.tray.set_tip(
                                 &format!("{} — {text}", channel::DISPLAY_NAME)

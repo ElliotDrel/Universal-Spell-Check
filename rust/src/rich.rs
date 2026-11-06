@@ -848,10 +848,10 @@ mod golden_tests {
     }
     #[test]
     fn frozen_baseline_processing_matches() {
-        let cases: Vec<crate::benchmark::Case> =
-            serde_json::from_str(include_str!("../../bench/baseline-cases.json")).unwrap();
-        let fixtures: Vec<crate::benchmark::Fixture> =
-            serde_json::from_str(include_str!("../tests/fixtures/baseline-api.json")).unwrap();
+        let cases: Vec<crate::bench::Case> =
+            serde_json::from_str(include_str!("../../bench/cases.json")).unwrap();
+        let fixtures: Vec<crate::bench::Fixture> =
+            serde_json::from_str(include_str!("../../bench/replay.json")).unwrap();
         let replacements =
             crate::core::Replacements::parse(include_bytes!("../../replacements.json")).unwrap();
         for case in cases {
