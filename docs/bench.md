@@ -491,3 +491,65 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+## Clipboard alternatives (experimental feature only)
+
+Build the native prototype runner with `cargo build --locked --manifest-path rust/Cargo.toml
+--features clipboard-experiments`. Ordinary Dev and Prod builds keep the current implementation;
+none of these alternatives is wired into app startup or persisted settings.
+
+The following commands require an explicitly reserved exclusive clipboard slot. They use no
+credentials, model/API request, focus changes, hotkey injection, or installed application. Each
+refuses mutations unless it can first own a complete original snapshot and prepare every recovery
+handle, then restores and verifies that snapshot
+on success, error, or caught panic. Clipboard history may still observe these synthetic writes;
+Windows history policy is best effort. Do not run concurrently with other clipboard users.
+
+```powershell
+rust/target/debug/universal-spell-check.exe --clipboard-experiment baseline --allow-desktop
+rust/target/debug/universal-spell-check.exe --clipboard-experiment owned --allow-desktop
+rust/target/debug/universal-spell-check.exe --clipboard-experiment cache --allow-desktop
+rust/target/debug/universal-spell-check.exe --clipboard-experiment notification --allow-desktop
+```
+
+- `baseline`: current `OleDuplicateData` backup and restore.
+- `owned`: ordinary HGLOBAL formats become owned bytes, in enumerated order. Special bitmap,
+  palette, metafile and enhanced-metafile formats retain independent native duplicates. Every
+  recovery handle is prepared before `EmptyClipboard`; preparation failure leaves current data
+  untouched. Refuse owner-managed formats, incomplete rendering/enumeration, over 128 formats,
+  zero-sized HGLOBALs, and over 64 MiB of ordinary format bytes, rather than skipping formats. This shifts allocation
+  into recovery; it does not reduce delayed-rendering latency.
+- `cache`: one bounded idle snapshot using baseline-owned duplicates, moved once after matching
+  sequence AND producer HWND under clipboard open. A miss falls back synchronously. Equal text
+  with a fresh sequence must miss. Snapshots with special GDI handles use complete synchronous fallback because their native
+  allocation size is not bounded by the baseline byte counter. Idle refresh is explicit in this
+  prototype, excluded from the capture sample, and invalidation precedes self-publication. This is not an installed background
+  clipboard monitor and does not claim that idle work is free.
+- `notification`: an actual `WM_CLIPBOARDUPDATE` listener wakes full sequence/read validation;
+  a 25-ms watchdog retains bounded retries if notifications are absent. A timer produces a delayed
+  synthetic publication without keyboard input. Normal capture already wakes on messages, so
+  this arm does not assume a 25-ms improvement. Each attempt retains the 700-ms readiness deadline.
+
+Output contains per-attempt status, all 20 successful roundtrip samples and per-capture samples
+(backup arms), cache hit count, variant, build profile and scope. Failed checks retain started/completed
+attempts plus the error, then return nonzero. Native roundtrip time includes synthetic overwrite and recovery;
+notification time includes its producer timer delay. Do not compare notification samples to backup
+samples, infer editor-visible latency, or select a winner from this small harness. The source and
+restored snapshot compare every ordinary format byte and format order, including independent ANSI
+and Unicode content; GDI duplication has a separate native unit check.
+
+Run deterministic non-desktop checks with `cargo test --locked --manifest-path rust/Cargo.toml
+--features clipboard-experiments`. CI additionally tests the feature without default features.
+Coverage includes owned binary bytes/order, inconsistent encodings, allocation failure before
+publication, GDI handle independence, owner/sequence cache identity, unsupported-format refusal,
+and notification accounting. Producer exit, complete special-format clipboard roundtrips,
+delayed-rendering failures, contention, handle-count stress and original-editor/no-selection
+acceptance remain pending. No publication-to-paste settlement behavior is changed.
+
+The ownership design follows the documented requirement to copy clipboard data while open
+([GetClipboardData](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboarddata))
+and preserve special native objects
+([OleDuplicateData](https://learn.microsoft.com/en-us/windows/win32/api/ole2/nf-ole2-oleduplicatedata)).
+Notifications are change hints from a registered listener
+([WM_CLIPBOARDUPDATE](https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-clipboardupdate));
+they do not prove nonempty Unicode and rich formats are readable.

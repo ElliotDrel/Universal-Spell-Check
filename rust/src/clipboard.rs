@@ -1,3 +1,5 @@
+#[cfg(feature = "clipboard-experiments")]
+pub mod experiments;
 use crate::{
     docs_native,
     store::wide,
