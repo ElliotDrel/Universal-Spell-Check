@@ -637,17 +637,13 @@ mod tests {
             })
             .collect();
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../bench/perf-budget.json");
-        let expected = serde_json::to_string_pretty(&measured).unwrap()
-            + "
-";
+        let expected = serde_json::to_string_pretty(&measured).unwrap() + "\n";
         if std::env::var_os("USC_UPDATE_BUDGET").is_some() {
             fs::write(path, &expected).unwrap();
         }
-        let committed = fs::read_to_string(path).unwrap_or_default().replace(
-            "
-", "
-",
-        );
+        let committed = fs::read_to_string(path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert_eq!(
             committed, expected,
             "Run USC_UPDATE_BUDGET=1 cargo test perf_budget"

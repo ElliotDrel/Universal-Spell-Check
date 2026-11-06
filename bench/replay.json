@@ -49,10 +49,10 @@
   },
   {
     "id": "unicode",
-    "input": "The caf\u00E9 opens tomorow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
-    "raw_ai_output": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
-    "output": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
-    "paste_text": "The caf\u00E9 opens tomorrow. Bring your r\u00E9sum\u00E9. \uD83D\uDE42",
+    "input": "The café opens tomorow. Bring your résumé. 🙂",
+    "raw_ai_output": "The café opens tomorrow. Bring your résumé. 🙂",
+    "output": "The café opens tomorrow. Bring your résumé. 🙂",
+    "paste_text": "The café opens tomorrow. Bring your résumé. 🙂",
     "paste_html": ""
   },
   {
@@ -69,14 +69,14 @@
     "raw_ai_output": "Please check the guide.",
     "output": "Please check the guide.",
     "paste_text": "Please check the guide.",
-    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000287\r\nStartFragment:0000000141\r\nEndFragment:0000000251\r\n\u003Chtml\u003E\r\n\u003Cbody\u003E\r\n\u003C!--StartFragment--\u003E\u003Cp data-pm-slice=\u00220 0 []\u0022\u003EPlease \u003Cstrong\u003Echeck\u003C/strong\u003E the \u003Ca href=\u0022https://example.com/guide\u0022\u003Eguide\u003C/a\u003E.\u003C/p\u003E\u003C!--EndFragment--\u003E\r\n\u003C/body\u003E\r\n\u003C/html\u003E"
+    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000287\r\nStartFragment:0000000141\r\nEndFragment:0000000251\r\n<html>\r\n<body>\r\n<!--StartFragment--><p data-pm-slice=\"0 0 []\">Please <strong>check</strong> the <a href=\"https://example.com/guide\">guide</a>.</p><!--EndFragment-->\r\n</body>\r\n</html>"
   },
   {
     "id": "rich-list",
     "input": "1. First itme.\n2. Second itme.",
     "raw_ai_output": "1. First item.  \n2. Second item.",
-    "output": "1. First item.  \n2. Second item.",
-    "paste_text": "1. First item.  \n2. Second item.",
-    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000266\r\nStartFragment:0000000141\r\nEndFragment:0000000230\r\n\u003Chtml\u003E\r\n\u003Cbody\u003E\r\n\u003C!--StartFragment--\u003E\u003Col data-pm-slice=\u00220 0 []\u0022\u003E\u003Cli\u003E\u003Cp\u003EFirst item.  \u003C/p\u003E\u003C/li\u003E\u003Cli\u003E\u003Cp\u003ESecond item.\u003C/p\u003E\u003C/li\u003E\u003C/ol\u003E\u003C!--EndFragment--\u003E\r\n\u003C/body\u003E\r\n\u003C/html\u003E"
+    "output": "1. First item.\n2. Second item.",
+    "paste_text": "1. First item.\n2. Second item.",
+    "paste_html": "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000000264\r\nStartFragment:0000000141\r\nEndFragment:0000000228\r\n<html>\r\n<body>\r\n<!--StartFragment--><ol data-pm-slice=\"0 0 []\"><li><p>First item.</p></li><li><p>Second item.</p></li></ol><!--EndFragment-->\r\n</body>\r\n</html>"
   }
 ]
