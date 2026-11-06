@@ -160,6 +160,8 @@ struct Run {
     hotkey: Option<Instant>,
     detail: Option<Value>,
     trials: Vec<Value>,
+    /// Live answers in `bench/replay.json` format, one per case.
+    recorded: Vec<Fixture>,
     error: Option<String>,
 }
 impl Run {
@@ -276,6 +278,16 @@ impl Run {
             "expected_match": same(&output, &case.expected), "error": error,
             "output": output, "timings": timings,
         });
+        if self.live && error.is_none() && !self.recorded.iter().any(|f| f.id == case.id) {
+            self.recorded.push(Fixture {
+                id: case.id.clone(),
+                input: case.text.clone(),
+                raw_ai_output: detail["raw_ai_output"].as_str().unwrap_or("").into(),
+                output: detail["output_text"].as_str().unwrap_or("").into(),
+                paste_text: wanted_text.into(),
+                paste_html: wanted_html.into(),
+            });
+        }
         self.trials.push(trial);
         self.index += 1;
         if self.index >= self.runs as isize {
@@ -439,6 +451,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         hotkey: None,
         detail: None,
         trials: Vec::new(),
+        recorded: Vec::new(),
         error: None,
     }));
     let weak = Rc::downgrade(&state);
@@ -506,6 +519,13 @@ pub fn run(args: &[String]) -> Result<(), String> {
     nwg::unbind_event_handler(&handler);
     nwg::unbind_raw_event_handler(&raw).map_err(|e| e.to_string())?;
     logger.flush();
+    if live {
+        fs::write(
+            output.join("recorded.json"),
+            serde_json::to_vec_pretty(&state.recorded).unwrap(),
+        )
+        .map_err(|e| e.to_string())?;
+    }
     let summary = summarize(&state.trials, &state.cases, live, state.error.as_deref());
     fs::write(
         output.join("summary.json"),
