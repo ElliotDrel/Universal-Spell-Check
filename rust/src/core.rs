@@ -191,8 +191,38 @@ impl Replacements {
                 text = rest.trim_start().to_owned();
             }
         }
+        let text = preserve_line_end_spacing(&protection.text, &text);
         Ok((protection.restore(text)?, applied, triggered, echo_removed))
     }
+}
+fn preserve_line_end_spacing(source: &str, corrected: &str) -> String {
+    let source: Vec<_> = source.split('\n').collect();
+    let corrected: Vec<_> = corrected.split('\n').collect();
+    // Index pairing is trusted only when blank lines stay in place; a shifted blank
+    // line means lines moved, so leave the model's spacing untouched.
+    let blank = |line: &str| line.trim_matches([' ', '\t', '\r']).is_empty();
+    if source.len() != corrected.len()
+        || source
+            .iter()
+            .zip(&corrected)
+            .any(|(s, c)| blank(s) != blank(c))
+    {
+        return corrected.join("\n");
+    }
+    source
+        .iter()
+        .zip(corrected)
+        .map(|(source, corrected)| {
+            let source = source.strip_suffix('\r').unwrap_or(source);
+            let (corrected, cr) = corrected
+                .strip_suffix('\r')
+                .map_or((corrected, ""), |s| (s, "\r"));
+            let body = corrected.trim_end_matches([' ', '\t']);
+            let trailing = &source[source.trim_end_matches([' ', '\t']).len()..];
+            format!("{body}{trailing}{cr}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 fn strip_echo<'a>(output: &'a str, input: &str) -> &'a str {
     if input.is_empty() {
@@ -288,6 +318,47 @@ impl Default for Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn model_line_end_spacing_is_restored_from_source() {
+        let replacements = Replacements::default();
+        let source = "1. First itme.\n2. Second itme.";
+        let protection = Protection::new(source).unwrap();
+        let (actual, _, _, _) = replacements
+            .process("1. First item.  \n2. Second item.", &protection)
+            .unwrap();
+        assert_eq!(actual, "1. First item.\n2. Second item.");
+        for (source, corrected, expected) in [
+            ("teh  \nword\t", "the\nword ", "the  \nword\t"),
+            (
+                "café🙂\r\n\t\r\nteh  ",
+                "café🙂  \r\n\r\nthe\t",
+                "café🙂\r\n\t\r\nthe  ",
+            ),
+            ("word\u{a0}", "word\u{a0}", "word\u{a0}"),
+        ] {
+            assert_eq!(preserve_line_end_spacing(source, corrected), expected);
+        }
+    }
+    #[test]
+    fn spacing_restoration_does_not_mask_changed_line_count_or_literals() {
+        assert_eq!(preserve_line_end_spacing("a\nb", "a  \nb\nc"), "a  \nb\nc");
+        assert_eq!(
+            preserve_line_end_spacing("a  \n\nb", "a\nb\t\n"),
+            "a\nb\t\n"
+        );
+        let protection = Protection::new("teh https://example.com/Path  \nnext").unwrap();
+        let raw = protection
+            .text
+            .replacen("teh", "the", 1)
+            .replace("  \n", "\n");
+        let (actual, _, _, _) = Replacements::default().process(&raw, &protection).unwrap();
+        assert_eq!(actual, "the https://example.com/Path  \nnext");
+        assert!(
+            Replacements::default()
+                .process("the lost placeholder\nnext", &protection)
+                .is_err()
+        );
+    }
     #[test]
     fn markdown_links_are_protected_as_complete_literals_before_the_model() {
         for link in [

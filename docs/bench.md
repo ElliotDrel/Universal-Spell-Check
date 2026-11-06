@@ -396,6 +396,10 @@ python bench/records/2026-10-rust-port/verify.py
 <candidate.exe> --bench-desktop --mode local --cases bench/records/2026-10-rust-port/cases.json --fixtures bench/records/2026-10-rust-port/fixtures.json --replacements replacements.json --runs 3 --warmup 1 --allow-desktop --output <fresh-output>
 ```
 
+- The historical `fixtures.json` stays frozen (hashed by `settlement/verify.py`), so
+  its `rich-list` expectation predates line-end spacing restoration. Treat that
+  case's mismatch as expected, or pass a copy merged with
+  `bench/fixtures/correction-contract-overrides.json` as `check_native_contracts.py` does.
 - Run the first block without developer logging; use a second matched block with
   `--developer-logging --evidence-log-dir <fresh-private-evidence-directory>` to
   expose diagnostic cost. Keep the directory separate from ordinary production
