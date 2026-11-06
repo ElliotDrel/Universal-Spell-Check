@@ -160,8 +160,23 @@ fn read_measured(
     budget: Duration,
     timings: &mut ReadTimings,
 ) -> Result<Clipboard, String> {
+    read_progressive(hwnd, budget, timings, true, &mut |_, _, _| Ok(()), false)
+}
+fn read_progressive(
+    hwnd: HWND,
+    budget: Duration,
+    timings: &mut ReadTimings,
+    diagnostics: bool,
+    ready: &mut dyn FnMut(&str, u32, usize) -> Result<(), String>,
+    strict: bool,
+) -> Result<Clipboard, String> {
     let _open = measure(&mut timings.open_ms, || open(hwnd, budget))?;
     let sequence = unsafe { GetClipboardSequenceNumber() };
+    let owner = if strict {
+        (unsafe { GetClipboardOwner() }) as usize
+    } else {
+        0
+    };
     let text = measure(&mut timings.unicode_ms, || -> Result<String, String> {
         let raw = bytes(13, 16 * 1024 * 1024)?;
         let units: Vec<u16> = raw
@@ -173,44 +188,64 @@ fn read_measured(
             .collect();
         Ok(String::from_utf16_lossy(&units))
     })?;
+    if !text.trim().is_empty() {
+        ready(&text, sequence, owner)?;
+    }
     // Unicode is required; unavailable ancillary formats must not discard usable text.
     let (html, html_status) = measure(&mut timings.html_ms, || {
         optional_format(bytes(format("HTML Format"), 16 * 1024 * 1024))
     });
-    let (rtf, rtf_status) = measure(&mut timings.rtf_ms, || {
-        optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
-    });
+    let (rtf, rtf_status) = if diagnostics {
+        measure(&mut timings.rtf_ms, || {
+            optional_format(bytes(format("Rich Text Format"), 16 * 1024 * 1024))
+        })
+    } else {
+        (Vec::new(), "disabled")
+    };
     let (native, native_status) = measure(&mut timings.native_ms, || {
         optional_format(bytes(format(docs_native::FORMAT), 1024 * 1024))
     });
     let (html, rtf) = measure(&mut timings.decode_ms, || (utf8(html), utf8(rtf)));
-    let formats = measure(&mut timings.enumerate_ms, || {
-        let mut formats = Vec::new();
-        unsafe {
-            let mut f = 0;
-            loop {
-                f = EnumClipboardFormats(f);
-                if f == 0 {
-                    break;
-                }
-                let mut name = [0u16; 256];
-                let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
-                formats.push(if len > 0 {
-                    String::from_utf16_lossy(&name[..len as usize])
-                } else {
-                    match f {
-                        13 => "UnicodeText".into(),
-                        1 => "Text".into(),
-                        7 => "OEMText".into(),
-                        16 => "Locale".into(),
-                        _ => format!("#{f}"),
+    let formats = if diagnostics {
+        measure(&mut timings.enumerate_ms, || {
+            let mut formats = Vec::new();
+            unsafe {
+                let mut f = 0;
+                loop {
+                    f = EnumClipboardFormats(f);
+                    if f == 0 {
+                        break;
                     }
-                });
+                    let mut name = [0u16; 256];
+                    let len = GetClipboardFormatNameW(f, name.as_mut_ptr(), 256);
+                    formats.push(if len > 0 {
+                        String::from_utf16_lossy(&name[..len as usize])
+                    } else {
+                        match f {
+                            13 => "UnicodeText".into(),
+                            1 => "Text".into(),
+                            7 => "OEMText".into(),
+                            16 => "Locale".into(),
+                            _ => format!("#{f}"),
+                        }
+                    });
+                }
             }
-        }
-        formats
-    });
-    if unsafe { GetClipboardSequenceNumber() } != sequence {
+            formats
+        })
+    } else {
+        Vec::new()
+    };
+    if strict
+        && [html_status, native_status]
+            .iter()
+            .any(|s| !matches!(*s, "ok" | "absent"))
+    {
+        return Err("Staged capture could not own every functional rich format".into());
+    }
+    if unsafe { GetClipboardSequenceNumber() } != sequence
+        || (strict && unsafe { GetClipboardOwner() } as usize != owner)
+    {
         return Err("Clipboard changed while capturing formats".into());
     }
     Ok(Clipboard {
@@ -399,6 +434,55 @@ pub fn capture(hwnd: HWND, timings: &mut CaptureTimings) -> Result<Clipboard, St
     }
     Err("The selected app did not copy any text.".into())
 }
+
+#[cfg(feature = "experimental-staged-capture")]
+pub fn capture_staged(
+    hwnd: HWND,
+    timings: &mut CaptureTimings,
+    diagnostics: bool,
+    ready: &mut dyn FnMut(&str, u32, usize) -> Result<(), String>,
+) -> Result<Clipboard, String> {
+    measure(&mut timings.modifiers_ms, || {
+        modifiers_released(Duration::from_millis(1200))
+    })?;
+    let mut dispatched = false;
+    for _ in 0..2 {
+        let before = unsafe { GetClipboardSequenceNumber() };
+        timings.copy_attempts += 1;
+        measure(&mut timings.copy_input_ms, || chord(0x43))?;
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_millis(700) {
+            if unsafe { GetClipboardSequenceNumber() } != before {
+                timings.read_attempts += 1;
+                let result = measure(&mut timings.read_ms, || {
+                    read_progressive(
+                        hwnd,
+                        Duration::from_millis(320),
+                        &mut timings.reads,
+                        diagnostics,
+                        &mut |text, sequence, owner| {
+                            // Bind before invoking the callback: even a dispatch error must never recopy.
+                            dispatched = true;
+                            ready(text, sequence, owner)
+                        },
+                        true,
+                    )
+                });
+                match result {
+                    Ok(data) if !data.text.trim().is_empty() => return Ok(data),
+                    Err(error) if dispatched => return Err(error),
+                    _ => (),
+                }
+            }
+            measure(&mut timings.wait_ms, || pump_wait(25));
+        }
+        if dispatched {
+            break;
+        }
+    }
+    Err("The selected app did not copy any text.".into())
+}
+
 pub struct WorkerWindow(pub HWND);
 impl WorkerWindow {
     pub fn new() -> Result<Self, String> {

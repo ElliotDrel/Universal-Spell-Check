@@ -491,3 +491,83 @@ when retries occur. Release builds are required; unsupported saved models are
 rejected before output creation or network access. Earlier retained schema-1
 samples have top-level split/native fields; all seven have one attempt, so their
 timing scope is unambiguous.
+
+
+### Staged capture experiments (October 25, 2026)
+
+These are three runnable prototypes under the opt-in `experimental-staged-capture`
+Cargo feature. Ordinary Dev/Prod builds keep baseline capture. Even a feature build
+keeps baseline capture unless the desktop benchmark explicitly supplies
+`--staged-capture <variant>`; the tray app cannot activate a candidate through
+settings or environment variables. No model, endpoint, HTTP parameters, transport,
+service retry policy, protected literals, clipboard backup, final rich mapper,
+active-target paste, or 50 ms settlement policy changes.
+
+| Selector | Runnable behavior | Trade-off |
+|---|---|---|
+| `unicode-first` | Own Unicode, build the unchanged protected request, dispatch one request worker while the same clipboard-open transaction finishes HTML/native capture; exclude intermediate Unicode only after all functional bytes are owned. | Holds the clipboard open through request dispatch; delayed rich rendering can still block this capture thread. |
+| `owned-prepare` | Finish the complete owned snapshot and history exclusion, dispatch the request, then prepare and reuse the source paragraph inventory before response-dependent reconstruction. | This first pass moves ProseMirror paragraph parsing/rest classification only; Docs/native, diff and link projection remain response-dependent. Owned source copies and dispatch can cost more than the work hidden. |
+| `helper` | Start a child of the same executable, receive owned `TextReady` then matching `SnapshotReady` frames, dispatch from the parent on `TextReady`, and finish history exclusion/reconstruction/paste in the parent. | Cold helper per correction, 4-second capture deadline and process/IPC overhead. No prewarmed-helper claim. Its purpose is bounded isolation of delayed rendering, not an assumed speedup. |
+
+All candidates require both the matching full snapshot and request result before
+mapping or paste. Run ID, owner, sequence and exact text bind both progressive
+frames. The native reader conservatively rejects sequence/owner changes across
+capture, including delayed-render changes. Once text is dispatched, a rich read
+failure or changed snapshot fails the run: response is discarded, the existing
+backup/recovery path runs, and capture does not recopy or dispatch again. Existing
+HTTP service retries remain intact; one coordinator dispatch is not a promise of
+one transport attempt. Request workers are scoped and joined before recovery;
+a failed rich capture can therefore still wait for the unchanged HTTP deadline.
+Backup capture remains the original synchronous path; the helper isolates selection
+capture only.
+
+Functional HTML/native reads are unconditional in every candidate. Only RTF and
+format-name enumeration are skipped when `developer_logging` is off: neither is
+consumed by reconstruction or paste. Ordinary read/readback behavior is unchanged.
+Existing mapper refusal/fallback decisions are preserved; capture failure introduces
+no new plaintext fallback. History policy remains best effort; it cannot undo an
+entry already collected from the source application's Ctrl+C.
+
+Build and run the component replay without desktop, network, settings or keys:
+
+```powershell
+cargo build --locked --manifest-path rust/Cargo.toml --features experimental-staged-capture
+python bench/check_staged_capture.py --exe rust/target/debug/universal-spell-check.exe --output benchmark_runs/staged-capture-check
+# Or run any arm on the small synthetic fixture:
+rust/target/debug/universal-spell-check.exe --bench-staged-capture --variant unicode-first --fixture bench/fixtures/staged-capture.json
+rust/target/debug/universal-spell-check.exe --bench-staged-capture --variant owned-prepare --fixture bench/fixtures/staged-capture.json
+rust/target/debug/universal-spell-check.exe --bench-staged-capture --variant helper --fixture bench/fixtures/staged-capture.json
+```
+
+The replay uses the actual coordinator/protected payload, source preparation and
+rich mapper; helper replay uses the actual child executable and framed pipes.
+Synthetic rich/request delays select completion order. Failures inject stale
+snapshots, rich-read failure, capture/request panic, oversized/partial frames and
+helper timeout. Successful mapping is compared to baseline including native bytes;
+the executable checks also verify helper exit through an OS process handle. CI
+runs these checks without touching the clipboard. Replay timings describe component
+ordering only and are not a speed claim or editor acceptance.
+
+For a separately authorized idle-desktop slot, build Release with the feature,
+then add `--staged-capture unicode-first`, `--staged-capture owned-prepare`, or
+`--staged-capture helper` to the existing `--bench-desktop --mode local` invocation.
+Omit the flag for baseline; use fresh output directories and matched fixtures/logging
+modes for each arm. Existing `--allow-desktop`, isolated offline credentials and
+editor correctness gates still apply. The manifest records the selected variant;
+run details record `staged_capture.trace`. Request/capture/source-preparation phases
+overlap, so `phase_durations_overlap` is true and `unattributed_ms` is null; do not
+sum phase durations or compare them as a serial budget. Live editor formatting,
+clipboard recovery/history behavior, actual delayed rendering and matched latency
+measurements remain pending.
+
+The helper is assigned to a kill-on-close Job Object before the parent sends its
+Start frame. Frames are length-capped at 64 MiB before allocation; a continuously
+drained output pipe prevents a full snapshot from blocking behind an unread pipe.
+Every timeout/error drops the job, kills/waits for the child and joins the drainer
+before clipboard recovery. Credentials and HTTP stay in the parent. Only synthetic
+fixtures enter replay IPC; the native helper transports the captured selection in
+memory, with no disk persistence.
+
+API ownership/IPC rationale: [GetClipboardData ownership and lifetime](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboarddata),
+[Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),
+and [anonymous pipe operations](https://learn.microsoft.com/en-us/windows/win32/ipc/anonymous-pipe-operations).
