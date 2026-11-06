@@ -1,90 +1,69 @@
-# AGENTS.md — Master System Resolver
+# Universal Spell Check
 
-> **CRITICAL MANDATE:** Do not invent logic or guess. Before editing code, answering detailed questions, or running a skill, match the user's intent to the routing table below and **read the referenced doc FIRST**. Do not rely on memory from prior sessions — docs evolve. If a task spans multiple rows, load each relevant doc before writing code.
+A Windows-wide AI spell checker. Select text in any app, press the hotkey, and the corrected text
+replaces the selection in place. It is a native Rust tray app with a small dashboard, shipped
+through Velopack and GitHub Releases. The user is Elliot, who runs it all day.
 
----
+**Speed is the product.** The hotkey path must feel instant. Prefer the simplest, lowest-level
+implementation that measurably improves the complete correction path while staying correct.
+Question unnecessary work before tuning it. Every PR is gated on request size and end-to-end
+latency (see Verifying).
 
-## Grounding (always-loaded context)
+Collaboration: speed first, simplicity second, minimal UI third. Be concise and decide fast.
 
-**Universal Spell Check** is a Windows-wide AI spell checker. Select text → press hotkey → corrected text replaces selection in place. Native Rust tray app + dashboard under `rust/` is the product; `src/` retains the C# reference and canonical `BuildChannel.cs`. Legacy AHK is archived under `.archive/ahk-legacy/`.
+## Channels
 
-**Core value:** select, hotkey, done. **Performance and speed come first.** Prefer the lowest-level, simplest practical implementation that measurably improves the complete correction path while preserving correctness. Question unnecessary work before tuning it; keep abstractions and fallbacks only when their measured benefit or reliability requirement justifies the cost. Build small, reusable verification and baseline tools whenever testing friction slows reliable iteration; retain failed attempts, provenance and editor correctness gates.
+Prod and Dev run side by side from the same code:
 
-**Two channels run side-by-side:** Prod (Rust `--no-default-features`, Ctrl+Alt+U) and Dev (default Rust features, Ctrl+Alt+D). Settings are isolated per channel; logs are unified into one shared corpus stamped per-line with `channel`/`app_version`/`pid` (this matters for fine-tune work). All channel constants live in `src/BuildChannel.cs` — never hardcode them elsewhere.
+| | Prod | Dev |
+|---|---|---|
+| Build | `--no-default-features` | default (`dev` feature) |
+| Hotkey | Ctrl+Alt+U | Ctrl+Alt+D |
+| Settings and API keys | `%LocalAppData%\UniversalSpellCheck.Data` | `%LocalAppData%\UniversalSpellCheck.Dev` |
+| Logs (shared) | `%LocalAppData%\UniversalSpellCheck.Data\logs` | same |
 
-**Collaboration tone:** speed first, simplicity second, minimal UI/overhead third. Concise, action-oriented. Decide fast.
+## Hard rules
 
-**Agent root:** `.agents` is the canonical editable root for agent files and helper scripts. `.claude` exists only as a compatibility junction; do not edit it directly.
+1. **Channel constants live in `rust/src/channel.rs`.** Never hardcode a hotkey, mutex, data folder or display string elsewhere.
+2. **Logs are shared, settings are isolated.** Both channels append to one daily JSONL corpus, stamped per line with `channel`, `app_version` and `pid`. Never split logs by channel; the unified corpus is the fine-tune dataset.
+3. **User data never lives in Velopack's install root** (`%LocalAppData%\UniversalSpellCheck`), which reinstalls replace. Keep the legacy-data migration intact.
+4. **One update flow.** Launch, periodic, tray and dashboard checks all go through the single `Updater` worker in `rust/src/update.rs`.
+5. **Releases ship via tag.** A `v*.*.*` tag triggers `.github/workflows/release.yml`. Use the `deploy` skill for Dev pushes and Prod releases, including its closeout checklist. Never tag or run `vpk` by hand.
+6. **Never mix model parameter families.** Standard models take `temperature`; reasoning models take `reasoning.effort`. See `docs/model-config.md`.
+7. **Debug before fixing.** When the cause is unclear, add logging, reproduce, read the log, then fix.
+8. **A change is not running until it is rebuilt and relaunched.**
+9. **A failed correction never pastes over the user's selection.** Rich formatting may fall back to plain text; a completed correction is never dropped just because formatting failed.
+10. **The dashboard never blocks the hotkey.** Log I/O and scans stay off the UI thread, and the first render is one 30-row page.
 
-For full project overview, stack details, and repo map → load `docs/overview.md`.
+## Where things live
 
----
+- `rust/src/` is the app. `runtime.rs` runs a correction (capture, protect, request, post-process, rich mapping, paste); `app.rs` owns the tray, hotkey and lifetime; `dashboard.rs` is the GUI; `http.rs` is WinHTTP; `core.rs` holds the prompt, payload, literal protection and replacements; `rich.rs`, `rich_links.rs` and `docs_native.rs` rebuild formatting; `bench.rs` is the end-to-end harness.
+- `rust/vendor/native-windows-gui/` is a patched dependency; see its `PROVENANCE.md` before touching it.
+- `bench/` holds the frozen cases (`cases.json`), recorded model answers (`replay.json`), the request-size budget (`perf-budget.json`) and `perf.py`.
+- `replacements.json` is the user's brand and casing fixes, applied after the model.
+- `.agents/skills/` holds `deploy`, `read-logs` and `formatting-troubleshoot`.
+- `_archive/` holds retired code kept for history (AHK app, fine-tune tooling). It is not built or maintained.
 
-## 1. Task Routing — load the right doc before acting
+## Docs
 
-| Intent | Read this first |
-|---|---|
-| Project overview, stack, repo map, channel summary | `docs/overview.md` |
-| Native app architecture, tray lifetime, hotkey, loading overlay | `docs/architecture.md` + `rust/AGENTS.md` |
-| Adding app/site-specific formatting rules or Chrome target detection | `.planning/app-site-formatting-customizations.md` |
-| Clipboard formatting fidelity, CF_HTML, preserving bold/links/spacing through a correction | `.planning/rich-text-clipboard-pipeline.md` |
-| Channel separation, hotkey/mutex/path constants, version stamping | `src/BuildChannel.cs` (canonical source) |
-| Editing API payloads, switching models, temperature/reasoning/verbosity | `docs/model-config.md` |
-| Replacements system, prompt-leak guard, JSONL log fields | `docs/replacements-and-logging.md` |
-| Reading, filtering, or analyzing runtime logs | Use the `read-logs` skill — run `python .agents/skills/read-logs/scripts/logs.py --help` for options. Use `--grep-detail <term>` or `--grep-detail field:term` to search inside spellcheck_detail blobs. Never manually parse log files. |
-| Pushing to Dev channel or releasing to Production | Use the `deploy` skill. Always. Do not push or tag manually. |
-| Auto-update flow, Velopack, release pipeline | `rust/src/update.rs` (C# reference: `src/UpdateService.cs`), `.github/workflows/release.yml` |
-| Debugging a bug, verification standards, runtime diagnostics | `docs/debugging-principles.md` |
-| Clipboard/hotkey edge cases, loading overlay checks, cache pitfalls | `docs/watchlist.md` |
-| Naming, style, error-handling, comments, C#/Python conventions | `docs/conventions.md` |
-| Dashboard UI / WPF / colors / fonts / mockups / visual changes | `DESIGN.md` (always, before any visual change) |
-| Working inside the WPF dashboard folder | `src/UI/AGENTS.md` + `DESIGN.md` |
-| Running, building, manual acceptance-testing the native app | `src/AGENTS.md`; Rust candidate: `rust/AGENTS.md` |
-| Python fine-tune dataset tooling, benchmarks, eval runs | `tests/AGENTS.md` |
-| Running the speed bench, comparing optimization variants, bench architecture, correctness gate | `docs/bench.md` |
-| Starting the Rust port, resuming after compaction, or investigating hotkey/clipboard speed after the port | `.planning/rust-port-performance-handoff.md` |
-| Dry-running text through replacements.json without the live app | `python tests/test-replacements.py "<text>"` — also accepts `--run <timestamp>` to replay a log entry, and `--show-skipped` to see rejected variants. |
-| Investigating a reported formatting problem with captured evidence and local replay | `.agents/skills/formatting-troubleshoot/SKILL.md` |
-| Tooling gaps, debugging workflow improvements, log reader / test / dry-run feature ideas | `docs/tooling-gaps.md` |
-| Autonomous speed optimization loop (`/autoopt N`), behavioral contracts, worktree workflow | `docs/autoopt.md` |
-| CI workflows, release tag automation | `.github/workflows/` (read the YAML) |
-| Where to file new docs / when to add vs append / past filing mistakes | `docs/filing-rules.md` |
-| Reviving the legacy AHK fallback | `.archive/ahk-legacy/` |
+Read the matching doc before working in its area:
 
----
+- `docs/architecture.md`: the correction pipeline, threading, clipboard, updates and the dashboard, plus traps that broke before.
+- `docs/formatting.md`: literal protection, replacements, terminal normalization and rich-text (CF_HTML, Google Docs) reconstruction.
+- `docs/logging.md`: the JSONL format, `spellcheck_detail` fields, timings and developer evidence.
+- `docs/testing.md`: the `--bench` harness, the performance gate and how to verify a change.
+- `docs/model-config.md`: models, payloads and API keys.
+- `DESIGN.md` and `PRODUCT.md`: read before any dashboard or visual change.
 
-## 2. Hard Rules (non-negotiable)
+For runtime logs, use the `read-logs` skill (`python .agents/skills/read-logs/scripts/logs.py --help`); never parse log files by hand.
 
-1. **Channels are owned by `BuildChannel`.** Never hardcode a hotkey, mutex name, app-data folder, or display string. Add the constant to `BuildChannel.cs` and consume it.
-2. **Logs are shared, settings are isolated.** `AppPaths.LogDirectory` returns the shared path; `AppDataDirectory` uses `BuildChannel.AppDataFolder`. Do not split logs by channel — the unified corpus is required for fine-tune work, and per-line `channel`/`app_version` stamps are the filter.
-3. **One update flow.** Every entry point (launch, periodic, tray, dashboard) uses the single `Updater` worker in `rust/src/update.rs` (C# reference: `UpdateService.CheckAsync(UpdateTrigger)`). Do not add parallel update paths.
-4. **Releases ship via tag.** A semver `v*.*.*` tag triggers `.github/workflows/release.yml`. Do not run `vpk` manually for production. Before ending a publishing turn, verify every session change is pushed, the Dev app/server is stopped and cleared, and session-created scratch/processes are cleaned up; after CI and release publication succeed, update/restart the local installed Prod app and verify its running version. Follow the `deploy` skill closeout checklist.
-5. **Never mix reasoning + standard params.** Standard GPT uses `temperature`; reasoning models use `reasoning.effort`. See `docs/model-config.md`.
-6. **Debug before fixing.** When root cause is unclear, add logging first, analyze, then fix. No guessing patches.
-7. **Native retests require rebuild/relaunch.** A code change is not running until the process is stopped and rebuilt. Prod owns Ctrl+Alt+U; Dev owns Ctrl+Alt+D — they can run side by side.
-8. **Dashboard startup work must be bounded and yield to WPF.** Never perform log I/O, corpus-wide scans, recursive pagination, or unbounded diff construction on the dispatcher. Initial feed rendering is capped at one 30-entry page; additional pages may load only after a completed layout pass or user scroll. Run `--dashboard-smoke` against a production-sized log corpus after changing dashboard loading or rendering.
-9. **User data never lives in Velopack's install root.** Prod settings, API key, logs, and state live under `%LocalAppData%\UniversalSpellCheck.Data`; `%LocalAppData%\UniversalSpellCheck` is installer-owned and may be replaced during reinstall. Keep migration from the legacy path intact.
+## Verifying
 
----
-
-## 3. Proactive Behavior
-
-- After changes, review diffs for bugs without waiting for the user to ask.
-- When file structure, flow, or config changes, update the relevant `docs/*.md` immediately — do not bloat this file. If it's a new category of content, see `docs/filing-rules.md`.
-- Ask clarifying questions up front when scope is ambiguous (which channel? which model? which commit?).
-
----
-
-## 4. Keeping This File Current
-
-This routing table is only useful if it reflects reality. **Treat doc drift as a bug.**
-
-- When you add/rename/delete a file referenced here, update the routing row in the same change.
-- When a new subsystem, doc, or `AGENTS.md` appears, add a routing row.
-- When a Hard Rule is superseded by code (e.g., a constant moves), update the rule.
-- When the Grounding header no longer matches what the project is doing (channel rename, stack change, new top-of-mind concern), revise it.
-- **Flag drift proactively.** If during any task you notice this file, `docs/*.md`, or any subdir `AGENTS.md` is stale, contradicts the code, or points to something that no longer exists — stop and surface it to the user with a proposed fix. Do not silently work around stale docs.
-- Filing rules for new content live in `docs/filing-rules.md`.
+- `cargo test --manifest-path rust/Cargo.toml` (Dev) and the same with `--no-default-features` (Prod). Add `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` before pushing.
+- Processing changes: run `--transform-json` or `--rich-json` over stdin for a deterministic replay, and extend the existing table tests (`formatting-contracts.jsonl`, `bench/replay.json`) rather than adding new ones.
+- Hot-path changes: build `--release` and run `universal-spell-check.exe --bench`. It takes the foreground for about 10 seconds, so run it on an idle desktop. Compare builds with `python bench/perf.py --base <old.exe> --candidate <new.exe>`.
+- If you change the prompt or payload, run `USC_UPDATE_BUDGET=1 cargo test perf_budget` and expect CI to fail if requests grow. Only Elliot accepts that, with the `perf-regression-accepted` label.
+- After changing docs, structure or config, update the doc that owns the fact in the same change. Don't add a doc when an existing one can own it.
 
 ---
 *Maintenance: this file is a letter — short, intent-only, grown one earned

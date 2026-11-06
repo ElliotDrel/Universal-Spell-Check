@@ -28,26 +28,33 @@ The tray icon menu has version info, "Check for Updates", "Open Dashboard", and 
 ## Repo layout
 
 ```
-rust/                      # The product — native Rust tray app and dashboard
-src/                       # Frozen C# reference; BuildChannel.cs remains canonical
-.github/workflows/         # Tag-triggered Velopack release pipeline
-replacements.json          # Brand/casing post-processing rules
-docs/                      # Architecture, conventions, debugging notes
-.archive/ahk-legacy/       # The original AutoHotkey implementation (history)
-tests/                     # Native tests plus Python fine-tune and benchmark tooling
+rust/                 # The app: native Rust tray, correction pipeline and dashboard
+bench/                # End-to-end bench cases, recorded answers, perf budget, compare script
+docs/                 # Architecture, formatting, logging, testing, model config
+replacements.json     # Brand and casing fixes applied after the model
+.agents/skills/       # Agent workflows: deploy, read-logs, formatting-troubleshoot
+.github/workflows/    # CI with performance gates, tag-triggered release
+_archive/             # Retired AHK app and fine-tune tooling (history only)
 ```
 
 ## Development
 
 ```powershell
-# Run a Dev build alongside the installed Prod app (Ctrl+Alt+D, separate settings)
+# Dev build alongside the installed Prod app (Ctrl+Alt+D, separate settings)
 cargo run --manifest-path rust/Cargo.toml --release
 
-# Build a release-style local artifact
+# Tests for both channels
+cargo test --manifest-path rust/Cargo.toml
+cargo test --manifest-path rust/Cargo.toml --no-default-features
+
+# End-to-end bench: real hotkey, copy, correction and paste into a test editor
+rust/target/release/universal-spell-check.exe --bench
+
+# Release-style local folder
 ./rust/package.ps1 -Output rust/dist/prod
 ```
 
-Prod and Dev settings are isolated (`%LocalAppData%\UniversalSpellCheck.Data\` vs `%LocalAppData%\UniversalSpellCheck.Dev\`). Logs are intentionally unified at `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl` with per-line `channel`, `app_version`, and `pid` stamps. `%LocalAppData%\UniversalSpellCheck\` is reserved for Velopack installation files.
+Prod and Dev settings are isolated (`%LocalAppData%\UniversalSpellCheck.Data\` vs `%LocalAppData%\UniversalSpellCheck.Dev\`). Logs are unified at `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-{date}.jsonl` with per-line `channel`, `app_version` and `pid` stamps. `%LocalAppData%\UniversalSpellCheck\` is reserved for Velopack installation files. See `docs/testing.md` for the bench and the CI performance gate.
 
 ## Release
 
@@ -57,4 +64,4 @@ Rust releases retain the existing package ID, `UniversalSpellCheck.exe` name, in
 
 ## License
 
-Personal project. No license declared.
+MIT. See [LICENSE](LICENSE).

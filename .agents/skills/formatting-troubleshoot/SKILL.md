@@ -7,7 +7,7 @@ description: Diagnose and fix Universal Spell Check clipboard and paste formatti
 
 Turn Elliot's brief formatting report into a reproduced, verified fix with as little repeated work from him as possible.
 
-Work in the Universal Spell Check repository. On Elliot's laptop, the primary checkout is `C:\Users\2supe\All Coding\Universal Spell Check`. Read its `AGENTS.md`; the mechanics live in the repository's `read-logs` skill, `docs/debugging-principles.md` (Local formatting replay), and `docs/replacements-and-logging.md` (Optional developer evidence).
+Work in the Universal Spell Check repository. On Elliot's laptop, the primary checkout is `C:\Users\2supe\All Coding\Universal-Spell-Check\Universal-Spell-Check`. Read its `AGENTS.md`; the mechanics live in the repository's `read-logs` skill (local replay), `docs/formatting.md` (the rich-text paths) and `docs/logging.md` (developer evidence).
 
 ## Required outcomes
 

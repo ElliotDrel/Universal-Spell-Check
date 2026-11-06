@@ -5,7 +5,7 @@ Ship a production release by pushing a semver tag to origin. This triggers
 → GitHub Release created. All installed prod copies auto-update via Velopack.
 
 For pipeline details, read `.github/workflows/release.yml`. For version constants
-read `rust/Cargo.toml`; channel constants remain in `src/BuildChannel.cs`.
+read `rust/Cargo.toml`; channel constants live in `rust/src/channel.rs`.
 
 **This is irreversible.** A pushed tag immediately starts the CI pipeline and
 creates a public GitHub Release. A clear user request to publish, release, or

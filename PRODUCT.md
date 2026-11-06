@@ -8,7 +8,7 @@
 
 A Windows-wide AI spell checker that lives in the system tray. The user selects text in any app, presses a global hotkey, and the selection is replaced in place with a corrected version.
 
-The **WPF dashboard** is the secondary surface: opened from the tray, it lets the user verify what the AI has been doing, manage the API key, edit custom replacements, and configure runtime behavior.
+The **dashboard** is the secondary surface: opened from the tray, it lets the user verify what the AI has been doing, manage the API key, edit custom replacements, and configure runtime behavior.
 
 The hotkey is the product. The dashboard exists to make the hotkey trustworthy.
 

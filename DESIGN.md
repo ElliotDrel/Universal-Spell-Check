@@ -1,6 +1,6 @@
 # Design System — Universal Spell Check (Native Dashboard)
 
-> **Scope:** This spec covers the WPF dashboard window for the native C#/.NET tray app under `src/`. The AHK production script (Universal Spell Checker.ahk) is archived and unaffected. The dashboard opens from the tray icon and provides an activity feed, settings, and (later) deeper analytics.
+> **Scope:** This spec covers the native dashboard window of the Rust tray app (`rust/src/dashboard.rs`, native Win32 controls via `native-windows-gui`). It opens from the tray icon and provides an activity feed, settings, and (later) deeper analytics.
 
 ## Product Context
 
@@ -9,15 +9,9 @@
 - **Project type:** Windows-native dashboard window inside an existing tray app.
 - **Memorable thing:** "This is serious software." Editorial typography signals craft. The dashboard should feel like a tool a power user respects — not a SaaS template.
 
-## Approved Mockups
+## Mockups
 
-| Screen | Status | File |
-|---|---|---|
-| Home (Activity feed) | Approved | `docs/design-mockups/home.png` |
-| Settings | Approved | `docs/design-mockups/settings.png` |
-| Insights (deferred to v2) | Reference only | `docs/design-mockups/insights-deferred.png` |
-
-Generated via gstack `/design-consultation`. Originals at `~/.gstack/projects/ElliotDrel-Universal-Spell-Check/designs/design-system-20260427/`.
+The original April 2026 mockups (Home, Settings, deferred Insights) were removed from the tree on 2026-11-06 and remain in git history. This spec is the layout authority.
 
 ## Aesthetic Direction
 
@@ -59,7 +53,7 @@ Generated via gstack `/design-consultation`. Originals at `~/.gstack/projects/El
 | Caption | Instrument Sans | Regular | 11px | Stat labels under numbers |
 | Mono | JetBrains Mono | Regular | 12px | Activity feed timestamps, hotkey chips, file paths, diff content |
 
-**Font sourcing:** Instrument Serif, Instrument Sans, JetBrains Mono are all OFL-licensed via Google Fonts. Bundle as embedded resources under `src/UI/Fonts/`. Do **not** rely on Google Fonts CDN — desktop apps should be offline-capable.
+**Font sourcing:** Instrument Serif, Instrument Sans, JetBrains Mono are all OFL-licensed via Google Fonts. They are bundled in `rust/assets/` and loaded from embedded memory. Do **not** download fonts at runtime — the app must work offline.
 
 ## Spacing
 
@@ -176,16 +170,14 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 **Layout (top to bottom):**
 1. Page header row (`Activity` + Refresh)
 2. All-time stats bar (four columns — see Stats bar above)
-3. Scrollable feed (`SmoothScrollViewer`, scrollbar hidden): day-grouped rows, infinite scroll
+3. Scrollable feed (scrollbar hidden): day-grouped rows, infinite scroll
 
 **Feed behavior:**
 - Reads the shared log corpus: `%LocalAppData%\UniversalSpellCheck.Data\logs\spellcheck-*.jsonl`
 - Newest successful `spellcheck_detail` entries first; **30 entries per page**; loads older pages when scrolled near the bottom (~120px) or when content does not fill the viewport
-- Trackpad: smooth per-frame scroll (`SmoothScrollViewer`); mouse wheel: native WPF scroll
+- Wheel input from child controls is forwarded to the feed so scrolling works anywhere over it
 
 **Empty state:** Centered `BodyMuted`: “No spell checks yet. Press your hotkey to get started.” Stats still show zeros / em dash.
-
-**Mockup note:** `docs/design-mockups/home.png` is the original two-column reference (tone, cream, typography). The shipped layout is a flat Wispr Flow–style feed with a top stats bar — treat this spec as the layout authority.
 
 ### Settings
 **Layout:** Page header "Settings" (Instrument Serif 32px) → vertical stack of section cards:
@@ -198,7 +190,7 @@ Sidebar nav label remains **Home**; page title is **Activity** (Instrument Serif
 6. **Logs** — developer logging toggle (off by default), short local capture description, log path in Mono + "Open folder" ghost button
 
 ### Insights (deferred to v2)
-Mockup at `docs/design-mockups/insights-deferred.png`. Shows: 4 stat cards top row, 30-day usage bar chart, model performance table, top corrections list. Build only after the activity feed proves valuable enough to warrant deeper analytics.
+The mockup (in git history) shows: 4 stat cards top row, 30-day usage bar chart, model performance table, top corrections list. Build only after the activity feed proves valuable enough to warrant deeper analytics.
 
 ## SAFE choices (category baseline)
 - Sidebar nav with icon + label
@@ -210,55 +202,21 @@ Mockup at `docs/design-mockups/insights-deferred.png`. Shows: 4 stat cards top r
 - **Cream over Mica gray** — Windows defaults to flat white or system Mica. Cream is warmer. Cost: stands apart from the OS chrome. Gain: instantly identifiable as this app.
 - **JetBrains Mono for timestamps only** — body font everywhere else. Cost: extra bundled font. Gain: log feels like a real log file.
 
-## Implementation Notes (WPF)
+## Implementation notes
 
-### csproj setup
-`src/UniversalSpellCheck.csproj` enables both `<UseWindowsForms>true</UseWindowsForms>` (tray, hotkey, loading overlay) and `<UseWPF>true</UseWPF>` (dashboard). Mixed mode is supported in .NET on Windows.
-
-### File layout
-```
-src/UI/
-├── Styles.xaml              # Design tokens (colors, brushes, fonts, type styles)
-├── Components.xaml          # Card, buttons, IconButton, HoverTextButton, nav styles
-├── SmoothScrollViewer.cs    # Trackpad smooth scroll; hidden vertical scrollbar
-├── InlineTextDiff.cs        # Line + character diff for feed rendering
-├── FeedActionIcons.cs       # Outline copy / check / more-vertical vectors
-├── MainWindow.xaml          # Shell: sidebar + Frame content host + update banner
-├── MainWindow.xaml.cs
-└── Pages/
-    ├── ActivityPage.xaml    # Stats bar + paginated feed
-    ├── ActivityPage.xaml.cs # NativeActivityLogReader + row builders
-    ├── SettingsPage.xaml
-    └── SettingsPage.xaml.cs
-```
-
-Bundled fonts live under `src/UI/Fonts/` (Instrument Serif/Sans, JetBrains Mono). See `src/UI/AGENTS.md` for font verification steps.
-
-### Wiring into existing tray app
-`SpellCheckAppContext.cs` opens the WPF `MainWindow` from the tray's `Open Dashboard` menu item. The WPF window's lifecycle is owned by the tray context; quit disposes it with the tray app.
-
-The WinForms `LoadingOverlayForm` (bottom-of-screen progress overlay) stays as-is — it's transient and the WinForms implementation is already correct.
-
-### Data binding (Activity)
-`ActivityPage` uses `NativeActivityLogReader` in `ActivityPage.xaml.cs` (not MVVM binding):
-
-- **Feed:** `ReadEntries(pageSize, cursor)` walks daily `spellcheck-*.jsonl` files newest-first (newest line in each file first). Cursor tracks file index + line index. Page size = 30.
-- **Stats:** `ReadAllTimeStats()` scans all log files on a worker thread for successful runs (`status=success`); accuracy = corrections / checks; day streak from calendar days with at least one success.
-- **Responsiveness:** log I/O never runs on the WPF dispatcher. Initial rendering is one page; viewport fill is measured after layout and loads at most one page per dispatcher turn. Hidden side-by-side diffs are created lazily, and diff matrix size is capped for unusually large text.
-- **Refresh:** clears `FeedItems` only (preserves empty state + loading indicator hosts); reloads stats + first page.
-- No file watcher — user refreshes or scrolls to load more. Dashboard is not the hot path.
-
-Settings manages named API keys and the selected model through `SettingsStore`, exposes update status and the shared manual update check, opens the log folder, and opens `replacements.json`. Hotkey capture remains deferred.
+- The dashboard runs on its own native UI thread so rendering and log reads never delay the hotkey (`docs/architecture.md`).
+- Feed: newest successful `spellcheck_detail` entries first, 30 rows before background statistics, more on scroll. Text previews are bounded; copying a row copies the full output.
+- Diffs: inline character diff by default. Side-by-side uses separate native rich-edit controls, created only when selected and reset before reuse. Append styled text with `EM_REPLACESEL`, never NWG's append, which replaces all text and erases earlier styles.
+- Minimum window size is 900×600 logical pixels, scaled to the active DPI.
 
 ### Testing the design
-After visual changes, verify in this order:
-1. Open **Home** — flat feed, top stats bar, **Activity** header (not two-column mockup layout).
-2. Cream `Canvas` — not gray or pure white.
-3. Instrument Serif/Sans loaded (no Cambria/Segoe fallback for headers).
-4. Inline diff readable — muted red/green, not saturated.
-5. Hover: row ghost background + copy/⋮ icons appear.
-6. Scroll to bottom — spinner + older entries; **Refresh** — feed reloads and pagination still works.
-7. Compare tone to `docs/design-mockups/home.png` and `settings.png` where layout still applies.
+After visual changes, verify in a Dev build (`cargo build --release`, then launch with `--dashboard`):
+1. **Home** shows the flat feed with the top stats bar and the **Activity** header.
+2. The canvas is cream, not gray or pure white.
+3. Instrument Serif/Sans are loaded (no Cambria/Segoe fallback for headers).
+4. The inline diff is readable: muted red/green, not saturated.
+5. Scrolling to the bottom loads older entries; refresh reloads and pagination still works.
+6. Ctrl+Alt+D still corrects text while the dashboard is open.
 
 ## Decisions Log
 
@@ -272,9 +230,10 @@ After visual changes, verify in this order:
 | 2026-05-27 | Flat Activity feed + all-time stats bar | Wispr Flow–style layout: no feed card, inline char diff, hover actions, paginated infinite scroll (30/page), `SmoothScrollViewer` for trackpad. Mockup `home.png` remains tone reference only. |
 | 2026-05-27 | Inline diff replaces stacked +/- rows | Character-level highlights within lines; side-by-side view optional per row via ⋮ menu. |
 | 2026-07-05 | Activity rows expose persisted timing telemetry | A hover clock lazily expands the clipboard, AI request, post-processing, paste, and total durations without adding hot-path work. |
+| 2026-10-18 | Native Rust dashboard replaces WPF | The Rust port shipped native Win32 controls on a dedicated UI thread; the C# app was retired on 2026-11-06. The visual system above is unchanged. |
 
 ## App identity
 
-The app mark combines a white lowercase a and checkmark on a rounded square: forest green for Prod, golden yellow for Dev. Source PNGs and multi-resolution Windows ICOs live in `src/Assets/`. The same channel mark appears in the tray, dashboard title/taskbar, sidebar, executable, and packaged Windows shortcuts. The prior generic Windows icon and runtime orange overlay are superseded.
+The app mark combines a white lowercase a and checkmark on a rounded square: forest green for Prod, golden yellow for Dev. Source PNGs and multi-resolution Windows ICOs live in `rust/assets/`. The same channel mark appears in the tray, dashboard title/taskbar, sidebar, executable, and packaged Windows shortcuts. The prior generic Windows icon and runtime orange overlay are superseded.
 
-Prod uses Elliot's corrected logo-no-outline.png, moved from Downloads to src/Assets/logo.png on 2026-10-11. It supersedes the generated green image and its background-removal variants. The PNG is preserved unchanged; its Windows ICO uses transparent square padding to preserve the artwork's aspect ratio. Dev retains the approved yellow PNG and ICO unchanged. Both ICOs contain 16, 20, 24, 32, 48, 64, 128, and 256 pixel sizes.
+Prod uses Elliot's corrected logo-no-outline.png, moved from Downloads to `src/Assets/logo.png` on 2026-10-11 and to `rust/assets/logo.png` on 2026-11-06. It supersedes the generated green image and its background-removal variants. The PNG is preserved unchanged; its Windows ICO uses transparent square padding to preserve the artwork's aspect ratio. Dev retains the approved yellow PNG and ICO unchanged. Both ICOs contain 16, 20, 24, 32, 48, 64, 128, and 256 pixel sizes.
