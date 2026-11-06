@@ -61,6 +61,13 @@ corrupted text.
 
 ## Replacements system
 
+Rust post-processing restores each source line's trailing ASCII spaces/tabs when
+the model returns the same number of lines. This prevents the model adding Markdown
+hard-break spaces (seen on list lines) while preserving intentional source spacing,
+CRLF and protected literals. A changed line count is left to existing structure
+guards. The historical rich-list capture in `bench/records/` is unchanged;
+`bench/fixtures/correction-contract-overrides.json` records the corrected expectation.
+
 `replacements.json` lives at the repo root and is copied next to the exe at publish time via a `<None Include>` itemgroup in the csproj. `AppPaths.ReplacementsPath` finds it by walking up from `AppContext.BaseDirectory` until the file is found — works for both dev checkout (`src/bin/...` walks up to repo root) and Velopack-installed prod (found on the first try, next to the exe).
 
 Format — canonical key maps to an array of variants to replace:
