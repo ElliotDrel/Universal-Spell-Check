@@ -14,7 +14,6 @@ use std::{
     thread,
     time::Duration,
 };
-#[cfg(not(feature = "acceptance"))]
 use velopack::sources::GithubSource;
 use velopack::{UpdateCheck, UpdateInfo, UpdateManager};
 #[derive(Clone, Copy, Debug)]
@@ -121,22 +120,6 @@ impl Updater {
     }
 }
 fn new_manager() -> Result<UpdateManager, velopack::Error> {
-    #[cfg(feature = "acceptance")]
-    {
-        crate::acceptance::validate().map_err(velopack::Error::Other)?;
-        let locator = velopack::locator::auto_locate_app_manifest(
-            velopack::locator::LocationContext::FromCurrentExe,
-        )?;
-        crate::acceptance::validate_install(&locator).map_err(velopack::Error::Other)?;
-        UpdateManager::new(
-            velopack::sources::FileSource::new(
-                std::path::Path::new(channel::ACCEPTANCE_ROOT).join("feed"),
-            ),
-            None,
-            None,
-        )
-    }
-    #[cfg(not(feature = "acceptance"))]
     UpdateManager::new(
         GithubSource::new(
             "https://github.com/ElliotDrel/Universal-Spell-Check",

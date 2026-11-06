@@ -827,8 +827,8 @@ mod golden_tests {
     use base64::Engine;
     use serde_json::{Value, json};
     #[test]
-    fn original_csharp_formatting_contracts() {
-        for (index, line) in include_str!("../tests/fixtures/csharp-formatting.jsonl")
+    fn formatting_contracts() {
+        for (index, line) in include_str!("../tests/fixtures/formatting-contracts.jsonl")
             .lines()
             .enumerate()
         {

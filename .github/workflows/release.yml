@@ -73,7 +73,7 @@ jobs:
             --packTitle "Universal Spell Check" `
             --runtime win-x64 `
             --channel win `
-            --icon src/Assets/app.ico
+            --icon rust/assets/app.ico
 
       - name: Verify fresh installer before publication
         shell: pwsh

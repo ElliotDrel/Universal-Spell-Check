@@ -1,6 +1,4 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#[cfg(feature = "acceptance")]
-mod acceptance;
 mod activity;
 mod app;
 mod benchmark;
@@ -29,11 +27,6 @@ mod timing;
 mod update;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    #[cfg(feature = "acceptance")]
-    if let Err(error) = acceptance::validate() {
-        eprintln!("Acceptance isolation rejected: {error}");
-        std::process::exit(1);
-    }
     let application_mode = !args.get(1).is_some_and(|arg| {
         matches!(
             arg.as_str(),
