@@ -198,7 +198,15 @@ impl Replacements {
 fn preserve_line_end_spacing(source: &str, corrected: &str) -> String {
     let source: Vec<_> = source.split('\n').collect();
     let corrected: Vec<_> = corrected.split('\n').collect();
-    if source.len() != corrected.len() {
+    // Index pairing is trusted only when blank lines stay in place; a shifted blank
+    // line means lines moved, so leave the model's spacing untouched.
+    let blank = |line: &str| line.trim_matches([' ', '\t', '\r']).is_empty();
+    if source.len() != corrected.len()
+        || source
+            .iter()
+            .zip(&corrected)
+            .any(|(s, c)| blank(s) != blank(c))
+    {
         return corrected.join("\n");
     }
     source
@@ -334,6 +342,10 @@ mod tests {
     #[test]
     fn spacing_restoration_does_not_mask_changed_line_count_or_literals() {
         assert_eq!(preserve_line_end_spacing("a\nb", "a  \nb\nc"), "a  \nb\nc");
+        assert_eq!(
+            preserve_line_end_spacing("a  \n\nb", "a\nb\t\n"),
+            "a\nb\t\n"
+        );
         let protection = Protection::new("teh https://example.com/Path  \nnext").unwrap();
         let raw = protection
             .text
