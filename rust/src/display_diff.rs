@@ -149,9 +149,14 @@ fn flush(out: &mut Vec<Edit>, removed: &mut Vec<&Token<'_>>, added: &mut Vec<&To
             added.clear();
             return;
         }
-        if old.word && new.word && old.prefix == new.prefix && small_typo(old.core, new.core) {
+        if old.prefix == new.prefix {
             push(out, Kind::Equal, old.prefix);
-            push_character_edits(out, old.core, new.core);
+            if old.word && new.word && small_typo(old.core, new.core) {
+                push_character_edits(out, old.core, new.core);
+            } else {
+                push(out, Kind::Delete, old.core);
+                push(out, Kind::Insert, new.core);
+            }
             removed.clear();
             added.clear();
             return;
