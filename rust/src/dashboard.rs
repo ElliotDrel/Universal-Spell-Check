@@ -1,7 +1,8 @@
 use crate::{
     activity::{self, Entry, Reader, Stats},
     clipboard,
-    diff::{Kind, diff},
+    diff::Kind,
+    display_diff::display_diff,
     platform,
     runtime::Worker,
     store::{Store, mask},
@@ -676,10 +677,7 @@ fn render_row(row: &mut Row) {
         if let Some(second) = &row.secondary {
             reset_text(second);
             append_text(second, "CORRECTED\r\n");
-            for edit in diff(
-                &input.encode_utf16().collect::<Vec<_>>(),
-                &output.encode_utf16().collect::<Vec<_>>(),
-            ) {
+            for edit in display_diff(input, output) {
                 let text = String::from_utf16_lossy(&edit.text);
                 if edit.kind != Kind::Insert {
                     append_segment(&row.body, &text, edit.kind);
@@ -690,10 +688,7 @@ fn render_row(row: &mut Row) {
             }
         }
     } else {
-        for edit in diff(
-            &input.encode_utf16().collect::<Vec<_>>(),
-            &output.encode_utf16().collect::<Vec<_>>(),
-        ) {
+        for edit in display_diff(input, output) {
             append_segment(&row.body, &String::from_utf16_lossy(&edit.text), edit.kind);
         }
     }

@@ -125,12 +125,12 @@ Flat list on the canvas (no card wrapper). One row per successful `spellcheck_de
 ```
 
 - **Metadata column:** timestamp in JetBrains Mono 12px (`MonoSmall`) with the exact model ID beneath it in Caption text; max width 96px, top-aligned
-- **Diff body:** character-level inline diff on changed lines (strikethrough + `DiffMinus*` for deletions, green insert for additions); unchanged lines render plain. Rows with `text_changed: false` show output text only.
+- **Diff body:** word-aware Myers inline diff, with character refinement for small typos and whitespace-only edits (strikethrough + `DiffMinus*` for deletions, green insert for additions); unchanged text renders plain. Rows with `text_changed: false` show output text only.
 - **Actions:** outline copy, timing clock, and vertical-dots icons (`FeedActionIcons`); **opacity 0 until row hover**; row background `HoverGhost` on hover
 - **Original text:** changed rows expose **See original** in the existing `⋮` diff-options menu, alongside inline and side-by-side views. It replaces the displayed diff in place with the uncorrected source and an `ORIGINAL TEXT - NOT SPELL-CHECKED` marker. The row's copy icon, copy tooltip, and click-to-copy body all target that original text until **See corrected** restores the normal view.
 - **Copy:** click diff body or copy icon → clipboard gets the text currently shown; copy icon shows checkmark for 1.5s on success
 - **Timing clock:** shown when the log entry contains timing telemetry; toggles a compact breakdown panel beneath the diff with clipboard, AI request phases, post-processing, paste, and total duration
-- **⋮ menu** (only when `text_changed`): choose **Inline diff**, **Side by side** (per-line char highlights in split columns), or **See original**
+- **⋮ menu** (only when `text_changed`): choose **Inline diff**, **Side by side** (matching word-aware highlights in split columns), or **See original**
 - Hairline `Border` divider under each row
 
 Legacy GitHub-style stacked `-` / `+` lines are superseded by inline diff; keep minus/plus *colors* for delete/insert segments.
@@ -206,7 +206,7 @@ The mockup (in git history) shows: 4 stat cards top row, 30-day usage bar chart,
 
 - The dashboard runs on its own native UI thread so rendering and log reads never delay the hotkey (`docs/architecture.md`).
 - Feed: newest successful `spellcheck_detail` entries first, 30 rows before background statistics, more on scroll. Text previews are bounded; copying a row copies the full output.
-- Diffs: inline character diff by default. Side-by-side uses separate native rich-edit controls, created only when selected and reset before reuse. Append styled text with `EM_REPLACESEL`, never NWG's append, which replaces all text and erases earlier styles.
+- Diffs: the Activity feed uses bounded Myers on Unicode-aware words and punctuation, refining only small typos and whitespace changes. This display-only diff is separate from exact UTF-16 formatting alignment. Side-by-side uses separate native rich-edit controls, created only when selected and reset before reuse. Append styled text with `EM_REPLACESEL`, never NWG's append, which replaces all text and erases earlier styles.
 - Minimum window size is 900×600 logical pixels, scaled to the active DPI.
 
 ### Testing the design

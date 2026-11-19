@@ -22,36 +22,6 @@ fn push(out: &mut Vec<Edit>, kind: Kind, text: &[u16]) {
         });
     }
 }
-pub fn diff(source: &[u16], target: &[u16]) -> Vec<Edit> {
-    try_diff(source, target).unwrap_or_else(|| {
-        let mut out = Vec::new();
-        let prefix = source
-            .iter()
-            .zip(target)
-            .take_while(|(a, b)| a == b)
-            .count();
-        let suffix = source[prefix..]
-            .iter()
-            .rev()
-            .zip(target[prefix..].iter().rev())
-            .take_while(|(a, b)| a == b)
-            .count();
-        push(&mut out, Kind::Equal, &source[..prefix]);
-        push(
-            &mut out,
-            Kind::Delete,
-            &source[prefix..source.len() - suffix],
-        );
-        push(
-            &mut out,
-            Kind::Insert,
-            &target[prefix..target.len() - suffix],
-        );
-        push(&mut out, Kind::Equal, &source[source.len() - suffix..]);
-        out
-    })
-}
-
 // Rich-text consumers must distinguish a bounded refusal from a precise edit map.
 pub fn try_diff(source: &[u16], target: &[u16]) -> Option<Vec<Edit>> {
     let mut prefix = 0;
@@ -138,7 +108,7 @@ fn line_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
     Some(out)
 }
 
-fn sparse_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
+pub(crate) fn sparse_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
     const MAX_EDITS: usize = 256;
     const MAX_WORK: usize = 2_000_000;
     let limit = MAX_EDITS.min(a.len() + b.len());
@@ -324,6 +294,5 @@ mod tests {
         let a = vec![97; 5000];
         let b = vec![98; 5000];
         assert!(try_diff(&a, &b).is_none());
-        check(&a, &b, &diff(&a, &b));
     }
 }
