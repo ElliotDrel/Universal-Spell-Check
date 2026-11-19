@@ -140,11 +140,7 @@ fn small_typo(before: &str, after: &str) -> bool {
     previous[b.len()] <= if min_len >= 6 { 2 } else { 1 }
 }
 
-fn flush(
-    out: &mut Vec<Edit>,
-    removed: &mut Vec<&Token<'_>>,
-    added: &mut Vec<&Token<'_>>,
-) {
+fn flush(out: &mut Vec<Edit>, removed: &mut Vec<&Token<'_>>, added: &mut Vec<&Token<'_>>) {
     if removed.len() == 1 && added.len() == 1 {
         let old = removed[0];
         let new = added[0];
@@ -327,7 +323,10 @@ mod tests {
     #[test]
     fn repeated_words_and_newlines_are_lossless() {
         check("the the the\nwhat what", "the that the\nwhat?");
-        check("First line\n\nSecond line", "First line\n\nBetter second line");
+        check(
+            "First line\n\nSecond line",
+            "First line\n\nBetter second line",
+        );
         check(" no change ", " no change ");
         check("", "some words");
         check("some words", "");
