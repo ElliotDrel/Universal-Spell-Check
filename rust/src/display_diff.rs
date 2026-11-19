@@ -2,6 +2,7 @@
 //! Never use these edits for rich-text style or Google Docs position mapping.
 use crate::diff::{self, Edit, Kind};
 use std::collections::HashMap;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Copy)]
 struct Token<'a> {
@@ -11,29 +12,26 @@ struct Token<'a> {
     word: bool,
 }
 
-fn word_char(ch: char) -> bool {
-    ch.is_alphanumeric()
-        || ch == '_'
-        || matches!(
-            ch,
-            '\u{0300}'..='\u{036f}'
-                | '\u{1ab0}'..='\u{1aff}'
-                | '\u{1dc0}'..='\u{1dff}'
-                | '\u{20d0}'..='\u{20ff}'
-                | '\u{fe20}'..='\u{fe2f}'
-        )
+fn word_grapheme(grapheme: &str) -> bool {
+    grapheme
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
 }
 
-// Attach leading whitespace to the next word or punctuation mark.
-// Whitespace must not become a cheap Myers anchor between unrelated words.
+// Split on extended grapheme clusters, so an emoji ZWJ sequence, combining
+// mark, skin tone or flag is highlighted as one visible symbol.
 fn tokenize(input: &str) -> Vec<Token<'_>> {
-    let mut chars = input.char_indices().peekable();
+    let mut graphemes = input.grapheme_indices(true).peekable();
     let mut tokens = Vec::new();
-    while let Some(&(start, _)) = chars.peek() {
-        while chars.peek().is_some_and(|(_, ch)| ch.is_whitespace()) {
-            chars.next();
+    while let Some(&(start, _)) = graphemes.peek() {
+        while graphemes
+            .peek()
+            .is_some_and(|(_, g)| g.chars().all(char::is_whitespace))
+        {
+            graphemes.next();
         }
-        let Some(&(core_start, first)) = chars.peek() else {
+        let Some(&(core_start, first)) = graphemes.peek() else {
             tokens.push(Token {
                 full: &input[start..],
                 prefix: &input[start..],
@@ -42,21 +40,21 @@ fn tokenize(input: &str) -> Vec<Token<'_>> {
             });
             break;
         };
-        chars.next();
-        let word = word_char(first);
-        let mut end = core_start + first.len_utf8();
+        graphemes.next();
+        let word = word_grapheme(first);
+        let mut end = core_start + first.len();
         if word {
-            while let Some(&(at, ch)) = chars.peek() {
-                let internal_apostrophe = matches!(ch, '\'' | '’')
-                    && input[at + ch.len_utf8()..]
-                        .chars()
+            while let Some(&(at, g)) = graphemes.peek() {
+                let internal_apostrophe = matches!(g, "'" | "’")
+                    && input[at + g.len()..]
+                        .graphemes(true)
                         .next()
-                        .is_some_and(word_char);
-                if !word_char(ch) && !internal_apostrophe {
+                        .is_some_and(word_grapheme);
+                if !word_grapheme(g) && !internal_apostrophe {
                     break;
                 }
-                chars.next();
-                end = at + ch.len_utf8();
+                graphemes.next();
+                end = at + g.len();
             }
         }
         tokens.push(Token {
@@ -330,6 +328,17 @@ mod tests {
         check(" no change ", " no change ");
         check("", "some words");
         check("some words", "");
+    }
+
+    #[test]
+    fn joined_emoji_and_flags_are_atomic_highlights() {
+        let edits = check("Engineer 👩‍💻 says hi", "Engineer 👨‍💻 says hi");
+        assert_eq!(rendered(&edits, &[Kind::Delete]), "👩‍💻");
+        assert_eq!(rendered(&edits, &[Kind::Insert]), "👨‍💻");
+        assert_eq!(rendered(&edits, &[Kind::Equal]), "Engineer  says hi");
+        let edits = check("🇺🇸 👍🏻", "🇨🇦 👍🏽");
+        assert_eq!(rendered(&edits, &[Kind::Delete]), "🇺🇸 👍🏻");
+        assert_eq!(rendered(&edits, &[Kind::Insert]), "🇨🇦 👍🏽");
     }
 
     #[test]
