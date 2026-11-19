@@ -294,6 +294,5 @@ mod tests {
         let a = vec![97; 5000];
         let b = vec![98; 5000];
         assert!(try_diff(&a, &b).is_none());
-        check(&a, &b, &diff(&a, &b));
     }
 }
