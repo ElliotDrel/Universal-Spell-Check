@@ -138,7 +138,7 @@ fn line_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
     Some(out)
 }
 
-fn sparse_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
+pub(crate) fn sparse_diff(a: &[u16], b: &[u16]) -> Option<Vec<Edit>> {
     const MAX_EDITS: usize = 256;
     const MAX_WORK: usize = 2_000_000;
     let limit = MAX_EDITS.min(a.len() + b.len());
