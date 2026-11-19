@@ -8,6 +8,7 @@ mod clipboard;
 mod core;
 mod dashboard;
 mod diff;
+mod display_diff;
 mod docs_native;
 mod evidence;
 mod evidence_storage;
