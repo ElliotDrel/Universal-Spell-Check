@@ -81,32 +81,68 @@ fn push(out: &mut Vec<Edit>, kind: Kind, text: &str) {
     }
 }
 
-fn push_character_edits(out: &mut Vec<Edit>, before: &str, after: &str) {
-    let a: Vec<_> = before.encode_utf16().collect();
-    let b: Vec<_> = after.encode_utf16().collect();
-    for edit in diff::diff(&a, &b) {
-        if let Some(last) = out.last_mut().filter(|last| last.kind == edit.kind) {
-            last.text.extend(edit.text);
-        } else {
-            out.push(edit);
+// Refinement is grapheme-aware too: slicing UTF-16 units independently can
+// produce invalid halves of emoji or other multi-scalar visible symbols.
+fn push_grapheme_edits(out: &mut Vec<Edit>, before: &str, after: &str) {
+    if before == after {
+        push(out, Kind::Equal, before);
+        return;
+    }
+    let old: Vec<_> = before.graphemes(true).collect();
+    let new: Vec<_> = after.graphemes(true).collect();
+    let mut ids = HashMap::new();
+    for grapheme in old.iter().chain(&new) {
+        let Ok(id) = u16::try_from(ids.len()) else {
+            push(out, Kind::Delete, before);
+            push(out, Kind::Insert, after);
+            return;
+        };
+        ids.entry(*grapheme).or_insert(id);
+    }
+    let a: Vec<_> = old.iter().map(|g| ids[g]).collect();
+    let b: Vec<_> = new.iter().map(|g| ids[g]).collect();
+    if let Some(steps) = diff::sparse_diff(&a, &b) {
+        let (mut i, mut j) = (0, 0);
+        for step in steps {
+            for _ in step.text {
+                match step.kind {
+                    Kind::Equal => {
+                        push(out, Kind::Equal, old[i]);
+                        i += 1;
+                        j += 1;
+                    }
+                    Kind::Delete => {
+                        push(out, Kind::Delete, old[i]);
+                        i += 1;
+                    }
+                    Kind::Insert => {
+                        push(out, Kind::Insert, new[j]);
+                        j += 1;
+                    }
+                }
+            }
         }
+        debug_assert_eq!(i, old.len());
+        debug_assert_eq!(j, new.len());
+    } else {
+        push(out, Kind::Delete, before);
+        push(out, Kind::Insert, after);
     }
 }
 
-// A one- or two-character typo is worth refining. Unrelated replacement words
-// stay intact, even if an LCS algorithm happens to match some internal letters.
+// A one- or two-grapheme typo is worth refining; unrelated words remain whole.
 fn small_typo(before: &str, after: &str) -> bool {
-    if !before.is_ascii() || !after.is_ascii() || before == after {
+    if before == after {
         return false;
     }
-    let a = before.as_bytes();
-    let b = after.as_bytes();
+    let a: Vec<_> = before.graphemes(true).collect();
+    let b: Vec<_> = after.graphemes(true).collect();
     if a.is_empty() || b.is_empty() || a.len().max(b.len()) > 48 || a.len().abs_diff(b.len()) > 2 {
         return false;
     }
     let mismatches: Vec<_> = if a.len() == b.len() {
         a.iter()
-            .zip(b)
+            .zip(&b)
             .enumerate()
             .filter_map(|(i, (x, y))| (x != y).then_some(i))
             .collect()
@@ -138,29 +174,46 @@ fn small_typo(before: &str, after: &str) -> bool {
     previous[b.len()] <= if min_len >= 6 { 2 } else { 1 }
 }
 
+fn refine_pair(out: &mut Vec<Edit>, old: &Token<'_>, new: &Token<'_>) -> bool {
+    if old.core == new.core {
+        push_grapheme_edits(out, old.prefix, new.prefix);
+        push(out, Kind::Equal, old.core);
+        return true;
+    }
+    if old.word && new.word && small_typo(old.core, new.core) {
+        push_grapheme_edits(out, old.prefix, new.prefix);
+        push_grapheme_edits(out, old.core, new.core);
+        return true;
+    }
+    if old.prefix == new.prefix {
+        push(out, Kind::Equal, old.prefix);
+        push(out, Kind::Delete, old.core);
+        push(out, Kind::Insert, new.core);
+        return true;
+    }
+    false
+}
+
 fn flush(out: &mut Vec<Edit>, removed: &mut Vec<&Token<'_>>, added: &mut Vec<&Token<'_>>) {
-    if removed.len() == 1 && added.len() == 1 {
-        let old = removed[0];
-        let new = added[0];
-        if old.core == new.core {
-            push_character_edits(out, old.prefix, new.prefix);
-            push(out, Kind::Equal, old.core);
-            removed.clear();
-            added.clear();
-            return;
+    // Match corresponding words in multi-token hunks where every change is a
+    // spacing edit or small typo. Leave actual sentence rewrites grouped.
+    let refinable = removed.len() == added.len()
+        && !removed.is_empty()
+        && removed.iter().zip(added.iter()).all(|(old, new)| {
+            old.core == new.core || (old.word && new.word && small_typo(old.core, new.core))
+        });
+    if refinable {
+        for (old, new) in removed.iter().zip(added.iter()) {
+            refine_pair(out, old, new);
         }
-        if old.prefix == new.prefix {
-            push(out, Kind::Equal, old.prefix);
-            if old.word && new.word && small_typo(old.core, new.core) {
-                push_character_edits(out, old.core, new.core);
-            } else {
-                push(out, Kind::Delete, old.core);
-                push(out, Kind::Insert, new.core);
-            }
-            removed.clear();
-            added.clear();
-            return;
-        }
+        removed.clear();
+        added.clear();
+        return;
+    }
+    if removed.len() == 1 && added.len() == 1 && refine_pair(out, removed[0], added[0]) {
+        removed.clear();
+        added.clear();
+        return;
     }
     for token in removed.drain(..) {
         push(out, Kind::Delete, token.full);
@@ -182,21 +235,17 @@ pub fn display_diff(before: &str, after: &str) -> Vec<Edit> {
     let old = tokenize(before);
     let new = tokenize(after);
     let mut ids = HashMap::new();
+    let mut next_id = 0usize;
     for token in old.iter().chain(&new) {
-        if !ids.contains_key(token.full) {
-            let Ok(id) = u16::try_from(ids.len()) else {
-                return vec![
-                    Edit {
-                        kind: Kind::Delete,
-                        text: before.encode_utf16().collect(),
-                    },
-                    Edit {
-                        kind: Kind::Insert,
-                        text: after.encode_utf16().collect(),
-                    },
-                ];
+        if let std::collections::hash_map::Entry::Vacant(slot) = ids.entry(token.full) {
+            let Ok(id) = u16::try_from(next_id) else {
+                let mut result = Vec::new();
+                push(&mut result, Kind::Delete, before);
+                push(&mut result, Kind::Insert, after);
+                return result;
             };
-            ids.insert(token.full, id);
+            slot.insert(id);
+            next_id += 1;
         }
     }
     let a: Vec<u16> = old.iter().map(|token| ids[token.full]).collect();
@@ -299,7 +348,10 @@ mod tests {
     fn small_typo_refines_characters_inside_one_word() {
         let edits = check("I recieve your mesage.", "I receive your message.");
         assert!(rendered(&edits, &[Kind::Equal]).contains("I rec"));
-        assert!(rendered(&edits, &[Kind::Delete]).len() < "recieve mesage".len());
+        assert!(!rendered(&edits, &[Kind::Delete]).contains("recieve"));
+        assert!(!rendered(&edits, &[Kind::Delete]).contains("mesage"));
+        assert!(!rendered(&edits, &[Kind::Insert]).contains("receive"));
+        assert!(!rendered(&edits, &[Kind::Insert]).contains("message"));
     }
 
     #[test]
@@ -314,6 +366,22 @@ mod tests {
         let edits = check("Hello world", "Hello  world");
         assert_eq!(rendered(&edits, &[Kind::Insert]), " ");
         assert_eq!(rendered(&edits, &[Kind::Delete]), "");
+    }
+
+    #[test]
+    fn multi_word_spacing_only_changes_keep_words_equal() {
+        let edits = check("a b c", "a  b  c");
+        assert_eq!(rendered(&edits, &[Kind::Delete]), "");
+        assert_eq!(rendered(&edits, &[Kind::Insert]), "  ");
+        assert_eq!(rendered(&edits, &[Kind::Equal]), "a b c");
+    }
+
+    #[test]
+    fn accented_typo_and_spacing_are_refined_separately() {
+        let edits = check("A cafè", "A  café");
+        assert_eq!(rendered(&edits, &[Kind::Delete]), "è");
+        assert_eq!(rendered(&edits, &[Kind::Insert]), " é");
+        assert!(rendered(&edits, &[Kind::Equal]).contains("caf"));
     }
 
     #[test]
