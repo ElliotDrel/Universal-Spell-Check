@@ -57,32 +57,46 @@ try {
     } while ($true)
     $reader = Join-Path $repoRoot '.agents/skills/read-logs/scripts/logs.py'
     $python = Get-Command -Name python -ErrorAction SilentlyContinue
-    $starts = @()
-    if ($python) {
-        $rows = & $python.Source $reader --event started --channel prod --last 100 --json 2>$null
-        if ($LASTEXITCODE -eq 0) { $starts = @($rows | ForEach-Object { $_ | ConvertFrom-Json }) }
-    }
+    $verifiedStarts = @{}
     foreach ($process in @(Get-Process -Name 'UniversalSpellCheck','universal-spell-check' -ErrorAction SilentlyContinue)) {
         try { $path = $process.Path } catch { $path = $null }
-        $info = if ($path) { (Get-Item -LiteralPath $path).VersionInfo } else { $null }
+        try { $processStart = $process.StartTime } catch { $processStart = $null }
+        try { $info = if ($path) { (Get-Item -LiteralPath $path).VersionInfo } else { $null } } catch { $info = $null }
         $kind = if (-not $path) { 'unknown' } elseif ($path.Equals($exe, [StringComparison]::OrdinalIgnoreCase)) { 'managed' } elseif ($info.ProductName -match '\bDev\b' -or $info.ProductVersion -match 'dev') { 'dev' } else { 'standalone_or_unclassified' }
-        $started = @($starts | Where-Object { $_.pid -eq $process.Id -and [DateTimeOffset]::Parse($_.ts).UtcDateTime -ge $process.StartTime.ToUniversalTime().AddSeconds(-1) } | Select-Object -Last 1)
+        $started = @()
+        if ($python -and $processStart) {
+            $evidenceDeadline = [DateTime]::UtcNow.AddSeconds(10)
+            do {
+                # Explicit dates include long-running processes and startup across midnight.
+                $rows = & $python.Source $reader --event started --channel prod --from $processStart.ToString('yyyy-MM-dd') --to $processStart.AddDays(1).ToString('yyyy-MM-dd') --json 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    $started = @($rows | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.pid -eq $process.Id -and [DateTimeOffset]::Parse($_.ts).UtcDateTime -ge $processStart.ToUniversalTime().AddSeconds(-1) } | Select-Object -Last 1)
+                }
+                if ($started.Count -or -not $Install -or $kind -ne 'managed' -or [DateTime]::UtcNow -ge $evidenceDeadline) { break }
+                Start-Sleep -Milliseconds 200
+            } while ($true)
+        }
         $runningVersion = if ($started.Count) { $started[0].version } else { $null }
         $result.processes += @{ pid = $process.Id; path = $path; version = $runningVersion; disk_version = $info.ProductVersion; kind = $kind }
         if ($kind -eq 'managed') {
             $result.managed_running = $true
-            if ($runningVersion -eq $result.managed_version) { $result.running_version_verified = $true }
+            if ($runningVersion -eq $result.managed_version) {
+                $result.running_version_verified = $true
+                $verifiedStarts[$process.Id] = $processStart.ToUniversalTime().AddSeconds(-1)
+            }
         }
     }
     foreach ($relative in @('publish/UniversalSpellCheck.exe','rust/dist/prod/UniversalSpellCheck.exe')) {
         $candidate = Join-Path $repoRoot $relative
         if (Test-Path -LiteralPath $candidate) { $result.cleanup_candidates += @{ path = $candidate; action = 'review_only'; reason = 'Reproducible standalone payload; never delete automatically.' } }
     }
-    $checks = if ($python) { & $python.Source $reader --event update_check_done --channel prod --last 1 --json 2>$null } else { $null }
+    $checks = if ($python) { & $python.Source $reader --event update_check_done --channel prod --from ([DateTime]::Now.AddDays(-1).ToString('yyyy-MM-dd')) --last 100 --json 2>$null } else { $null }
     if ($python -and $LASTEXITCODE -eq 0 -and $checks) {
-        $check = $checks | Select-Object -Last 1 | ConvertFrom-Json
-        $currentPids = @($result.processes | Where-Object { $_.kind -eq 'managed' -and $_.version -eq $result.managed_version } | ForEach-Object { $_.pid })
-        if ($check.pid -in $currentPids -and $check.version -eq $result.managed_version -and ([DateTimeOffset]::Now - [DateTimeOffset]::Parse($check.ts)).TotalHours -le 24) { $result.updater_last_success = $check.ts }
+        $check = $checks | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object {
+            $checkTime = [DateTimeOffset]::Parse($_.ts)
+            $verifiedStarts.ContainsKey([int]$_.pid) -and $_.version -eq $result.managed_version -and $checkTime.UtcDateTime -ge $verifiedStarts[[int]$_.pid] -and $checkTime -le [DateTimeOffset]::Now -and ([DateTimeOffset]::Now - $checkTime).TotalHours -le 24
+        } | Sort-Object { [DateTimeOffset]::Parse($_.ts) } | Select-Object -Last 1
+        if ($check) { $result.updater_last_success = $check.ts }
     }
     $result.correction = if ($result.credentials_present) { 'not_run' } else { 'missing_credentials' }
     if (-not $result.managed_path -or -not $result.updater_present) { throw 'Managed installation or updater is missing.' }
