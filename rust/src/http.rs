@@ -106,8 +106,8 @@ unsafe extern "system" fn callback(
 struct Request {
     handle: Handle,
     state: Arc<State>,
-    send_api_ms: f64,
-    send_completion_wait_ms: f64,
+    send_api_ms: Option<f64>,
+    send_completion_wait_ms: Option<f64>,
 }
 impl Request {
     fn new(
@@ -179,8 +179,8 @@ impl Request {
             let request = Self {
                 handle,
                 state,
-                send_api_ms: 0.,
-                send_completion_wait_ms: 0.,
+                send_api_ms: None,
+                send_completion_wait_ms: None,
             };
             let redirect = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
             if WinHttpSetOption(
@@ -195,7 +195,7 @@ impl Request {
             Ok(request)
         }
     }
-    fn accepted(ok: i32) -> Result<(), Failure> {
+    fn accepted(ok: i32) -> Result<(), Box<Failure>> {
         if ok != 0 {
             return Ok(());
         }
@@ -206,7 +206,7 @@ impl Request {
             Err(Failure::transport(error))
         }
     }
-    fn wait(&self, deadline: Instant, expected: u32) -> Result<Option<Vec<u8>>, Failure> {
+    fn wait(&self, deadline: Instant, expected: u32) -> Result<Option<Vec<u8>>, Box<Failure>> {
         loop {
             while let Some(signal) = self
                 .state
@@ -279,7 +279,7 @@ impl Request {
             })
         }
     }
-    fn send(&mut self, deadline: Instant) -> Result<(), Failure> {
+    fn send(&mut self, deadline: Instant) -> Result<(), Box<Failure>> {
         let started = Instant::now();
         let accepted = unsafe {
             Self::accepted(WinHttpSendRequest(
@@ -292,15 +292,15 @@ impl Request {
                 Arc::as_ptr(&self.state) as usize,
             ))
         };
-        self.send_api_ms = started.elapsed().as_secs_f64() * 1000.;
+        self.send_api_ms = Some(started.elapsed().as_secs_f64() * 1000.);
         accepted?;
         let started = Instant::now();
         let completed = self.wait(deadline, WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE);
-        self.send_completion_wait_ms = started.elapsed().as_secs_f64() * 1000.;
+        self.send_completion_wait_ms = Some(started.elapsed().as_secs_f64() * 1000.);
         completed?;
         Ok(())
     }
-    fn receive(&mut self, deadline: Instant) -> Result<u32, Failure> {
+    fn receive(&mut self, deadline: Instant) -> Result<u32, Box<Failure>> {
         unsafe {
             Self::accepted(WinHttpReceiveResponse(self.handle.0, null_mut()))?;
         }
@@ -322,7 +322,7 @@ impl Request {
             Ok(status)
         }
     }
-    fn read(&mut self, deadline: Instant) -> Result<Vec<u8>, Failure> {
+    fn read(&mut self, deadline: Instant) -> Result<Vec<u8>, Box<Failure>> {
         let mut body = Vec::new();
         loop {
             unsafe {
@@ -348,26 +348,53 @@ impl Request {
     }
 }
 #[derive(Debug)]
-struct Failure {
-    message: String,
+pub struct Failure {
+    pub message: String,
     retry: bool,
+    pub attempts: u32,
+    pub send_ms: Option<f64>,
+    pub send_api_ms: Option<f64>,
+    pub send_completion_wait_ms: Option<f64>,
+    pub wait_ms: Option<f64>,
+    pub download_ms: Option<f64>,
+    pub total_ms: Option<f64>,
 }
 impl Failure {
-    fn transport(code: u32) -> Self {
+    fn empty() -> Self {
         Self {
+            message: String::new(),
+            retry: false,
+            attempts: 0,
+            send_ms: None,
+            send_api_ms: None,
+            send_completion_wait_ms: None,
+            wait_ms: None,
+            download_ms: None,
+            total_ms: None,
+        }
+    }
+    fn transport(code: u32) -> Box<Self> {
+        Box::new(Self {
             message: if code == ERROR_WINHTTP_TIMEOUT {
                 "The OpenAI request timed out.".into()
             } else {
                 format!("Windows HTTP error {code}")
             },
             retry: true,
-        }
+            ..Self::empty()
+        })
     }
-    fn permanent(message: impl Into<String>) -> Self {
-        Self {
+    fn permanent(message: impl Into<String>) -> Box<Self> {
+        Box::new(Self {
             message: message.into(),
             retry: false,
-        }
+            ..Self::empty()
+        })
+    }
+}
+fn add_time(total: &mut Option<f64>, value: Option<f64>) {
+    if let Some(value) = value {
+        *total = Some(total.unwrap_or(0.) + value);
     }
 }
 pub struct Client {
@@ -438,17 +465,21 @@ impl Client {
         payload: &Value,
         key: &str,
         on_wait: impl Fn(),
-    ) -> Result<Response, String> {
+    ) -> Result<Response, Box<Failure>> {
         if key.trim().is_empty() || key == "offline-replay-no-network" {
-            return Err(
-                "A saved API key is needed; offline placeholders cannot access the network.".into(),
-            );
+            return Err(Failure::permanent(
+                "A saved API key is needed; offline placeholders cannot access the network.",
+            ));
         }
         let total = Instant::now();
         let (mut send_ms, mut wait_ms, mut download_ms) = (0., 0., 0.);
+        let (mut prior_send, mut prior_wait, mut prior_download) = (None, None, None);
         for attempt in 1..=2 {
             match self.once(payload, key, &on_wait) {
                 Ok(mut response) => {
+                    add_time(&mut prior_send, Some(response.send_ms));
+                    add_time(&mut prior_wait, Some(response.wait_ms));
+                    add_time(&mut prior_download, Some(response.download_ms));
                     send_ms += response.send_ms;
                     wait_ms += response.wait_ms;
                     download_ms += response.download_ms;
@@ -463,17 +494,33 @@ impl Client {
                         return Ok(response);
                     }
                 }
-                Err(failure) => {
+                Err(mut failure) => {
+                    add_time(&mut prior_send, failure.send_ms);
+                    add_time(&mut prior_wait, failure.wait_ms);
+                    add_time(&mut prior_download, failure.download_ms);
                     if !failure.retry || attempt == 2 {
-                        return Err(failure.message);
+                        failure.attempts = attempt;
+                        failure.send_ms = prior_send;
+                        failure.wait_ms = prior_wait;
+                        failure.download_ms = prior_download;
+                        failure.total_ms = Some(total.elapsed().as_secs_f64() * 1000.);
+                        return Err(failure);
                     }
+                    send_ms = prior_send.unwrap_or(0.);
+                    wait_ms = prior_wait.unwrap_or(0.);
+                    download_ms = prior_download.unwrap_or(0.);
                 }
             }
             std::thread::sleep(Duration::from_millis(500));
         }
         unreachable!()
     }
-    fn once(&self, payload: &Value, key: &str, on_wait: &impl Fn()) -> Result<Response, Failure> {
+    fn once(
+        &self,
+        payload: &Value,
+        key: &str,
+        on_wait: &impl Fn(),
+    ) -> Result<Response, Box<Failure>> {
         let started = Instant::now();
         let deadline = started + Duration::from_secs(30);
         let body = serde_json::to_vec(payload).map_err(|e| Failure::permanent(e.to_string()))?;
@@ -486,19 +533,61 @@ impl Client {
             true,
         )
         .map_err(Failure::permanent)?;
+        Self::execute(
+            &mut request,
+            deadline,
+            started,
+            self.collect_native_diagnostics,
+            on_wait,
+        )
+    }
+    fn execute(
+        request: &mut Request,
+        deadline: Instant,
+        started: Instant,
+        collect_native_diagnostics: bool,
+        on_wait: &impl Fn(),
+    ) -> Result<Response, Box<Failure>> {
         let sent = Instant::now();
-        request.send(deadline)?;
+        let result = request.send(deadline);
+        let send_elapsed = sent.elapsed().as_secs_f64() * 1000.;
+        if let Err(mut failure) = result {
+            failure.send_ms = Some(send_elapsed);
+            failure.send_api_ms = request.send_api_ms;
+            failure.send_completion_wait_ms = request.send_completion_wait_ms;
+            return Err(failure);
+        }
         let send_ms = sent.elapsed().as_secs_f64() * 1000.;
         on_wait();
         let wait = Instant::now();
-        let status = request.receive(deadline)?;
+        let status = request.receive(deadline).map_err(|mut failure| {
+            failure.send_ms = Some(send_ms);
+            failure.send_api_ms = request.send_api_ms;
+            failure.send_completion_wait_ms = request.send_completion_wait_ms;
+            failure.wait_ms = Some(wait.elapsed().as_secs_f64() * 1000.);
+            failure
+        })?;
         let wait_ms = wait.elapsed().as_secs_f64() * 1000.;
         let download = Instant::now();
-        let body = request.read(deadline)?;
+        let body = request.read(deadline).map_err(|mut failure| {
+            failure.send_ms = Some(send_ms);
+            failure.send_api_ms = request.send_api_ms;
+            failure.send_completion_wait_ms = request.send_completion_wait_ms;
+            failure.wait_ms = Some(wait_ms);
+            failure.download_ms = Some(download.elapsed().as_secs_f64() * 1000.);
+            failure
+        })?;
         let download_ms = download.elapsed().as_secs_f64() * 1000.;
         let raw = String::from_utf8_lossy(&body).into_owned();
-        let body = parse_body(status, &body)?;
-        let native = if self.collect_native_diagnostics {
+        let body = parse_body(status, &body).map_err(|mut failure| {
+            failure.send_ms = Some(send_ms);
+            failure.send_api_ms = request.send_api_ms;
+            failure.send_completion_wait_ms = request.send_completion_wait_ms;
+            failure.wait_ms = Some(wait_ms);
+            failure.download_ms = Some(download_ms);
+            failure
+        })?;
+        let native = if collect_native_diagnostics {
             request.diagnostics()
         } else {
             Value::Null
@@ -509,8 +598,8 @@ impl Client {
             raw,
             status,
             send_ms,
-            send_api_ms: Some(request.send_api_ms),
-            send_completion_wait_ms: Some(request.send_completion_wait_ms),
+            send_api_ms: request.send_api_ms,
+            send_completion_wait_ms: request.send_completion_wait_ms,
             wait_ms,
             download_ms,
             total_ms: started.elapsed().as_secs_f64() * 1000.,
@@ -673,6 +762,33 @@ mod tests {
         server.join().unwrap();
     }
     #[test]
+    fn failure_retains_only_attempted_phase_timings() {
+        let (release, gate) = std::sync::mpsc::channel();
+        let (mut request, _connection, _session, server) =
+            local_request(Duration::ZERO, false, Some(gate));
+        let started = Instant::now();
+        let failure = Client::execute(
+            &mut request,
+            started + Duration::from_millis(100),
+            started,
+            false,
+            &|| {},
+        )
+        .err()
+        .expect("gated response must time out");
+        assert_eq!(failure.message, "The OpenAI request timed out.");
+        assert!(failure.send_ms.is_some());
+        assert!(failure.send_api_ms.is_some());
+        // Depending on WinHTTP callback ordering, the deadline can expire in send or receive.
+        if failure.wait_ms.is_some() {
+            assert!(failure.send_completion_wait_ms.is_some());
+        }
+        assert!(failure.download_ms.is_none());
+        let _ = release.send(());
+        drop(request);
+        server.join().unwrap();
+    }
+    #[test]
     fn request_deadline_does_not_require_response_release() {
         let (release, gate) = std::sync::mpsc::channel();
         let (mut request, _connection, _session, server) =
@@ -716,7 +832,7 @@ mod tests {
     }
 }
 
-fn parse_body(status: u32, body: &[u8]) -> Result<Value, Failure> {
+fn parse_body(status: u32, body: &[u8]) -> Result<Value, Box<Failure>> {
     match serde_json::from_slice(body) {
         Ok(value) => Ok(value),
         Err(_) if !(200..300).contains(&status) => {

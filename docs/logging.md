@@ -40,6 +40,9 @@ measures that (`docs/testing.md`). Non-overlapping top-level phases:
 attempts, clipboard write, the 50 ms settle, paste input). `request_send_ms`, `request_wait_ms`
 and `response_download_ms` are WinHTTP callback intervals, not proven upload or server time;
 compare `request_ms` as a whole. A stage that never ran is `null`; zero is a measured value.
+On terminal request failure, measured request phase intervals are retained across attempts;
+unreached intervals stay `null`. `request_attempts` identifies how many attempts began, while
+`request_native.send_api_ms` and `request_native.send_completion_wait_ms` describe the terminal attempt. `request_native.client_failed` includes transport, response-size and response-decoding failures; it does not classify them all as transport failures.
 Replay runs report `api_ms` as `null`. Failure `recovery_ms` is reported outside `total_ms`.
 
 ## Other events
@@ -60,3 +63,5 @@ it. Storage is shared across channels under a named mutex, capped at 16 MiB per 
 256 MiB total, with oldest-first pruning of whole run folders. Evidence can contain surrounding
 editor content; keys and settings are never included. Google Docs native slices are kept in
 memory for the paste and persisted only when developer logging is on.
+
+Clipboard backup render failures include the numeric format, registered format name, Win32 error and owner PID. No clipboard payload is added to the error. A zero Win32 error means the producer supplied no error, not that rendering succeeded.

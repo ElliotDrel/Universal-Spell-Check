@@ -6,6 +6,12 @@ A Windows-wide AI spell checker. Select text anywhere, press **Ctrl+Alt+U**, and
 
 Download the latest `Setup.exe` from the [Releases](https://github.com/ElliotDrel/Universal-Spell-Check/releases) page and run it. No admin prompt, no code signing — Windows SmartScreen may warn on first install. The app checks GitHub Releases on launch and every ~4 hours. It installs a newer version automatically during startup. Background checks prepare updates for the next restart.
 
+For a JSON installation inventory, run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-production.ps1`. Add `-Install` to download and run the latest official installer after verifying its published SHA-256 digest; the command fails if the digest is unavailable. `-VerifyOnly` is the read-only default. It checks the package manifest, running version and enabled startup target, inventories Dev/standalone processes, and reports the last matching updater success. `success` means those installation checks passed; only `verification_complete` confirms a successful correction and recent updater evidence. Add `-VerifyCorrection` on an idle desktop for one bounded live correction in an isolated editor (uses the saved Production key and may incur API cost). Missing keys, old startup targets and incomplete checks are reported explicitly. The script neither deletes old payloads nor reads secret values; its cleanup list is review-only.
+
+Silent installation launches the managed app when it is not already running. The correction verifier supports the published `0.13.4` desktop-probe command as well as the newer consolidated benchmark, and requires exactly one successful correction with a nonempty result.
+
+Setup has a two-minute deadline. During installation, startup reconciliation has up to ten seconds to finish. When Python is available, the verifier uses the approved log reader to match a running PID and its start time to the version logged by that process; the file version alone is not proof of the running version. Without Python, installation inventory still runs, but process-version and updater evidence remain incomplete and `verification_complete` stays false.
+
 Technical users can restart and update from PowerShell:
 
 ```powershell

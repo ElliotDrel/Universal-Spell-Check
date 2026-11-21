@@ -26,7 +26,7 @@ jobs:
   check:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install pinned Rust tools
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -62,7 +62,7 @@ jobs:
           python -c "import subprocess; subprocess.run([r'rust\target\release\universal-spell-check.exe','--startup-smoke'],check=True,timeout=15)"
       - name: Package candidate
         run: ./rust/package.ps1 -SkipBuild -Output rust/dist/prod
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: prod-candidate
           path: rust/dist/prod/
@@ -74,7 +74,7 @@ jobs:
     env:
       BUDGET: bench/perf-budget.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: bench/perf-budget.json
           sparse-checkout-cone-mode: false
@@ -111,11 +111,14 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install pinned Rust tools
         run: rustup toolchain install 1.99.1 --profile minimal
+      # Restoring base/rust/target creates base; it must already be a registered worktree.
+      - name: Check out base
+        run: git worktree add base "origin/${{ github.base_ref }}"
       - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
@@ -125,8 +128,6 @@ jobs:
             base/rust/target
           key: ${{ runner.os }}-perf-1.99.1-${{ hashFiles('rust/Cargo.lock') }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}-perf-1.99.1-
-      - name: Check out base
-        run: git worktree add base "origin/${{ github.base_ref }}"
       - name: Build base and PR
         # Each build runs in its own checkout so it uses its own toolchain and cargo config.
         run: |

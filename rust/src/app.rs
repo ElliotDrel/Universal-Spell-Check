@@ -90,8 +90,15 @@ pub fn run(
     } else {
         "data_migration_failed"
     });
-    if !startup_smoke {
-        let _ = platform::first_run(&store);
+    if !startup_smoke && let Err(error) = platform::first_run(&store) {
+        logger.event(format!(
+            "startup_registration_failed error={}",
+            serde_json::to_string(&error).unwrap_or_default()
+        ));
+        bus.send(UiEvent::Notify(
+            "Login startup could not be updated".into(),
+            error,
+        ));
     }
     let worker = Worker::new(store.clone(), logger.clone(), bus.clone(), hwnd as usize)?;
     let updater = Updater::new(store.clone(), logger.clone(), bus.clone());

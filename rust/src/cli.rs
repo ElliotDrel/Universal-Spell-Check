@@ -52,7 +52,11 @@ fn write(value: Value) -> Result<(), String> {
 /// `--transform-json`: post-processing plus rich mapping from the recorded `raw_ai_output`.
 pub fn transform(value: &Value, replacements: &Replacements) -> Result<Value, String> {
     let source = field(value, &["input", "input_text"]);
-    let protection = Protection::for_target(&source, &field(value, &["active_exe"]))?;
+    let protection = Protection::for_rich_target(
+        &source,
+        &field(value, &["active_exe"]),
+        &field(value, &["source_html", "clipboard_html"]),
+    )?;
     let raw = field(value, &["raw_ai_output"]);
     if raw.is_empty() {
         return Err(

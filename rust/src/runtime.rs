@@ -347,17 +347,35 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
         detail["captured_text_history_excluded"] = json!(history);
         let (protection, request_payload) = measure(&mut timings.prepare_ms, || -> Result<_, String> {
         let input = crate::terminal::normalize(&captured.text, &target.2);
-        let protection = Protection::for_target(&input, &target.2)?;
+        let protection = Protection::for_rich_target(&input, &target.2, &captured.html)?;
         let request_payload = protection.payload(&settings.model);
         Ok((protection, request_payload))
         })?;
         measure(&mut timings.diagnostics_ms, || {
         detail["request_payload"] = json!(serde_json::to_string(&request_payload).unwrap_or_default());
         });
-        bus.send(UiEvent::Phase("Sending to AI..."));
-        let response=measure(&mut timings.request_ms, || match replay{Some(replay)=>replay.request(&request_payload),None=>client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||bus.send(UiEvent::Phase("Waiting for AI...")))})?;
+        bus.send(UiEvent::Phase("Correcting..."));
+        let response=measure(&mut timings.request_ms, || match replay {
+            Some(replay)=>replay.request(&request_payload),
+            None=>match client.ok_or("HTTP client unavailable")?.request(&request_payload,&key,||{}) {
+                Ok(response)=>Ok(response),
+                Err(failure)=>{
+                    detail["request_attempts"] = json!(failure.attempts);
+                    detail["request_native"] = json!({
+                        "final_response_attempt":failure.attempts,
+                        "send_api_ms":failure.send_api_ms,
+                        "send_completion_wait_ms":failure.send_completion_wait_ms,
+                        "client_failed":true,
+                        "measured_total_ms":failure.total_ms
+                    });
+                    request_phases = Some((failure.send_ms, failure.wait_ms, failure.download_ms));
+                    detail["status"] = json!("request_failed");
+                    Err(failure.message)
+                }
+            }
+        })?;
         // Retain existing transport labels; these are not isolated upload/server phases.
-        if replay.is_none() { request_phases = Some((response.send_ms, response.wait_ms, response.download_ms)); }
+        if replay.is_none() { request_phases = Some((Some(response.send_ms), Some(response.wait_ms), Some(response.download_ms))); }
         measure(&mut timings.diagnostics_ms, || {
         detail["request_native"] = json!({"final_response_attempt":response.attempts,"native":response.native,"send_api_ms":response.send_api_ms,"send_completion_wait_ms":response.send_completion_wait_ms});
         detail["status_code"] = json!(response.status);
@@ -448,9 +466,9 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
     } else {
         Value::Null
     };
-    measured["request_send_ms"] = json!(request_phases.map(|p| p.0));
-    measured["request_wait_ms"] = json!(request_phases.map(|p| p.1));
-    measured["response_download_ms"] = json!(request_phases.map(|p| p.2));
+    measured["request_send_ms"] = json!(request_phases.and_then(|p| p.0));
+    measured["request_wait_ms"] = json!(request_phases.and_then(|p| p.1));
+    measured["response_download_ms"] = json!(request_phases.and_then(|p| p.2));
     detail["timings"] = measured;
     detail["timing_schema_version"] = json!(1);
     detail["timing_boundary"] = json!(if result.is_ok() {
