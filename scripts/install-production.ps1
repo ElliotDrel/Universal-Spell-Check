@@ -25,6 +25,11 @@ try {
             $process = Start-Process -FilePath $temporary -ArgumentList '--silent' -Wait -PassThru -WindowStyle Hidden
             if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)." }
         } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary } }
+        # Silent setup does not guarantee that the resident app was launched.
+        if (-not @(Get-Process -Name 'UniversalSpellCheck' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }).Count) {
+            Start-Process -FilePath $exe -WindowStyle Hidden
+            Start-Sleep -Seconds 2
+        }
     }
     if (Test-Path -LiteralPath $exe) { $result.managed_path = $exe; $result.managed_version = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion }
     $result.updater_present = Test-Path -LiteralPath (Join-Path $root 'Update.exe')
@@ -66,10 +71,23 @@ try {
         if (-not $result.credentials_present) { throw 'Missing credentials; add a key in Production Settings.' }
         $output = Join-Path ([IO.Path]::GetTempPath()) ('usc-install-check-' + [guid]::NewGuid())
         $arguments = @('--bench','--live','--case','short','--runs','1','--warmup','0','--cases',('"' + (Join-Path $repoRoot 'bench/cases.json') + '"'),'--replay',('"' + (Join-Path $repoRoot 'bench/replay.json') + '"'),'--replacements',('"' + (Join-Path $root 'current/replacements.json') + '"'),'--output',('"' + $output + '"'))
+        # The currently published release predates the consolidated --bench command.
+        $legacy = $result.managed_version -eq '0.13.4'
+        if ($legacy) {
+            New-Item -ItemType Directory -Path $output | Out-Null
+            $casePath = Join-Path $output 'short-case.json'
+            Set-Content -LiteralPath $casePath -Encoding Ascii -Value '[{"id":"short","text":"This is a tset.","expected":"This is a test."}]'
+            $evidence = Join-Path $output 'evidence'
+            $arguments = @('--bench-desktop','--allow-desktop','--mode','e2e','--runs','1','--warmup','0','--cases',('"' + $casePath + '"'),'--settings',('"' + (Join-Path $env:LOCALAPPDATA $dataName) + '"'),'--replacements',('"' + (Join-Path $root 'current/replacements.json') + '"'),'--output',('"' + $evidence + '"'))
+        } else { $evidence = $output }
+        $result.correction = 'failed'
         $probe = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -WindowStyle Hidden
         if (-not $probe.WaitForExit(90000)) { $probe.Kill(); throw 'The isolated correction probe timed out.' }
-        $summary = Get-Content -LiteralPath (Join-Path $output 'summary.json') -Raw | ConvertFrom-Json
-        if ($probe.ExitCode -ne 0 -or $summary.failed -or $summary.error) { $result.correction = 'failed'; throw "Correction probe failed; inspect $output" }
+        $summaryPath = Join-Path $evidence 'summary.json'
+        if (-not (Test-Path -LiteralPath $summaryPath)) { throw "Correction probe produced no summary (exit $($probe.ExitCode)); inspect $output" }
+        $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+        $passed = if ($legacy) { $null -ne $summary.aggregate -and $summary.aggregate.attempted -eq 1 -and $summary.aggregate.succeeded -eq 1 -and $summary.aggregate.failed -eq 0 -and $summary.aggregate.quality_matches -eq 1 -and -not $summary.block_error } else { $summary.measured -eq 1 -and $summary.failed -eq 0 -and -not $summary.error }
+        if ($probe.ExitCode -ne 0 -or -not $passed) { throw "Correction probe failed or did not complete exactly one correction; inspect $output" }
         $result.correction = 'passed'
     }
     $result.verification_complete = $result.correction -eq 'passed' -and $null -ne $result.updater_last_success
