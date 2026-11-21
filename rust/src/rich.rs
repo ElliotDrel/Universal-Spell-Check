@@ -164,9 +164,9 @@ fn replace_paragraphs(fragment: &str, p: &[Paragraph], bodies: &[String]) -> Str
     rebuilt
 }
 pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich {
-    let Some(fragment) = fragment(html).filter(|f| {
-        f.contains("data-pm-slice") && re!(r"(?i)\brich-link-source-app-id\b").is_match(f)
-    }) else {
+    let Some(fragment) = fragment(html)
+        .filter(|f| re!(r"(?i)\b(?:rich-link-source-app-id|text-link-href)\b").is_match(f))
+    else {
         return rewrite_base(html, source, corrected, native);
     };
     match crate::rich_links::project(fragment, source, corrected) {
@@ -218,7 +218,24 @@ fn rewrite_base(html: &str, source: &str, corrected: &str, native: &[u8]) -> Ric
         return docs_rewrite(fragment, source, corrected, native);
     }
     if !fragment.contains("data-pm-slice") {
-        return Rich::plain("unsupported_editor", corrected);
+        // Producer markers do not establish whether the copied text can be mapped.
+        // Keep an unchanged selection verbatim; otherwise use the same bounded mapper.
+        if source == corrected {
+            return Rich::made(corrected.into(), fragment, "original_html", 0);
+        }
+        let mapped = align(fragment, source, corrected, false);
+        // Recovery of text absent from the Unicode selection is producer-specific.
+        if mapped.applied && mapped.text == corrected {
+            return mapped;
+        }
+        return Rich::plain(
+            if mapped.reason == "alignment_budget_exceeded" {
+                "alignment_budget_exceeded"
+            } else {
+                "unsupported_editor"
+            },
+            corrected,
+        );
     }
     let corrected = if (fragment.contains("skill-mention-name=")
         || fragment.contains("chatgpt-library-file-mention-id="))

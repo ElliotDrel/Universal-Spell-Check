@@ -10,7 +10,7 @@ DPAPI and WinHTTP are direct Win32 calls. No webview or renderer is loaded.
 1. `VelopackApp::build().run()` must stay the first thing in `main`. Moving it breaks first-run hooks and restart-after-update. Implicit staged-package application is disabled so CLI forwarding cannot install before acknowledgement.
 2. Legacy-data migration runs before any logger or settings read. It is copy-only and checkpointed, merges same-day logs without duplicates, and never deletes the source. It exists because a reinstall once replaced the installer root and destroyed the log corpus stored there.
 3. A single-instance mutex per channel. A second launch exits. `--restart` (alias `--update`) instead forwards a channel-specific registered message to the running instance and exits once acknowledged; Dev rejects both flags.
-4. The hotkey is registered with `RegisterHotKey` (Ctrl+Alt+U Prod, Ctrl+Alt+D Dev). Start-on-login is a Settings toggle that writes the `HKCU\...\Run` key; Dev never registers it.
+4. The hotkey is registered with `RegisterHotKey` (Ctrl+Alt+U Prod, Ctrl+Alt+D Dev). Start-on-login is a Settings toggle that writes the `HKCU\...\Run` key; Dev and standalone builds never register it. Installed Production reconciles an existing enabled entry on launch, including after migration; an absent entry remains an opt-out.
 5. `--startup-smoke` builds the real tray and exits. CI runs it because processing tests cannot catch tray construction failures (a constructor-order crash once shipped and killed every launch).
 
 ## A correction (`Worker::run` in `runtime.rs`)
@@ -28,8 +28,8 @@ during a run logs `guard_rejected reason=already_running` and is dropped, never 
 8. **Paste**: write the clipboard, wait the 50 ms publication settle, wait for modifiers again, send Ctrl+V to whatever window is active now. Switching apps during the request is expected and not an error; capture and paste targets are both logged.
 9. **Finish**: on failure, restore the user's clipboard (only after the sequence changed). On success the corrected text stays on the clipboard. Then write `run_completed` and one `spellcheck_detail`.
 
-Unchanged text still pastes. Overlay phases (`Copying text...`, `Sending to AI...`,
-`Waiting for AI...`, `Pasting...`) are sent over the bus. The overlay hides as soon as the hot
+Unchanged text still pastes with its original rich fragment when the editor is unfamiliar.
+Overlay phases (`Copying text...`, `Correcting...`, `Pasting...`) are sent over the bus. The overlay hides as soon as the hot
 path returns, before any slow clipboard restore, so it never sticks after a failure.
 
 ## Traps that broke before

@@ -17,12 +17,15 @@ struct LinkedNode {
     end: usize,
     label: String,
     chip: bool,
+    destination: Option<String>,
 }
 struct Link {
     start: usize,
     end: usize,
     label: String,
     href: String,
+    destination_start: usize,
+    destination_end: usize,
 }
 pub struct Projection {
     pub html: String,
@@ -45,8 +48,13 @@ fn linked_nodes(html: &str) -> Option<Vec<LinkedNode>> {
         }
         let all = tag.get(0)?;
         if &tag[1] == "/" {
-            let (open_name, start, inner_start, chip): (String, usize, usize, bool) =
-                stack.pop()?;
+            let (open_name, start, inner_start, chip, destination): (
+                String,
+                usize,
+                usize,
+                bool,
+                Option<String>,
+            ) = stack.pop()?;
             if open_name != name {
                 return None;
             }
@@ -58,13 +66,27 @@ fn linked_nodes(html: &str) -> Option<Vec<LinkedNode>> {
                     end: all.end(),
                     label: decoded(&TAG.replace_all(&html[inner_start..all.start()], "")),
                     chip,
+                    destination,
                 });
             }
         } else {
-            let chip = ATTRIBUTE
-                .captures_iter(&tag[3])
-                .any(|a| a[1].eq_ignore_ascii_case("rich-link-source-app-id"));
-            stack.push((name, all.start(), all.end(), chip));
+            let attributes: Vec<_> = ATTRIBUTE.captures_iter(&tag[3]).collect();
+            let destination = attributes
+                .iter()
+                .find(|a| a[1].eq_ignore_ascii_case("text-link-href"))
+                .and_then(|a| a.get(2).or_else(|| a.get(3)).or_else(|| a.get(4)))
+                .map(|m| decoded(m.as_str()));
+            let destination = destination.filter(|_| {
+                !attributes.iter().any(|a| {
+                    a[1].eq_ignore_ascii_case("skill-mention-name")
+                        || a[1].eq_ignore_ascii_case("chatgpt-library-file-mention-id")
+                })
+            });
+            let chip = destination.is_some()
+                || attributes
+                    .iter()
+                    .any(|a| a[1].eq_ignore_ascii_case("rich-link-source-app-id"));
+            stack.push((name, all.start(), all.end(), chip, destination));
         }
     }
     if !stack.is_empty() {
@@ -164,6 +186,8 @@ fn links(text: &str) -> Vec<Link> {
             end: end + 1,
             label: unescape(&text[start + 1..label_end]),
             href: unescape(href),
+            destination_start: href_start,
+            destination_end: end,
         });
         i = end + 1;
     }
@@ -176,6 +200,44 @@ pub(crate) fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
     links(text)
         .into_iter()
         .map(|link| (link.start, link.end))
+        .collect()
+}
+/// Only a uniquely matched copied web-link chip makes its label editable. Plain Markdown,
+/// reference chips, and ambiguous occurrences retain whole-link protection.
+pub(crate) fn editable_links(text: &str, html: &str) -> Vec<((usize, usize), (usize, usize))> {
+    if !html.contains("text-link-href") || html.len().saturating_add(text.len()) > 2_000_000 {
+        return Vec::new();
+    }
+    let Some(nodes) = linked_nodes(html) else {
+        return Vec::new();
+    };
+    let links = links(text);
+    if nodes.len() > 1024 || links.len() > 1024 {
+        return Vec::new();
+    }
+    links
+        .iter()
+        .filter(|link| {
+            links
+                .iter()
+                .filter(|other| other.label == link.label && other.href == link.href)
+                .count()
+                == 1
+                && nodes
+                    .iter()
+                    .filter(|node| {
+                        node.label == link.label
+                            && node.destination.as_deref() == Some(link.href.as_str())
+                    })
+                    .count()
+                    == 1
+        })
+        .map(|link| {
+            (
+                (link.start, link.end),
+                (link.destination_start, link.destination_end),
+            )
+        })
         .collect()
 }
 fn normalize(text: &str, links: &[Link], selected: &[usize]) -> String {
@@ -231,6 +293,13 @@ pub fn project(
         }
         let occurrence = peers.iter().position(|n| n.start == node.start).unwrap();
         let (index, link) = candidates[occurrence];
+        if node
+            .destination
+            .as_ref()
+            .is_some_and(|href| href != &link.href)
+        {
+            return Err("unverified_destinations");
+        }
         if selected.last().is_some_and(|previous| *previous >= index) {
             return Err("unverified_order");
         }
@@ -260,6 +329,41 @@ pub fn project(
 mod tests {
     use super::*;
     use crate::rich::{build_cf_html, fragment, rewrite};
+    #[test]
+    fn verified_web_chip_labels_are_corrected_without_exposing_destinations() {
+        let source = "A [lnik](https://example.com/acceptance).";
+        let fragment_html = "<p>A <span text-link-href='https://example.com/acceptance'><span>lnik</span></span>.</p>";
+        let html = build_cf_html(fragment_html);
+        let protected = crate::core::Protection::for_rich_target(source, "chrome", &html).unwrap();
+        assert!(protected.text.contains("[lnik]("));
+        assert!(!protected.text.contains("https://"));
+        let corrected = protected
+            .restore(protected.text.replace("lnik", "link"))
+            .unwrap();
+        let result = rewrite(&html, source, &corrected, &[]);
+        assert!(result.applied, "{}", result.reason);
+        assert_eq!(
+            fragment(&result.html),
+            Some("<p>A <a href=\"https://example.com/acceptance\"><span>link</span></a>.</p>")
+        );
+        assert_eq!(result.text, "A link.");
+        // Unmatched and repeated destinations remain complete protected links.
+        for input in [
+            source.replace("acceptance", "other"),
+            format!("{source} {source}"),
+        ] {
+            let protected =
+                crate::core::Protection::for_rich_target(&input, "chrome", &html).unwrap();
+            assert!(!protected.text.contains("lnik"));
+        }
+        let secret_label = "sk-proj-abcdefghijklmnopqrstuvwxyz123456";
+        let secret_source = source.replace("lnik", secret_label);
+        let secret_html = html.replace("lnik", secret_label);
+        let protected =
+            crate::core::Protection::for_rich_target(&secret_source, "chrome", &secret_html)
+                .unwrap();
+        assert!(!protected.text.contains(secret_label));
+    }
     #[test]
     fn copied_codex_escaped_parentheses_survive_the_complete_request_pipeline() {
         let source = r"Fix teh word and keep [Inbox](https://example.com/a_(b\)) and [Inbox](https://example.com/c?x=1&y=2).";

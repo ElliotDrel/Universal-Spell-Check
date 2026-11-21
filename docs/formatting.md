@@ -17,6 +17,7 @@ indent is left alone.
 
 Before the request, URLs, complete Markdown links, UUIDs and opaque IDs, common API keys, JWTs,
 secret-looking assignments, and Windows, UNC and POSIX paths become numbered placeholders.
+Verified, uniquely matched web-link chips expose their editable labels while protecting their exact destinations. Ordinary Markdown and ambiguous or reference chips remain complete literals.
 Quoted paths may contain spaces. Replacements run while placeholders are still in place, then
 values are restored byte for byte. A missing or duplicated placeholder fails the run and nothing
 is pasted. In T3 Code (`t3.rs`), a whole `[Assistant quote](t3-citation://...)` link is one
@@ -48,7 +49,8 @@ from `text/plain`), so no per-site rule can recover it; only the HTML path can.
 
 `rich_text.mode` records which path ran:
 
-- `aligned_html`: the general path. Each source HTML text node must map in order onto the copied Unicode text, and every model edit must land inside a mapped node. Tags and attributes are kept. HTML text nodes missing from the Unicode flavor (ChatGPT omits headings) are preserved and also inserted into the Unicode paste.
+- `original_html`: an unfamiliar producer returned unchanged text; preserve its original fragment without rebuilding it.
+- `aligned_html`: the general path. Each source HTML text node must map in order onto the copied Unicode text, and every model edit must land inside a mapped node. Tags and attributes are kept. Unfamiliar producers use this path only when it returns exactly the corrected Unicode text; their unmatched markup text is never recovered by guessing. HTML text nodes missing from the Unicode flavor (ChatGPT omits headings) are preserved and also inserted into the Unicode paste.
 - `html`: simple ChatGPT ProseMirror paragraphs and LinkedIn messaging paragraphs (detected from the CF_HTML `SourceURL`). Empty paragraphs stay as markup so they don't paste as extra lines.
 - `list_body_text`: one bare list item. Only the corrected body is pasted as text, because ChatGPT nests a pasted HTML block inside the current item.
 - `nested_list_html` and `structured_list_html`: list trees where every paragraph maps to exactly one generated Unicode line with the same marker before and after.

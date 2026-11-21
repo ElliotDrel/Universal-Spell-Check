@@ -508,9 +508,19 @@ impl Backup {
                 if format == 0x80 || (0x200..=0x3ff).contains(&format) {
                     return Err("Clipboard uses an unsupported owner-managed format; selection was left unchanged.".into());
                 }
+                SetLastError(0);
                 let source = GetClipboardData(format);
                 if source.is_null() {
-                    return Err("Clipboard backup could not render a source format; selection was left unchanged.".into());
+                    let code = GetLastError();
+                    let owner = GetClipboardOwner();
+                    let mut owner_pid = 0;
+                    GetWindowThreadProcessId(owner, &mut owner_pid);
+                    let mut name = [0u16; 256];
+                    let len = GetClipboardFormatNameW(format, name.as_mut_ptr(), name.len() as i32);
+                    let name = String::from_utf16_lossy(&name[..len.max(0) as usize]);
+                    return Err(format!(
+                        "Clipboard backup could not render a source format; selection was left unchanged. format={format} name={name:?} win32_error={code} owner_pid={owner_pid}"
+                    ));
                 }
                 if !matches!(format, 2 | 3 | 9 | 14 | 0x82 | 0x83 | 0x8e) {
                     allocated = allocated.saturating_add(GlobalSize(source));
