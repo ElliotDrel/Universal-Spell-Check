@@ -11,6 +11,8 @@ try {
     $channelSource = Get-Content -LiteralPath (Join-Path $repoRoot 'rust/src/channel.rs') -Raw
     $dataName = [regex]::Match($channelSource, 'pub const SHARED_DATA_FOLDER: &str = "([^"]+)"').Groups[1].Value
     if (-not $dataName) { throw 'Cannot resolve the shared data folder from channel.rs.' }
+    $startupName = [regex]::Match($channelSource, '(?s)pub const MUTEX: &str = if IS_DEV \{\s*"[^"]+"\s*\} else \{\s*"([^"]+)"\s*\};').Groups[1].Value
+    if (-not $startupName) { throw 'Cannot resolve the Production startup identifier from channel.rs.' }
     if ($Install) {
         $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/ElliotDrel/Universal-Spell-Check/releases/latest' -Headers @{ 'User-Agent' = 'UniversalSpellCheck-installer' }
         $expectedVersion = $release.tag_name.TrimStart('v')
@@ -45,7 +47,7 @@ try {
         $result.manifest_valid = $null -ne $id -and $id.InnerText -eq 'UniversalSpellCheck' -and $null -ne $version -and $version.InnerText -eq $result.managed_version
     }
     $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-    $result.startup_target = (Get-ItemProperty -LiteralPath $runKey -Name 'UniversalSpellCheck' -ErrorAction SilentlyContinue).UniversalSpellCheck
+    $result.startup_target = (Get-ItemProperty -LiteralPath $runKey -Name $startupName -ErrorAction SilentlyContinue).$startupName
     $result.startup_valid = -not $result.startup_target -or $result.startup_target.Trim('"').Equals($exe, [StringComparison]::OrdinalIgnoreCase)
     foreach ($process in @(Get-Process -Name 'UniversalSpellCheck','universal-spell-check' -ErrorAction SilentlyContinue)) {
         try { $path = $process.Path } catch { $path = $null }

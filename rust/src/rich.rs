@@ -186,13 +186,16 @@ pub fn rewrite(html: &str, source: &str, corrected: &str, native: &[u8]) -> Rich
             }
             result
         }
-        outcome => {
+        Err(reason) => {
+            // The generic mapper cannot prove that rejected chip markup carries all
+            // protected Unicode links. Keep the complete corrected text instead.
+            let mut result = Rich::plain("unverified_links", corrected);
+            result.link_status = reason.into();
+            result
+        }
+        Ok(None) => {
             let mut result = rewrite_base(html, source, corrected, native);
-            result.link_status = match outcome {
-                Err(reason) => reason,
-                _ => "not_applicable",
-            }
-            .into();
+            result.link_status = "not_applicable".into();
             result
         }
     }

@@ -459,7 +459,8 @@ mod tests {
                 &[],
             );
             assert!(out.link_status.starts_with("unverified"));
-            assert!(!out.html.contains("<a href="));
+            assert!(!out.applied);
+            assert!(out.html.is_empty());
             assert_eq!(out.text, source.replace("teh", "the"));
         }
         let source = "teh [Inbox](https://example.com/a)";

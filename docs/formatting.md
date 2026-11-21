@@ -57,7 +57,7 @@ from `text/plain`), so no per-site rule can recover it; only the HTML path can.
 - `docs_native`: Google Docs. The copied Chromium native slice is verified against the selection, its style positions are remapped with the same diff, and its cache ID is removed so Docs cannot paste the original slice instead.
 
 Codex link chips are reconciled with their Markdown destinations by occurrence order. Any
-ambiguity keeps the original destinations and reports an unverified `link_status`; it never
-guesses. Diffs have fixed work budgets: over budget, the result is `alignment_budget_exceeded`
+ambiguity pastes the complete corrected Unicode text without HTML and reports an unverified
+`link_status`; the generic mapper never retries a rejected projection. Diffs have fixed work budgets: over budget, the result is `alignment_budget_exceeded`
 and the app pastes plain text. A coarse display diff is never used as a formatting map. Any
 refusal or exception still pastes the corrected Unicode text, with `rich_text.reason` saying why.
