@@ -100,6 +100,16 @@ pub fn first_run(store: &Store) -> Result<(), String> {
     }
     let flag = store.directory.join("startup.initialized");
     if flag.exists() {
+        // Only an installed Production app may retarget an existing enabled entry.
+        // An absent entry is an intentional opt-out. Smoke runs skip first_run.
+        if startup_registered()
+            && velopack::locator::auto_locate_app_manifest(
+                velopack::locator::LocationContext::FromCurrentExe,
+            )
+            .is_ok()
+        {
+            startup(true)?;
+        }
         return Ok(());
     }
     startup(true)?;

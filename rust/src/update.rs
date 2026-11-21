@@ -44,12 +44,27 @@ impl Updater {
         let queued = restart_queued.clone();
         let status = state.clone();
         thread::Builder::new().name("updates".into()).spawn(move||{
-            let manager=if channel::IS_DEV{None}else{std::panic::catch_unwind(new_manager).ok().and_then(Result::ok)};
+            let (manager, unavailable)=if channel::IS_DEV {
+                (None, "Updates are disabled in Dev.".to_string())
+            } else {
+                match std::panic::catch_unwind(new_manager) {
+                    Ok(Ok(manager)) => (Some(manager), String::new()),
+                    Ok(Err(velopack::Error::NotInstalled(_))) if !installed_layout() =>
+                        (None, "Standalone build: install the official release to enable updates.".to_string()),
+                    result => {
+                        let error=match result { Ok(Err(error))=>error.to_string(), Err(_)=>"Update manager initialization panicked".into(), _=>unreachable!() };
+                        logger.event(format!("update_manager_init_failed error={}",serde_json::to_string(&error).unwrap_or_default()));
+                        (None, format!("Updates unavailable: {error}"))
+                    }
+                }
+            };
+            if manager.is_none() { *status.lock().unwrap_or_else(|p|p.into_inner())=unavailable.clone(); }
             let mut pending:Option<Box<UpdateInfo>>=None;
             loop{
                 let trigger=match rx.recv_timeout(Duration::from_secs(4*60*60)){Ok(trigger)=>trigger,Err(mpsc::RecvTimeoutError::Timeout)=>Trigger::Periodic,Err(_)=>break};active.store(true,Ordering::Release);
                 let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||->Result<(),String>{
-                    let Some(manager)=manager.as_ref()else{if matches!(trigger,Trigger::Restart){return Err("Restart updates require an installed production app.".into());}return Ok(());};
+                    let Some(manager)=manager.as_ref()else{logger.event(format!("update_check_skipped trigger={trigger:?} reason=unavailable"));if matches!(trigger,Trigger::Restart){queued.store(false,Ordering::Release);}
+if matches!(trigger,Trigger::Manual | Trigger::Restart){bus.send(UiEvent::Notify("Updates unavailable".into(),unavailable.clone()));}return Ok(());};
                     if matches!(trigger,Trigger::Restart){
                         logger.event("restart_requested");
                         let downloaded=pending.as_ref().map(|u|u.TargetFullRelease.clone()).or_else(||manager.get_update_pending_restart());
@@ -118,6 +133,16 @@ impl Updater {
         }
         true
     }
+}
+fn installed_layout() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| {
+            exe.parent()
+                .and_then(|current| current.parent())
+                .map(|root| root.join("Update.exe").exists())
+        })
+        .unwrap_or(false)
 }
 fn new_manager() -> Result<UpdateManager, velopack::Error> {
     UpdateManager::new(

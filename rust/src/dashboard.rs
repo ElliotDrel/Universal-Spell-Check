@@ -309,6 +309,14 @@ impl Ui {
         let result = (|| {
             let mut keys = self.store.load_keys()?;
             if action == 0 {
+                if self.key_name.text().trim().is_empty() {
+                    self.key_name.set_focus();
+                    return Err("Enter a name for the new API key.".into());
+                }
+                if self.key_value.text().trim().is_empty() {
+                    self.key_value.set_focus();
+                    return Err("Enter the new API key.".into());
+                }
                 keys.add(&self.key_name.text(), &self.key_value.text())?;
             } else {
                 let id = self
@@ -335,7 +343,11 @@ impl Ui {
                 self.key_name.set_text("");
                 self.worker.reload();
                 self.reload_keys();
-                self.status.set_text("Encrypted key collection saved.");
+                self.status.set_text(if action == 0 {
+                    "API key added, encrypted, and selected."
+                } else {
+                    "Encrypted key collection saved."
+                });
             }
             Err(e) => self.error(e),
         }
