@@ -44,6 +44,9 @@ impl Protection {
         Self::for_target(text, "")
     }
     pub fn for_target(text: &str, process: &str) -> Result<Self, String> {
+        Self::for_rich_target(text, process, "")
+    }
+    pub fn for_rich_target(text: &str, process: &str, html: &str) -> Result<Self, String> {
         let mut namespace = 0;
         while text.contains(&format!("__USC_LITERAL_{namespace}_")) {
             namespace += 1;
@@ -52,6 +55,15 @@ impl Protection {
         let mut output = String::with_capacity(text.len());
         let mut cursor = 0;
         let mut spans = Vec::new();
+        let editable: Vec<_> = crate::rich_links::editable_links(text, html)
+            .into_iter()
+            // A visible label may itself contain a key, path, or other protected literal.
+            .filter(|(whole, destination)| {
+                !LITERALS
+                    .is_match(&text[whole.0 + 1..destination.0 - 2])
+                    .unwrap_or(true)
+            })
+            .collect();
         for found in LITERALS.captures_iter(text) {
             let cap = found.map_err(|_| "Literal protection exceeded its work limit")?;
             let m = cap.get(0).unwrap();
@@ -59,12 +71,23 @@ impl Protection {
                 .into_iter()
                 .find(|n| cap.name(n).is_some())
                 .unwrap();
-            spans.push((m.start(), m.end(), kind));
+            let range = editable
+                .iter()
+                .find(|(whole, _)| whole.0 == m.start() && m.end() <= whole.1)
+                .map_or((m.start(), m.end()), |(_, destination)| *destination);
+            spans.push((range.0, range.1, kind));
         }
         spans.extend(
             crate::rich_links::literal_ranges(text)
                 .into_iter()
-                .map(|(start, end)| (start, end, "url")),
+                .map(|range| {
+                    editable
+                        .iter()
+                        .find(|(whole, _)| *whole == range)
+                        .map_or((range.0, range.1, "url"), |(_, destination)| {
+                            (destination.0, destination.1, "url")
+                        })
+                }),
         );
         let citation_ranges = if crate::t3::matches(process) {
             crate::t3::citation_ranges(text)
