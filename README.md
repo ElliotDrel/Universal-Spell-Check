@@ -10,6 +10,8 @@ For a JSON installation inventory, run `powershell -NoProfile -ExecutionPolicy B
 
 Silent installation launches the managed app when it is not already running. The correction verifier supports the published `0.13.4` desktop-probe command as well as the newer consolidated benchmark, and requires exactly one successful correction with a nonempty result.
 
+Setup has a two-minute deadline. During installation, startup reconciliation has up to ten seconds to finish. When Python is available, the verifier uses the approved log reader to match a running PID and its start time to the version logged by that process; the file version alone is not proof of the running version. Without Python, installation inventory still runs, but process-version and updater evidence remain incomplete and `verification_complete` stays false.
+
 Technical users can restart and update from PowerShell:
 
 ```powershell

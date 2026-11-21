@@ -42,7 +42,7 @@ and `response_download_ms` are WinHTTP callback intervals, not proven upload or 
 compare `request_ms` as a whole. A stage that never ran is `null`; zero is a measured value.
 On terminal request failure, measured request phase intervals are retained across attempts;
 unreached intervals stay `null`. `request_attempts` identifies how many attempts began, while
-`request_send_api_ms` and `request_send_completion_wait_ms` describe the terminal attempt.
+`request_native.send_api_ms` and `request_native.send_completion_wait_ms` describe the terminal attempt. `request_native.client_failed` includes transport, response-size and response-decoding failures; it does not classify them all as transport failures.
 Replay runs report `api_ms` as `null`. Failure `recovery_ms` is reported outside `total_ms`.
 
 ## Other events

@@ -51,6 +51,9 @@ pub fn startup(enabled: bool) -> Result<(), String> {
     if channel::IS_DEV {
         return Ok(());
     }
+    if enabled && !installed_production() {
+        return Err("Login startup requires an installed Production build.".into());
+    }
     unsafe {
         let mut key = null_mut();
         let status = RegCreateKeyExW(
@@ -96,12 +99,7 @@ pub fn startup(enabled: bool) -> Result<(), String> {
 }
 pub fn first_run(store: &Store) -> Result<(), String> {
     // A standalone or test executable must never become the login app.
-    if channel::IS_DEV
-        || velopack::locator::auto_locate_app_manifest(
-            velopack::locator::LocationContext::FromCurrentExe,
-        )
-        .is_err()
-    {
+    if !installed_production() {
         return Ok(());
     }
     let flag = store.directory.join("startup.initialized");
@@ -116,6 +114,20 @@ pub fn first_run(store: &Store) -> Result<(), String> {
     startup(true)?;
     fs::create_dir_all(&store.directory).map_err(|e| e.to_string())?;
     fs::write(flag, time::OffsetDateTime::now_utc().to_string()).map_err(|e| e.to_string())
+}
+fn installed_production() -> bool {
+    !channel::IS_DEV
+        && velopack::locator::auto_locate_app_manifest(
+            velopack::locator::LocationContext::FromCurrentExe,
+        )
+        .is_ok()
+}
+#[cfg(all(test, not(feature = "dev")))]
+#[test]
+fn standalone_settings_cannot_enable_login_startup() {
+    // Assert eligibility first so this regression test can never write the Run key.
+    assert!(!installed_production());
+    assert!(startup(true).unwrap_err().contains("installed Production"));
 }
 pub fn migrate(store: &Store) -> Result<(), String> {
     let base = std::env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA missing")?;

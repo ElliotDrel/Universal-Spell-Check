@@ -44,7 +44,7 @@ impl Updater {
         let queued = restart_queued.clone();
         let status = state.clone();
         thread::Builder::new().name("updates".into()).spawn(move||{
-            let (manager, unavailable)=if channel::IS_DEV {
+            let initialize=|| if channel::IS_DEV {
                 (None, "Updates are disabled in Dev.".to_string())
             } else {
                 match std::panic::catch_unwind(new_manager) {
@@ -58,10 +58,15 @@ impl Updater {
                     }
                 }
             };
+            let (mut manager, mut unavailable)=initialize();
             if manager.is_none() { *status.lock().unwrap_or_else(|p|p.into_inner())=unavailable.clone(); }
             let mut pending:Option<Box<UpdateInfo>>=None;
             loop{
                 let trigger=match rx.recv_timeout(Duration::from_secs(4*60*60)){Ok(trigger)=>trigger,Err(mpsc::RecvTimeoutError::Timeout)=>Trigger::Periodic,Err(_)=>break};active.store(true,Ordering::Release);
+                if manager.is_none() && !channel::IS_DEV && installed_layout() {
+                    (manager, unavailable)=initialize();
+                    if manager.is_none() { *status.lock().unwrap_or_else(|p|p.into_inner())=unavailable.clone(); }
+                }
                 let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||->Result<(),String>{
                     let Some(manager)=manager.as_ref()else{logger.event(format!("update_check_skipped trigger={trigger:?} reason=unavailable"));if matches!(trigger,Trigger::Restart){queued.store(false,Ordering::Release);}
 if matches!(trigger,Trigger::Manual | Trigger::Restart){bus.send(UiEvent::Notify("Updates unavailable".into(),unavailable.clone()));}return Ok(());};

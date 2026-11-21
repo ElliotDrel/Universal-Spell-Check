@@ -10,7 +10,7 @@ DPAPI and WinHTTP are direct Win32 calls. No webview or renderer is loaded.
 1. `VelopackApp::build().run()` must stay the first thing in `main`. Moving it breaks first-run hooks and restart-after-update. Implicit staged-package application is disabled so CLI forwarding cannot install before acknowledgement.
 2. Legacy-data migration runs before any logger or settings read. It is copy-only and checkpointed, merges same-day logs without duplicates, and never deletes the source. It exists because a reinstall once replaced the installer root and destroyed the log corpus stored there.
 3. A single-instance mutex per channel. A second launch exits. `--restart` (alias `--update`) instead forwards a channel-specific registered message to the running instance and exits once acknowledged; Dev rejects both flags.
-4. The hotkey is registered with `RegisterHotKey` (Ctrl+Alt+U Prod, Ctrl+Alt+D Dev). Start-on-login is a Settings toggle that writes the `HKCU\...\Run` key; Dev and standalone builds never register it. Installed Production reconciles an existing enabled entry on launch, including after migration; an absent entry remains an opt-out.
+4. The hotkey is registered with `RegisterHotKey` (Ctrl+Alt+U Prod, Ctrl+Alt+D Dev). Start-on-login is a Settings toggle that writes the `HKCU\...\Run` key; Dev and standalone builds never register it. The first installed Production launch enables startup and writes `startup.initialized`. Subsequent launches reconcile an existing enabled entry, including after migration; with that marker present, an absent entry remains an opt-out. Registration failures are logged and notified without stopping corrections.
 5. `--startup-smoke` builds the real tray and exits. CI runs it because processing tests cannot catch tray construction failures (a constructor-order crash once shipped and killed every launch).
 
 ## A correction (`Worker::run` in `runtime.rs`)
@@ -29,8 +29,7 @@ during a run logs `guard_rejected reason=already_running` and is dropped, never 
 9. **Finish**: on failure, restore the user's clipboard (only after the sequence changed). On success the corrected text stays on the clipboard. Then write `run_completed` and one `spellcheck_detail`.
 
 Unchanged text still pastes with its original rich fragment when the editor is unfamiliar.
-Overlay phases (`Copying text...`, `Correcting...`, `Pasting...`) are sent over the bus. The overlay hides as soon as the hot
-path returns, before any slow clipboard restore, so it never sticks after a failure.
+Overlay phases (`Copying text...`, `Correcting...`, `Pasting...`) are sent over the bus. On failure, clipboard recovery finishes before the completion phase hides the overlay.
 
 ## Traps that broke before
 
@@ -47,7 +46,7 @@ One `Updater` worker serializes every check: launch, every four hours, tray, das
 restart. Launch checks download and apply a newer release, then relaunch. Background and manual
 checks only prepare a verified download for the next restart. Restart applies a pending package
 (in memory or the SDK's cached one) before falling back to a plain restart, so a downloaded update
-still installs when the feed is unreachable. Dev and uninstalled builds skip updates
+still installs when the feed is unreachable. An installed app retries failed update-manager initialization on subsequent triggers. Dev and uninstalled builds skip updates
 (`update_check_skipped`). Releases come from `release.yml` on a version tag.
 
 ## Dashboard (`dashboard.rs`)

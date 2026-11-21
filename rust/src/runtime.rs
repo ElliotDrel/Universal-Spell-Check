@@ -365,7 +365,7 @@ fn run(started: Instant, context: RunContext<'_>) -> Result<(), String> {
                         "final_response_attempt":failure.attempts,
                         "send_api_ms":failure.send_api_ms,
                         "send_completion_wait_ms":failure.send_completion_wait_ms,
-                        "transport_failed":true,
+                        "client_failed":true,
                         "measured_total_ms":failure.total_ms
                     });
                     request_phases = Some((failure.send_ms, failure.wait_ms, failure.download_ms));

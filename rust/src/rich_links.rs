@@ -205,7 +205,12 @@ pub(crate) fn literal_ranges(text: &str) -> Vec<(usize, usize)> {
 /// Only a uniquely matched copied web-link chip makes its label editable. Plain Markdown,
 /// reference chips, and ambiguous occurrences retain whole-link protection.
 pub(crate) fn editable_links(text: &str, html: &str) -> Vec<((usize, usize), (usize, usize))> {
-    if !html.contains("text-link-href") || html.len().saturating_add(text.len()) > 2_000_000 {
+    if html.len().saturating_add(text.len()) > 2_000_000
+        || !html
+            .as_bytes()
+            .windows(b"text-link-href".len())
+            .any(|marker| marker.eq_ignore_ascii_case(b"text-link-href"))
+    {
         return Vec::new();
     }
     let Some(nodes) = linked_nodes(html) else {
@@ -347,6 +352,13 @@ mod tests {
             Some("<p>A <a href=\"https://example.com/acceptance\"><span>link</span></a>.</p>")
         );
         assert_eq!(result.text, "A link.");
+        for attribute in ["TEXT-LINK-HREF", "Text-Link-Href"] {
+            let mixed = html.replace("text-link-href", attribute);
+            let protected =
+                crate::core::Protection::for_rich_target(source, "chrome", &mixed).unwrap();
+            assert!(protected.text.contains("[lnik]("));
+            assert!(!protected.text.contains("https://"));
+        }
         // Unmatched and repeated destinations remain complete protected links.
         for input in [
             source.replace("acceptance", "other"),
