@@ -70,7 +70,7 @@ try {
                 # Explicit dates include long-running processes and startup across midnight.
                 $rows = & $python.Source $reader --event started --channel prod --from $processStart.ToString('yyyy-MM-dd') --to $processStart.AddDays(1).ToString('yyyy-MM-dd') --json 2>$null
                 if ($LASTEXITCODE -eq 0) {
-                    $started = @($rows | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.pid -eq $process.Id -and [DateTimeOffset]::Parse($_.ts).UtcDateTime -ge $processStart.ToUniversalTime().AddSeconds(-1) } | Select-Object -Last 1)
+                    $started = @($rows | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.pid -eq $process.Id -and [DateTimeOffset]::Parse($_.ts).UtcDateTime -ge $processStart.ToUniversalTime().AddSeconds(-1) -and [DateTimeOffset]::Parse($_.ts).UtcDateTime -le [DateTime]::UtcNow } | Select-Object -Last 1)
                 }
                 if ($started.Count -or -not $Install -or $kind -ne 'managed' -or [DateTime]::UtcNow -ge $evidenceDeadline) { break }
                 Start-Sleep -Milliseconds 200
