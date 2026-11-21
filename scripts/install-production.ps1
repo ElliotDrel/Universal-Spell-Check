@@ -28,7 +28,10 @@ try {
         # Silent setup does not guarantee that the resident app was launched.
         if (-not @(Get-Process -Name 'UniversalSpellCheck' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }).Count) {
             Start-Process -FilePath $exe -WindowStyle Hidden
-            Start-Sleep -Seconds 2
+            $launchDeadline = [DateTime]::UtcNow.AddSeconds(10)
+            while (-not @(Get-Process -Name 'UniversalSpellCheck' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }).Count -and [DateTime]::UtcNow -lt $launchDeadline) {
+                Start-Sleep -Milliseconds 200
+            }
         }
     }
     if (Test-Path -LiteralPath $exe) { $result.managed_path = $exe; $result.managed_version = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion }
