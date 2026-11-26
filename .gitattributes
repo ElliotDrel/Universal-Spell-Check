@@ -1,3 +1,8 @@
+# Line endings: LF in the repo and on disk on every OS; Windows batch files need CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 rust/vendor/** -whitespace
 bench/records/** text eol=lf
 bench/records/2026-10-desktop-latency/settlement/workload/* -text
