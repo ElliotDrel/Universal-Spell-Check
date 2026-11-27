@@ -36,7 +36,8 @@ Untitled-*.md
 
 # Local tooling state
 .gstack/
-.claude/
+/.claude/*
+!/.claude/skills
 .dotnet/
 
 # Generated runs and datasets (kept local, never committed)
